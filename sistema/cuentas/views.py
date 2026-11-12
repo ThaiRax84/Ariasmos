@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -44,10 +45,11 @@ def _completar_inicio(request, usuario):
     servicios.reiniciar_intentos(usuario)
     login(request, usuario, backend="django.contrib.auth.backends.ModelBackend")
     request.session["ultima_actividad"] = timezone.now().timestamp()
+    servicios.ligar_sesion(request)
     servicios.marcar_reingreso(request)
     registrar("inicio_sesion", usuario=usuario, objeto=usuario, datos={"dispositivo": request.dispositivo.pk if request.dispositivo else None}, request=request)
-    if servicios.por_revisar(usuario).exists():
-        messages.warning(request, "Se usaron códigos tuyos para autorizar solicitudes. Revísalos.")
+    if servicios.tiene_avisos(usuario):
+        messages.warning(request, "Hay avisos sobre tu código de autorización. Revísalos.")
         return redirect("autorizaciones")
     return redirect(_destino_seguro(request, siguiente))
 
@@ -59,11 +61,11 @@ def entrar(request):
     if request.method == "GET" and request.GET.get("siguiente"):
         request.session["siguiente_tras_entrar"] = request.GET["siguiente"]
     if request.method == "POST":
-        if servicios.limite_ip_superado(request):
+        if servicios.limite_intentos_superado(request):
             registrar("inicio_sesion_limitado", request=request)
             messages.error(request, "Demasiados intentos desde este equipo. Espera unos minutos.")
             return render(request, "cuentas/entrar.html", {"formulario": formulario}, status=429)
-        servicios.contar_intento_ip(request)
+        servicios.contar_intento(request)
         if formulario.is_valid():
             usuario = Usuario.objects.filter(usuario__iexact=formulario.cleaned_data["usuario"]).first()
             if usuario is None:
@@ -94,10 +96,10 @@ def entrar_codigo(request):
     usuario = get_object_or_404(Usuario, pk=pendiente, activo=True)
     formulario = FormularioCodigo(request.POST if request.method == "POST" else None)
     if request.method == "POST":
-        if servicios.limite_ip_superado(request):
+        if servicios.limite_intentos_superado(request):
             messages.error(request, "Demasiados intentos desde este equipo. Espera unos minutos.")
             return render(request, "cuentas/entrar_codigo.html", {"formulario": formulario}, status=429)
-        servicios.contar_intento_ip(request)
+        servicios.contar_intento(request)
         if formulario.is_valid():
             if usuario.esta_bloqueado():
                 request.session.pop("pendiente_codigo", None)
@@ -173,6 +175,7 @@ def cambiar_contrasena(request):
         request.user.save(update_fields=["password"])
         login(request, request.user, backend="django.contrib.auth.backends.ModelBackend")
         request.session["ultima_actividad"] = timezone.now().timestamp()
+        servicios.ligar_sesion(request)
         registrar("contrasena_cambiada", usuario=request.user, objeto=request.user, request=request)
         messages.success(request, "Contraseña actualizada.")
         return redirect("inicio")
@@ -182,7 +185,18 @@ def cambiar_contrasena(request):
 @requiere_sesion
 def autorizaciones(request):
     codigos = CodigoUsado.objects.filter(autorizador=request.user, proposito=CodigoUsado.AUTORIZACION).select_related("usado_por", "solicitud__titular")[:100]
-    return render(request, "cuentas/autorizaciones.html", {"codigos": codigos})
+    bloqueos = servicios.avisos_pendientes(request.user).select_related("capturista", "solicitud__titular")
+    return render(request, "cuentas/autorizaciones.html", {"codigos": codigos, "bloqueos": bloqueos})
+
+
+@requiere_sesion
+@require_POST
+def aviso_enterado(request, pk):
+    aviso = get_object_or_404(servicios.avisos_pendientes(request.user), pk=pk)
+    aviso.visto = True
+    aviso.save(update_fields=["visto"])
+    registrar("aviso_codigo_enterado", usuario=request.user, objeto=aviso, datos={"capturista": aviso.capturista_id}, request=request)
+    return redirect("autorizaciones")
 
 
 @requiere_sesion
@@ -221,6 +235,11 @@ def usuario_nuevo(request):
     formulario = FormularioUsuarioNuevo(request.POST if request.method == "POST" else None)
     if request.method == "POST" and formulario.is_valid():
         datos = formulario.cleaned_data
+        exceso = servicios.permisos_que_exceden(request.user, datos["rol"].permisos())
+        if exceso:
+            servicios.rechazar_escalada(request.user, request, "crear_usuario_con_rol_superior", datos["rol"], exceso)
+            messages.error(request, "No puedes crear un usuario con un rol que tiene permisos que tú no tienes.")
+            return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Nuevo usuario", "boton": "Crear usuario", "volver": "usuarios"}, status=403)
         nuevo = Usuario.objects.create_user(datos["usuario"], datos["contrasena1"], nombre=datos["nombre"], rol=datos["rol"])
         registrar("usuario_creado", usuario=request.user, objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": nuevo.rol_id}, request=request)
         messages.success(request, f"Usuario {nuevo.usuario} creado.")
@@ -231,9 +250,19 @@ def usuario_nuevo(request):
 @requiere_permiso("administrar_usuarios", reingreso=True)
 def usuario_editar(request, pk):
     objetivo = get_object_or_404(Usuario, pk=pk)
+    exceso = servicios.permisos_que_exceden(request.user, objetivo.permisos_de_rol())
+    if exceso:
+        servicios.rechazar_escalada(request.user, request, "editar_usuario_superior", objetivo, exceso)
+        raise PermissionDenied
     antes = {"nombre": objetivo.nombre, "rol": objetivo.rol_id, "activo": objetivo.activo}
     formulario = FormularioUsuarioEditar(request.POST if request.method == "POST" else None, instance=objetivo)
     if request.method == "POST" and formulario.is_valid():
+        rol_nuevo = formulario.cleaned_data.get("rol")
+        exceso = servicios.permisos_que_exceden(request.user, rol_nuevo.permisos() if rol_nuevo else set())
+        if exceso:
+            servicios.rechazar_escalada(request.user, request, "asignar_rol_superior", objetivo, exceso)
+            messages.error(request, "No puedes asignar un rol con permisos que tú no tienes.")
+            return redirect("usuario_editar", pk=pk)
         with transaction.atomic():
             cambiado = formulario.save(commit=False)
             datos = formulario.cleaned_data
@@ -276,10 +305,20 @@ def roles(request):
 
 
 def _guardar_rol(request, rol=None):
+    if rol is not None:
+        exceso = servicios.permisos_que_exceden(request.user, rol.permisos())
+        if exceso:
+            servicios.rechazar_escalada(request.user, request, "editar_rol_superior", rol, exceso)
+            raise PermissionDenied
     formulario = FormularioRol(request.POST if request.method == "POST" else None, instance=rol)
     if request.method == "POST" and formulario.is_valid():
         antes = sorted(rol.permisos()) if rol else []
         nuevos = set(formulario.cleaned_data["permisos"])
+        exceso = servicios.permisos_que_exceden(request.user, nuevos)
+        if exceso:
+            servicios.rechazar_escalada(request.user, request, "otorgar_permisos_a_rol", rol, exceso)
+            messages.error(request, "No puedes dar a un rol permisos que tú no tienes.")
+            return redirect("rol_editar", pk=rol.pk) if rol else redirect("rol_nuevo")
         with transaction.atomic():
             guardado = formulario.save()
             if rol is not None and not servicios.quedan_administradores(rol_modificado=guardado, permisos_nuevos=nuevos):
@@ -329,6 +368,15 @@ def dispositivo_aprobar(request, pk):
         messages.success(request, f"Equipo {dispositivo.codigo} aprobado.")
     else:
         messages.error(request, "Escribe un nombre para el equipo.")
+    return redirect("dispositivos")
+
+
+@requiere_permiso("aprobar_dispositivos")
+@require_POST
+def dispositivos_descartar(request):
+    descartados = Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).delete()[0]
+    registrar("dispositivos_descartados", usuario=request.user, datos={"cantidad": descartados}, request=request)
+    messages.success(request, f"Se descartaron {descartados} equipos pendientes.")
     return redirect("dispositivos")
 
 

@@ -2,6 +2,7 @@ import hashlib
 import secrets
 from datetime import timedelta
 
+from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
@@ -11,6 +12,7 @@ from django.utils import timezone
 from auditoria.servicios import registrar
 from configuracion.models import parametro
 from nucleo import totp
+from proyecto.red import ip_cliente
 
 from .models import CodigoUsado, Delegacion, Dispositivo, Usuario
 from .permisos import INDISPENSABLES
@@ -28,14 +30,26 @@ def buscar_dispositivo(credencial):
     return Dispositivo.objects.filter(hash_credencial=hash_credencial(credencial)).first()
 
 
+def depurar_pendientes():
+    limite = timezone.now() - timedelta(hours=24)
+    return Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE, creado__lt=limite).delete()[0]
+
+
+def hay_cupo_pendientes():
+    depurar_pendientes()
+    return Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() < parametro("maximo_equipos_pendientes")
+
+
 def registrar_dispositivo(request):
+    if not hay_cupo_pendientes():
+        return None, None
     credencial = secrets.token_urlsafe(32)
     codigo = "".join(secrets.choice(ALFABETO_CODIGO) for _ in range(6))
     dispositivo = Dispositivo.objects.create(
         hash_credencial=hash_credencial(credencial),
         codigo=codigo,
         agente=request.META.get("HTTP_USER_AGENT", "")[:300],
-        ip=request.META.get("REMOTE_ADDR", "")[:45],
+        ip=ip_cliente(request)[:45],
     )
     return credencial, dispositivo
 
@@ -119,14 +133,19 @@ def usar_delegacion(usuario, permiso, request=None, contexto=None):
     return None
 
 
-def limite_ip_superado(request):
-    clave = f"intentos-ip:{request.META.get('REMOTE_ADDR', '')}"
-    intentos = cache.get(clave, 0)
-    return intentos >= parametro("intentos_por_ip_cada_5_minutos")
+def _clave_intentos(request):
+    dispositivo = getattr(request, "dispositivo", None)
+    if dispositivo is not None:
+        return f"intentos-equipo:{dispositivo.pk}"
+    return f"intentos-ip:{ip_cliente(request)}"
 
 
-def contar_intento_ip(request):
-    clave = f"intentos-ip:{request.META.get('REMOTE_ADDR', '')}"
+def limite_intentos_superado(request):
+    return cache.get(_clave_intentos(request), 0) >= parametro("intentos_por_equipo_cada_5_minutos")
+
+
+def contar_intento(request):
+    clave = _clave_intentos(request)
     if not cache.add(clave, 1, 300):
         try:
             cache.incr(clave)
@@ -188,3 +207,29 @@ def quedan_administradores(excluir_usuario=None, rol_modificado=None, permisos_n
 
 def por_revisar(usuario):
     return CodigoUsado.objects.filter(autorizador=usuario, revision=CodigoUsado.POR_REVISAR)
+
+
+def permisos_que_exceden(actor, permisos):
+    return set(permisos) - actor.permisos_de_rol()
+
+
+def rechazar_escalada(actor, request, motivo, objeto=None, exceso=()):
+    registrar("escalada_rechazada", usuario=actor, objeto=objeto, datos={"motivo": motivo, "permisos": sorted(exceso)}, request=request)
+
+
+def avisos_pendientes(usuario):
+    intentos = apps.get_model("solicitudes", "IntentoCodigo")
+    return intentos.objects.filter(autorizador=usuario, tipo="bloqueo", visto=False)
+
+
+def tiene_avisos(usuario):
+    return por_revisar(usuario).exists() or avisos_pendientes(usuario).exists()
+
+
+CLAVE_SESION_EQUIPO = "dispositivo_id"
+
+
+def ligar_sesion(request):
+    dispositivo = getattr(request, "dispositivo", None)
+    if dispositivo is not None:
+        request.session[CLAVE_SESION_EQUIPO] = dispositivo.pk

@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from auditoria.servicios import registrar
 
-from .servicios import buscar_dispositivo, poner_cookie_dispositivo, registrar_dispositivo
+from .servicios import CLAVE_SESION_EQUIPO, buscar_dispositivo, poner_cookie_dispositivo, registrar_dispositivo
 
 LIBRES_DISPOSITIVO = ("/static/", "/dispositivo/", "/asistente/")
 LIBRES_TOTP = ("/static/", "/cuentas/totp/", "/cuentas/salir/", "/dispositivo/")
@@ -25,6 +25,10 @@ class ControlDispositivo:
         nueva = None
         if dispositivo is None:
             nueva, dispositivo = registrar_dispositivo(request)
+            if dispositivo is None:
+                if request.user.is_authenticated:
+                    logout(request)
+                return render(request, "cuentas/dispositivo_pendiente.html", {"dispositivo": None, "sin_cupo": True}, status=403)
         request.dispositivo = dispositivo
         if dispositivo.aprobado:
             ahora = timezone.now()
@@ -48,6 +52,14 @@ class ControlSesion:
     def __call__(self, request):
         usuario = request.user
         if usuario.is_authenticated and not request.path.startswith("/static/"):
+            equipo = request.session.get(CLAVE_SESION_EQUIPO)
+            actual = request.dispositivo.pk if getattr(request, "dispositivo", None) is not None else None
+            if equipo is None and actual is not None:
+                request.session[CLAVE_SESION_EQUIPO] = actual
+            elif equipo is not None and equipo != actual:
+                registrar("sesion_en_otro_equipo", usuario=usuario, datos={"equipo_sesion": equipo, "equipo_actual": actual}, request=request)
+                logout(request)
+                return redirect("entrar")
             ahora = timezone.now().timestamp()
             minutos = usuario.rol.minutos_inactividad if usuario.rol_id else 15
             ultima = request.session.get("ultima_actividad")

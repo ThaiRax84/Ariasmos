@@ -156,6 +156,7 @@ def codigo(request):
             request.session.pop(CLAVE_SESION, None)
             login(request, nuevo, backend="django.contrib.auth.backends.ModelBackend")
             request.session["ultima_actividad"] = timezone.now().timestamp()
+            cuentas_servicios.ligar_sesion(request)
             cuentas_servicios.marcar_reingreso(request)
             registrar("inicio_sesion", usuario=nuevo, objeto=nuevo, request=request)
             messages.success(request, "Instalación lista.")
