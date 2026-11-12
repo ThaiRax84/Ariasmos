@@ -1,3 +1,5 @@
+from django.conf import settings
+
 POLITICA_CONTENIDO = "; ".join(
     [
         "default-src 'self'",
@@ -12,6 +14,20 @@ POLITICA_CONTENIDO = "; ".join(
         "frame-ancestors 'none'",
     ]
 )
+
+
+CABECERAS_DE_PROXY = ("HTTP_X_FORWARDED_FOR", "HTTP_X_FORWARDED_PROTO", "HTTP_X_FORWARDED_HOST", "HTTP_X_FORWARDED_PORT", "HTTP_FORWARDED")
+
+
+class CabecerasProxy:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.META.get("REMOTE_ADDR", "") not in getattr(settings, "PROXIES_CONFIABLES", ()):
+            for cabecera in CABECERAS_DE_PROXY:
+                request.META.pop(cabecera, None)
+        return self.get_response(request)
 
 
 class CabecerasSeguridad:

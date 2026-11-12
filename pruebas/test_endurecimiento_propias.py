@@ -5,7 +5,7 @@ from datetime import timedelta
 import pytest
 from django.conf import settings
 from django.core.cache import cache
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -183,3 +183,13 @@ def test_hsts_y_proxies_con_https(tmp_path, monkeypatch):
     instancia.reemplazar(dict(datos, https=False))
     assert not hasattr(ajustes_frescos(), "SECURE_HSTS_SECONDS")
     sys.modules.pop("proyecto.ajustes", None)
+
+
+def test_cabeceras_de_proxy_solo_desde_proxies_confiables(personas):
+    with override_settings(SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"), SECURE_HSTS_SECONDS=31536000):
+        confiable = cliente(personas["op"]).get(reverse("inicio"), HTTP_X_FORWARDED_PROTO="https")
+        assert confiable.headers.get("Strict-Transport-Security") == "max-age=31536000"
+        externo = Client(REMOTE_ADDR="10.0.0.5")
+        externo.cookies[settings.COOKIE_DISPOSITIVO] = equipo_aprobado()
+        respuesta = externo.get(reverse("entrar"), HTTP_X_FORWARDED_PROTO="https")
+        assert "Strict-Transport-Security" not in respuesta.headers

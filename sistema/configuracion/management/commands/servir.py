@@ -20,4 +20,5 @@ class Command(BaseCommand):
             port=opciones["puerto"],
             threads=opciones["hilos"],
             ident="servidor",
+            clear_untrusted_proxy_headers=False,
         )

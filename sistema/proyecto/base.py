@@ -21,6 +21,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "proyecto.seguridad.CabecerasProxy",
     "django.middleware.security.SecurityMiddleware",
     "proyecto.seguridad.CabecerasSeguridad",
     "django.contrib.sessions.middleware.SessionMiddleware",
