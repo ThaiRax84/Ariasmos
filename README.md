@@ -44,10 +44,16 @@ Para usar otra carpeta de instancia, define la variable de entorno `COBRO_INSTAN
 ## Primer uso
 
 1. Abre `http://localhost:8000/` en el navegador del servidor. Te lleva al asistente.
-2. Captura el token, el nombre del negocio, la plantilla (`escuela` o `generico`), los importes, el primer usuario de Dirección y activa su autenticador (cualquier app TOTP; la clave se muestra como texto y como enlace `otpauth://`).
+2. Captura el token, el nombre del negocio y la plantilla: `generico` (sirve tal cual a la mayoría de negocios con clientes recurrentes), `escuela` o un archivo de plantilla propio. Puedes usarla tal cual o cambiar vocabulario y conceptos; luego captura importes, los **datos de pago** (CLABE, beneficiario, medios aceptados; se puede omitir y completar después en *Configuración → Datos de pago*), el primer usuario de Dirección y activa su autenticador (cualquier app TOTP; la clave se muestra como texto y como enlace `otpauth://`).
 3. Al terminar, ese navegador queda como el primer equipo aprobado.
 
 Cada navegador nuevo queda **pendiente** y muestra un código; Supervisión o Dirección lo aprueba en *Equipos*, donde también puede descartar los pendientes. Los pendientes de más de 24 horas se depuran solos y hay un tope de pendientes configurable. Desde la consola del servidor también se puede aprobar: `python manage.py aprobar_dispositivo CODIGO --nombre "Caja 1"`.
+
+## Datos de pago y plantillas
+
+- La ficha de pago se arma sola con la cuenta bancaria principal: banco, CLABE agrupada, beneficiario, medios aceptados y la indicación de dónde escribir la matrícula. La CLABE se valida y el banco se reconoce por sus tres primeros dígitos con el catálogo de `datos/bancos.json`, que se carga solo al migrar (o con `python manage.py cargar_bancos`).
+- *Configuración → Guardar configuración como plantilla* descarga un JSON con vocabulario, roles, políticas, catálogos y conceptos, sin importes, cuentas, usuarios ni datos de personas. Ese archivo se puede importar en el asistente de otra instalación; se valida contra un esquema estricto (máximo 256 KB).
+- La longitud de la matrícula (7), la sede (0) y las ranuras (10) no se preguntan en el asistente: están en *Configuración → Ajustes avanzados* y solo se pueden cambiar antes de emitir la primera matrícula.
 
 ## Cuentas de usuario
 
@@ -89,5 +95,10 @@ Se corren desde la raíz del repositorio. No necesitan `instancia/`.
 | `inicializar` | Crea `instancia/` con claves aleatorias |
 | `servir` | Servidor de producción (waitress) |
 | `aprobar_dispositivo CODIGO` | Aprueba un equipo desde el servidor |
+| `cargar_bancos` | Carga o actualiza el catálogo de bancos sin borrar ni duplicar |
 | `verificar_auditoria` | Verifica la cadena de hashes de la auditoría |
 | `demostracion` | Configura una instalación de prueba |
+
+## Licencia
+
+Este programa es propietario: todos los derechos reservados. Consulta el archivo [`LICENSE`](LICENSE).
