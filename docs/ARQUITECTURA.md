@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.1 · 12/11/2026 · Estado: base aprobada para construir la Fase 1.
+Versión 0.2 · 12/11/2026 · Estado: base aprobada para construir la Fase 1.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -106,7 +106,7 @@ Módulos (apps de Django) y entidades principales:
 | `nucleo` | — | Matrícula, dinero, cadena de auditoría. Python puro, sin Django. |
 | `configuracion` | Negocio, Parametro, Vocabulario | Un solo negocio por instalación; `sede` y `ranuras`. |
 | `cuentas` | Usuario, Rol, PermisoRol, Dispositivo, Delegacion, CodigoUsado | §6. |
-| `titulares` | Titular, Contacto, Agrupacion, MotivoBaja | Estados: `pendiente`, `activo`, `baja`, `rechazado`. |
+| `titulares` | Titular, Contacto, CampoContacto, Agrupacion, MotivoBaja | Estados: `pendiente`, `activo`, `baja`, `rechazado`. Contacto en §5.2. |
 | `solicitudes` | Solicitud, PoliticaAccion | Motor genérico de aprobación. |
 | `cobros` | ConceptoCobro, ReglaRecargo, PlanCobro, Cargo, Pago, Aplicacion, Recibo | Libro inmutable. |
 | `caja` | Caja, Turno, Arqueo, Traslado | Custodia del efectivo. |
@@ -129,7 +129,18 @@ Orden de aplicación por defecto (configurable): recargos, luego cargos por venc
 
 Nada se edita ni se borra: una cancelación crea el asiento inverso y deja ambos visibles.
 
-### 5.2 Plantilla «escuela»
+### 5.2 Contacto
+
+Cada titular tiene al menos un **Contacto**: nombre, relación con el titular (catálogo configurable; puede ser «el mismo titular»), y los datos que el negocio decida pedir.
+
+- Los **campos de contacto** se definen en configuración: tipo (`telefono`, `correo`, `texto`), etiqueta, si es obligatorio en el alta y si es el medio principal para avisos.
+- El teléfono se guarda normalizado (solo dígitos, con el prefijo de país configurado; 10 dígitos nacionales por defecto) y se valida al capturar.
+- Un titular puede tener varios contactos; uno se marca como principal y es el que aparece en la ficha y en la cobranza.
+- Ver contactos requiere el permiso de ver titulares; editarlos queda en auditoría. Los destinos de reporte con detalle `sin_nombres` nunca incluyen datos de contacto.
+
+La plantilla «escuela» pide un contacto responsable con **teléfono obligatorio**.
+
+### 5.3 Plantilla «escuela»
 
 Viene en `plantillas/escuela.json` y el asistente la carga si se elige:
 
@@ -247,7 +258,7 @@ Un **corte** es una definición configurable: nombre, frecuencia, alcance, si ci
 
 Flujo: el sistema genera el corte solo en la fecha indicada y lo deja como borrador. Supervisión lo revisa y lo cierra con un clic. Si nadie lo cierra en el plazo configurado, se entrega marcado «sin revisar» para no detener a nadie. Al cerrar un corte que cierra periodo, ese periodo queda bloqueado: los ajustes posteriores entran en el periodo siguiente.
 
-**Destinos** (enchufables): `carpeta` (PDF + CSV + JSON con un `manifiesto.json`), y `correo` más adelante. Cada destino define su nivel de detalle (`completo`, `sin_nombres`). Un agente externo puede leer la carpeta; el sistema no depende de ningún agente.
+**Destinos** (enchufables): `carpeta` (PDF + CSV + JSON con un `manifiesto.json`; la ruta se elige en el asistente y se puede cambiar después), y `correo` más adelante. Cada destino define su nivel de detalle (`completo`, `sin_nombres`). Un agente externo puede leer la carpeta; el sistema no depende de ningún agente.
 
 Cada archivo de corte lleva un hash firmado con la clave de la instalación para detectar alteraciones.
 
