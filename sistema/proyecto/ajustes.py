@@ -1,0 +1,35 @@
+import sys
+
+from django.core.exceptions import ImproperlyConfigured
+
+from . import instancia
+from .base import *
+from .base import base_de_datos
+
+_datos = instancia.leer()
+
+if _datos is None:
+    if "inicializar" not in sys.argv:
+        raise ImproperlyConfigured(
+            f"No existe {instancia.ruta_archivo()}. Ejecuta: python manage.py inicializar"
+        )
+    SECRET_KEY = "sin-instancia"
+    CLAVE_MATRICULA = b""
+    DATABASES = base_de_datos(":memory:")
+    ALLOWED_HOSTS = []
+else:
+    SECRET_KEY = _datos["clave_django"]
+    CLAVE_MATRICULA = bytes.fromhex(_datos["clave_matricula"])
+    DATABASES = base_de_datos(_datos["base_datos"])
+    ALLOWED_HOSTS = list(_datos.get("hosts", []))
+    CSRF_TRUSTED_ORIGINS = list(_datos.get("origenes_confiables", []))
+    TOKEN_ASISTENTE_HASH = _datos.get("token_asistente_hash", "")
+    if _datos.get("https", True):
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+        COOKIE_DISPOSITIVO_SEGURA = True
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    else:
+        SESSION_COOKIE_SECURE = False
+        CSRF_COOKIE_SECURE = False
+        COOKIE_DISPOSITIVO_SEGURA = False
