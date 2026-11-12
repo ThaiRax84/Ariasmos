@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.3 · 12/11/2026 · Estado: base aprobada para construir la Fase 1.
+Versión 0.4 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -46,7 +46,7 @@ Dinero siempre en **centavos enteros**. Zona horaria configurable (por defecto `
 
 ### 4.1 Requisitos
 
-- Numérica y de **7 dígitos** por defecto, porque la referencia numérica de un SPEI admite hasta 7. Longitud configurable de 5 a 12 al instalar.
+- Numérica y de **7 dígitos**, porque la referencia numérica de un SPEI admite hasta 7. El asistente no pregunta la longitud; es un ajuste avanzado (5 a 12) que solo puede cambiarse antes de emitir la primera matrícula.
 - Única, nunca reutilizada, sin cero inicial (los bancos lo recortan).
 - Con dígito verificador que detecte los errores de captura comunes.
 - No secuencial: no revela cuántos titulares hay ni permite adivinar la siguiente.
@@ -110,7 +110,7 @@ Módulos (apps de Django) y entidades principales:
 | `solicitudes` | Solicitud, PoliticaAccion | Motor genérico de aprobación. |
 | `cobros` | ConceptoCobro, ReglaRecargo, PlanCobro, Cargo, Pago, Aplicacion, Recibo | Libro inmutable. |
 | `caja` | Caja, Turno, Arqueo, Traslado | Custodia del efectivo. |
-| `banco` | CuentaBancaria, Importacion, MovimientoBancario, ReglaPagador | Adaptadores de entrada. |
+| `banco` | CuentaBancaria, Banco, Importacion, MovimientoBancario, ReglaPagador | Datos de pago en §5.3; adaptadores de entrada en §8. |
 | `reportes` | DefinicionCorte, Corte, Destino | Frecuencias y destinos configurables. |
 | `auditoria` | Evento | Solo inserción, encadenado por hash. |
 | `respaldo` | Respaldo | Bitácora de copias y pruebas de restauración. |
@@ -140,7 +140,27 @@ Cada titular tiene al menos un **Contacto**: nombre, relación con el titular (c
 
 La plantilla «escuela» pide un contacto responsable con **teléfono obligatorio**.
 
-### 5.3 Plantilla «escuela»
+### 5.3 Datos de pago
+
+Lo que la ficha de pago le dice a quien paga sale de **campos**, no de un texto libre. Cada **CuentaBancaria** del negocio tiene:
+
+| Campo | Regla |
+|---|---|
+| Banco | Se elige del catálogo de bancos; se propone solo a partir de los tres primeros dígitos de la CLABE |
+| CLABE | 18 dígitos; se valida su dígito verificador y que su prefijo corresponda al banco elegido |
+| Beneficiario | Nombre del titular de la cuenta tal como lo pide el banco |
+| Número de cuenta | Opcional |
+| Convenio | Opcional, para cobranza referenciada |
+| Medios aceptados | Casillas: transferencia, depósito en ventanilla, efectivo en caja y los que el negocio agregue |
+| Dónde va la referencia | Casillas: referencia numérica, concepto o ambos (por defecto ambos) |
+| Contacto para dudas | Teléfono o correo |
+| Principal | Una sola cuenta aparece en la ficha por defecto |
+
+La ficha arma sola las instrucciones con esos campos y con la matrícula del titular. Un campo opcional de «nota adicional» queda para lo que no quepa en los anteriores.
+
+**Catálogo de bancos.** Viene dentro del programa (`datos/bancos.json`), no se consulta por internet: clave de tres dígitos, nombre y **nivel de soporte** para traer movimientos (`archivo verificado`, `archivo genérico`, `convenio`, `sin probar`). Cualquier banco que reciba SPEI sirve para identificar pagos por matrícula, porque la identificación la hace este sistema; lo que cambia de un banco a otro es el formato del archivo de movimientos. El catálogo se actualiza con cada versión.
+
+### 5.4 Plantilla «escuela»
 
 Viene en `plantillas/escuela.json` y el asistente la carga si se elige:
 
@@ -313,10 +333,17 @@ Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol
 
 ## 11. Configuración e instalación
 
-- **Asistente de primer uso:** nombre del negocio, vocabulario (cómo se llama al titular, a la matrícula, a las agrupaciones), plantilla, conceptos e importes, roles, políticas de aprobación, cajas, cuenta bancaria, cortes y destinos, respaldo. Crea al primer usuario de Dirección y aprueba el primer dispositivo.
+- **Asistente de primer uso:** nombre del negocio, vocabulario (cómo se llama al titular, a la matrícula, a las agrupaciones), plantilla, conceptos e importes, roles, políticas de aprobación, cajas, datos de pago, cortes y destinos, respaldo. Crea al primer usuario de Dirección y aprueba el primer dispositivo.
+- **Plantillas.** Una plantilla es la configuración completa sin datos: vocabulario, conceptos, recargos, roles y permisos, políticas, campos de contacto, cortes. El asistente ofrece:
+  - `generico`: pensada para servir tal cual a la mayoría de los negocios que cobran a clientes recurrentes;
+  - `escuela`;
+  - **importar** un archivo de plantilla;
+  - partir de cualquiera y **personalizar** cada parte antes de terminar.
+
+  Desde configuración, Dirección puede **guardar la configuración actual como plantilla** (un archivo) para usarla en otra sede o compartirla. Una plantilla importada se trata como dato no confiable: se valida contra un esquema y nunca contiene código, usuarios, claves ni datos de titulares.
 - **Todo editable después** por quien tenga el permiso: Supervisión administra conceptos de cobro; Dirección lo demás.
 - **Repo sin datos:** `instancia/`, bases, respaldos y documentos internos están en `.gitignore`. Descargar el repo da el motor, las plantillas y el asistente, nada más.
-- **Instalación en Windows:** script que crea el entorno, genera claves, registra los dos servicios (web y trabajador) con reinicio automático y abre el asistente.
+- **Instalación en Windows:** un **instalador `.exe`** que trae todo incluido (no hay que instalar Python). Instala el programa, genera las claves, registra los servicios de Windows (web, trabajador y TLS) con arranque automático y reinicio ante fallas, y abre el asistente. Los datos viven en una carpeta aparte del programa, de modo que actualizar con un instalador nuevo los conserva y hace un respaldo antes de migrar. Las demás computadoras no instalan nada: entran por el navegador. El instalador se compila de forma automática en el repo y se publica en sus versiones.
 
 ## 12. Estructura del repo
 
@@ -337,7 +364,8 @@ instancia/         (ignorada) claves, base, configuración local
 | 1 | Proyecto base, matrícula, usuarios, roles, dispositivos, titulares, solicitudes con las tres vías, conceptos de cobro, asistente, auditoría |
 | 2 | Cargos automáticos y recargos, pagos en efectivo, recibos, caja y traslados |
 | 3 | Importación bancaria, identificación y conciliación |
-| 4 | Cortes, destinos, respaldo, instalador y guías |
+| 4 | Cortes, destinos, respaldo, instalador `.exe` y guías |
+| 5 | Diseño de la interfaz, con el motor ya terminado |
 
 ## 14. Pendientes de decisión
 
