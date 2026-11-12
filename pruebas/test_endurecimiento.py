@@ -5,7 +5,7 @@ from django.test import Client
 from django.urls import reverse
 
 from auditoria.models import Evento
-from cuentas.models import Dispositivo, PermisoRol, Rol
+from cuentas.models import CodigoActivacion, Dispositivo, PermisoRol, Rol
 from cuentas.permisos import PERMISOS
 from solicitudes.models import Solicitud
 from titulares.models import CampoContacto, RelacionContacto
@@ -121,7 +121,7 @@ def test_nadie_se_asigna_un_rol_con_mas_permisos(personas, roles):
     c.post(reverse("usuario_editar", args=[personas["op"].pk]), {"nombre": "x", "rol": roles["Dirección"].pk, "activo": "on"})
     personas["op"].refresh_from_db()
     assert personas["op"].rol.nombre == "Operación"
-    c.post(reverse("usuario_nuevo"), {"usuario": "complice", "nombre": "Complice", "rol": roles["Dirección"].pk, "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    c.post(reverse("usuario_nuevo"), {"usuario": "complice", "nombre": "Complice", "rol": roles["Dirección"].pk})
     assert not roles["Dirección"].usuarios.filter(usuario="complice").exists()
 
 
@@ -132,10 +132,11 @@ def test_nadie_toma_la_cuenta_de_alguien_con_mas_permisos(personas, roles):
     secreto = direccion.totp_secreto
     c.post(
         reverse("usuario_editar", args=[direccion.pk]),
-        {"nombre": direccion.nombre, "rol": roles["Dirección"].pk, "activo": "on", "contrasena_nueva": "Otra-contrasena-2026", "reiniciar_totp": "on"},
+        {"nombre": direccion.nombre, "rol": roles["Dirección"].pk, "activo": "on", "restablecer_acceso": "on", "reiniciar_totp": "on"},
     )
     direccion.refresh_from_db()
     assert direccion.check_password(CONTRASENA)
+    assert not CodigoActivacion.objects.filter(usuario=direccion).exists()
     assert direccion.totp_secreto == secreto and direccion.totp_confirmado
     c.post(reverse("usuario_editar", args=[direccion.pk]), {"nombre": direccion.nombre, "rol": roles["Dirección"].pk})
     direccion.refresh_from_db()

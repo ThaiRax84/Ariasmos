@@ -12,7 +12,7 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "dispositivo_pendiente", "asistente:inicio", "asistente:conceptos", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:conceptos", "asistente:usuario", "asistente:codigo"}
 
 SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 

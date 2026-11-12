@@ -151,10 +151,10 @@ def test_permisos_delegados_no_cuentan_para_otorgar(personas, roles):
     aprobador = _rol("Aprobador", ["aprobar_solicitudes"])
     lectura = _rol("Lectura", ["ver_titulares"])
     c = cliente(limitado)
-    c.post(reverse("usuario_nuevo"), {"usuario": "nuevo1", "nombre": "N", "rol": aprobador.pk, "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    c.post(reverse("usuario_nuevo"), {"usuario": "nuevo1", "nombre": "N", "rol": aprobador.pk})
     assert not aprobador.usuarios.exists()
     assert Evento.objects.filter(accion="escalada_rechazada", datos__motivo="crear_usuario_con_rol_superior").exists()
-    c.post(reverse("usuario_nuevo"), {"usuario": "nuevo2", "nombre": "N", "rol": lectura.pk, "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    c.post(reverse("usuario_nuevo"), {"usuario": "nuevo2", "nombre": "N", "rol": lectura.pk})
     assert lectura.usuarios.filter(usuario="nuevo2").exists()
 
 
