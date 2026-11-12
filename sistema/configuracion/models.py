@@ -29,7 +29,7 @@ PARAMETROS = {
 
 class Negocio(models.Model):
     nombre = models.CharField(max_length=150)
-    instrucciones_pago = models.TextField(blank=True)
+    nota_ficha = models.TextField(blank=True)
     zona_horaria = models.CharField(max_length=64, default="America/Mexico_City")
     sede = models.PositiveSmallIntegerField(default=0)
     ranuras = models.PositiveSmallIntegerField(default=10)

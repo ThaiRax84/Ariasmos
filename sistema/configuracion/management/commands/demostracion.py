@@ -27,7 +27,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             Negocio.objects.update_or_create(
                 pk=1,
-                defaults={"nombre": "Negocio de demostración", "instrucciones_pago": "Instrucciones de pago de ejemplo.", "plantilla": opciones["plantilla"], "configurado": True},
+                defaults={"nombre": "Negocio de demostración", "plantilla": opciones["plantilla"], "configurado": True},
             )
             plantillas.cargar(opciones["plantilla"])
             roles = {rol.nivel: rol for rol in Rol.objects.all()}

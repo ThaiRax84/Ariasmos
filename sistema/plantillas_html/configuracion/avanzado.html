@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Ajustes avanzados de la {{ voc.matricula|lower }}</h1>
+<p>La {{ voc.matricula|lower }} tiene 7 dígitos porque es lo que admite la referencia numérica de una transferencia SPEI. La sede y las ranuras solo importan si varias instalaciones emiten {{ voc.matricula|lower }}s sin conectarse entre sí: cada una usa una sede distinta.</p>
+{% if bloqueado %}<p class="mensaje warning">Ya se emitieron {{ voc.matricula|lower }}s: estos ajustes quedaron fijos y no se pueden cambiar.</p>{% endif %}
+<form method="post" class="formulario angosto" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones">{% if not bloqueado %}<button class="boton" type="submit">Guardar</button>{% endif %}<a class="boton secundario" href="{% url 'configuracion:indice' %}">Volver</a></div>
+</form>
+{% endblock %}
