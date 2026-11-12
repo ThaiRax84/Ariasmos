@@ -14,7 +14,7 @@ ROLES = ("Operación", "Supervisión", "Dirección")
 
 PUBLICAS = {"entrar", "entrar_codigo", "dispositivo_pendiente", "asistente:inicio", "asistente:conceptos", "asistente:usuario", "asistente:codigo"}
 
-SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion"}
+SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -41,6 +41,7 @@ MATRIZ = {
     "rol_nuevo": ("administrar_roles",),
     "rol_editar": ("administrar_roles",),
     "dispositivos": ("aprobar_dispositivos",),
+    "dispositivos_descartar": ("aprobar_dispositivos",),
     "dispositivo_aprobar": ("aprobar_dispositivos",),
     "dispositivo_revocar": ("aprobar_dispositivos",),
     "delegaciones": ("otorgar_delegaciones",),
@@ -153,7 +154,7 @@ def test_matriz_url_por_rol(escenario, nombre):
             assert respuesta.status_code == 403, (nombre, nombre_rol, respuesta.status_code)
 
 
-@pytest.mark.parametrize("nombre", sorted(SOLO_SESION - {"revisar_autorizacion", "salir"}))
+@pytest.mark.parametrize("nombre", sorted(SOLO_SESION - {"revisar_autorizacion", "aviso_enterado", "salir"}))
 def test_rutas_de_sesion_piden_sesion(escenario, nombre):
     usuarios, _ = escenario
     respuesta = cliente().get(reverse(nombre))
