@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
-from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
@@ -12,7 +11,7 @@ from cuentas.models import CodigoUsado
 from cuentas.servicios import consumir_codigo, usar_delegacion
 from titulares.models import MotivoBaja, Titular
 
-from .models import PoliticaAccion, Solicitud
+from .models import IntentoCodigo, PoliticaAccion, Solicitud
 
 
 class ErrorSolicitud(Exception):
@@ -245,9 +244,10 @@ def autorizar_con_codigo(solicitud, capturista, autorizador, codigo, request=Non
     if not (autorizador.activo and autorizador.totp_confirmado and autorizador.tiene_permiso_de_rol(politica.permiso_aprobar)):
         registrar("codigo_rechazado", usuario=capturista, objeto=solicitud, datos={"autorizador": autorizador.pk, "motivo": "sin_facultad"}, request=request)
         raise ErrorSolicitud("Esa persona no puede autorizar esta solicitud.")
-    llave = f"codigos-solicitud:{solicitud.pk}"
-    if cache.get(llave, 0) >= parametro("intentos_codigo_por_solicitud"):
-        raise ErrorSolicitud("Demasiados códigos erróneos; la solicitud queda en la bandeja.")
+    bloqueo = motivo_de_bloqueo(capturista, autorizador, solicitud)
+    if bloqueo is not None:
+        _registrar_bloqueo(capturista, autorizador, solicitud, bloqueo, request)
+        raise ErrorSolicitud("Demasiados códigos erróneos; usa la bandeja o espera una hora.")
     with transaction.atomic():
         solicitud = Solicitud.objects.select_related("titular").get(pk=solicitud.pk)
         if solicitud.estado != Solicitud.PENDIENTE:
@@ -273,12 +273,35 @@ def autorizar_con_codigo(solicitud, capturista, autorizador, codigo, request=Non
                 request=request,
             )
             return solicitud
-    if not cache.add(llave, 1, 3600):
-        try:
-            cache.incr(llave)
-        except ValueError:
-            cache.set(llave, 1, 3600)
+    IntentoCodigo.objects.create(tipo=IntentoCodigo.FALLIDO, capturista=capturista, autorizador=autorizador, solicitud=solicitud, motivo=motivo)
     registrar("codigo_rechazado", usuario=capturista, objeto=solicitud, datos={"autorizador": autorizador.pk, "motivo": motivo}, request=request)
+    bloqueo = motivo_de_bloqueo(capturista, autorizador, solicitud)
+    if bloqueo is not None:
+        _registrar_bloqueo(capturista, autorizador, solicitud, bloqueo, request)
     if motivo == "reutilizado":
         raise ErrorSolicitud("Ese código ya se usó. Pide uno nuevo.")
     raise ErrorSolicitud("El código no es válido.")
+
+
+def motivo_de_bloqueo(capturista, autorizador, solicitud):
+    fallidos = IntentoCodigo.objects.filter(tipo=IntentoCodigo.FALLIDO)
+    recientes = fallidos.filter(momento__gte=timezone.now() - timedelta(hours=1))
+    limite = parametro("intentos_codigo_por_hora")
+    if recientes.filter(capturista=capturista).count() >= limite:
+        return "capturista"
+    if recientes.filter(autorizador=autorizador).count() >= limite:
+        return "autorizador"
+    if fallidos.filter(solicitud=solicitud).count() >= parametro("intentos_codigo_por_solicitud"):
+        return "solicitud"
+    return None
+
+
+def _registrar_bloqueo(capturista, autorizador, solicitud, motivo, request):
+    IntentoCodigo.objects.create(tipo=IntentoCodigo.BLOQUEO, capturista=capturista, autorizador=autorizador, solicitud=solicitud, motivo=motivo)
+    registrar(
+        "codigo_bloqueado",
+        usuario=capturista,
+        objeto=solicitud,
+        datos={"capturista": capturista.pk, "autorizador": autorizador.pk, "motivo": motivo},
+        request=request,
+    )

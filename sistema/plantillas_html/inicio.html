@@ -2,11 +2,12 @@
 {% load formato %}
 {% block contenido %}
 <h1>Hola, {{ user.nombre }}</h1>
-{% if por_revisar %}
+{% if por_revisar or bloqueos %}
 <section class="panel alerta">
-  <h2>Autorizaciones con tu código por revisar</h2>
-  <p>Se usaron códigos de tu autenticador para autorizar solicitudes. Confírmalas o repórtalas.</p>
-  <a class="boton" href="{% url 'autorizaciones' %}">Revisar ({{ por_revisar|length }})</a>
+  <h2>Avisos sobre tu código de autorización</h2>
+  {% if por_revisar %}<p>Se usaron códigos de tu autenticador para autorizar solicitudes. Confírmalas o repórtalas.</p>{% endif %}
+  {% if bloqueos %}<p>Alguien tecleó códigos erróneos a tu nombre y la vía de código quedó bloqueada.</p>{% endif %}
+  <a class="boton" href="{% url 'autorizaciones' %}">Revisar</a>
 </section>
 {% endif %}
 <div class="atajos">

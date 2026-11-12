@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block contenido %}
 <h1>Autorizaciones con mi código</h1>
+{% if bloqueos %}
+<section class="panel alerta">
+  <h2>Códigos erróneos a tu nombre</h2>
+  <ul class="lista">
+  {% for b in bloqueos %}
+    <li>{{ b.momento|date:"d/m/Y H:i" }} · {{ b.capturista }}{% if b.solicitud %} · {{ b.solicitud.get_accion_display }} de {{ b.solicitud.titular }}{% endif %} · la vía de código quedó bloqueada una hora
+      <form method="post" action="{% url 'aviso_enterado' b.pk %}" class="en-linea">{% csrf_token %}<button class="boton secundario" type="submit">Enterado</button></form></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% if codigos %}
 <table class="tabla">
 <thead><tr><th>Cuándo</th><th>Capturó</th><th>Solicitud</th><th>Estado</th><th></th></tr></thead>

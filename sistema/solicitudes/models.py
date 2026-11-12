@@ -66,3 +66,20 @@ class Solicitud(models.Model):
     def resaltada(self, politica=None):
         politica = politica or self.politica()
         return self.estado == self.PENDIENTE and timezone.now() - self.creada >= timedelta(hours=politica.horas_resaltar)
+
+
+class IntentoCodigo(models.Model):
+    FALLIDO = "fallido"
+    BLOQUEO = "bloqueo"
+    TIPOS = [(FALLIDO, "Código erróneo"), (BLOQUEO, "Vía de código bloqueada")]
+
+    tipo = models.CharField(max_length=10, choices=TIPOS)
+    capturista = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    autorizador = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="intentos_de_codigo")
+    solicitud = models.ForeignKey(Solicitud, null=True, blank=True, on_delete=models.PROTECT, related_name="intentos_de_codigo")
+    motivo = models.CharField(max_length=20, blank=True)
+    momento = models.DateTimeField(auto_now_add=True, db_index=True)
+    visto = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-momento"]
