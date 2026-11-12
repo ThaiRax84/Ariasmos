@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicios import registrar
-from configuracion.models import vocabulario
+from configuracion.models import parametro, vocabulario
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
 from solicitudes import motor
@@ -51,6 +51,11 @@ def nuevo(request):
         raise PermissionDenied
     formulario = FormularioAlta(request.POST if request.method == "POST" else None, voc=voc)
     if request.method == "POST" and formulario.is_valid():
+        limite = parametro("maximo_altas_pendientes_por_capturista")
+        if Titular.objects.filter(creado_por=request.user, estado=Titular.PENDIENTE).count() >= limite:
+            registrar("alta_rechazada_por_tope", usuario=request.user, datos={"limite": limite}, request=request)
+            formulario.add_error(None, f"Tienes {limite} altas pendientes de aprobación. Espera a que se resuelvan antes de capturar otra.")
+            return render(request, "titulares/nuevo.html", {"formulario": formulario}, status=429)
         with transaction.atomic():
             titular = crear_titular(
                 request.user,
