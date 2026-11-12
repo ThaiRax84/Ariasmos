@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.5 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.6 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -150,14 +150,13 @@ La plantilla «escuela» pide un contacto responsable con **teléfono obligatori
 
 ### 5.3 Familias
 
-Una **familia** (nombre configurable; en la plantilla genérica, «cuenta») agrupa a varios titulares que paga la misma persona.
+Una **familia** (nombre configurable; en la plantilla genérica, «cuenta») liga a varios titulares que paga la misma persona.
 
+- Cada titular se da de alta por separado y conserva **su propia matrícula**. La familia no tiene matrícula: es solo el vínculo entre titulares ya existentes.
 - Tiene un contacto responsable, compartido por sus miembros, y un **estado de cuenta único** que suma los cargos de todos.
-- Tiene su **propia matrícula**, emitida por el mismo generador y el mismo contador que las de los titulares, por lo que nunca coincide con ninguna otra. Sirve para pagar todo con una sola transferencia.
-- Reparto de un pago:
-  - con la **matrícula de la familia**: se aplica a los cargos de todos sus miembros en el orden de §5.1 (recargos, luego vencimiento más antiguo, luego prioridad);
-  - con la **matrícula de un titular**: primero a sus cargos; lo que sobre pasa a los cargos de sus hermanos en el mismo orden, y solo si no queda nada pendiente en la familia se guarda como saldo a favor de la familia.
-- Un titular pertenece a lo sumo a una familia. Asignarla en el alta se aprueba junto con el alta; cambiarla después es una acción del motor de aprobaciones (`cambio_familia`), porque cambia a dónde va el dinero.
+- Reparto de un pago hecho con la matrícula de cualquier miembro: primero a los cargos de ese titular, en el orden de §5.1; lo que sobre pasa solo a los cargos pendientes de los demás miembros, en el mismo orden (recargos, luego vencimiento más antiguo, luego prioridad); y solo si no queda nada pendiente en la familia se guarda como saldo a favor de la familia, que se usa en el siguiente cargo de cualquiera de ellos.
+- Un titular pertenece a lo sumo a una familia. Ligar, cambiar o desligar es una acción del motor de aprobaciones (`cambio_familia`), porque cambia a dónde va el dinero que sobra: Supervisión lo hace directo y Operación lo solicita.
+- Desligar no mueve pagos ya aplicados; el saldo a favor de la familia se reparte según indique quien aprueba.
 - Un titular sin familia funciona exactamente igual que antes.
 
 ### 5.4 Datos de pago
@@ -370,7 +369,7 @@ Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol
 
   Desde configuración, Dirección puede **guardar la configuración actual como plantilla** (un archivo) para usarla en otra sede o compartirla. Una plantilla importada se trata como dato no confiable: se valida contra un esquema y nunca contiene código, usuarios, claves ni datos de titulares.
 - **Todo editable después** por quien tenga el permiso: Supervisión administra conceptos de cobro; Dirección lo demás.
-- **Importación inicial.** Para empezar con un padrón existente, Dirección sube un Excel o CSV. El sistema no exige un formato: propone qué columna es cada dato (nombre, apellidos, agrupación, responsable, teléfono, saldo por concepto), deja corregir la correspondencia, muestra una vista previa con los errores renglón por renglón y no escribe nada hasta confirmar. Al confirmar crea titulares activos con su matrícula, sus contactos, sus familias (renglones con el mismo responsable y teléfono se proponen como familia) y su saldo inicial. Detecta duplicados si se repite. Entrega la lista de matrículas asignadas y las fichas de pago para repartir. Todo queda en la bitácora.
+- **Importación inicial.** Para empezar con un padrón existente, Dirección sube un Excel o CSV. El sistema no exige un formato: propone qué columna es cada dato (nombre, apellidos, agrupación, responsable, teléfono, saldo por concepto), deja corregir la correspondencia, muestra una vista previa con los errores renglón por renglón y no escribe nada hasta confirmar. Al confirmar crea titulares activos con su matrícula, sus contactos, sus vínculos de familia (renglones con el mismo responsable y teléfono se proponen como familia; cada titular recibe su propia matrícula) y su saldo inicial. Detecta duplicados si se repite. Entrega la lista de matrículas asignadas y las fichas de pago para repartir. Todo queda en la bitácora.
 - **Repo sin datos:** `instancia/`, bases, respaldos y documentos internos están en `.gitignore`. Descargar el repo da el motor, las plantillas y el asistente, nada más.
 - **Instalación en Windows:** un **instalador `.exe`** que trae todo incluido (no hay que instalar Python). Instala el programa, genera las claves, registra los servicios de Windows (web, trabajador y TLS) con arranque automático y reinicio ante fallas, y abre el asistente. Los datos viven en una carpeta aparte del programa, de modo que actualizar con un instalador nuevo los conserva y hace un respaldo antes de migrar. Las demás computadoras no instalan nada: entran por el navegador. El instalador se compila de forma automática en el repo y se publica en sus versiones.
 
