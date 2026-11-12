@@ -136,7 +136,7 @@ Cada titular tiene al menos un **Contacto**: nombre, relación con el titular (c
 - Los **campos de contacto** se definen en configuración: tipo (`telefono`, `correo`, `texto`), etiqueta, si es obligatorio en el alta y si es el medio principal para avisos.
 - El teléfono se guarda normalizado (solo dígitos, con el prefijo de país configurado; 10 dígitos nacionales por defecto) y se valida al capturar.
 - Un titular puede tener varios contactos; uno se marca como principal y es el que aparece en la ficha y en la cobranza.
-- Ver contactos requiere el permiso de ver titulares; editarlos queda en auditoría. Los destinos de reporte con detalle `sin_nombres` nunca incluyen datos de contacto.
+- Ver contactos requiere el permiso de ver titulares; editarlos queda en auditoría. Solo los destinos de reporte con detalle `completo` incluyen datos de contacto.
 
 La plantilla «escuela» pide un contacto responsable con **teléfono obligatorio**.
 
@@ -258,7 +258,7 @@ Un **corte** es una definición configurable: nombre, frecuencia, alcance, si ci
 
 Flujo: el sistema genera el corte solo en la fecha indicada y lo deja como borrador. Supervisión lo revisa y lo cierra con un clic. Si nadie lo cierra en el plazo configurado, se entrega marcado «sin revisar» para no detener a nadie. Al cerrar un corte que cierra periodo, ese periodo queda bloqueado: los ajustes posteriores entran en el periodo siguiente.
 
-**Destinos** (enchufables): `carpeta` (PDF + CSV + JSON con un `manifiesto.json`; la ruta se elige en el asistente y se puede cambiar después), y `correo` más adelante. Cada destino define su nivel de detalle (`completo`, `sin_nombres`). Un agente externo puede leer la carpeta; el sistema no depende de ningún agente.
+**Destinos** (enchufables): `carpeta` (PDF + CSV + JSON con un `manifiesto.json`; la ruta se elige en el asistente y se puede cambiar después), y `correo` más adelante. Cada destino define su nivel de detalle: `completo` (nombre, matrícula y contacto), `solo_nombres` (nombre, sin matrícula ni contacto) o `sin_nombres` (solo matrícula). Un agente externo puede leer la carpeta; el sistema no depende de ningún agente.
 
 Cada archivo de corte lleva un hash firmado con la clave de la instalación para detectar alteraciones.
 
