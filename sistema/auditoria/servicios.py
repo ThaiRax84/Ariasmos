@@ -4,14 +4,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from nucleo import cadena
+from proyecto.red import ip_cliente
 
 from .models import Evento
 
 
 def _ip(request):
-    if request is None:
-        return ""
-    return request.META.get("REMOTE_ADDR", "")[:45]
+    return ip_cliente(request)[:45]
 
 
 def _limpiar(datos):

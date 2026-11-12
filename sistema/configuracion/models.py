@@ -16,8 +16,11 @@ PARAMETROS = {
     "minutos_validez_reingreso": (5, "Minutos que vale el reingreso de contraseña para acciones delicadas"),
     "ventana_codigo_pasos": (1, "Periodos de 30 segundos de tolerancia para los códigos del autenticador"),
     "dias_maximos_delegacion": (30, "Días máximos de una delegación temporal"),
-    "intentos_por_ip_cada_5_minutos": (30, "Intentos de inicio de sesión permitidos por dirección cada 5 minutos"),
+    "intentos_por_equipo_cada_5_minutos": (30, "Intentos de inicio de sesión permitidos por equipo cada 5 minutos"),
     "intentos_codigo_por_solicitud": (5, "Códigos erróneos permitidos por solicitud antes de exigir la bandeja"),
+    "intentos_codigo_por_hora": (5, "Códigos por teléfono erróneos por hora, por capturista y por autorizador, antes de bloquear esa vía"),
+    "maximo_equipos_pendientes": (50, "Equipos pendientes de aprobación como máximo; los de más de 24 horas se depuran solos"),
+    "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
     "digitos_telefono_nacional": (10, "Dígitos de un teléfono nacional sin prefijo de país"),
 }

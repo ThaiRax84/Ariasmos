@@ -24,11 +24,13 @@ else:
     ALLOWED_HOSTS = list(_datos.get("hosts", []))
     CSRF_TRUSTED_ORIGINS = list(_datos.get("origenes_confiables", []))
     TOKEN_ASISTENTE_HASH = _datos.get("token_asistente_hash", "")
+    PROXIES_CONFIABLES = list(_datos.get("proxies_confiables", ["127.0.0.1", "::1"]))
     if _datos.get("https", True):
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
         COOKIE_DISPOSITIVO_SEGURA = True
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+        SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
     else:
         SESSION_COOKIE_SECURE = False
         CSRF_COOKIE_SECURE = False

@@ -37,6 +37,7 @@ def nueva(https=True):
         "https": https,
         "hosts": hosts,
         "origenes_confiables": [],
+        "proxies_confiables": ["127.0.0.1", "::1"],
     }
 
 
