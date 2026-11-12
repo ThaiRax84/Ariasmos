@@ -1,0 +1,183 @@
+{
+  "nombre": "Escuela",
+  "descripcion": "Padrón de alumnos con inscripción, colegiatura mensual y cargos por evento.",
+  "vocabulario": {
+    "titular": "Alumno",
+    "titulares": "Alumnos",
+    "matricula": "Matrícula",
+    "agrupacion": "Grupo",
+    "agrupaciones": "Grupos"
+  },
+  "roles": [
+    {
+      "nombre": "Operación",
+      "nivel": 1,
+      "minutos_inactividad": 30,
+      "requiere_totp": false,
+      "permisos": [
+        "ver_titulares",
+        "solicitar_alta_baja",
+        "registrar_pago_efectivo",
+        "turno_caja",
+        "solicitar_ajustes",
+        "cargo_manual",
+        "sugerir_conciliacion",
+        "ver_cortes"
+      ]
+    },
+    {
+      "nombre": "Supervisión",
+      "nivel": 2,
+      "minutos_inactividad": 20,
+      "requiere_totp": true,
+      "permisos": [
+        "ver_titulares",
+        "solicitar_alta_baja",
+        "registrar_pago_efectivo",
+        "turno_caja",
+        "solicitar_ajustes",
+        "cargo_manual",
+        "sugerir_conciliacion",
+        "ver_cortes",
+        "alta_baja_directa",
+        "aprobar_solicitudes",
+        "otorgar_delegaciones",
+        "aplicar_ajustes",
+        "recibir_efectivo",
+        "conciliar_banco",
+        "administrar_conceptos",
+        "cerrar_cortes",
+        "aprobar_dispositivos"
+      ]
+    },
+    {
+      "nombre": "Dirección",
+      "nivel": 3,
+      "minutos_inactividad": 15,
+      "requiere_totp": true,
+      "permisos": [
+        "ver_titulares",
+        "solicitar_alta_baja",
+        "registrar_pago_efectivo",
+        "turno_caja",
+        "solicitar_ajustes",
+        "cargo_manual",
+        "sugerir_conciliacion",
+        "ver_cortes",
+        "alta_baja_directa",
+        "aprobar_solicitudes",
+        "otorgar_delegaciones",
+        "aplicar_ajustes",
+        "recibir_efectivo",
+        "conciliar_banco",
+        "administrar_conceptos",
+        "cerrar_cortes",
+        "aprobar_dispositivos",
+        "administrar_usuarios",
+        "administrar_roles",
+        "administrar_politicas",
+        "administrar_configuracion",
+        "ver_auditoria",
+        "administrar_respaldos"
+      ]
+    }
+  ],
+  "rol_inicial": "Dirección",
+  "politicas": [
+    {
+      "accion": "alta",
+      "permiso_directo": "alta_baja_directa",
+      "permiso_solicitar": "solicitar_alta_baja",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "baja",
+      "permiso_directo": "alta_baja_directa",
+      "permiso_solicitar": "solicitar_alta_baja",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "reactivacion",
+      "permiso_directo": "alta_baja_directa",
+      "permiso_solicitar": "solicitar_alta_baja",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    }
+  ],
+  "motivos_baja": [
+    "Cambio de domicilio",
+    "Cambio de escuela",
+    "Motivos económicos",
+    "Conclusión de estudios",
+    "Otro"
+  ],
+  "relaciones_contacto": [
+    "Madre",
+    "Padre",
+    "Tutor o tutora",
+    "Familiar",
+    "El mismo alumno"
+  ],
+  "campos_contacto": [
+    {
+      "etiqueta": "Teléfono",
+      "tipo": "telefono",
+      "obligatorio": true,
+      "principal": true
+    },
+    {
+      "etiqueta": "Correo electrónico",
+      "tipo": "correo",
+      "obligatorio": false
+    }
+  ],
+  "conceptos": [
+    {
+      "nombre": "Inscripción",
+      "tipo": "unico",
+      "aplica_a": "nuevos",
+      "prioridad": 10,
+      "recargo": false
+    },
+    {
+      "nombre": "Examen de ubicación",
+      "tipo": "por_evento",
+      "aplica_a": "nuevos",
+      "prioridad": 20,
+      "recargo": false
+    },
+    {
+      "nombre": "Colegiatura",
+      "tipo": "recurrente",
+      "periodicidad": "mensual",
+      "aplica_a": "todos",
+      "prioridad": 30,
+      "recargo": true
+    },
+    {
+      "nombre": "Libros",
+      "tipo": "por_evento",
+      "aplica_a": "manual",
+      "prioridad": 40,
+      "recargo": false
+    },
+    {
+      "nombre": "Extras",
+      "tipo": "por_evento",
+      "aplica_a": "manual",
+      "prioridad": 50,
+      "recargo": false
+    }
+  ]
+}
