@@ -37,7 +37,7 @@ python manage.py migrate
 python manage.py servir
 ```
 
-`inicializar` crea la carpeta `instancia/` (fuera de git) con la clave de Django, la clave de matrícula de 32 bytes y la ruta de la base, e imprime un **token de instalación**. Guárdalo: el asistente lo pide en el primer paso. Si se pierde, `python manage.py inicializar --nuevo-token` genera otro. Nunca borres ni regeneres `instancia/configuracion.json` en una instalación con datos: la clave de matrícula no se puede recuperar.
+`inicializar` crea la carpeta `instancia/` (fuera de git) con la clave de Django, la clave de matrícula y la clave de la bitácora (32 bytes cada una) y la ruta de la base, e imprime un **token de instalación**. En una instancia que ya existe, `inicializar` solo agrega las claves que falten (por ejemplo, la de la bitácora al actualizar). Guárdalo: el asistente lo pide en el primer paso. Si se pierde, `python manage.py inicializar --nuevo-token` genera otro. Nunca borres ni regeneres `instancia/configuracion.json` ni `instancia/ancla_auditoria.json` en una instalación con datos: sin la clave de matrícula no se reconstruyen las matrículas y sin la clave y el ancla de la bitácora no se puede verificar su integridad.
 
 Para usar otra carpeta de instancia, define la variable de entorno `COBRO_INSTANCIA` con su ruta.
 
@@ -48,6 +48,14 @@ Para usar otra carpeta de instancia, define la variable de entorno `COBRO_INSTAN
 3. Al terminar, ese navegador queda como el primer equipo aprobado.
 
 Cada navegador nuevo queda **pendiente** y muestra un código; Supervisión o Dirección lo aprueba en *Equipos*, donde también puede descartar los pendientes. Los pendientes de más de 24 horas se depuran solos y hay un tope de pendientes configurable. Desde la consola del servidor también se puede aprobar: `python manage.py aprobar_dispositivo CODIGO --nombre "Caja 1"`.
+
+## Cuentas de usuario
+
+Nadie teclea la contraseña de otra persona. Al crear una cuenta (o con «Restablecer acceso» al editarla) el sistema muestra una sola vez un **código de activación** (`XXXXX-XXXXX`) que vence en 72 horas por defecto. La persona entra en «Tengo un código de activación», escribe su usuario y el código y elige su contraseña; si su rol lo exige, después da de alta su autenticador.
+
+## Bitácora
+
+Cada evento queda numerado y sellado con la clave de la bitácora, y el último sello se ancla en `instancia/ancla_auditoria.json`. `python manage.py verificar_auditoria` (o el botón en *Auditoría*) detecta alteraciones, huecos y eventos borrados; un fallo se muestra como alerta en el inicio de quien ve la auditoría. Cada titular tiene su historial en lenguaje llano en su ficha.
 
 ## HTTPS y red local
 
