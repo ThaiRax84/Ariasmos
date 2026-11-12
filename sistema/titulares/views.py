@@ -111,15 +111,46 @@ def editar(request, pk):
     if titular.estado == Titular.RECHAZADO:
         raise PermissionDenied
     original = foto_titular(titular)
+    nombre_actual, apellidos_actual = titular.nombre, titular.apellidos
     formulario = FormularioTitular(request.POST if request.method == "POST" else None, instance=titular, voc=vocabulario())
+    if titular.estado != Titular.PENDIENTE:
+        formulario.fields["nombre"].help_text = "Cambiar el nombre de un registro aprobado requiere autorización."
     if request.method == "POST" and formulario.is_valid():
-        guardado = formulario.save()
-        cambios = diferencias(original, foto_titular(guardado))
+        propuesto = {"nombre": formulario.cleaned_data["nombre"].strip(), "apellidos": formulario.cleaned_data["apellidos"].strip()}
+        libre = titular.estado == Titular.PENDIENTE
+        cambia_nombre = (propuesto["nombre"], propuesto["apellidos"]) != (nombre_actual, apellidos_actual)
+        with transaction.atomic():
+            guardado = formulario.save(commit=False)
+            if not libre:
+                guardado.nombre, guardado.apellidos = nombre_actual, apellidos_actual
+            guardado.save()
+            cambios = diferencias(original, foto_titular(guardado))
+            if cambios:
+                registrar("titular_editado", usuario=request.user, objeto=guardado, datos={"cambios": cambios}, request=request)
         if cambios:
-            registrar("titular_editado", usuario=request.user, objeto=guardado, datos={"cambios": cambios}, request=request)
-        messages.success(request, "Datos guardados.")
+            messages.success(request, "Datos guardados.")
+        if cambia_nombre and not libre:
+            _corregir_nombre(request, guardado, propuesto, nombre_actual, apellidos_actual)
+        elif not cambios:
+            messages.info(request, "No hubo cambios.")
         return redirect("titulares:detalle", pk=pk)
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Editar {titular}", "boton": "Guardar"})
+
+
+def _corregir_nombre(request, titular, propuesto, nombre_actual, apellidos_actual):
+    datos = dict(propuesto, nombre_anterior=nombre_actual, apellidos_anterior=apellidos_actual)
+    try:
+        resultado = motor.ejecutar("correccion_nombre", request.user, titular, datos, request=request)
+    except motor.ErrorSolicitud as error:
+        messages.error(request, f"El nombre no se cambió: {error}")
+        return
+    except PermissionDenied:
+        messages.error(request, "El nombre no se cambió: no tienes permiso para corregirlo.")
+        return
+    if resultado.solicitud is None:
+        messages.success(request, "Nombre corregido.")
+    else:
+        messages.warning(request, "El cambio de nombre quedó como SOLICITUD pendiente de aprobación; el nombre no cambia hasta que se apruebe. Los demás datos ya se guardaron.")
 
 
 @requiere_permiso(*CAPTURA)

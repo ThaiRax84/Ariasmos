@@ -71,7 +71,26 @@ class Reactivacion:
         pass
 
 
-MANEJADORES = {"alta": Alta(), "baja": Baja(), "reactivacion": Reactivacion()}
+class CorreccionNombre:
+    def validar(self, titular, datos):
+        if titular.estado not in (Titular.ACTIVO, Titular.BAJA):
+            raise ErrorSolicitud("La corrección de nombre aplica a registros activos o dados de baja.")
+        nombre, apellidos = (datos.get("nombre") or "").strip(), (datos.get("apellidos") or "").strip()
+        if not nombre or not apellidos:
+            raise ErrorSolicitud("Indica el nombre y los apellidos propuestos.")
+        if nombre == titular.nombre and apellidos == titular.apellidos:
+            raise ErrorSolicitud("El nombre propuesto es igual al actual.")
+
+    def aplicar(self, titular, datos):
+        titular.nombre = datos["nombre"].strip()
+        titular.apellidos = datos["apellidos"].strip()
+        titular.save(update_fields=["nombre", "apellidos", "actualizado"])
+
+    def rechazar(self, titular, datos):
+        pass
+
+
+MANEJADORES = {"alta": Alta(), "baja": Baja(), "reactivacion": Reactivacion(), "correccion_nombre": CorreccionNombre()}
 
 
 def _aplicar(manejador, titular, datos):

@@ -113,6 +113,16 @@
       "horas_resaltar": 24,
       "permite_delegacion": true,
       "permite_codigo": true
+    },
+    {
+      "accion": "correccion_nombre",
+      "permiso_directo": "alta_baja_directa",
+      "permiso_solicitar": "solicitar_alta_baja",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
     }
   ],
   "motivos_baja": [
