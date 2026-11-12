@@ -1,0 +1,15 @@
+instancia/
+contexto-hp-servidor-local.md
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+respaldos/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+staticfiles/
+media/
+*.log
+.env
