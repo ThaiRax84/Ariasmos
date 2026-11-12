@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.6 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.7 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -128,6 +128,15 @@ Módulos (apps de Django) y entidades principales:
 Orden de aplicación por defecto (configurable): recargos, luego cargos por vencimiento más antiguo, luego por prioridad del concepto.
 
 Nada se edita ni se borra: una cancelación crea el asiento inverso y deja ambos visibles.
+
+**Reglas de cálculo.** Viven en `nucleo/recargos.py` y `nucleo/reparto.py`, Python puro con sus pruebas; nadie más calcula recargos, becas ni repartos.
+
+- *Generación.* Un concepto recurrente produce un cargo por titular activo con plan vigente y por periodo, el día configurado. Es idempotente por (titular, concepto, periodo). Los conceptos únicos para titulares nuevos se cargan al aprobarse el alta.
+- *Recargo.* El primero nace el día siguiente a `máx(vencimiento, prórroga) + días de gracia` si el cargo base sigue con saldo. Si la regla se repite, nace otro cada mes en ese mismo día. Fijo: el importe de la regla. Porcentaje: sobre el saldo pendiente del cargo base en ese momento, redondeado al centavo más cercano. El tope limita la suma de recargos de un mismo cargo. Un recargo nunca genera recargo. Si el equipo estuvo apagado, los recargos atrasados se generan al volver, sin duplicar.
+- *Beca.* Se descuenta al generar el cargo; el cargo guarda importe original, descuento e importe final. Nunca baja de cero.
+- *Saldo a favor.* No es una cuenta aparte: es la parte de un pago que todavía no se aplica a ningún cargo. Cuando nace un cargo nuevo se le aplica primero el saldo a favor más antiguo del titular o de su familia.
+- *Reversos.* Cancelar un cargo, condonar un recargo o revertir un pago crea un asiento de reverso ligado al original, con motivo y autorización. El saldo de un cargo es `importe − cancelado − aplicado por pagos vigentes`.
+- *Cargo manual.* Operación lo crea con el importe del concepto; cambiar el importe exige el permiso de ajustes o una solicitud.
 
 **Becas.** Una beca es un descuento (porcentaje o importe fijo) sobre un concepto recurrente de un titular, con vigencia y motivo. Se aplica sola al generar cada cargo y queda visible en él. Sustituye al descuento suelto del plan.
 
