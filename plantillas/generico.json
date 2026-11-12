@@ -1,6 +1,6 @@
 {
   "nombre": "Genérico",
-  "descripcion": "Padrón de clientes con una cuota única, una cuota periódica y cargos adicionales.",
+  "descripcion": "Para la mayoría de los negocios que cobran a clientes recurrentes: alta, mensualidad con recargo y cargos por producto o servicio.",
   "vocabulario": {
     "titular": "Cliente",
     "titulares": "Clientes",
@@ -150,14 +150,14 @@
   ],
   "conceptos": [
     {
-      "nombre": "Cuota de alta",
+      "nombre": "Alta o inscripción",
       "tipo": "unico",
       "aplica_a": "nuevos",
       "prioridad": 10,
       "recargo": false
     },
     {
-      "nombre": "Cuota periódica",
+      "nombre": "Mensualidad",
       "tipo": "recurrente",
       "periodicidad": "mensual",
       "aplica_a": "todos",
@@ -165,11 +165,23 @@
       "recargo": true
     },
     {
-      "nombre": "Cargo adicional",
+      "nombre": "Producto o servicio",
       "tipo": "por_evento",
       "aplica_a": "manual",
       "prioridad": 30,
       "recargo": false
+    },
+    {
+      "nombre": "Otro cargo",
+      "tipo": "por_evento",
+      "aplica_a": "manual",
+      "prioridad": 40,
+      "recargo": false
     }
+  ],
+  "medios_pago": [
+    "Transferencia SPEI",
+    "Depósito en ventanilla",
+    "Efectivo en caja"
   ]
 }
