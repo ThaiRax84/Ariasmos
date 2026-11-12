@@ -47,13 +47,13 @@ Para usar otra carpeta de instancia, define la variable de entorno `COBRO_INSTAN
 2. Captura el token, el nombre del negocio, la plantilla (`escuela` o `generico`), los importes, el primer usuario de Dirección y activa su autenticador (cualquier app TOTP; la clave se muestra como texto y como enlace `otpauth://`).
 3. Al terminar, ese navegador queda como el primer equipo aprobado.
 
-Cada navegador nuevo queda **pendiente** y muestra un código; Supervisión o Dirección lo aprueba en *Equipos*. Desde la consola del servidor también se puede aprobar: `python manage.py aprobar_dispositivo CODIGO --nombre "Caja 1"`.
+Cada navegador nuevo queda **pendiente** y muestra un código; Supervisión o Dirección lo aprueba en *Equipos*, donde también puede descartar los pendientes. Los pendientes de más de 24 horas se depuran solos y hay un tope de pendientes configurable. Desde la consola del servidor también se puede aprobar: `python manage.py aprobar_dispositivo CODIGO --nombre "Caja 1"`.
 
 ## HTTPS y red local
 
 Por defecto las cookies llevan la marca `Secure`, así que fuera de `localhost` el sistema debe servirse con TLS (por ejemplo, Caddy delante de waitress; ver §3 y §10 de la arquitectura). Para probar en una red local sin TLS, crea la instancia con `python manage.py inicializar --sin-https`.
 
-Los nombres de host aceptados y los orígenes de confianza se editan en `instancia/configuracion.json` (`hosts`, `origenes_confiables`). Para escuchar en la red: `python manage.py servir --host 0.0.0.0 --puerto 8000`.
+Los nombres de host aceptados y los orígenes de confianza se editan en `instancia/configuracion.json` (`hosts`, `origenes_confiables`). `proxies_confiables` (por defecto `["127.0.0.1", "::1"]`) indica desde qué direcciones se acepta la cabecera `X-Forwarded-For` para conocer la IP real del cliente; con https activo se envía HSTS de un año. Para escuchar en la red: `python manage.py servir --host 0.0.0.0 --puerto 8000`.
 
 ## Demostración
 
