@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Autorizar con código</h1>
+<p>{{ solicitud.get_accion_display }} · {{ solicitud.titular }}. Pide a quien autoriza que te dicte el código de 6 dígitos de su autenticador. Cada código sirve una sola vez.</p>
+{% if formulario.fields.autorizador.choices %}
+<form method="post" class="formulario angosto">
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Autorizar</button><a class="boton secundario" href="{% url 'solicitudes:detalle' solicitud.pk %}">Cancelar</a></div>
+</form>
+{% else %}<p>No hay nadie con autenticador activo que pueda autorizar esta solicitud.</p>{% endif %}
+{% endblock %}

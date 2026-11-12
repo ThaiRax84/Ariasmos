@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>{{ solicitud.get_accion_display }} · {{ solicitud.titular }}</h1>
+<section class="panel{% if resaltada %} resaltada{% endif %}">
+  <dl class="datos">
+    <dt>{{ voc.matricula }}</dt><dd><a href="{% url 'titulares:detalle' solicitud.titular.pk %}">{{ solicitud.titular.matricula_formateada }}</a></dd>
+    <dt>Estado</dt><dd>{{ solicitud.get_estado_display }}</dd>
+    <dt>Solicitó</dt><dd>{{ solicitud.solicitante }} · {{ solicitud.creada|date:"d/m/Y H:i" }}</dd>
+    <dt>Caduca</dt><dd>{{ solicitud.caduca_en|date:"d/m/Y H:i" }}</dd>
+    {% if solicitud.accion == "correccion_nombre" %}<dt>Nombre actual</dt><dd>{{ solicitud.titular.nombre_completo }}</dd><dt>Nombre propuesto</dt><dd><strong>{{ solicitud.datos.nombre }} {{ solicitud.datos.apellidos }}</strong></dd>{% if solicitud.estado != "pendiente" and solicitud.datos.nombre_anterior %}<dt>Nombre antes de la solicitud</dt><dd>{{ solicitud.datos.nombre_anterior }} {{ solicitud.datos.apellidos_anterior }}</dd>{% endif %}{% endif %}
+    {% if solicitud.datos.nota %}<dt>Nota</dt><dd>{{ solicitud.datos.nota }}</dd>{% endif %}
+    {% if solicitud.resuelta_por %}<dt>Resolvió</dt><dd>{{ solicitud.resuelta_por }} · {{ solicitud.get_via_display }} · {{ solicitud.resuelta_en|date:"d/m/Y H:i" }}</dd>{% endif %}
+    {% if solicitud.nota_resolucion %}<dt>Nota de resolución</dt><dd>{{ solicitud.nota_resolucion }}</dd>{% endif %}
+  </dl>
+</section>
+{% if puede_resolver %}
+<div class="acciones">
+  <form method="post" action="{% url 'solicitudes:aprobar' solicitud.pk %}" class="en-linea">{% csrf_token %}<button class="boton grande" type="submit">Aprobar</button></form>
+  <form method="post" action="{% url 'solicitudes:rechazar' solicitud.pk %}" class="en-linea">{% csrf_token %}{{ formulario_rechazo.nota }}<button class="boton grande peligro" type="submit" data-confirmar="¿Rechazar la solicitud?">Rechazar</button></form>
+</div>
+{% endif %}
+{% if puede_codigo %}<p><a class="boton grande secundario" href="{% url 'solicitudes:codigo' solicitud.pk %}">Autorizar con código por teléfono</a></p>{% endif %}
+{% endblock %}

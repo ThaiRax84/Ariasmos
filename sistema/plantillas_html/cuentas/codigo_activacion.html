@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Código de activación</h1>
+<p>Entrega este código a <strong>{{ objetivo.nombre }}</strong> (usuario <strong>{{ objetivo.usuario }}</strong>). Se muestra una sola vez y vence el {{ caduca|date:"d/m/Y H:i" }}.</p>
+<p class="codigo-equipo">{{ codigo }}</p>
+<p>La persona entra en «Tengo un código de activación», escribe su usuario y este código, y elige su propia contraseña.</p>
+<a class="boton" href="{% url 'usuarios' %}">Listo</a>
+{% endblock %}

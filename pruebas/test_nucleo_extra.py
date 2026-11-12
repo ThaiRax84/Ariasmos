@@ -1,0 +1,91 @@
+import pytest
+
+from nucleo import cadena, dinero, telefono, totp
+
+SECRETO_RFC = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+
+
+@pytest.mark.parametrize("momento,esperado", [(59, "94287082"), (1111111109, "07081804"), (1234567890, "89005924"), (2000000000, "69279037")])
+def test_totp_vectores_rfc6238(momento, esperado):
+    assert totp.codigo(SECRETO_RFC, totp.paso_actual(momento), digitos=8) == esperado
+    assert totp.codigo(SECRETO_RFC, totp.paso_actual(momento)) == esperado[-6:]
+
+
+def test_totp_verifica_con_ventana_y_rechaza_otro():
+    secreto = totp.generar_secreto()
+    paso = totp.paso_actual(1_000_000)
+    assert totp.verificar(secreto, totp.codigo(secreto, paso - 1), momento=1_000_000) == paso - 1
+    assert totp.verificar(secreto, totp.codigo(secreto, paso - 3), momento=1_000_000) is None
+    assert totp.verificar(secreto, "12ab", momento=1_000_000) is None
+    assert totp.uri(secreto, "persona", "Negocio X").startswith("otpauth://totp/Negocio%20X%3Apersona?secret=")
+
+
+def test_dinero_en_centavos():
+    assert dinero.a_centavos("1,250.5") == 125050
+    assert dinero.a_centavos("$ 3") == 300
+    assert dinero.a_centavos(".07") == 7
+    assert dinero.formatear(123456789) == "$1,234,567.89"
+    for malo in ("", "1.234", "abc", "1.2.3", "١٢"):
+        with pytest.raises(dinero.ErrorImporte):
+            dinero.a_centavos(malo)
+
+
+CLAVE_BITACORA = bytes(range(32, 64))
+
+
+def _cadena(clave, n=5):
+    eslabones = []
+    anterior = cadena.GENESIS
+    for i in range(n):
+        contenido = {"numero": i + 1, "texto": "á"}
+        sello = cadena.sellar(clave, anterior, contenido)
+        eslabones.append((anterior, contenido, sello))
+        anterior = sello
+    return eslabones
+
+
+def test_cadena_detecta_alteracion():
+    eslabones = _cadena(CLAVE_BITACORA)
+    assert cadena.verificar(CLAVE_BITACORA, eslabones) is None
+    eslabones[2] = (eslabones[2][0], {"numero": 99, "texto": "á"}, eslabones[2][2])
+    assert cadena.verificar(CLAVE_BITACORA, eslabones) == 2
+
+
+def test_sellos_recalculados_sin_la_clave_no_validan():
+    falsa = bytes(32)
+    reescrita = _cadena(falsa)
+    assert cadena.verificar(CLAVE_BITACORA, reescrita) == 0
+    with pytest.raises(ValueError):
+        cadena.sellar(b"corta", cadena.GENESIS, {})
+
+
+def test_firma_del_ancla():
+    ancla = {"numero": 3, "sello": "ab"}
+    firma = cadena.firmar(CLAVE_BITACORA, ancla)
+    assert cadena.firma_valida(CLAVE_BITACORA, ancla, firma)
+    assert not cadena.firma_valida(CLAVE_BITACORA, dict(ancla, numero=4), firma)
+    assert not cadena.firma_valida(CLAVE_BITACORA, ancla, None)
+
+
+@pytest.mark.parametrize(
+    "entrada,esperado",
+    [
+        ("55 1234 5678", "525512345678"),
+        ("(55) 1234-5678", "525512345678"),
+        ("+52 55 1234 5678", "525512345678"),
+        ("0052 55 1234 5678", "525512345678"),
+        ("525512345678", "525512345678"),
+    ],
+)
+def test_telefono_normaliza(entrada, esperado):
+    assert telefono.normalizar(entrada, "52", 10) == esperado
+
+
+@pytest.mark.parametrize("entrada", ["", "12345", "55 1234 567", "+1 555 123 4567", "55-1234-5678 ext 2", "abc"])
+def test_telefono_rechaza(entrada):
+    with pytest.raises(telefono.TelefonoInvalido):
+        telefono.normalizar(entrada, "52", 10)
+
+
+def test_telefono_formato():
+    assert telefono.formatear("525512345678", "52") == "+52 55 1234 5678"

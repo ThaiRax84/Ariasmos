@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Activar mi cuenta</h1>
+<p>Escribe tu usuario, el código de activación que te entregaron y elige tu contraseña. El código sirve una sola vez.</p>
+<form method="post" class="formulario angosto" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Activar</button><a class="boton secundario" href="{% url 'entrar' %}">Volver</a></div>
+</form>
+{% endblock %}

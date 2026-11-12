@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Delegaciones temporales</h1>
+<p><a class="boton" href="{% url 'delegacion_nueva' %}">Nueva delegación</a></p>
+<table class="tabla">
+<thead><tr><th>Para</th><th>Permiso</th><th>Otorgó</th><th>Vence</th><th>Usos</th><th>Estado</th><th></th></tr></thead>
+<tbody>
+{% for d, vigente in filas %}
+<tr><td>{{ d.receptor }}</td><td>{{ d.permiso|nombre_permiso }}</td><td>{{ d.otorgante }}</td><td>{{ d.vence|date:"d/m/Y H:i"|default:"—" }}</td>
+<td>{{ d.usos }}{% if d.usos_maximos %}/{{ d.usos_maximos }}{% endif %}</td>
+<td>{% if d.revocada %}Revocada{% elif vigente %}Vigente{% else %}Vencida{% endif %}</td>
+<td>{% if vigente %}<form method="post" action="{% url 'delegacion_revocar' d.pk %}" class="en-linea">{% csrf_token %}<button class="boton peligro" type="submit">Revocar</button></form>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}

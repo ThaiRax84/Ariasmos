@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Políticas de aprobación</h1>
+<table class="tabla">
+<thead><tr><th>Acción</th><th>Directo</th><th>Solicita</th><th>Aprueba</th><th>Caduca</th><th>Vías extra</th><th></th></tr></thead>
+<tbody>{% for p in politicas %}<tr><td>{{ p }}</td><td>{{ p.permiso_directo|nombre_permiso }}</td><td>{{ p.permiso_solicitar|nombre_permiso }}</td><td>{{ p.permiso_aprobar|nombre_permiso }}</td><td>{{ p.horas_caducidad }} h</td><td>{% if p.permite_delegacion %}delegación {% endif %}{% if p.permite_codigo %}código{% endif %}</td><td><a href="{% url 'solicitudes:politica_editar' p.pk %}">Editar</a></td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

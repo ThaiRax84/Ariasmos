@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Usuarios</h1>
+<p><a class="boton" href="{% url 'usuario_nuevo' %}">Nuevo usuario</a></p>
+<table class="tabla">
+<thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Autenticador</th><th></th></tr></thead>
+<tbody>
+{% for u in usuarios %}
+<tr><td>{{ u.usuario }}</td><td>{{ u.nombre }}</td><td>{{ u.rol|default:"—" }}</td>
+<td>{% if not u.activo %}Inactivo{% elif u.bloqueado_hasta and u.bloqueado_hasta > ahora %}Bloqueado{% else %}Activo{% endif %}</td>
+<td>{% if u.totp_confirmado %}Sí{% else %}No{% endif %}</td>
+<td><a href="{% url 'usuario_editar' u.pk %}">Editar</a></td></tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ficha de pago {{ titular.matricula }}</title>
+<link rel="stylesheet" href="{% static 'css/sistema.css' %}">
+<script src="{% static 'js/sistema.js' %}" defer></script>
+</head>
+<body class="ficha">
+<div class="no-imprimir acciones">
+  <button class="boton" type="button" id="imprimir">Imprimir</button>
+  <a class="boton secundario" href="{% url 'titulares:detalle' titular.pk %}">Volver</a>
+</div>
+<article class="hoja">
+  <h1>{{ negocio.nombre }}</h1>
+  <h2>Ficha de pago</h2>
+  <p class="referencia">{{ voc.matricula }}<br><strong>{{ titular.matricula_formateada }}</strong></p>
+  <dl class="datos">
+    <dt>{{ voc.titular }}</dt><dd>{{ titular.nombre_completo }}</dd>
+    {% if titular.agrupacion %}<dt>{{ voc.agrupacion }}</dt><dd>{{ titular.agrupacion }}</dd>{% endif %}
+    <dt>Referencia bancaria</dt><dd>{{ titular.referencia_bancaria }}</dd>
+    {% if contacto %}<dt>Contacto</dt><dd>{{ contacto.nombre }}{% if contacto.relacion %} ({{ contacto.relacion }}){% endif %}{% for etiqueta, valor, medio in contacto_detalle %}{% if medio %}<br>{{ etiqueta }}: {{ valor }}{% endif %}{% endfor %}</dd>{% endif %}
+  </dl>
+  <section class="instrucciones">
+    <h3>Cómo pagar</h3>
+    <p>{{ negocio.instrucciones_pago|linebreaksbr }}</p>
+    <p>Escribe siempre la {{ voc.matricula|lower }} <strong>{{ titular.matricula }}</strong> como referencia o concepto del pago.</p>
+  </section>
+  <p class="pie">Emitida el {% now "d/m/Y" %}</p>
+</article>
+</body>
+</html>

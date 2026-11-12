@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Historial de {{ titular.nombre_completo }}</h1>
+<p>{{ voc.matricula }} {{ titular.matricula_formateada }} · <a href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a></p>
+<ul class="lista historial">
+{% for f in filas %}
+  <li>
+    <strong>{{ f.momento|date:"d/m/Y H:i" }}</strong> · {{ f.usuario }} · {{ f.descripcion }}
+    {% if f.cambios %}<ul>{% for etiqueta, antes, despues in f.cambios %}<li>{{ etiqueta }}: {{ antes }} → {{ despues }}</li>{% endfor %}</ul>{% endif %}
+  </li>
+{% empty %}<li>Sin movimientos registrados.</li>{% endfor %}
+</ul>
+{% endblock %}

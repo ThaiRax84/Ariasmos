@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Equipos</h1>
+<h2>Pendientes de aprobación</h2>
+{% if pendientes %}
+<table class="tabla">
+<thead><tr><th>Código</th><th>Navegador</th><th>Dirección</th><th>Desde</th><th>Aprobar como</th></tr></thead>
+<tbody>
+{% for d in pendientes %}
+<tr><td class="codigo-equipo chico">{{ d.codigo }}</td><td><small>{{ d.agente|truncatechars:60 }}</small></td><td>{{ d.ip }}</td><td>{{ d.creado|date:"d/m/Y H:i" }}</td>
+<td><form method="post" action="{% url 'dispositivo_aprobar' d.pk %}" class="en-linea">{% csrf_token %}<input type="text" name="nombre" required maxlength="100" placeholder="Nombre del equipo"><button class="boton" type="submit">Aprobar</button></form></td></tr>
+{% endfor %}
+</tbody></table>
+<form method="post" action="{% url 'dispositivos_descartar' %}">{% csrf_token %}<button class="boton peligro" type="submit" data-confirmar="¿Descartar todos los equipos pendientes?">Descartar pendientes</button></form>
+{% else %}<p>No hay equipos pendientes.</p>{% endif %}
+<h2>Aprobados y revocados</h2>
+<table class="tabla">
+<thead><tr><th>Nombre</th><th>Código</th><th>Estado</th><th>Aprobó</th><th>Último uso</th><th></th></tr></thead>
+<tbody>
+{% for d in otros %}
+<tr><td>{{ d.nombre }}</td><td>{{ d.codigo }}</td><td>{{ d.get_estado_display }}</td><td>{{ d.aprobado_por|default:"servidor" }}</td><td>{{ d.ultimo_uso|date:"d/m/Y H:i" }}</td>
+<td>{% if d.estado == "aprobado" %}<form method="post" action="{% url 'dispositivo_revocar' d.pk %}" class="en-linea">{% csrf_token %}<button class="boton peligro" type="submit" data-confirmar="¿Revocar este equipo?">Revocar</button></form>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table>
+{% endblock %}
