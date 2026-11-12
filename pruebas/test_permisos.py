@@ -2,6 +2,7 @@ import pytest
 from django.urls import URLPattern, URLResolver, get_resolver, reverse
 from django.utils import timezone
 
+from banco.models import Banco, CuentaBancaria
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
@@ -12,7 +13,7 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:conceptos", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:usuario", "asistente:codigo"}
 
 SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
@@ -64,6 +65,11 @@ MATRIZ = {
     "configuracion:catalogo": ("administrar_configuracion",),
     "configuracion:catalogo_nuevo": ("administrar_configuracion",),
     "configuracion:catalogo_editar": ("administrar_configuracion",),
+    "configuracion:avanzado": ("administrar_configuracion",),
+    "configuracion:exportar": ("administrar_configuracion",),
+    "banco:lista": ("administrar_configuracion",),
+    "banco:nueva": ("administrar_configuracion",),
+    "banco:editar": ("administrar_configuracion",),
     "auditoria:lista": ("ver_auditoria",),
     "auditoria:verificar": ("ver_auditoria",),
 }
@@ -102,6 +108,7 @@ def escenario(db):
     regla = ReglaRecargo.objects.create(nombre="Regla")
     plan = PlanCobro.objects.create(titular=titular, concepto=ConceptoCobro.objects.filter(tipo="recurrente").first(), vigente_desde=timezone.now().date())
     agrupacion = Agrupacion.objects.create(nombre="G1")
+    cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
     argumentos = {
         "titulares:detalle": {"pk": titular.pk},
         "titulares:ficha_pago": {"pk": titular.pk},
@@ -128,6 +135,7 @@ def escenario(db):
         "configuracion:catalogo": {"catalogo": "agrupaciones"},
         "configuracion:catalogo_nuevo": {"catalogo": "agrupaciones"},
         "configuracion:catalogo_editar": {"catalogo": "agrupaciones", "pk": agrupacion.pk},
+        "banco:editar": {"pk": cuenta.pk},
     }
     return usuarios, argumentos
 

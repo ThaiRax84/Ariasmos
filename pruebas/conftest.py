@@ -15,7 +15,7 @@ CONTRASENA = "Contrasena-de-prueba-2026"
 
 
 def configurar(plantilla="escuela"):
-    Negocio.objects.update_or_create(pk=1, defaults={"nombre": "Negocio de prueba", "instrucciones_pago": "Instrucciones de prueba", "plantilla": plantilla, "configurado": True})
+    Negocio.objects.update_or_create(pk=1, defaults={"nombre": "Negocio de prueba", "nota_ficha": "Instrucciones de prueba", "plantilla": plantilla, "configurado": True})
     plantillas.cargar(plantilla)
     return {rol.nombre: rol for rol in Rol.objects.all()}
 
