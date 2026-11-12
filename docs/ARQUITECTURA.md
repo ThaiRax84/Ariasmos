@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.2 · 12/11/2026 · Estado: base aprobada para construir la Fase 1.
+Versión 0.3 · 12/11/2026 · Estado: base aprobada para construir la Fase 1.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -105,7 +105,7 @@ Módulos (apps de Django) y entidades principales:
 |---|---|---|
 | `nucleo` | — | Matrícula, dinero, cadena de auditoría. Python puro, sin Django. |
 | `configuracion` | Negocio, Parametro, Vocabulario | Un solo negocio por instalación; `sede` y `ranuras`. |
-| `cuentas` | Usuario, Rol, PermisoRol, Dispositivo, Delegacion, CodigoUsado | §6. |
+| `cuentas` | Usuario, Rol, PermisoRol, Dispositivo, Delegacion, CodigoUsado, CodigoActivacion | §6. |
 | `titulares` | Titular, Contacto, CampoContacto, Agrupacion, MotivoBaja | Estados: `pendiente`, `activo`, `baja`, `rechazado`. Contacto en §5.2. |
 | `solicitudes` | Solicitud, PoliticaAccion | Motor genérico de aprobación. |
 | `cobros` | ConceptoCobro, ReglaRecargo, PlanCobro, Cargo, Pago, Aplicacion, Recibo | Libro inmutable. |
@@ -176,6 +176,7 @@ Los permisos son átomos fijos en el código; qué rol tiene cuáles se guarda e
 | Administrar conceptos de cobro | — | ✓ | ✓ |
 | Ver cortes / cerrar cortes | ver | ✓ | ✓ |
 | Aprobar dispositivos | — | ✓ | ✓ |
+| Cambiar nombre de un titular aprobado | solicita | ✓ | ✓ |
 | Usuarios, roles, políticas, configuración | — | — | ✓ |
 | Auditoría y respaldos | — | — | ✓ |
 
@@ -200,6 +201,24 @@ Reglas fijas, no configurables: nadie aprueba su propia solicitud; toda aprobaci
 ### 6.4 Baja
 
 Solicitud con motivo (catálogo configurable) → aprobación → `baja`. Se detienen los cargos recurrentes futuros, el adeudo se conserva y la matrícula sigue reconociendo pagos tardíos. Una reactivación conserva la misma matrícula. El borrado real (derecho de cancelación) es una anonimización que solo Dirección ejecuta y solo pasado el plazo de conservación configurado.
+
+### 6.5 Corrección de nombre
+
+Cambiar el nombre o los apellidos de un titular `activo` o en `baja` es una acción del motor de aprobaciones (`correccion_nombre`), con las mismas tres vías y su propia política. Evita que un registro ya aprobado se convierta en otra persona sin que nadie lo vea.
+
+- Mientras el titular está `pendiente`, el nombre se edita libremente: el alta todavía no se aprueba.
+- Agrupación, notas y contactos se editan sin aprobación.
+- Todo cambio, con o sin aprobación, queda en la bitácora (§10.1).
+
+### 6.6 Cuentas y código de activación
+
+Nadie teclea la contraseña de otra persona.
+
+1. Quien administra usuarios crea la cuenta con nombre, usuario y rol. El sistema genera un **código de activación** de un solo uso, lo muestra una vez y guarda solo su hash. Caduca en el plazo configurado (72 horas por defecto).
+2. La persona entra con su usuario y ese código, elige su propia contraseña y, si su rol lo exige, da de alta su autenticador. No requiere aprobación de nadie.
+3. **Restablecer acceso** hace lo mismo: invalida la contraseña y las sesiones abiertas y genera un código nuevo.
+
+Los intentos fallidos con un código cuentan para el bloqueo de la cuenta. Quién generó cada código y desde qué equipo se activó queda en la bitácora; si alguien usa un código ajeno, la persona lo nota porque el suyo ya no funciona.
 
 ## 7. Efectivo
 
@@ -268,13 +287,27 @@ Cada archivo de corte lleva un hash firmado con la clave de la instalación para
 |---|---|
 | Red | El servicio escucha solo en la red local; regla de firewall limitada a esa subred; TLS con autoridad interna cuyo certificado se instala en cada computadora autorizada. |
 | Dispositivos | Solo entran **computadoras aprobadas**. Un navegador nuevo queda «pendiente» hasta que Supervisión o Dirección lo aprueba; recibe una credencial de dispositivo de larga duración (cookie `HttpOnly`, `Secure`, `SameSite=Strict`; en la base solo su hash). Se puede revocar. La primera se aprueba desde el propio servidor al instalar. |
-| Identidad | Una cuenta por persona. Argon2id. Bloqueo progresivo tras intentos fallidos. Cierre por inactividad configurable por rol. TOTP obligatorio para quien aprueba. Reingreso de contraseña antes de acciones delicadas. |
+| Identidad | Una cuenta por persona, activada con código de un solo uso (§6.6). Nadie otorga ni modifica lo que excede sus propios permisos. Argon2id. Bloqueo progresivo tras intentos fallidos. Cierre por inactividad configurable por rol. TOTP obligatorio para quien aprueba. Reingreso de contraseña antes de acciones delicadas. |
 | Aplicación | Permiso verificado en el servidor en cada vista y sobre cada objeto. CSRF activo. CSP sin scripts en línea ni orígenes externos. Solo ORM. Límite de peticiones en inicio de sesión y códigos. |
 | Archivos | Los archivos subidos se leen, nunca se ejecutan; tamaño y tipo limitados; se guardan fuera de la carpeta pública. Las exportaciones neutralizan celdas que empiezan con `=`, `+`, `-`, `@`. |
-| Integridad | Libro inmutable. Cada evento de auditoría guarda `hash(evento anterior ‖ contenido)`; una tarea diaria verifica la cadena. Periodos cerrados bloqueados. |
+| Integridad | Libro inmutable. Bitácora sellada con clave y anclada fuera de la base (§10.1). Periodos cerrados bloqueados. |
 | Secretos | Carpeta `instancia/` fuera del repo, con permisos restringidos a la cuenta del servicio: clave de Django, clave de matrícula, clave de respaldo. |
 | Respaldo | Copia diaria consistente de la base, cifrada con AES-256-GCM, hacia una carpeta sincronizada fuera del equipo. Retención 30 diarias y 12 mensuales. Prueba de restauración automática mensual. La clave de recuperación se imprime al instalar. |
 | Privacidad | Datos mínimos; vistas limitadas por rol; toda exportación queda registrada; aviso de privacidad y consentimiento del tutor fuera del sistema, con casilla de constancia en el alta. |
+
+### 10.1 Bitácora
+
+**Qué se graba.** Toda alta, edición y cambio de estado de titulares y contactos, y todo cambio de agrupaciones, conceptos, planes, usuarios, roles, políticas y configuración. Cada evento guarda: momento, **usuario que lo hizo**, equipo, acción, y el valor **anterior y nuevo** de cada dato cambiado. También inicios de sesión, aprobaciones, códigos y accesos denegados.
+
+**Dónde se ve.**
+- **Historial del titular:** en la ficha de cada titular, una lista en lenguaje llano de quién cambió qué y cuándo, incluidos sus contactos y solicitudes. Lo ve quien puede ver titulares.
+- **Bitácora general:** todos los eventos, con filtros. Solo Dirección.
+
+**Cómo se protege.**
+- Solo inserción y numeración consecutiva sin huecos.
+- **Sello con clave:** `sello = HMAC-SHA256(clave_auditoria, sello anterior ‖ contenido)`. La clave vive en `instancia/`, fuera de la base; sin ella no se pueden recalcular los sellos tras alterar un evento.
+- **Ancla externa:** tras cada evento confirmado se escribe en `instancia/` el número y el sello del último evento, firmados. Si se borran los eventos finales o se restaura una copia vieja de la base, la verificación lo detecta porque la base queda por detrás del ancla.
+- **Verificación:** a demanda y por tarea diaria; un fallo aparece como alerta en el inicio de Dirección. A partir de la Fase 4 el ancla viaja también en cada corte y en cada respaldo, de modo que existe fuera del equipo.
 
 Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol, acceso a objetos ajenos, CSRF, fijación de sesión, fuerza bruta, autoaprobación, reutilización de código, delegación vencida, manipulación del libro, archivos maliciosos, inyección en exportaciones y concurrencia en contador de matrícula, folios e importaciones.
 
