@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Auditoría</h1>
+<div class="atajos">
+  <form method="get" class="busqueda"><input type="search" name="accion" value="{{ accion }}" placeholder="Filtrar por acción" aria-label="Acción"><button class="boton secundario" type="submit">Filtrar</button></form>
+  <form method="post" action="{% url 'auditoria:verificar' %}">{% csrf_token %}<button class="boton" type="submit">Verificar cadena</button></form>
+</div>
+<table class="tabla compacta">
+<thead><tr><th>#</th><th>Momento</th><th>Usuario</th><th>Acción</th><th>Objeto</th><th>Datos</th></tr></thead>
+<tbody>{% for e in eventos %}<tr><td>{{ e.pk }}</td><td>{{ e.momento|date:"d/m/Y H:i:s" }}</td><td>{{ e.usuario_texto|default:"—" }}</td><td>{{ e.accion }}</td><td>{{ e.objeto_tipo }} {{ e.objeto_id }}</td><td><small>{{ e.datos }}</small></td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

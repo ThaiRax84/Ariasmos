@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Hola, {{ user.nombre }}</h1>
+{% if por_revisar %}
+<section class="panel alerta">
+  <h2>Autorizaciones con tu código por revisar</h2>
+  <p>Se usaron códigos de tu autenticador para autorizar solicitudes. Confírmalas o repórtalas.</p>
+  <a class="boton" href="{% url 'autorizaciones' %}">Revisar ({{ por_revisar|length }})</a>
+</section>
+{% endif %}
+<div class="atajos">
+  {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}
+  {% if "ver_titulares" in permisos %}<a class="boton grande secundario" href="{% url 'titulares:lista' %}">Buscar {{ voc.titular|lower }}</a>{% endif %}
+  {% if dispositivos_pendientes %}<a class="boton grande secundario" href="{% url 'dispositivos' %}">Equipos por aprobar ({{ dispositivos_pendientes }})</a>{% endif %}
+</div>
+{% if "aprobar_solicitudes" in permisos %}
+<section class="panel">
+  <h2>Bandeja de pendientes</h2>
+  {% if pendientes %}
+  <ul class="lista">
+    {% for s, resaltada in pendientes %}
+    <li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }} · {{ s.titular }} · {{ s.titular.matricula_formateada }}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}{% if resaltada %} · lleva tiempo esperando{% endif %}</small></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p>No hay solicitudes pendientes.</p>{% endif %}
+</section>
+{% endif %}
+{% if propias %}
+<section class="panel">
+  <h2>Mis solicitudes en espera</h2>
+  <ul class="lista">{% for s in propias %}<li><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }} · {{ s.titular }}</a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if delegaciones %}
+<section class="panel">
+  <h2>Delegaciones que tengo</h2>
+  <ul class="lista">{% for d in delegaciones %}<li>{{ d.permiso|nombre_permiso }} · de {{ d.otorgante }}{% if d.vence %} · vence {{ d.vence|date:"d/m/Y H:i" }}{% endif %}{% if d.usos_maximos %} · {{ d.usos }}/{{ d.usos_maximos }} usos{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

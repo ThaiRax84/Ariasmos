@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<p class="paso">Instalación · paso {{ paso }} de 4</p>
+<h1>{{ titulo }}</h1>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Continuar</button></div>
+</form>
+{% endblock %}

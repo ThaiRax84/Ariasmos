@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Iniciar sesión</h1>
+<form method="post" class="formulario angosto">
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Entrar</button></div>
+</form>
+{% endblock %}

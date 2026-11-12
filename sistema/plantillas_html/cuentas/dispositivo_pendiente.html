@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Equipo no autorizado</h1>
+{% if dispositivo and dispositivo.estado == "revocado" %}
+<p>El acceso de este equipo fue revocado.</p>
+{% else %}
+<p>Este navegador todavía no está aprobado. Pide a Supervisión o Dirección que lo apruebe con este código:</p>
+<p class="codigo-equipo">{{ dispositivo.codigo }}</p>
+<p>Cuando lo aprueben, recarga esta página.</p>
+<a class="boton" href="{% url 'dispositivo_pendiente' %}">Ya lo aprobaron</a>
+{% endif %}
+{% endblock %}

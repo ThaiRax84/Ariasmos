@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block contenido %}
+<p class="paso">Instalación · paso {{ paso }} de 4</p>
+<h1>{{ titulo }}</h1>
+<ol class="pasos">
+  <li>En la aplicación autenticadora del teléfono, agrega una cuenta con esta clave: <code class="clave">{{ secreto }}</code></li>
+  <li>O pega este enlace si tu aplicación lo admite: <code class="uri">{{ uri }}</code></li>
+  <li>Escribe el código de 6 dígitos. Este equipo quedará aprobado como el primero.</li>
+</ol>
+<form method="post" class="formulario angosto">
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Terminar instalación</button></div>
+</form>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>{{ titular.nombre_completo }}</h1>
+<p class="matricula-grande">{{ voc.matricula }}: <strong>{{ titular.matricula_formateada }}</strong> <span class="estado {{ titular.estado }}">{{ titular.get_estado_display }}</span></p>
+<div class="atajos">
+  <a class="boton" href="{% url 'titulares:ficha_pago' titular.pk %}">Ficha de pago</a>
+  {% if puede_capturar %}
+    {% if titular.estado != "rechazado" %}<a class="boton secundario" href="{% url 'titulares:editar' titular.pk %}">Editar datos</a>{% endif %}
+    {% if titular.estado == "pendiente" and not alta_abierta %}<a class="boton secundario" href="{% url 'titulares:solicitar_alta' titular.pk %}">Pedir aprobación del alta</a>{% endif %}
+    {% if titular.estado == "activo" and not baja_abierta %}<a class="boton peligro" href="{% url 'titulares:baja' titular.pk %}">Baja</a>{% endif %}
+    {% if titular.estado == "baja" and not reactivacion_abierta %}<a class="boton secundario" href="{% url 'titulares:reactivar' titular.pk %}">Reactivar</a>{% endif %}
+  {% endif %}
+</div>
+<section class="panel">
+  <h2>Datos</h2>
+  <dl class="datos">
+    <dt>{{ voc.agrupacion }}</dt><dd>{{ titular.agrupacion|default:"—" }}</dd>
+    <dt>Alta capturada</dt><dd>{{ titular.creado|date:"d/m/Y H:i" }} por {{ titular.creado_por }}</dd>
+    {% if titular.motivo_baja %}<dt>Motivo de baja</dt><dd>{{ titular.motivo_baja }} ({{ titular.fecha_baja|date:"d/m/Y" }})</dd>{% endif %}
+    <dt>Consentimiento</dt><dd>{% if titular.constancia_consentimiento %}Registrado{% else %}No registrado{% endif %}</dd>
+    {% if titular.notas %}<dt>Notas</dt><dd>{{ titular.notas|linebreaksbr }}</dd>{% endif %}
+  </dl>
+</section>
+<section class="panel">
+  <h2>Contactos</h2>
+  {% for contacto, filas in contactos %}
+  <div class="contacto{% if contacto.principal %} principal{% endif %}">
+    <strong>{{ contacto.nombre }}</strong>{% if contacto.relacion %} · {{ contacto.relacion }}{% endif %}{% if contacto.principal %} · <em>principal</em>{% endif %}
+    <ul>{% for etiqueta, valor, medio in filas %}<li>{{ etiqueta }}: {{ valor }}</li>{% endfor %}</ul>
+    {% if puede_capturar %}<a href="{% url 'titulares:contacto_editar' titular.pk contacto.pk %}">Editar</a>{% endif %}
+  </div>
+  {% empty %}<p>Sin contactos.</p>{% endfor %}
+  {% if puede_capturar %}<p><a class="boton secundario" href="{% url 'titulares:contacto_nuevo' titular.pk %}">Agregar contacto</a></p>{% endif %}
+</section>
+{% if planes %}
+<section class="panel">
+  <h2>Planes de cobro</h2>
+  <ul class="lista">{% for p in planes %}<li>{{ p.concepto }}{% if p.importe_texto %} · {{ p.importe_texto }}{% endif %}{% if p.descuento_texto %} · descuento {{ p.descuento_texto }}{% endif %} · desde {{ p.vigente_desde|date:"d/m/Y" }}{% if not p.activo %} · inactivo{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if "administrar_conceptos" in permisos and titular.estado != "rechazado" %}<p><a href="{% url 'cobros:plan_nuevo' %}?titular={{ titular.pk }}">Agregar plan de cobro</a></p>{% endif %}
+<section class="panel">
+  <h2>Solicitudes</h2>
+  <ul class="lista">{% for s in solicitudes %}<li><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }} · {{ s.get_estado_display }}</a> <small>{{ s.creada|date:"d/m/Y H:i" }} · {{ s.solicitante }}{% if s.resuelta_por %} → {{ s.resuelta_por }} ({{ s.get_via_display }}){% endif %}</small></li>{% empty %}<li>Sin solicitudes.</li>{% endfor %}</ul>
+</section>
+{% endblock %}

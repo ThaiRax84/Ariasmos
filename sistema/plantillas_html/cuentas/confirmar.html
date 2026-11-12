@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Confirma tu contraseña</h1>
+<p>Esta acción es delicada. Escribe otra vez tu contraseña para continuar.</p>
+<form method="post" class="formulario angosto">
+  {% csrf_token %}
+  <input type="hidden" name="siguiente" value="{{ siguiente }}">
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Confirmar</button></div>
+</form>
+{% endblock %}

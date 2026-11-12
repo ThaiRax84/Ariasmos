@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Configuración</h1>
+<div class="rejilla">
+  <a class="boton grande secundario" href="{% url 'configuracion:negocio' %}">Datos del negocio</a>
+  <a class="boton grande secundario" href="{% url 'configuracion:vocabulario' %}">Vocabulario</a>
+  <a class="boton grande secundario" href="{% url 'configuracion:parametros' %}">Parámetros</a>
+  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'agrupaciones' %}">{{ voc.agrupaciones }}</a>
+  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'motivos' %}">Motivos de baja</a>
+  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'campos' %}">Campos de contacto</a>
+  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'relaciones' %}">Relaciones de contacto</a>
+</div>
+{% endblock %}

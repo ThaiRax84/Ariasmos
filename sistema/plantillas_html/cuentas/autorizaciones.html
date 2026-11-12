@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Autorizaciones con mi código</h1>
+{% if codigos %}
+<table class="tabla">
+<thead><tr><th>Cuándo</th><th>Capturó</th><th>Solicitud</th><th>Estado</th><th></th></tr></thead>
+<tbody>
+{% for c in codigos %}
+<tr class="{% if c.revision == 'por_revisar' %}resaltada{% endif %}">
+  <td>{{ c.usado_en|date:"d/m/Y H:i" }}</td>
+  <td>{{ c.usado_por }}</td>
+  <td>{% if c.solicitud %}{{ c.solicitud.get_accion_display }} · {{ c.solicitud.titular }}{% endif %}</td>
+  <td>{{ c.get_revision_display }}</td>
+  <td>{% if c.revision == 'por_revisar' %}
+    <form method="post" action="{% url 'revisar_autorizacion' c.pk %}" class="en-linea">{% csrf_token %}<input type="hidden" name="decision" value="confirmar"><button class="boton" type="submit">Confirmar</button></form>
+    <form method="post" action="{% url 'revisar_autorizacion' c.pk %}" class="en-linea">{% csrf_token %}<input type="hidden" name="decision" value="reportar"><button class="boton peligro" type="submit" data-confirmar="¿Reportar esta autorización como no reconocida?">Reportar</button></form>
+  {% endif %}</td>
+</tr>
+{% endfor %}
+</tbody></table>
+{% else %}<p>No se han usado códigos tuyos para autorizar.</p>{% endif %}
+{% endblock %}
