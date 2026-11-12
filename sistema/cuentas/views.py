@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import login, logout
+from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -16,6 +18,7 @@ from nucleo import totp
 from . import servicios
 from .decoradores import requiere_permiso, requiere_sesion
 from .formularios import (
+    FormularioActivacion,
     FormularioAprobarDispositivo,
     FormularioCambioPropio,
     FormularioCodigo,
@@ -27,7 +30,7 @@ from .formularios import (
     FormularioUsuarioEditar,
     FormularioUsuarioNuevo,
 )
-from .models import CodigoUsado, Delegacion, Dispositivo, PermisoRol, Rol, Usuario
+from .models import CodigoActivacion, CodigoUsado, Delegacion, Dispositivo, PermisoRol, Rol, Usuario
 from .permisos import PERMISOS
 
 MENSAJE_FALLO = "Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente."
@@ -112,6 +115,61 @@ def entrar_codigo(request):
             servicios.registrar_fallo(usuario, request, motivo=f"codigo_{motivo}")
             messages.error(request, "El código no es válido o ya se usó.")
     return render(request, "cuentas/entrar_codigo.html", {"formulario": formulario})
+
+
+MENSAJE_ACTIVACION = "Usuario o código de activación no válidos, o la cuenta está bloqueada temporalmente."
+
+
+def activar(request):
+    if request.user.is_authenticated:
+        return redirect("inicio")
+    formulario = FormularioActivacion(request.POST if request.method == "POST" else None)
+    if request.method == "POST":
+        if servicios.limite_intentos_superado(request):
+            messages.error(request, "Demasiados intentos desde este equipo. Espera unos minutos.")
+            return render(request, "cuentas/activar.html", {"formulario": formulario}, status=429)
+        servicios.contar_intento(request)
+        if formulario.is_valid():
+            datos = formulario.cleaned_data
+            usuario = Usuario.objects.filter(usuario__iexact=datos["usuario"]).first()
+            activacion = None
+            if usuario is None:
+                make_password(datos["contrasena1"])
+                registrar("codigo_activacion_fallido", datos={"motivo": "usuario_desconocido"}, request=request)
+            elif usuario.esta_bloqueado() or not usuario.activo:
+                registrar("codigo_activacion_fallido", objeto=usuario, datos={"motivo": "bloqueado" if usuario.activo else "inactivo"}, request=request)
+            else:
+                encontrado = servicios.buscar_activacion(usuario, datos["codigo"])
+                if encontrado is not None and encontrado.vigente():
+                    activacion = encontrado
+                elif encontrado is not None and encontrado.usado_en is None and not encontrado.invalidado:
+                    registrar("codigo_activacion_caducado", objeto=usuario, datos={"codigo": encontrado.pk}, request=request)
+                    servicios.registrar_fallo(usuario, request, motivo="activacion_caducada")
+                else:
+                    registrar("codigo_activacion_fallido", objeto=usuario, datos={"motivo": "codigo"}, request=request)
+                    servicios.registrar_fallo(usuario, request, motivo="activacion")
+            if activacion is not None:
+                try:
+                    password_validation.validate_password(datos["contrasena1"], usuario)
+                except ValidationError as error:
+                    formulario.add_error("contrasena1", error)
+                    return render(request, "cuentas/activar.html", {"formulario": formulario})
+                with transaction.atomic():
+                    quemado = CodigoActivacion.objects.filter(pk=activacion.pk, usado_en__isnull=True, invalidado=False).update(usado_en=timezone.now())
+                    if quemado == 1:
+                        usuario.set_password(datos["contrasena1"])
+                        usuario.save(update_fields=["password"])
+                        servicios.invalidar_activaciones(usuario)
+                        registrar("cuenta_activada", usuario=usuario, objeto=usuario, datos={"codigo": activacion.pk, "generado_por": activacion.creado_por_id}, request=request)
+                if quemado == 1:
+                    if usuario.totp_confirmado:
+                        request.session["pendiente_codigo"] = usuario.pk
+                        request.session["pendiente_codigo_en"] = timezone.now().timestamp()
+                        messages.info(request, "Contraseña definida. Escribe el código de tu autenticador.")
+                        return redirect("entrar_codigo")
+                    return _completar_inicio(request, usuario)
+            messages.error(request, MENSAJE_ACTIVACION)
+    return render(request, "cuentas/activar.html", {"formulario": formulario})
 
 
 @require_POST
@@ -240,10 +298,11 @@ def usuario_nuevo(request):
             servicios.rechazar_escalada(request.user, request, "crear_usuario_con_rol_superior", datos["rol"], exceso)
             messages.error(request, "No puedes crear un usuario con un rol que tiene permisos que tú no tienes.")
             return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Nuevo usuario", "boton": "Crear usuario", "volver": "usuarios"}, status=403)
-        nuevo = Usuario.objects.create_user(datos["usuario"], datos["contrasena1"], nombre=datos["nombre"], rol=datos["rol"])
-        registrar("usuario_creado", usuario=request.user, objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": nuevo.rol_id}, request=request)
-        messages.success(request, f"Usuario {nuevo.usuario} creado.")
-        return redirect("usuarios")
+        with transaction.atomic():
+            nuevo = Usuario.objects.create_user(datos["usuario"], None, nombre=datos["nombre"], rol=datos["rol"])
+            registrar("usuario_creado", usuario=request.user, objeto=nuevo, datos={"usuario": nuevo.usuario, "cambios": diferencias({}, {"nombre": nuevo.nombre, "rol": str(nuevo.rol), "activo": True})}, request=request)
+            codigo, caduca = servicios.generar_activacion(nuevo, request.user, request)
+        return render(request, "cuentas/codigo_activacion.html", {"objetivo": nuevo, "codigo": codigo, "caduca": caduca})
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Nuevo usuario", "boton": "Crear usuario", "volver": "usuarios"})
 
 
@@ -266,8 +325,6 @@ def usuario_editar(request, pk):
         with transaction.atomic():
             cambiado = formulario.save(commit=False)
             datos = formulario.cleaned_data
-            if datos.get("contrasena_nueva"):
-                cambiado.set_password(datos["contrasena_nueva"])
             if datos.get("desbloquear"):
                 cambiado.intentos_fallidos = 0
                 cambiado.bloqueado_hasta = None
@@ -286,12 +343,15 @@ def usuario_editar(request, pk):
                 datos={
                     "usuario": cambiado.usuario,
                     "cambios": diferencias(antes, {"nombre": cambiado.nombre, "rol": str(cambiado.rol) if cambiado.rol_id else None, "activo": cambiado.activo}),
-                    "contrasena_cambiada": bool(datos.get("contrasena_nueva")),
+                    "acceso_restablecido": bool(datos.get("restablecer_acceso")),
                     "desbloqueado": bool(datos.get("desbloquear")),
                     "totp_reiniciado": bool(datos.get("reiniciar_totp")),
                 },
                 request=request,
             )
+            activacion = servicios.restablecer_acceso(cambiado, request.user, request) if datos.get("restablecer_acceso") else None
+        if activacion is not None:
+            return render(request, "cuentas/codigo_activacion.html", {"objetivo": cambiado, "codigo": activacion[0], "caduca": activacion[1]})
         messages.success(request, "Usuario actualizado.")
         return redirect("usuarios")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Editar usuario {objetivo.usuario}", "boton": "Guardar", "volver": "usuarios"})

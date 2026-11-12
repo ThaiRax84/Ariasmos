@@ -1,9 +1,11 @@
 import hashlib
+import hmac
 import secrets
 from datetime import timedelta
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import F, Q
@@ -14,7 +16,7 @@ from configuracion.models import parametro
 from nucleo import totp
 from proyecto.red import ip_cliente
 
-from .models import CodigoUsado, Delegacion, Dispositivo, Usuario
+from .models import CodigoActivacion, CodigoUsado, Delegacion, Dispositivo, Usuario
 from .permisos import INDISPENSABLES
 
 ALFABETO_CODIGO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -233,3 +235,45 @@ def ligar_sesion(request):
     dispositivo = getattr(request, "dispositivo", None)
     if dispositivo is not None:
         request.session[CLAVE_SESION_EQUIPO] = dispositivo.pk
+
+
+def normalizar_activacion(texto):
+    return "".join(c for c in str(texto or "").upper() if c.isascii() and c.isalnum())
+
+
+def hash_activacion(codigo):
+    return hmac.new(settings.SECRET_KEY.encode("utf-8"), ("activacion|" + normalizar_activacion(codigo)).encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def invalidar_activaciones(usuario):
+    return CodigoActivacion.objects.filter(usuario=usuario, usado_en__isnull=True, invalidado=False).update(invalidado=True)
+
+
+def generar_activacion(usuario, creado_por, request=None):
+    invalidar_activaciones(usuario)
+    codigo = "".join(secrets.choice(ALFABETO_CODIGO) for _ in range(10))
+    caduca = timezone.now() + timedelta(hours=parametro("horas_validez_codigo_activacion"))
+    CodigoActivacion.objects.create(usuario=usuario, hash_codigo=hash_activacion(codigo), creado_por=creado_por, caduca=caduca)
+    registrar("codigo_activacion_generado", usuario=creado_por, objeto=usuario, datos={"para": usuario.usuario, "caduca": caduca}, request=request)
+    return f"{codigo[:5]}-{codigo[5:]}", caduca
+
+
+def cerrar_sesiones(usuario):
+    cerradas = 0
+    for sesion in Session.objects.filter(expire_date__gt=timezone.now()):
+        if sesion.get_decoded().get("_auth_user_id") == str(usuario.pk):
+            sesion.delete()
+            cerradas += 1
+    return cerradas
+
+
+def restablecer_acceso(usuario, actor, request=None):
+    usuario.set_unusable_password()
+    usuario.save(update_fields=["password"])
+    cerradas = cerrar_sesiones(usuario)
+    registrar("acceso_restablecido", usuario=actor, objeto=usuario, datos={"para": usuario.usuario, "sesiones_cerradas": cerradas}, request=request)
+    return generar_activacion(usuario, actor, request)
+
+
+def buscar_activacion(usuario, codigo):
+    return CodigoActivacion.objects.filter(usuario=usuario, hash_codigo=hash_activacion(codigo)).first()

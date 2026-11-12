@@ -49,11 +49,10 @@ class FormularioCambioPropio(ContrasenaNueva):
         return valor
 
 
-class FormularioUsuarioNuevo(ContrasenaNueva):
+class FormularioUsuarioNuevo(forms.Form):
     usuario = forms.RegexField(label="Usuario", max_length=60, regex=r"^[a-zA-Z0-9_.-]+$", error_messages={"invalid": "Solo letras, números, punto, guion y guion bajo."})
     nombre = forms.CharField(label="Nombre completo", max_length=150)
     rol = forms.ModelChoiceField(label="Rol", queryset=Rol.objects.all())
-    field_order = ["usuario", "nombre", "rol", "contrasena1", "contrasena2"]
 
     def clean_usuario(self):
         valor = self.cleaned_data["usuario"]
@@ -63,7 +62,7 @@ class FormularioUsuarioNuevo(ContrasenaNueva):
 
 
 class FormularioUsuarioEditar(forms.ModelForm):
-    contrasena_nueva = forms.CharField(label="Contraseña nueva (opcional)", required=False, strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
+    restablecer_acceso = forms.BooleanField(label="Restablecer acceso: invalida su contraseña y sus sesiones y genera un código de activación", required=False)
     desbloquear = forms.BooleanField(label="Quitar bloqueo por intentos", required=False)
     reiniciar_totp = forms.BooleanField(label="Reiniciar autenticador (deberá darlo de alta otra vez)", required=False)
 
@@ -71,11 +70,10 @@ class FormularioUsuarioEditar(forms.ModelForm):
         model = Usuario
         fields = ["nombre", "rol", "activo"]
 
-    def clean_contrasena_nueva(self):
-        valor = self.cleaned_data.get("contrasena_nueva")
-        if valor:
-            password_validation.validate_password(valor, self.instance)
-        return valor
+class FormularioActivacion(ContrasenaNueva):
+    usuario = forms.CharField(label="Usuario", max_length=60, widget=forms.TextInput(attrs={"autocomplete": "username", "autofocus": True}))
+    codigo = forms.CharField(label="Código de activación", max_length=20, widget=forms.TextInput(attrs={"autocomplete": "off", "autocapitalize": "characters"}))
+    field_order = ["usuario", "codigo", "contrasena1", "contrasena2"]
 
 
 class FormularioRol(forms.ModelForm):

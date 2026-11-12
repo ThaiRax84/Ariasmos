@@ -20,6 +20,7 @@ PARAMETROS = {
     "intentos_codigo_por_solicitud": (5, "Códigos erróneos permitidos por solicitud antes de exigir la bandeja"),
     "intentos_codigo_por_hora": (5, "Códigos por teléfono erróneos por hora, por capturista y por autorizador, antes de bloquear esa vía"),
     "maximo_equipos_pendientes": (50, "Equipos pendientes de aprobación como máximo; los de más de 24 horas se depuran solos"),
+    "horas_validez_codigo_activacion": (72, "Horas que vale un código de activación de cuenta"),
     "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
     "digitos_telefono_nacional": (10, "Dígitos de un teléfono nacional sin prefijo de país"),

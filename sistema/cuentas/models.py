@@ -196,3 +196,19 @@ class CodigoUsado(models.Model):
     class Meta:
         ordering = ["-usado_en"]
         constraints = [models.UniqueConstraint(fields=["autorizador", "paso"], name="codigo_un_solo_uso")]
+
+
+class CodigoActivacion(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name="codigos_activacion")
+    hash_codigo = models.CharField(max_length=64, unique=True)
+    creado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    creado = models.DateTimeField(auto_now_add=True)
+    caduca = models.DateTimeField()
+    usado_en = models.DateTimeField(null=True, blank=True)
+    invalidado = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-creado"]
+
+    def vigente(self, ahora=None):
+        return self.usado_en is None and not self.invalidado and self.caduca > (ahora or timezone.now())
