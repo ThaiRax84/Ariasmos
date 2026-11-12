@@ -160,7 +160,7 @@ def conceptos(request):
                 if valor:
                     regla, _ = ReglaRecargo.objects.update_or_create(
                         nombre=f"Recargo de {concepto.nombre}",
-                        defaults={"tipo": datos[f"recargo_tipo_{concepto.pk}"], "valor": valor, "dias_gracia": datos.get(f"recargo_gracia_{concepto.pk}") or 0},
+                        defaults={"tipo": datos.get(f"recargo_tipo_{concepto.pk}") or ReglaRecargo.FIJO, "valor": valor, "dias_gracia": datos.get(f"recargo_gracia_{concepto.pk}") or 0},
                     )
                     concepto.regla_recargo = regla
                 concepto.save()

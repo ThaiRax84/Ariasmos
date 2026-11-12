@@ -192,7 +192,7 @@ class FormularioAsistenteConceptos(forms.Form):
                 self.fields[f"dia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: día de vencimiento (1 a 28)", min_value=1, max_value=28, required=False)
             if concepto.nombre in (con_recargo or {}):
                 sugerido = (con_recargo or {})[concepto.nombre] or {}
-                self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: tipo de recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"))
+                self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: tipo de recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"), required=False)
                 self.fields[f"recargo_valor_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: valor del recargo (importe o porcentaje)", required=False)
                 self.fields[f"recargo_gracia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: días de gracia", min_value=0, max_value=60, required=False, initial=sugerido.get("dias_gracia", 0))
 
