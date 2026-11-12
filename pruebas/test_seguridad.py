@@ -166,7 +166,8 @@ def test_cambio_de_permisos_auditado(personas):
     c.post(reverse("rol_editar", args=[rol.pk]), {"nombre": rol.nombre, "nivel": 1, "minutos_inactividad": 30, "permisos": permisos})
     assert "administrar_conceptos" in rol.permisos()
     evento = Evento.objects.filter(accion="rol_cambiado").latest("id")
-    assert "administrar_conceptos" in evento.datos["despues"] and "administrar_conceptos" not in evento.datos["antes"]
+    antes, despues = evento.datos["cambios"]["permisos"]
+    assert "administrar_conceptos" in despues and "administrar_conceptos" not in antes
 
 
 def test_limite_por_ip(personas):

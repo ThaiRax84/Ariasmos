@@ -6,6 +6,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 ARCHIVO = "configuracion.json"
+ANCLA = "ancla_auditoria.json"
 
 
 def carpeta():
@@ -33,12 +34,18 @@ def nueva(https=True):
     return {
         "clave_django": secrets.token_urlsafe(50),
         "clave_matricula": secrets.token_hex(32),
+        "clave_auditoria": secrets.token_hex(32),
         "base_datos": str(base / "cobro.sqlite3"),
         "https": https,
         "hosts": hosts,
         "origenes_confiables": [],
         "proxies_confiables": ["127.0.0.1", "::1"],
     }
+
+
+def faltantes(datos):
+    completas = {"clave_auditoria": secrets.token_hex(32), "proxies_confiables": ["127.0.0.1", "::1"]}
+    return {clave: valor for clave, valor in completas.items() if clave not in datos}
 
 
 def escribir(datos):

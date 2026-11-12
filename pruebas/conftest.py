@@ -53,6 +53,12 @@ def codigo_actual(usuario, desfase=0):
     return totp.codigo(usuario.totp_secreto, totp.paso_actual() + desfase)
 
 
+@pytest.fixture(autouse=True)
+def ancla_temporal(settings, tmp_path):
+    settings.RUTA_ANCLA_AUDITORIA = str(tmp_path / "ancla_auditoria.json")
+    return settings.RUTA_ANCLA_AUDITORIA
+
+
 @pytest.fixture
 def roles(db):
     return configurar("escuela")

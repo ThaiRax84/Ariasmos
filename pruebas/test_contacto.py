@@ -70,8 +70,9 @@ def test_edicion_de_contacto_auditada(personas):
     assert contacto.nombre == "Otra persona" and contacto.valor(campo) == "523398765432"
     evento = Evento.objects.filter(accion="contacto_editado").latest("id")
     assert evento.usuario == personas["op"]
-    assert evento.datos["antes"]["valores"][str(campo.pk)] == "525512345678"
-    assert evento.datos["despues"]["valores"][str(campo.pk)] == "523398765432"
+    assert evento.datos["cambios"][campo.etiqueta] == ["+52 55 1234 5678", "+52 33 9876 5432"]
+    assert evento.datos["cambios"]["Nombre del contacto"] == ["Responsable", "Otra persona"]
+    assert evento.titular == titular.pk
 
 
 def test_segundo_contacto_principal_desplaza_al_primero(personas):

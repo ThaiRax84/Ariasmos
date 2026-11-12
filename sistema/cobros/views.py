@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.forms.models import model_to_dict
 from django.shortcuts import get_object_or_404, redirect, render
 
-from auditoria.servicios import registrar
+from auditoria.servicios import diferencias, registrar
 from cuentas.decoradores import requiere_permiso
 
 from .formularios import FormularioConcepto, FormularioPlan, FormularioRegla
@@ -20,7 +20,7 @@ def _guardar(request, clase_formulario, instancia, evento, destino, titulo, inic
             f"{evento}_{'cambiado' if antes else 'creado'}",
             usuario=request.user,
             objeto=guardado,
-            datos={"antes": antes, "despues": model_to_dict(guardado)},
+            datos={"nombre": str(guardado), "cambios": diferencias(antes or {}, model_to_dict(guardado))},
             request=request,
         )
         messages.success(request, "Guardado.")

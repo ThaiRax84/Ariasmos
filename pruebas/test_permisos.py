@@ -21,6 +21,7 @@ MATRIZ = {
     "titulares:nuevo": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:detalle": ("ver_titulares",),
     "titulares:ficha_pago": ("ver_titulares",),
+    "titulares:historial": ("ver_titulares",),
     "titulares:editar": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:contacto_nuevo": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:contacto_editar": ("solicitar_alta_baja", "alta_baja_directa"),
@@ -104,6 +105,7 @@ def escenario(db):
     argumentos = {
         "titulares:detalle": {"pk": titular.pk},
         "titulares:ficha_pago": {"pk": titular.pk},
+        "titulares:historial": {"pk": titular.pk},
         "titulares:editar": {"pk": titular.pk},
         "titulares:contacto_nuevo": {"pk": titular.pk},
         "titulares:contacto_editar": {"pk": titular.pk, "contacto_pk": Contacto.objects.get(titular=titular).pk},

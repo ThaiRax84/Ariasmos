@@ -1,12 +1,19 @@
 {% extends "base.html" %}
+{% load formato %}
 {% block contenido %}
-<h1>Auditoría</h1>
+<h1>Bitácora</h1>
+{% if verificacion %}<p class="{% if not verificacion.valida %}mensaje error{% endif %}">Última verificación: {{ verificacion.momento|date:"d/m/Y H:i" }} · {% if verificacion.valida %}íntegra ({{ verificacion.eventos }} eventos){% else %}NO íntegra: {{ motivos|obtener:verificacion.motivo }}{% if verificacion.numero %} (evento {{ verificacion.numero }}){% endif %}{% endif %}</p>{% endif %}
 <div class="atajos">
-  <form method="get" class="busqueda"><input type="search" name="accion" value="{{ accion }}" placeholder="Filtrar por acción" aria-label="Acción"><button class="boton secundario" type="submit">Filtrar</button></form>
-  <form method="post" action="{% url 'auditoria:verificar' %}">{% csrf_token %}<button class="boton" type="submit">Verificar cadena</button></form>
+  <form method="get" class="busqueda">
+    <input type="search" name="accion" value="{{ accion }}" placeholder="Acción" aria-label="Acción">
+    <select name="usuario" aria-label="Usuario"><option value="">Todos los usuarios</option>{% for u in usuarios %}<option value="{{ u.pk }}"{% if usuario == u.pk|stringformat:"d" %} selected{% endif %}>{{ u.nombre }}</option>{% endfor %}</select>
+    <input type="search" name="titular" value="{{ titular }}" placeholder="{{ voc.matricula }}" aria-label="{{ voc.titular }}">
+    <button class="boton secundario" type="submit">Filtrar</button>
+  </form>
+  <form method="post" action="{% url 'auditoria:verificar' %}">{% csrf_token %}<button class="boton" type="submit">Verificar bitácora</button></form>
 </div>
 <table class="tabla compacta">
-<thead><tr><th>#</th><th>Momento</th><th>Usuario</th><th>Acción</th><th>Objeto</th><th>Datos</th></tr></thead>
-<tbody>{% for e in eventos %}<tr><td>{{ e.pk }}</td><td>{{ e.momento|date:"d/m/Y H:i:s" }}</td><td>{{ e.usuario_texto|default:"—" }}</td><td>{{ e.accion }}</td><td>{{ e.objeto_tipo }} {{ e.objeto_id }}</td><td><small>{{ e.datos }}</small></td></tr>{% endfor %}</tbody>
+<thead><tr><th>#</th><th>Momento</th><th>Usuario</th><th>Equipo</th><th>Acción</th><th>Objeto</th><th>Datos</th></tr></thead>
+<tbody>{% for e in eventos %}<tr><td>{{ e.numero }}</td><td>{{ e.momento|date:"d/m/Y H:i:s" }}</td><td>{{ e.usuario_texto|default:"—" }}</td><td>{{ e.equipo|default:"—" }}</td><td>{{ e.accion }}</td><td>{{ e.objeto_tipo }} {{ e.objeto_id }}{% if e.titular %} · {{ voc.titular|lower }} {{ e.titular }}{% endif %}</td><td><small>{{ e.datos }}</small></td></tr>{% endfor %}</tbody>
 </table>
 {% endblock %}

@@ -45,4 +45,4 @@ def test_asignacion_concurrente_de_matriculas():
     assert len(set(matriculas)) == len(matriculas)
     assert all(es_valida(m, 7) for m in matriculas)
     assert Negocio.objects.get(pk=1).contador_matricula >= HILOS * POR_HILO
-    assert verificar_cadena()[0]
+    assert verificar_cadena().valida

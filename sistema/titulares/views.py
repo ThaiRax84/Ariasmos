@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from auditoria.servicios import registrar
+from auditoria.servicios import diferencias, registrar
 from configuracion.models import parametro, vocabulario
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
@@ -12,9 +12,10 @@ from solicitudes import motor
 from solicitudes.models import Solicitud
 
 from . import contactos
+from .historial import historial
 from .formularios import FormularioAlta, FormularioBaja, FormularioEditarContacto, FormularioNota, FormularioTitular
 from .models import Contacto, Titular
-from .servicios import crear_titular, guardar_contacto
+from .servicios import crear_titular, foto_titular, guardar_contacto
 
 CAPTURA = ("solicitar_alta_baja", "alta_baja_directa")
 
@@ -90,6 +91,12 @@ def detalle(request, pk):
 
 
 @requiere_permiso("ver_titulares")
+def ver_historial(request, pk):
+    titular = get_object_or_404(Titular, pk=pk)
+    return render(request, "titulares/historial.html", {"titular": titular, "filas": historial(titular, vocabulario())})
+
+
+@requiere_permiso("ver_titulares")
 def ficha_pago(request, pk):
     titular = get_object_or_404(Titular, pk=pk)
     contacto = contactos.principal(titular)
@@ -103,12 +110,13 @@ def editar(request, pk):
     titular = get_object_or_404(Titular, pk=pk)
     if titular.estado == Titular.RECHAZADO:
         raise PermissionDenied
-    antes = {"nombre": titular.nombre, "apellidos": titular.apellidos, "agrupacion": titular.agrupacion_id, "notas": titular.notas}
+    original = foto_titular(titular)
     formulario = FormularioTitular(request.POST if request.method == "POST" else None, instance=titular, voc=vocabulario())
     if request.method == "POST" and formulario.is_valid():
         guardado = formulario.save()
-        despues = {"nombre": guardado.nombre, "apellidos": guardado.apellidos, "agrupacion": guardado.agrupacion_id, "notas": guardado.notas}
-        registrar("titular_editado", usuario=request.user, objeto=guardado, datos={"antes": antes, "despues": despues}, request=request)
+        cambios = diferencias(original, foto_titular(guardado))
+        if cambios:
+            registrar("titular_editado", usuario=request.user, objeto=guardado, datos={"cambios": cambios}, request=request)
         messages.success(request, "Datos guardados.")
         return redirect("titulares:detalle", pk=pk)
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Editar {titular}", "boton": "Guardar"})

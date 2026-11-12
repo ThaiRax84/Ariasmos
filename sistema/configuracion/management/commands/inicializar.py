@@ -26,7 +26,12 @@ class Command(BaseCommand):
             instancia.reemplazar(datos)
             self.stdout.write(self.style.SUCCESS("Token del asistente renovado."))
         else:
-            self.stdout.write(f"La instancia ya existe en {instancia.carpeta()}; no se cambió nada.")
+            nuevas = instancia.faltantes(datos)
+            if nuevas:
+                instancia.reemplazar({**datos, **nuevas})
+                self.stdout.write(self.style.SUCCESS(f"Instancia existente completada con: {', '.join(sorted(nuevas))}"))
+            else:
+                self.stdout.write(f"La instancia ya existe en {instancia.carpeta()}; no se cambió nada.")
             return
         self.stdout.write(f"Token del asistente: {token}")
         self.stdout.write("Guárdalo: se pide en el primer paso del asistente y no se vuelve a mostrar.")

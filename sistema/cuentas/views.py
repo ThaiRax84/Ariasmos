@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from auditoria.servicios import registrar
+from auditoria.servicios import diferencias, registrar
 from nucleo import totp
 
 from . import servicios
@@ -254,7 +254,7 @@ def usuario_editar(request, pk):
     if exceso:
         servicios.rechazar_escalada(request.user, request, "editar_usuario_superior", objetivo, exceso)
         raise PermissionDenied
-    antes = {"nombre": objetivo.nombre, "rol": objetivo.rol_id, "activo": objetivo.activo}
+    antes = {"nombre": objetivo.nombre, "rol": str(objetivo.rol) if objetivo.rol_id else None, "activo": objetivo.activo}
     formulario = FormularioUsuarioEditar(request.POST if request.method == "POST" else None, instance=objetivo)
     if request.method == "POST" and formulario.is_valid():
         rol_nuevo = formulario.cleaned_data.get("rol")
@@ -284,8 +284,8 @@ def usuario_editar(request, pk):
                 usuario=request.user,
                 objeto=cambiado,
                 datos={
-                    "antes": antes,
-                    "despues": {"nombre": cambiado.nombre, "rol": cambiado.rol_id, "activo": cambiado.activo},
+                    "usuario": cambiado.usuario,
+                    "cambios": diferencias(antes, {"nombre": cambiado.nombre, "rol": str(cambiado.rol) if cambiado.rol_id else None, "activo": cambiado.activo}),
                     "contrasena_cambiada": bool(datos.get("contrasena_nueva")),
                     "desbloqueado": bool(datos.get("desbloquear")),
                     "totp_reiniciado": bool(datos.get("reiniciar_totp")),
@@ -312,7 +312,7 @@ def _guardar_rol(request, rol=None):
             raise PermissionDenied
     formulario = FormularioRol(request.POST if request.method == "POST" else None, instance=rol)
     if request.method == "POST" and formulario.is_valid():
-        antes = sorted(rol.permisos()) if rol else []
+        antes_rol = {"nombre": rol.nombre, "nivel": rol.nivel, "minutos_inactividad": rol.minutos_inactividad, "requiere_totp": rol.requiere_totp, "permisos": sorted(rol.permisos())} if rol else {}
         nuevos = set(formulario.cleaned_data["permisos"])
         exceso = servicios.permisos_que_exceden(request.user, nuevos)
         if exceso:
@@ -332,7 +332,10 @@ def _guardar_rol(request, rol=None):
                 "rol_creado" if rol is None else "rol_cambiado",
                 usuario=request.user,
                 objeto=guardado,
-                datos={"nombre": guardado.nombre, "antes": antes, "despues": sorted(nuevos), "requiere_totp": guardado.requiere_totp, "minutos_inactividad": guardado.minutos_inactividad},
+                datos={
+                    "nombre": guardado.nombre,
+                    "cambios": diferencias(antes_rol, {"nombre": guardado.nombre, "nivel": guardado.nivel, "minutos_inactividad": guardado.minutos_inactividad, "requiere_totp": guardado.requiere_totp, "permisos": sorted(nuevos)}),
+                },
                 request=request,
             )
         messages.success(request, "Rol guardado.")

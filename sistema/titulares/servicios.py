@@ -1,11 +1,35 @@
 from django.conf import settings
 from django.db import transaction
 
-from auditoria.servicios import registrar
+from auditoria.servicios import diferencias, registrar
 from configuracion.models import Negocio
 from nucleo import matricula as generador
 
-from .models import Contacto, Titular
+from . import contactos
+from .models import CampoContacto, Contacto, Titular
+
+
+def foto_titular(titular):
+    return {
+        "nombre": titular.nombre,
+        "apellidos": titular.apellidos,
+        "agrupacion": str(titular.agrupacion) if titular.agrupacion_id else None,
+        "notas": titular.notas,
+        "estado": titular.get_estado_display(),
+        "motivo_baja": str(titular.motivo_baja) if titular.motivo_baja_id else None,
+    }
+
+
+def foto_contacto(contacto):
+    foto = {
+        "Nombre del contacto": contacto.nombre,
+        "Relación": str(contacto.relacion) if contacto.relacion_id else None,
+        "Contacto principal": "Sí" if contacto.principal else "No",
+    }
+    for campo in CampoContacto.objects.all():
+        valor = contacto.valor(campo)
+        foto[campo.etiqueta] = contactos.mostrar_valor(campo, valor) if valor else None
+    return foto
 
 
 def siguiente_matricula(negocio):
@@ -34,7 +58,7 @@ def crear_titular(usuario, datos, contacto=None, conceptos=(), request=None):
             "titular_creado",
             usuario=usuario,
             objeto=titular,
-            datos={"matricula": asignada, "conceptos": [c.pk for c in conceptos]},
+            datos={"matricula": asignada, "conceptos": [str(c) for c in conceptos], "cambios": diferencias({}, foto_titular(titular))},
             request=request,
         )
         if contacto is not None:
@@ -45,26 +69,30 @@ def crear_titular(usuario, datos, contacto=None, conceptos=(), request=None):
 def guardar_contacto(usuario, titular, datos, contacto=None, principal=None, request=None):
     with transaction.atomic():
         nuevo = contacto is None
-        antes = None
         if nuevo:
             contacto = Contacto(titular=titular)
+            antes = {}
         else:
-            antes = {"nombre": contacto.nombre, "relacion": contacto.relacion_id, "valores": dict(contacto.valores), "principal": contacto.principal}
+            antes = foto_contacto(contacto)
         if principal is None:
             principal = contacto.principal if not nuevo else not Contacto.objects.filter(titular=titular, principal=True).exists()
         if principal:
-            Contacto.objects.filter(titular=titular, principal=True).exclude(pk=contacto.pk).update(principal=False)
+            for otro in Contacto.objects.filter(titular=titular, principal=True).exclude(pk=contacto.pk):
+                otro.principal = False
+                otro.save(update_fields=["principal", "actualizado"])
+                registrar("contacto_editado", usuario=usuario, objeto=otro, datos={"contacto": otro.nombre, "cambios": {"Contacto principal": ["Sí", "No"]}}, request=request)
         contacto.nombre = datos["nombre"]
         contacto.relacion = datos.get("relacion")
         contacto.valores = datos.get("valores", {})
         contacto.principal = principal
         contacto.save()
-        despues = {"nombre": contacto.nombre, "relacion": contacto.relacion_id, "valores": dict(contacto.valores), "principal": contacto.principal}
-        registrar(
-            "contacto_creado" if nuevo else "contacto_editado",
-            usuario=usuario,
-            objeto=contacto,
-            datos={"titular": titular.pk, "antes": antes, "despues": despues},
-            request=request,
-        )
+        cambios = diferencias(antes, foto_contacto(contacto))
+        if nuevo or cambios:
+            registrar(
+                "contacto_creado" if nuevo else "contacto_editado",
+                usuario=usuario,
+                objeto=contacto,
+                datos={"contacto": contacto.nombre, "cambios": cambios},
+                request=request,
+            )
     return contacto

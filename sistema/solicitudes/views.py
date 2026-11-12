@@ -3,7 +3,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from auditoria.servicios import registrar
+from auditoria.servicios import diferencias, registrar
 from cuentas.decoradores import requiere_permiso
 
 from . import motor
@@ -110,7 +110,7 @@ def politica_editar(request, pk):
     formulario = FormularioPolitica(request.POST if request.method == "POST" else None, instance=politica)
     if request.method == "POST" and formulario.is_valid():
         guardada = formulario.save()
-        registrar("politica_cambiada", usuario=request.user, objeto=guardada, datos={"antes": antes, "despues": formulario.cleaned_data}, request=request)
+        registrar("politica_cambiada", usuario=request.user, objeto=guardada, datos={"accion": guardada.accion, "cambios": diferencias(antes, FormularioPolitica(instance=guardada).initial)}, request=request)
         messages.success(request, "Política guardada.")
         return redirect("solicitudes:politicas")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Política: {politica}", "boton": "Guardar"})

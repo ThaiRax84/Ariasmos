@@ -30,17 +30,41 @@ def test_dinero_en_centavos():
             dinero.a_centavos(malo)
 
 
-def test_cadena_detecta_alteracion():
+CLAVE_BITACORA = bytes(range(32, 64))
+
+
+def _cadena(clave, n=5):
     eslabones = []
     anterior = cadena.GENESIS
-    for i in range(5):
-        contenido = {"i": i, "texto": "á"}
-        propio = cadena.encadenar(anterior, contenido)
-        eslabones.append((anterior, contenido, propio))
-        anterior = propio
-    assert cadena.verificar(eslabones) is None
-    eslabones[2] = (eslabones[2][0], {"i": 99, "texto": "á"}, eslabones[2][2])
-    assert cadena.verificar(eslabones) == 2
+    for i in range(n):
+        contenido = {"numero": i + 1, "texto": "á"}
+        sello = cadena.sellar(clave, anterior, contenido)
+        eslabones.append((anterior, contenido, sello))
+        anterior = sello
+    return eslabones
+
+
+def test_cadena_detecta_alteracion():
+    eslabones = _cadena(CLAVE_BITACORA)
+    assert cadena.verificar(CLAVE_BITACORA, eslabones) is None
+    eslabones[2] = (eslabones[2][0], {"numero": 99, "texto": "á"}, eslabones[2][2])
+    assert cadena.verificar(CLAVE_BITACORA, eslabones) == 2
+
+
+def test_sellos_recalculados_sin_la_clave_no_validan():
+    falsa = bytes(32)
+    reescrita = _cadena(falsa)
+    assert cadena.verificar(CLAVE_BITACORA, reescrita) == 0
+    with pytest.raises(ValueError):
+        cadena.sellar(b"corta", cadena.GENESIS, {})
+
+
+def test_firma_del_ancla():
+    ancla = {"numero": 3, "sello": "ab"}
+    firma = cadena.firmar(CLAVE_BITACORA, ancla)
+    assert cadena.firma_valida(CLAVE_BITACORA, ancla, firma)
+    assert not cadena.firma_valida(CLAVE_BITACORA, dict(ancla, numero=4), firma)
+    assert not cadena.firma_valida(CLAVE_BITACORA, ancla, None)
 
 
 @pytest.mark.parametrize(

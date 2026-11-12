@@ -1,5 +1,6 @@
 from django.shortcuts import render
 
+from auditoria.servicios import MOTIVOS, ultima_verificacion
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
@@ -20,4 +21,9 @@ def inicio(request):
         "delegaciones": Delegacion.objects.vigentes().filter(receptor=usuario).select_related("otorgante"),
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
+    if usuario.tiene_permiso("ver_auditoria"):
+        verificacion = ultima_verificacion()
+        if verificacion is not None and not verificacion.valida:
+            contexto["bitacora_fallida"] = verificacion
+            contexto["bitacora_motivo"] = MOTIVOS.get(verificacion.motivo, verificacion.motivo)
     return render(request, "inicio.html", contexto)
