@@ -97,7 +97,19 @@ function Manage {
     )
     $env:COBRO_INSTANCIA = $R.Instancia
     $env:PYTHONUTF8 = '1'
-    return Ejecutar -Archivo $R.Python -Argumentos (@('-X', 'utf8', '-B', $R.Manage) + $Argumentos) -Descripcion $Descripcion -Silencioso:$Silencioso
+    $codificacion = [Console]::OutputEncoding
+    try {
+        [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    }
+    catch {
+        $codificacion = $null
+    }
+    try {
+        return Ejecutar -Archivo $R.Python -Argumentos (@('-X', 'utf8', '-B', $R.Manage) + $Argumentos) -Descripcion $Descripcion -Silencioso:$Silencioso
+    }
+    finally {
+        if ($null -ne $codificacion) { [Console]::OutputEncoding = $codificacion }
+    }
 }
 
 function Proteger-Datos {
@@ -115,32 +127,25 @@ function Proteger-Datos {
 function Proteger-Programa {
     param([Parameter(Mandatory = $true)]$R)
     Ejecutar -Archivo 'icacls.exe' -Argumentos @($R.Programa, '/grant', "*$($script:SidServicio):(OI)(CI)RX", '/Q') -Descripcion 'La cuenta del servicio solo lee la carpeta del programa' | Out-Null
-    foreach ($regla in (Get-Acl -LiteralPath $R.Programa).Access) {
-        $sid = Sid-De $regla.IdentityReference
-        if ($sid -eq $script:SidServicio -and ($regla.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write)) {
+    foreach ($regla in (Reglas-Sid -Ruta $R.Programa)) {
+        if ($regla.IdentityReference.Value -eq $script:SidServicio -and $regla.AccessControlType -eq 'Allow' -and ($regla.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write)) {
             throw 'La cuenta del servicio tiene permiso de escritura en la carpeta del programa.'
         }
     }
 }
 
-function Sid-De {
-    param($Identidad)
-    try {
-        return $Identidad.Translate([System.Security.Principal.SecurityIdentifier]).Value
-    }
-    catch {
-        return "$Identidad"
-    }
+function Reglas-Sid {
+    param([Parameter(Mandatory = $true)][string]$Ruta)
+    return @((Get-Acl -LiteralPath $Ruta).GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
 }
 
 function Comprobar-Privado {
     param([Parameter(Mandatory = $true)][string]$Ruta)
     $permitidos = @($script:SidAdministradores, $script:SidSistema, $script:SidServicio)
-    foreach ($regla in (Get-Acl -LiteralPath $Ruta).Access) {
+    foreach ($regla in (Reglas-Sid -Ruta $Ruta)) {
         if ($regla.AccessControlType -ne 'Allow') { continue }
-        $sid = Sid-De $regla.IdentityReference
-        if ($permitidos -notcontains $sid) {
-            throw ('La carpeta {0} da acceso a {1}; solo deben tenerlo Administradores, SYSTEM y la cuenta del servicio.' -f $Ruta, $regla.IdentityReference)
+        if ($permitidos -notcontains $regla.IdentityReference.Value) {
+            throw ('La carpeta {0} da acceso a {1}; solo deben tenerlo Administradores, SYSTEM y la cuenta del servicio.' -f $Ruta, $regla.IdentityReference.Value)
         }
     }
 }
