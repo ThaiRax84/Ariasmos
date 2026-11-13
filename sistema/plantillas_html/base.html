@@ -17,6 +17,7 @@
     {% if "ver_titulares" in permisos %}<a href="{% url 'titulares:lista' %}">{{ voc.titulares }}</a><a href="{% url 'titulares:familias' %}">{{ voc.familias }}</a>{% endif %}
     {% if "registrar_pago_efectivo" in permisos %}<a href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
     {% if "turno_caja" in permisos %}<a href="{% url 'caja:inicio' %}">Mi caja</a>{% endif %}
+    {% if inventario_activo %}{% if "vender_articulos" in permisos or "registrar_movimientos_inventario" in permisos or "subir_conteo_inventario" in permisos or "devolver_articulos" in permisos or "revisar_inventario" in permisos or "administrar_articulos" in permisos %}<a href="{% url 'inventario:indice' %}">Inventario</a>{% endif %}{% endif %}
     {% if "recibir_efectivo" in permisos %}<a href="{% url 'caja:custodia' %}">Efectivo</a>{% endif %}
     {% if "conciliar_banco" in permisos or "sugerir_conciliacion" in permisos %}<a href="{% url 'conciliacion:cola' %}">Banco</a>{% endif %}
     {% if "solicitar_alta_baja" in permisos or "aprob_solicitudes" in permisos or "alta_baja_directa" in permisos %}<a href="{% url 'solicitudes:bandeja' %}">Solicitudes</a>{% endif %}

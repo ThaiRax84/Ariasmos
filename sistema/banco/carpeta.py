@@ -124,7 +124,7 @@ def importar_contenido(nombre, contenido, sha256):
         raise conciliacion.ErrorConciliacion("El archivo dice ser PDF y no lo es.")
     filas = lectura.filas_de_hoja(nombre, contenido)
     cuenta, encabezado, columnas = _cuenta_de_hoja(filas)
-    movimientos = conciliacion.movimientos_de_filas(filas, encabezado, columnas, cuenta)
+    movimientos = conciliacion.movimientos_de_filas(filas, encabezado, columnas, cuenta, exigir_cuadre=False)
     return conciliacion.importar(cuenta, movimientos, Importacion.ARCHIVO, nombre, sha256, None, None, origen=Importacion.CARPETA)
 
 

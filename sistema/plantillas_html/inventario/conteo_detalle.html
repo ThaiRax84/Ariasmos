@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Conteo {{ conteo.pk }}{% if conteo.inicial %} (carga inicial){% endif %}</h1>
+<p>Subió {{ conteo.usuario }} el {{ conteo.creado|date:"d/m/Y H:i" }} · {{ conteo.get_origen_display }}{% if conteo.nombre_archivo %} · {{ conteo.nombre_archivo }}{% endif %}.
+{% if conteo.aplicado_en %}Aprobado por {{ conteo.aplicado_por }} el {{ conteo.aplicado_en|date:"d/m/Y H:i" }}.{% elif conteo.solicitud %}Solicitud {{ conteo.solicitud.get_estado_display|lower }}: <a href="{% url 'solicitudes:detalle' conteo.solicitud.pk %}">ver solicitud</a>.{% endif %}</p>
+<p>Lo esperado es la existencia del sistema en el momento del conteo; al aprobarse se ajusta exactamente esa diferencia y no se tocan los movimientos posteriores.</p>
+<table class="tabla">
+<thead><tr><th>Artículo</th><th>Contado</th><th>Esperado al contar</th><th>Diferencia</th></tr></thead>
+<tbody>{% for r in renglones %}<tr><td>{{ r.articulo }}</td><td>{{ r.contado }}</td><td>{{ r.esperado }}</td><td>{% if r.diferencia %}<strong>{{ r.diferencia }}</strong>{% else %}0{% endif %}</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

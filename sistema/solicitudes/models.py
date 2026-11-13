@@ -20,6 +20,8 @@ ACCIONES = [
     ("pago_sobre_tope", "Pago mayor al tope"),
     ("retiro_caja", "Retiro de caja"),
     ("revertir_retiro", "Reversión de retiro de caja"),
+    ("conteo_inventario", "Conteo de inventario"),
+    ("devolucion_efectivo", "Devolución de artículos en efectivo"),
 ]
 
 

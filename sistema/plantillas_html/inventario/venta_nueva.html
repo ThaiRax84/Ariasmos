@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+{% if publico %}
+<h1>Venta sin {{ voc.matricula|lower }}</h1>
+<p>Para quien no es {{ voc.titular|lower }}: se cobra completa en efectivo en este momento y se registra contra la cuenta interna «Público en general», que nunca queda con adeudo. El precio lo pone cada artículo.</p>
+{% if not turno %}<p class="mensaje warning">Abre tu turno de caja para vender sin {{ voc.matricula|lower }}. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>{% endif %}
+{% else %}
+<h1>Vender a {{ titular.nombre_completo }}</h1>
+<p>{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>. El precio lo pone cada artículo. «Lo paga ahora» crea los cargos y pasa al cobro, que se aplica primero a estos artículos; «Se va a su adeudo» los deja pendientes para cobrarse con lo demás.</p>
+{% endif %}
+{% if total %}
+<section class="panel alerta">
+  <h2>Total de la venta: {{ total|dinero }}</h2>
+  <form method="post" class="formulario angosto" novalidate>
+    {% csrf_token %}
+    {% for nombre, valor in ocultos %}<input type="hidden" name="{{ nombre }}" value="{{ valor }}">{% endfor %}
+    <input type="hidden" name="ficha" value="{{ ficha }}">
+    {% if con_piezas %}
+    <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
+    {% if piezas.listo %}{% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}<p>Cambio a entregar: <strong>{{ piezas.cambio|dinero }}</strong>{% if piezas.cambio %}. Entrega exactamente estas piezas; si entregas otras, corrígelas antes de confirmar.{% endif %}</p>{% else %}<p>Escribe las piezas que te entregan; el sistema calcula el cambio.</p>{% endif %}
+    {% include "comun/_campos.html" with formulario=piezas.formulario %}
+    <div class="acciones">{% if piezas.listo %}<button class="boton grande" type="submit">Cobrar y emitir recibo</button>{% else %}<button class="boton grande" type="submit">Calcular el cambio</button>{% endif %}<a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Corregir</a></div>
+    {% else %}
+    <input type="hidden" name="paso" value="confirmar">
+    <div class="acciones"><button class="boton grande" type="submit">Cobrar {{ total|dinero }} y emitir recibo</button><a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Corregir</a></div>
+    {% endif %}
+  </form>
+</section>
+{% else %}
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">{% if publico %}Ver el total{% else %}Registrar la venta{% endif %}</button><a class="boton secundario" href="{% url 'inventario:indice' %}">Cancelar</a></div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Venta {{ venta }}</h1>
+<dl class="datos">
+  <dt>{{ voc.titular }}</dt><dd>{% if venta.titular.interno %}Público en general{% else %}<a href="{% url 'titulares:detalle' venta.titular.pk %}">{{ venta.titular.nombre_completo }}</a> · {{ venta.titular.matricula_formateada }}{% endif %}</dd>
+  <dt>Fecha</dt><dd>{{ venta.creada|date:"d/m/Y H:i" }} · vendió {{ venta.usuario }}</dd>
+  <dt>Cómo se paga</dt><dd>{{ venta.get_modo_display }}{% if venta.pago %} · recibo <a href="{% url 'cobros:recibo' venta.pago.recibo.pk %}">{{ venta.pago.recibo }}</a>{% endif %}</dd>
+  <dt>Total</dt><dd>{{ venta.total|dinero }}</dd>
+</dl>
+{% if puede_cobrar %}<p><a class="boton" href="{% url 'cobros:cobrar' venta.titular.pk %}?venta={{ venta.pk }}">Cobrar esta venta</a></p>{% endif %}
+<table class="tabla">
+<thead><tr><th>Artículo</th><th>Cantidad</th><th>Precio</th><th>Importe</th><th>Pendiente del cargo</th><th>Se puede devolver</th><th>Existencia</th></tr></thead>
+<tbody>{% for f in renglones %}<tr><td>{{ f.renglon.articulo.nombre }}</td><td>{{ f.renglon.cantidad }}</td><td>{{ f.renglon.precio_unitario|dinero }}</td><td>{{ f.renglon.importe|dinero }}</td><td>{{ f.saldo|dinero }}</td><td>{{ f.disponible }}</td><td>{% if f.renglon.sin_existencia %}sin existencia al vender{% endif %}</td></tr>{% endfor %}</tbody>
+</table>
+{% if puede_devolver %}<p><a class="boton secundario" href="{% url 'inventario:devolver_venta' venta.pk %}">Registrar devolución</a></p>{% endif %}
+{% if devoluciones %}
+<h2>Devoluciones</h2>
+<ul class="lista">{% for d in devoluciones %}<li>{{ d }} · {{ d.creada|date:"d/m/Y H:i" }} · {{ d.get_medio_display }}{% if d.importe_cancelado %} · cancelado {{ d.importe_cancelado|dinero }}{% endif %}{% if d.importe_dinero %} · regresó {{ d.importe_dinero|dinero }}{% endif %}{% if d.pago_credito %} (recibo {{ d.pago_credito.recibo }}){% endif %} · registró {{ d.usuario }}{% if d.autorizada_por %}, autorizó {{ d.autorizada_por }}{% endif %} · {{ d.get_revision_display }}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

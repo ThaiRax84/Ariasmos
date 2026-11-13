@@ -12,7 +12,7 @@ from cuentas.models import Usuario
 
 from .conftest import nuevo_usuario
 
-APLICACIONES = ("asistente", "auditoria", "banco", "caja", "cobros", "configuracion", "cuentas", "solicitudes", "titulares")
+APLICACIONES = ("asistente", "auditoria", "banco", "caja", "cobros", "configuracion", "cuentas", "inventario", "solicitudes", "titulares")
 EXTRA = {
     "FormularioColumnas": lambda: {"filas": [["fecha", "importe"], ["03/08/2026", "10"]], "encabezado": 0, "propuesta": {}},
     "FormularioDelegacion": lambda: {"otorgante": Usuario.objects.get(usuario="direccion")},

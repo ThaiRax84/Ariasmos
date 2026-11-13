@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "cobros",
     "banco",
     "caja",
+    "inventario",
     "cortes",
     "respaldos",
 ]

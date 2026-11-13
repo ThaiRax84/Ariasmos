@@ -33,12 +33,15 @@ RAIZ = {
     "cortes": False,
     "motivos_retiro": False,
     "caja": False,
+    "inventario": False,
 }
 PERIODOS_RETIRO = ("dia", "semana")
 TOPES_CAJA = {
     "maximo_retiros_periodo": 10000,
     "dias_retiro_sin_revisar": 365,
 }
+LOGICOS_INVENTARIO = ("modulo_inventario", "devoluciones_inventario")
+DIAS_INVENTARIO = {"dias_devolucion": 365, "dias_conteo_sin_aprobar": 60}
 TIPOS_CORTE = ("diario", "mayor", "cobranza")
 NIVELES_CORTE = ("completo", "solo_nombres", "sin_nombres")
 NIVELES_POR_DEFECTO = {"diario": "solo_nombres", "mayor": "solo_nombres", "cobranza": "completo"}
@@ -195,6 +198,18 @@ def _caja(valor, ruta):
     return caja
 
 
+def _inventario(valor, ruta):
+    _objeto(valor, ruta, LOGICOS_INVENTARIO + tuple(DIAS_INVENTARIO))
+    inventario = {}
+    for clave in LOGICOS_INVENTARIO:
+        if clave in valor:
+            inventario[clave] = _logico(valor[clave], f"{ruta}.{clave}")
+    for clave, maximo in DIAS_INVENTARIO.items():
+        if clave in valor:
+            inventario[clave] = _entero(valor[clave], f"{ruta}.{clave}", 0 if clave == "dias_devolucion" else 1, maximo)
+    return inventario
+
+
 def _recargo(valor, ruta):
     if valor is None:
         return None
@@ -266,6 +281,7 @@ def validar(datos):
     limpia["cajas"] = _textos(datos, "cajas", 60)
     limpia["motivos_retiro"] = _textos(datos, "motivos_retiro", 100)
     limpia["caja"] = _caja(datos.get("caja", {}), "caja")
+    limpia["inventario"] = _inventario(datos.get("inventario", {}), "inventario")
     denominaciones = _lista(datos.get("denominaciones", []), "denominaciones", "denominaciones")
     limpia["denominaciones"] = [_entero(v, f"denominaciones[{i}]", 1, 100000000) for i, v in enumerate(denominaciones)]
     if len(set(limpia["denominaciones"])) != len(limpia["denominaciones"]):

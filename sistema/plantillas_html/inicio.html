@@ -25,14 +25,28 @@
 {% if retenidas %}
 <section class="panel alerta">
   <h2>Importaciones automáticas retenidas</h2>
-  <p>Llegaron por la carpeta vigilada y no continúan un estado anterior: sus pagos no se aplican hasta que alguien con permiso de conciliación las revise.</p>
-  <ul class="lista">{% for i in retenidas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+  <p>Llegaron por la carpeta vigilada con movimientos que tienen una señal de sospecha: esos pagos no se aplican hasta que alguien con permiso de conciliación los compare con el banco y los libere.</p>
+  <ul class="lista">{% for i in retenidas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.retenidos }} movimiento{{ i.retenidos|pluralize }} retenido{{ i.retenidos|pluralize }} por {{ i.monto_retenido|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if sin_respaldo %}
+<section class="panel alerta">
+  <h2>Pagos sin respaldo en el estado</h2>
+  <p>Se aplicaron desde un archivo editable y no aparecen en el estado de cuenta en PDF de su periodo. No se revierten solos: compáralos con el banco y, si no existieron, solicita su reversión.</p>
+  <ul class="lista">{% for m in sin_respaldo %}<li>{{ m.fecha|date:"d/m/Y" }} · {{ m.importe|dinero }} · {{ m.pago.titular.nombre_completo }} · recibo {{ m.pago.recibo }}{% if "solicitar_ajustes" in permisos or "aplicar_ajustes" in permisos %} · <a href="{% url 'cobros:revertir' m.pago.pk %}">Solicitar su reversión</a>{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if antiguos_sin_respaldo %}
+<section class="panel alerta">
+  <h2>Pagos sin un estado que los respalde</h2>
+  <p>Se aplicaron desde archivos editables hace más de {{ dias_sin_respaldo }} días y todavía no se importa el estado de cuenta en PDF que los cubra.</p>
+  <ul class="lista">{% for m in antiguos_sin_respaldo %}<li>{{ m.fecha|date:"d/m/Y" }} · {{ m.importe|dinero }} · {{ m.pago.titular.nombre_completo }} · recibo {{ m.pago.recibo }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if automaticas %}
 <section class="panel">
   <h2>Últimas importaciones de la carpeta vigilada</h2>
-  <ul class="lista">{% for i in automaticas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.aplicados }} aplicado{{ i.aplicados|pluralize }}{% if i.retenida and not i.liberada_en %} · retenida{% endif %}</li>{% endfor %}</ul>
+  <ul class="lista">{% for i in automaticas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.aplicados }} aplicado{{ i.aplicados|pluralize }}{% if i.retenida and not i.liberada_en %} · con retenidos{% endif %}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if importaciones_por_revisar %}
@@ -40,6 +54,16 @@
   <h2>Importaciones bancarias por revisar</h2>
   <p>Aplicaron pagos y no se pudieron comprobar contra un estado anterior. Revísalas contra el banco; quien importó no puede marcarlas.</p>
   <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.importo }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if avisos_inventario.bajo_minimo or avisos_inventario.por_revisar or avisos_inventario.conteo_viejo %}
+<section class="panel alerta">
+  <h2>Inventario</h2>
+  <ul class="lista">
+    {% for a, e in avisos_inventario.bajo_minimo %}<li>{{ a }}: existencia {{ e }}, mínimo {{ a.minimo }}.</li>{% endfor %}
+    {% if avisos_inventario.por_revisar %}<li>{{ avisos_inventario.por_revisar }} movimiento{{ avisos_inventario.por_revisar|pluralize }} de inventario por revisar. <a href="{% url 'inventario:revision' %}">Revisar</a></li>{% endif %}
+    {% if avisos_inventario.conteo_viejo %}<li>El <a href="{% url 'inventario:conteo_detalle' avisos_inventario.conteo_viejo.pk %}">conteo {{ avisos_inventario.conteo_viejo.pk }}</a> espera aprobación desde el {{ avisos_inventario.conteo_viejo.creado|date:"d/m/Y" }}.</li>{% endif %}
+  </ul>
 </section>
 {% endif %}
 {% if muestra_banco %}

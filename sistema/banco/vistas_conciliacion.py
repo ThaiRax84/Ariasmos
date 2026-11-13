@@ -172,8 +172,9 @@ def importacion(request, pk):
         "movimientos": objeto.lista.select_related("pago__titular", "pago__recibo"),
         "aplicados": aplicados["n"],
         "monto": aplicados["t"] or 0,
-        "puede_revisar": objeto.requiere_revision and objeto.revisada_por_id is None and request.user.tiene_permiso(REVISA) and objeto.creada_por_id != request.user.pk and objeto.liberada_por_id != request.user.pk,
-        "puede_liberar": objeto.retenida and objeto.liberada_en is None and request.user.tiene_permiso(CONCILIA),
+        "puede_revisar": objeto.requiere_revision and objeto.revisada_por_id is None and request.user.tiene_permiso(REVISA) and objeto.creada_por_id != request.user.pk and not conciliacion.libero_algo(objeto, request.user),
+        "retenidos": list(conciliacion.retenidos(objeto).order_by("fecha", "id")),
+        "puede_liberar": request.user.tiene_permiso(CONCILIA),
     }
     return render(request, "banco/importacion.html", contexto)
 
@@ -197,12 +198,18 @@ def revisada(request, pk):
 @require_POST
 def liberar(request, pk):
     objeto = get_object_or_404(Importacion.objects.select_related("cuenta"), pk=pk)
+    elegidos = None
+    if request.POST.get("alcance") == "elegidos":
+        elegidos = [valor for valor in request.POST.getlist("movimiento") if valor.isdigit() and len(valor) < 12]
+        if not elegidos:
+            messages.error(request, "Marca los movimientos que quieres liberar.")
+            return redirect("conciliacion:importacion", pk=pk)
     try:
-        aplicados, depositos = conciliacion.liberar(objeto, request.user, request)
+        aplicados, depositos = conciliacion.liberar(objeto, request.user, request, movimientos=elegidos)
     except conciliacion.ErrorConciliacion as error:
         messages.error(request, str(error))
     else:
-        messages.success(request, f"Importación liberada: {aplicados} pago{'s' if aplicados != 1 else ''} aplicado{'s' if aplicados != 1 else ''} y {depositos} depósito{'s' if depositos != 1 else ''} conciliado{'s' if depositos != 1 else ''}.")
+        messages.success(request, f"Movimientos liberados: {aplicados} pago{'s' if aplicados != 1 else ''} aplicado{'s' if aplicados != 1 else ''} y {depositos} depósito{'s' if depositos != 1 else ''} conciliado{'s' if depositos != 1 else ''}.")
     return redirect("conciliacion:importacion", pk=pk)
 
 

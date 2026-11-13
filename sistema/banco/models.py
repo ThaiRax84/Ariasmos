@@ -179,8 +179,20 @@ class MovimientoBancario(models.Model):
     COMPLETABLES = {"banco_origen", "cuenta_pagador", "nombre_pagador", "rastreo"}
     MUTABLES = {
         "estado", "pago", "traslado", "sugerencia", "alternativas", "motivo", "coincide_importe", "propuesta", "propuesta_por", "propuesta_en", "nota",
-        "resuelto_por", "resuelto_en", "confirmado_por", "posible_duplicado",
+        "resuelto_por", "resuelto_en", "confirmado_por", "posible_duplicado", "retencion", "liberado_por", "liberado_en", "sin_respaldo", "sin_respaldo_en",
     } | COMPLETABLES
+    RETENCIONES = {
+        "excede_adeudo": "El importe es mayor que el adeudo vigente de la familia: dejaría saldo a favor",
+        "tope_pago": "El importe pasa del tope de un pago aplicado desde la carpeta",
+        "fecha_futura": "La fecha del movimiento es futura",
+        "fuera_de_estado": "Cae en un periodo que ya cubre un estado en PDF y no está en ese estado",
+        "titular_inactivo": "El titular no está activo",
+        "matricula_repetida": "La misma matrícula ya recibió otro pago en este archivo",
+        "saldos_no_cuadran": "Los saldos del archivo no cuadran renglón a renglón con los importes",
+        "saldo_no_continua": "El saldo del archivo no continúa el último saldo conocido de la cuenta",
+        "tope_exposicion": "Rebasaría el tope de pagos aplicados sin respaldo de un estado en PDF",
+        "sin_continuidad": "Estado en PDF que no continúa al anterior",
+    }
 
     cuenta = models.ForeignKey(CuentaBancaria, on_delete=models.PROTECT, related_name="movimientos")
     importacion = models.ForeignKey(Importacion, on_delete=models.PROTECT, related_name="lista")
@@ -215,6 +227,11 @@ class MovimientoBancario(models.Model):
     nota = models.CharField(max_length=300, blank=True)
     resuelto_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     resuelto_en = models.DateTimeField(null=True, blank=True)
+    retencion = models.CharField(max_length=200, blank=True)
+    liberado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    liberado_en = models.DateTimeField(null=True, blank=True)
+    sin_respaldo = models.BooleanField(default=False)
+    sin_respaldo_en = models.DateTimeField(null=True, blank=True)
 
     objects = ConsultaMovimientos.as_manager()
 
@@ -238,6 +255,14 @@ class MovimientoBancario(models.Model):
 
     def delete(self, *args, **kwargs):
         raise models.ProtectedError("los movimientos bancarios no se borran", set())
+
+    @property
+    def retenido(self):
+        return bool(self.retencion) and self.liberado_en is None and self.estado == self.POR_IDENTIFICAR
+
+    @property
+    def motivos_retencion(self):
+        return [self.RETENCIONES.get(codigo, codigo) for codigo in self.retencion.split(",") if codigo]
 
     @property
     def cuenta_pagador_enmascarada(self):

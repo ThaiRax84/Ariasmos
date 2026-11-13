@@ -57,7 +57,7 @@ def _cerrar(corte, cifras, usuario=None, sin_revisar=False):
 
 
 def con_movimientos(turno):
-    return Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO).exists() or turno.devoluciones.exists() or turno.retiros.exists() or turno.retiros_devueltos.exists()
+    return Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO).exists() or turno.devoluciones.exists() or turno.retiros.exists() or turno.retiros_devueltos.exists() or turno.devoluciones_articulos.exists()
 
 
 def crear_diario(turno, arqueo, request=None):

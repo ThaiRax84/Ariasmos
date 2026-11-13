@@ -52,6 +52,21 @@ def describir(solicitud):
         retiro = RetiroCaja.objects.filter(pk=datos.get("retiro")).select_related("registrado_por", "motivo").first()
         if retiro is not None:
             filas += [("Retiro", str(retiro)), ("Importe", formatear(retiro.importe)), ("Registró", str(retiro.registrado_por)), ("Motivo del retiro", str(retiro.motivo))]
+    elif solicitud.accion == "conteo_inventario":
+        from inventario.models import Conteo
+
+        conteo = Conteo.objects.filter(pk=datos.get("conteo")).first()
+        if conteo is not None:
+            renglones = list(conteo.renglones.select_related("articulo"))
+            filas += [("Conteo", f"{conteo.pk} · {len(renglones)} artículos contados por {conteo.usuario}"), ("Con diferencia", ", ".join(f"{r.articulo.clave} ({r.diferencia:+d})" for r in renglones if r.diferencia) or "ninguno")]
+    elif solicitud.accion == "devolucion_efectivo":
+        from inventario.models import RenglonVenta, Venta
+
+        venta = Venta.objects.filter(pk=datos.get("venta")).select_related("titular").first()
+        if venta is not None:
+            filas.append(("Venta", f"{venta} · {venta.titular.nombre_completo}"))
+            renglones = {str(r.pk): r for r in RenglonVenta.objects.filter(venta=venta).select_related("articulo")}
+            filas.append(("Artículos", "; ".join(f"{renglones[k].articulo.nombre} × {v[0]}{'' if v[1] else ' (mal estado)'}" for k, v in (datos.get("renglones") or {}).items() if k in renglones)))
     elif solicitud.accion == "cambio_familia":
         modo = {"ligar": "Ligar a", "crear": "Crear y ligar a", "desligar": "Desligar de"}.get(datos.get("modo"), "")
         familia = Familia.objects.filter(pk=datos.get("familia")).first()

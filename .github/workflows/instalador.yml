@@ -51,7 +51,24 @@ jobs:
       - name: Dependencias
         run: python -m pip install --disable-pip-version-check -r requirements-pruebas.txt
       - name: Pruebas
-        run: python -m pytest -q
+        shell: bash
+        run: |
+          python -u -m pytest -v > pruebas.log 2>&1 &
+          proceso=$!
+          for vuelta in $(seq 1 84); do
+            if ! kill -0 $proceso 2>/dev/null; then
+              codigo=0
+              wait $proceso || codigo=$?
+              if [ $codigo -ne 0 ]; then grep -n -E "FAILED|ERROR|Fatal Python|Timeout" pruebas.log | head -n 60 || true; fi
+              tail -n 120 pruebas.log
+              exit $codigo
+            fi
+            sleep 10
+          done
+          echo "Las pruebas no terminaron en 14 minutos. Final del registro:"
+          tail -n 150 pruebas.log
+          taskkill //F //T //PID "$(cat /proc/$proceso/winpid)" || true
+          exit 1
 
   instalador-windows:
     runs-on: windows-latest

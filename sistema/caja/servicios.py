@@ -57,12 +57,19 @@ def recibe_movimientos(turno):
     return turno is not None and Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists() and not ConteoArqueo.objects.filter(turno_id=turno.pk).exists()
 
 
+def devoluciones_articulos():
+    from inventario.models import Devolucion
+
+    return Devolucion.objects.filter(medio=Devolucion.EFECTIVO)
+
+
 def neto_de(turno):
     cobrado = _suma(Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO))
     devuelto = _suma(ReversionPago.objects.filter(turno=turno), "pago__importe")
     retirado = _suma(RetiroCaja.objects.filter(turno=turno))
     regresado = _suma(ReversionRetiro.objects.filter(turno=turno), "retiro__importe")
-    return cobrado - devuelto - retirado + regresado
+    articulos = _suma(devoluciones_articulos().filter(turno=turno), "importe_dinero")
+    return cobrado - devuelto - retirado + regresado - articulos
 
 
 def esperado_de(turno):
@@ -201,10 +208,11 @@ def custodia(usuario):
     devuelto = _suma(ReversionPago.objects.filter(turno__usuario=usuario), "pago__importe")
     retirado = _suma(RetiroCaja.objects.filter(turno__usuario=usuario))
     regresado = _suma(ReversionRetiro.objects.filter(turno__usuario=usuario), "retiro__importe")
+    articulos = _suma(devoluciones_articulos().filter(turno__usuario=usuario), "importe_dinero")
     enviado = _suma(Traslado.objects.filter(origen=usuario, tipo=Traslado.ENTREGA, estado=Traslado.CONFIRMADO))
     depositado = _suma(Traslado.objects.filter(origen=usuario, tipo=Traslado.DEPOSITO))
     recibido = _suma(Traslado.objects.filter(destino=usuario, tipo=Traslado.ENTREGA, estado=Traslado.CONFIRMADO))
-    return cobrado - devuelto - retirado + regresado - enviado - depositado + recibido
+    return cobrado - devuelto - retirado + regresado - articulos - enviado - depositado + recibido
 
 
 def disponible(usuario):

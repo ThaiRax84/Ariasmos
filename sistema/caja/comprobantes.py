@@ -186,4 +186,7 @@ def leer(comprobante):
 
 
 def todos():
-    return [(c.archivo, c.sha256) for c in ComprobanteRetiro.objects.order_by("id")]
+    from inventario.models import ComprobanteInventario
+
+    retiros = [(c.archivo, c.sha256) for c in ComprobanteRetiro.objects.order_by("id")]
+    return retiros + [(c.archivo, c.sha256) for c in ComprobanteInventario.objects.order_by("id")]

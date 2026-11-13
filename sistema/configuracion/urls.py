@@ -12,6 +12,7 @@ urlpatterns = [
     path("avanzado/", views.avanzado, name="avanzado"),
     path("caja/", views.caja, name="caja"),
     path("carpeta-banco/", views.carpeta_banco, name="carpeta_banco"),
+    path("inventario/", views.inventario, name="inventario"),
     path("avanzado/moneda/", views.cambiar_moneda, name="moneda"),
     path("padron/", vistas_padron.subir, name="padron_subir"),
     path("padron/lotes/<int:pk>/", vistas_padron.lote, name="padron_lote"),

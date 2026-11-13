@@ -8,7 +8,10 @@ from caja.models import Caja, MotivoRetiro, Traslado
 from caja.servicios import abrir_turno
 from cobros import libro
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
+from configuracion.models import Parametro
 from cortes.models import Corte, Destino, Entrega
+from inventario import servicios as inventario
+from inventario.models import Articulo, Conteo, Devolucion, Venta
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
 from titulares.models import Agrupacion, Contacto, Familia, LotePadron, Titular
@@ -155,6 +158,30 @@ MATRIZ = {
     "configuracion:padron_lote": ("administrar_configuracion",),
     "configuracion:padron_matriculas": ("administrar_configuracion",),
     "configuracion:padron_fichas": ("administrar_configuracion",),
+    "configuracion:inventario": ("administrar_configuracion",),
+    "inventario:indice": ("vender_articulos", "registrar_movimientos_inventario", "subir_conteo_inventario", "devolver_articulos", "revisar_inventario", "administrar_articulos"),
+    "inventario:articulos": ("administrar_articulos",),
+    "inventario:articulo_nuevo": ("administrar_articulos",),
+    "inventario:articulo_editar": ("administrar_articulos",),
+    "inventario:vender": ("vender_articulos",),
+    "inventario:vender_publico": ("vender_articulos",),
+    "inventario:vender_titular": ("vender_articulos",),
+    "inventario:ventas": ("vender_articulos", "devolver_articulos", "revisar_inventario"),
+    "inventario:venta": ("vender_articulos", "devolver_articulos", "revisar_inventario"),
+    "inventario:devolver": ("devolver_articulos",),
+    "inventario:devolver_venta": ("devolver_articulos",),
+    "inventario:registro_nuevo": ("registrar_movimientos_inventario",),
+    "inventario:registro": ("registrar_movimientos_inventario", "revisar_inventario"),
+    "inventario:registro_comprobante": ("registrar_movimientos_inventario",),
+    "inventario:registro_descargar": ("registrar_movimientos_inventario", "revisar_inventario"),
+    "inventario:registro_revisar": ("revisar_inventario",),
+    "inventario:devolucion_revisar": ("revisar_inventario",),
+    "inventario:renglon_revisar": ("revisar_inventario",),
+    "inventario:revision": ("revisar_inventario",),
+    "inventario:existencias_csv": ("revisar_inventario", "administrar_articulos"),
+    "inventario:conteo": ("subir_conteo_inventario",),
+    "inventario:conteo_lista": ("subir_conteo_inventario",),
+    "inventario:conteo_detalle": ("subir_conteo_inventario", "revisar_inventario", "aprobar_solicitudes"),
 }
 
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar", "conectar_certificado", "conectar_instalador"}
@@ -213,6 +240,14 @@ def escenario(db):
     mayor = Corte.objects.create(tipo="mayor", fecha=timezone.now().date().replace(day=1), periodo_inicio=timezone.now().date().replace(day=1), periodo_fin=timezone.now().date().replace(day=1), cifras={})
     destino = Destino.objects.create(nombre="D", ruta="/tmp")
     entrega_corte = Entrega.objects.create(corte=mayor, destino=destino, nivel="completo")
+    Parametro.objects.update_or_create(clave="modulo_inventario", defaults={"valor": "1"})
+    Parametro.objects.update_or_create(clave="devoluciones_inventario", defaults={"valor": "1"})
+    articulo = Articulo.objects.create(clave="LIB-1", nombre="Libro de prueba", precio=10000, concepto=ConceptoCobro.objects.first())
+    venta = inventario.vender(titular, [(articulo.pk, 2)], Venta.ADEUDO, usuarios["Operación"])
+    renglon = venta.renglones.get()
+    devolucion = inventario.devolver(venta, {str(renglon.pk): [1, True]}, Devolucion.SALDO, usuarios["Operación"], "prueba")
+    registro = inventario.registrar_movimiento("entrada", articulo, 5, "Compra", "", usuarios["Operación"])
+    conteo = inventario.subir_conteo({articulo.pk: 3}, usuarios["Operación"], Conteo.PANTALLA)
     argumentos = {
         "cortes:detalle": {"pk": mayor.pk},
         "cortes:descargar": {"pk": mayor.pk, "formato": "json"},
@@ -285,6 +320,17 @@ def escenario(db):
         "caja:motivo_editar": {"pk": motivo_retiro.pk},
         "conciliacion:liberar": {"pk": importacion.pk},
         "caja:rechazar": {"pk": entrega.pk},
+        "inventario:articulo_editar": {"pk": articulo.pk},
+        "inventario:vender_titular": {"pk": titular.pk},
+        "inventario:venta": {"pk": venta.pk},
+        "inventario:devolver_venta": {"pk": venta.pk},
+        "inventario:registro": {"pk": registro.pk},
+        "inventario:registro_comprobante": {"pk": registro.pk},
+        "inventario:registro_descargar": {"pk": registro.pk},
+        "inventario:registro_revisar": {"pk": registro.pk},
+        "inventario:devolucion_revisar": {"pk": devolucion.pk},
+        "inventario:renglon_revisar": {"pk": renglon.pk},
+        "inventario:conteo_detalle": {"pk": conteo.pk},
     }
     return usuarios, argumentos
 
