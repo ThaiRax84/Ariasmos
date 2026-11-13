@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from auditoria.servicios import diferencias, registrar
 from nucleo import totp
 
-from . import servicios
+from . import qr, servicios
 from .decoradores import requiere_permiso, requiere_sesion
 from .formularios import (
     FormularioActivacion,
@@ -221,8 +221,9 @@ def alta_totp(request):
             return redirect("inicio")
         messages.error(request, "El código no coincide. Revisa la hora del teléfono e inténtalo otra vez.")
     emisor = request.negocio.nombre if request.negocio else "Sistema de cobro"
-    contexto = {"formulario": formulario, "secreto": secreto, "uri": totp.uri(secreto, usuario.usuario, emisor)}
-    return render(request, "cuentas/totp.html", contexto)
+    respuesta = render(request, "cuentas/totp.html", {"formulario": formulario, **qr.contexto(secreto, usuario.usuario, emisor)})
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta
 
 
 @requiere_sesion

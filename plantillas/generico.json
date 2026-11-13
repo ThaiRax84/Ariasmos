@@ -1,6 +1,7 @@
 {
   "nombre": "Genérico",
   "descripcion": "Para la mayoría de los negocios que cobran a clientes recurrentes: alta, mensualidad con recargo y cargos por producto o servicio.",
+  "moneda": "MXN",
   "vocabulario": {
     "titular": "Cliente",
     "titulares": "Clientes",

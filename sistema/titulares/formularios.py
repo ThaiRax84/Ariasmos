@@ -6,7 +6,12 @@ from .contactos import FormularioContacto
 from .models import Agrupacion, Familia, MotivoBaja, Titular
 
 
+MAXIMO_NOTAS = 2000
+
+
 class FormularioTitular(forms.ModelForm):
+    notas = forms.CharField(label="Notas", max_length=MAXIMO_NOTAS, required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
     class Meta:
         model = Titular
         fields = ["nombre", "apellidos", "agrupacion", "notas"]
@@ -27,7 +32,7 @@ class FormularioAlta(FormularioContacto):
     conceptos = forms.ModelMultipleChoiceField(label="Conceptos iniciales", queryset=ConceptoCobro.objects.none(), required=False, widget=forms.CheckboxSelectMultiple)
     familia = forms.ModelChoiceField(label="Familia (opcional)", queryset=Familia.objects.none(), required=False)
     familia_nueva = forms.CharField(label="O crear una familia nueva con este nombre", max_length=100, required=False)
-    notas = forms.CharField(label="Notas", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+    notas = forms.CharField(label="Notas", max_length=MAXIMO_NOTAS, required=False, widget=forms.Textarea(attrs={"rows": 3}))
     constancia_consentimiento = forms.BooleanField(label="Se entregó el aviso de privacidad y se obtuvo el consentimiento", required=True)
 
     def __init__(self, *args, voc=None, **kwargs):

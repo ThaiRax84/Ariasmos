@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from banco.models import CuentaBancaria
 from cobros.models import ConceptoCobro
+from cuentas.qr import agrupar
 from configuracion.models import Negocio, vocabulario
 from cuentas.models import Dispositivo, Usuario
 from nucleo import totp
@@ -28,7 +29,7 @@ def terminar(c, usuario="jefa"):
     respuesta = c.post(reverse("asistente:usuario"), {"usuario": usuario, "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
     assert respuesta.url == reverse("asistente:codigo")
     secreto = c.session["asistente"]["secreto"]
-    assert secreto in c.get(reverse("asistente:codigo")).content.decode()
+    assert agrupar(secreto) in c.get(reverse("asistente:codigo")).content.decode()
     return c.post(reverse("asistente:codigo"), {"codigo": totp.codigo(secreto, totp.paso_actual())})
 
 
@@ -49,7 +50,7 @@ def test_asistente_completo_deja_instalacion_usable():
     assert "Usar tal cual" in c.get(reverse("asistente:personalizar")).content.decode()
     colegiatura = ConceptoCobro.objects.get(tipo="recurrente")
     datos = {f"importe_{c_.pk}": "100" for c_ in ConceptoCobro.objects.all()}
-    datos.update({f"importe_{colegiatura.pk}": "1500.50", f"dia_{colegiatura.pk}": 10, f"recargo_tipo_{colegiatura.pk}": "porcentaje", f"recargo_valor_{colegiatura.pk}": "10", f"recargo_gracia_{colegiatura.pk}": 3})
+    datos.update({f"importe_{colegiatura.pk}": "1500.50", f"dia_{colegiatura.pk}": 10, f"recargo_tipo_{colegiatura.pk}": "porcentaje", f"recargo_porcentaje_{colegiatura.pk}": "10", f"recargo_gracia_{colegiatura.pk}": 3})
     assert c.post(reverse("asistente:conceptos"), datos).url == reverse("asistente:pago")
     colegiatura.refresh_from_db()
     assert colegiatura.importe_centavos == 150050 and colegiatura.dia_vencimiento == 10 and colegiatura.regla_recargo.valor == 1000
@@ -91,7 +92,7 @@ def test_personalizar_vocabulario_y_conceptos():
     assert not ConceptoCobro.objects.filter(nombre="Otro cargo").exists()
     nuevo = ConceptoCobro.objects.get(nombre="Cuota anual")
     assert nuevo.periodicidad == "anual"
-    assert f'name="recargo_valor_{nuevo.pk}"' in c.get(reverse("asistente:conceptos")).content.decode()
+    assert f'name="recargo_importe_{nuevo.pk}"' in c.get(reverse("asistente:conceptos")).content.decode()
 
 
 @pytest.mark.django_db
@@ -113,6 +114,6 @@ def test_importar_plantilla_de_punta_a_punta():
     assert vocabulario()["titular"] == "Miembro"
     membresia = ConceptoCobro.objects.get(nombre="Membresía")
     pagina = c.get(reverse("asistente:conceptos")).content.decode()
-    assert f'name="recargo_valor_{membresia.pk}"' in pagina
+    assert f'name="recargo_importe_{membresia.pk}"' in pagina
     assert terminar(c).url == reverse("inicio")
     assert Negocio.objects.get().configurado

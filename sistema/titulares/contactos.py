@@ -25,6 +25,19 @@ def normalizar_telefono(texto):
 
 
 class CampoTelefono(forms.CharField):
+    acepta = "digitos"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.maximo_tecleo = parametro("digitos_telefono_nacional")
+
+    def prepare_value(self, valor):
+        texto = str(valor or "")
+        inicio = prefijo()
+        if texto.isdigit() and texto.startswith(inicio) and len(texto) == len(inicio) + self.maximo_tecleo:
+            return texto[len(inicio):]
+        return valor
+
     def clean(self, valor):
         valor = super().clean(valor)
         if not valor:
@@ -35,7 +48,7 @@ class CampoTelefono(forms.CharField):
 def campo_formulario(campo, exigir_obligatorios):
     requerido = campo.obligatorio and exigir_obligatorios
     if campo.tipo == CampoContacto.TELEFONO:
-        return CampoTelefono(label=campo.etiqueta, required=requerido, max_length=30, widget=forms.TextInput(attrs={"inputmode": "tel", "autocomplete": "tel"}))
+        return CampoTelefono(label=campo.etiqueta, required=requerido, max_length=30, widget=forms.TextInput(attrs={"autocomplete": "tel-national"}))
     if campo.tipo == CampoContacto.CORREO:
         return forms.EmailField(label=campo.etiqueta, required=requerido, max_length=150)
     return forms.CharField(label=campo.etiqueta, required=requerido, max_length=200)

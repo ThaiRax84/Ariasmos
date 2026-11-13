@@ -108,7 +108,7 @@ def test_rol_que_aprueba_debe_activar_totp(personas, roles):
     c = cliente(sin)
     assert c.get(reverse("titulares:lista")).url == reverse("totp")
     pagina = c.get(reverse("totp")).content.decode()
-    assert "otpauth://totp/" in pagina
+    assert 'class="segno"' in pagina and "Introducir clave manualmente" in pagina
 
 
 def test_cierre_por_inactividad(personas):

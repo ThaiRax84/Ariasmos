@@ -15,6 +15,7 @@ from banco.models import CuentaBancaria
 from banco.servicios import guardar_cuenta
 from banco.views import avisar as avisar_banco
 from cobros.models import ConceptoCobro, ReglaRecargo
+from cuentas import qr
 from cuentas import servicios as cuentas_servicios
 from cuentas.formularios import FormularioCodigo
 from cuentas.models import CodigoUsado, Usuario
@@ -71,7 +72,7 @@ def _leer_plantilla(formulario):
 
 def inicio(request):
     negocio = _disponible(request)
-    inicial = {"nombre": negocio.nombre, "zona_horaria": negocio.zona_horaria} if negocio else {}
+    inicial = {"nombre": negocio.nombre, "zona_horaria": negocio.zona_horaria, "moneda": negocio.moneda} if negocio else {}
     datos_post = request.POST if request.method == "POST" else None
     formulario = FormularioAsistenteInicio(datos_post, request.FILES if request.method == "POST" else None, plantillas=plantillas.disponibles(), initial=inicial)
     if request.method == "POST" and formulario.is_valid():
@@ -88,9 +89,9 @@ def inicio(request):
         with transaction.atomic():
             guardado, _ = Negocio.objects.update_or_create(
                 pk=1,
-                defaults={"nombre": formulario.cleaned_data["nombre"], "zona_horaria": formulario.cleaned_data["zona_horaria"], "plantilla": origen, "configurado": False},
+                defaults={"nombre": formulario.cleaned_data["nombre"], "zona_horaria": formulario.cleaned_data["zona_horaria"], "moneda": formulario.cleaned_data["moneda"], "plantilla": origen, "configurado": False},
             )
-            registrar("asistente_negocio", objeto=guardado, datos={"nombre": guardado.nombre, "plantilla": origen}, request=request)
+            registrar("asistente_negocio", objeto=guardado, datos={"nombre": guardado.nombre, "plantilla": origen, "moneda": guardado.moneda}, request=request)
         if origen == "importada":
             _guardar_estado(request, autorizado=True, pendiente=datos)
             return redirect("asistente:revisar")
@@ -272,7 +273,8 @@ def codigo(request):
         "paso": 6,
         "total": TOTAL_PASOS,
         "titulo": "Autenticador del primer usuario",
-        "secreto": secreto,
-        "uri": totp.uri(secreto, nuevo.usuario, negocio.nombre),
+        **qr.contexto(secreto, nuevo.usuario, negocio.nombre),
     }
-    return render(request, "asistente/codigo.html", contexto)
+    respuesta = render(request, "asistente/codigo.html", contexto)
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta

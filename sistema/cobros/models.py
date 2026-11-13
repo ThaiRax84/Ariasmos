@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models import F, Q
 from django.utils import timezone
 
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 
 
 class ReglaRecargo(models.Model):

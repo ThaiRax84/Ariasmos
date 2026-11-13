@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
 
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 
 
 class SinBorrado(models.QuerySet):

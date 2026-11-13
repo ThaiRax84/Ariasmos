@@ -3,15 +3,16 @@ from django.db import transaction
 from django.forms.models import model_to_dict
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from auditoria.servicios import diferencias, registrar
 from cuentas.decoradores import requiere_permiso
 from banco.models import MedioPago
 from caja.models import Caja, Denominacion
+from cobros.models import Cargo, Pago
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
 from . import plantillas
-
 from .formularios import (
     FormularioAgrupacion,
     FormularioAjustesAvanzados,
@@ -19,6 +20,7 @@ from .formularios import (
     FormularioCampoContacto,
     FormularioDenominacion,
     FormularioMedioPago,
+    FormularioMoneda,
     FormularioMotivo,
     FormularioNegocio,
     FormularioParametros,
@@ -68,7 +70,41 @@ def avanzado(request):
                 registrar("configuracion_cambiada", usuario=request.user, objeto=guardado, datos={"cambios": diferencias(antes, model_to_dict(guardado, fields=list(antes)))}, request=request)
             messages.success(request, "Ajustes guardados.")
             return redirect("configuracion:indice")
-    return render(request, "configuracion/avanzado.html", {"formulario": formulario, "bloqueado": actual.matriculas_emitidas})
+    return render(request, "configuracion/avanzado.html", {"formulario": formulario, "bloqueado": actual.matriculas_emitidas, **_contexto_moneda(actual)})
+
+
+def moneda_bloqueada():
+    return Cargo.objects.exists() or Pago.objects.exists()
+
+
+def _contexto_moneda(actual, formulario=None):
+    bloqueada = moneda_bloqueada()
+    return {"formulario_moneda": formulario or FormularioMoneda(initial={"moneda": actual.moneda}, bloqueada=bloqueada), "moneda_bloqueada": bloqueada}
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+@require_POST
+def cambiar_moneda(request):
+    actual = Negocio.objects.get(pk=1)
+    if moneda_bloqueada():
+        registrar("moneda_rechazada", usuario=request.user, objeto=actual, datos={"motivo": "ya_hay_movimientos", "pedida": str(request.POST.get("moneda", ""))[:3]}, request=request)
+        messages.error(request, "Ya hay cargos o pagos registrados: la moneda no se puede cambiar.")
+        return redirect("configuracion:avanzado")
+    formulario = FormularioMoneda(request.POST)
+    if not formulario.is_valid():
+        return render(request, "configuracion/avanzado.html", {"formulario": FormularioAjustesAvanzados(instance=actual), "bloqueado": actual.matriculas_emitidas, **_contexto_moneda(actual, formulario)})
+    nueva = formulario.cleaned_data["moneda"]
+    with transaction.atomic():
+        if moneda_bloqueada():
+            registrar("moneda_rechazada", usuario=request.user, objeto=actual, datos={"motivo": "ya_hay_movimientos", "pedida": nueva}, request=request)
+            messages.error(request, "Ya hay cargos o pagos registrados: la moneda no se puede cambiar.")
+            return redirect("configuracion:avanzado")
+        if nueva != actual.moneda:
+            Negocio.objects.filter(pk=1).update(moneda=nueva)
+            quitadas = Denominacion.objects.filter(activa=True).update(activa=False)
+            registrar("moneda_cambiada", usuario=request.user, objeto=actual, datos={"cambios": {"moneda": [actual.moneda, nueva]}, "denominaciones_desactivadas": quitadas}, request=request)
+            messages.success(request, f"Moneda cambiada a {nueva}. Captura las denominaciones de caja de la nueva moneda.")
+    return redirect("configuracion:avanzado")
 
 
 @requiere_permiso(PERMISO, reingreso=True)
