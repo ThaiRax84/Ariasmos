@@ -28,6 +28,7 @@ from .formularios import (
     FormularioParametros,
     FormularioRelacion,
     FormularioVocabulario,
+    TOPES_CARPETA,
     guardar_caja,
     valores_caja,
 )
@@ -144,7 +145,7 @@ def parametros(request):
     formulario = FormularioParametros(request.POST if request.method == "POST" else None, valores=antes)
     if request.method == "POST" and formulario.is_valid():
         with transaction.atomic():
-            for clave in PARAMETROS:
+            for clave in formulario.fields:
                 Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(formulario.cleaned_data[clave])})
             registrar("parametros_cambiados", usuario=request.user, datos={"cambios": diferencias(antes, {clave: parametro(clave) for clave in PARAMETROS})}, request=request)
         messages.success(request, "Parámetros guardados.")
@@ -176,12 +177,16 @@ def caja(request):
 @requiere_permiso(PERMISO, reingreso=True)
 def carpeta_banco(request):
     actual = Negocio.objects.get(pk=1)
-    formulario = FormularioCarpetaBanco(request.POST if request.method == "POST" else None, initial={"carpeta_banco": actual.carpeta_banco})
+    antes_topes = {clave: int(parametro(clave)) for clave in TOPES_CARPETA}
+    formulario = FormularioCarpetaBanco(request.POST if request.method == "POST" else None, initial={"carpeta_banco": actual.carpeta_banco, **antes_topes})
     if request.method == "POST" and formulario.is_valid():
         nueva = formulario.cleaned_data["carpeta_banco"]
         with transaction.atomic():
             Negocio.objects.filter(pk=1).update(carpeta_banco=nueva)
-            registrar("carpeta_banco_cambiada", usuario=request.user, objeto=actual, datos={"cambios": {"carpeta_banco": [actual.carpeta_banco, nueva]}}, request=request)
+            for clave, valor in formulario.topes().items():
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+            cambios = diferencias({"carpeta_banco": actual.carpeta_banco, **antes_topes}, {"carpeta_banco": nueva, **formulario.topes()})
+            registrar("carpeta_banco_cambiada", usuario=request.user, objeto=actual, datos={"cambios": cambios}, request=request)
         messages.success(request, "Carpeta vigilada guardada." if nueva else "Carpeta vigilada desactivada.")
         return redirect("configuracion:indice")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "boton": "Guardar", "volver": "configuracion:indice"})

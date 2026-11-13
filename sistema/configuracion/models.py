@@ -57,6 +57,14 @@ PARAMETROS = {
     "serie_retiros": ("R", "Serie de los folios de retiros de caja"),
     "intentos_verificar_recibo_por_hora": (20, "Verificaciones de recibo fallidas por hora, por persona y por equipo, antes de bloquear la verificación"),
     "propuestas_cambio_sin_cobro": (10, "Propuestas de cambio sin cobro registrado que se permiten por turno"),
+    "tope_aplicado_sin_respaldo": (0, "Importe máximo en centavos de pagos aplicados desde archivos editables de la carpeta vigilada sin respaldo de un estado en PDF (0 retiene todo archivo editable)"),
+    "tope_pago_carpeta": (0, "Importe máximo en centavos de un pago aplicado solo desde un archivo editable de la carpeta vigilada (0 sin tope individual)"),
+    "dias_sin_respaldo_alerta": (45, "Días que un pago aplicado desde un archivo editable puede quedar sin un estado en PDF que lo respalde antes de alertar"),
+    "modulo_inventario": (0, "1 para usar el inventario; 0 para ocultarlo"),
+    "devoluciones_inventario": (0, "1 para aceptar devoluciones de artículos vendidos; 0 para no aceptarlas"),
+    "dias_devolucion": (15, "Días después de la venta en que se acepta una devolución de artículos"),
+    "dias_conteo_sin_aprobar": (3, "Días que un conteo de inventario puede esperar aprobación antes de avisar a Dirección"),
+    "serie_devoluciones": ("D", "Serie de los recibos de saldo a favor por devolución de artículos"),
 }
 
 ESPECIALES = (
@@ -68,6 +76,12 @@ ESPECIALES = (
     "maximo_retiros_periodo",
     "maximo_efectivo_caja",
     "dias_retiro_sin_revisar",
+    "tope_aplicado_sin_respaldo",
+    "tope_pago_carpeta",
+    "modulo_inventario",
+    "devoluciones_inventario",
+    "dias_devolucion",
+    "dias_conteo_sin_aprobar",
 )
 
 
@@ -143,6 +157,10 @@ def parametro(clave):
         return int(valor)
     except ValueError:
         return base
+
+
+def inventario_activo():
+    return bool(parametro("modulo_inventario"))
 
 
 def hoy_negocio():

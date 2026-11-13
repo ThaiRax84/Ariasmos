@@ -34,11 +34,12 @@ from .formularios import (
     FormularioCajaCortes,
     FormularioPersonalizar,
     FormularioRevisarPlantilla,
+    TOPES_CARPETA,
     guardar_caja,
     valores_caja,
 )
 from .resumen import resumir
-from .models import VOCABULARIO_BASE, Negocio, Vocabulario, hoy_negocio, vocabulario
+from .models import VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, hoy_negocio, parametro, vocabulario
 
 CLAVE_SESION = "asistente"
 
@@ -262,6 +263,11 @@ def cortes(request):
                 DefinicionCorte.objects.filter(tipo=tipo).update(nivel=datos[f"nivel_{tipo}"])
             if datos["carpeta_respaldo"]:
                 Negocio.objects.filter(pk=1).update(carpeta_respaldo=datos["carpeta_respaldo"])
+            antes_topes = {clave: int(parametro(clave)) for clave in TOPES_CARPETA}
+            for clave, valor in formulario.topes().items():
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+            if antes_topes != formulario.topes():
+                registrar("carpeta_banco_topes", objeto=negocio, datos={"cambios": diferencias(antes_topes, formulario.topes()), "origen": "asistente"}, request=request)
             if datos["carpeta_banco"] != negocio.carpeta_banco:
                 Negocio.objects.filter(pk=1).update(carpeta_banco=datos["carpeta_banco"])
                 registrar("carpeta_banco_cambiada", objeto=negocio, datos={"cambios": {"carpeta_banco": [negocio.carpeta_banco, datos["carpeta_banco"]]}, "origen": "asistente"}, request=request)

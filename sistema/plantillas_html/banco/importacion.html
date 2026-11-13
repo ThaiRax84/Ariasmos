@@ -5,12 +5,26 @@
 <p>{{ importacion.nombre_archivo }} · {{ importacion.cuenta }} · {{ importacion.get_adaptador_display }} · huella {{ importacion.sha256|slice:":12" }}…</p>
 <p>Importó {{ importacion.importo }} · clasificación: <strong>{{ importacion.get_continuidad_display }}</strong>{% if importacion.periodo_inicio %} · periodo {{ importacion.periodo_inicio|date:"d/m/Y" }} a {{ importacion.periodo_fin|date:"d/m/Y" }}{% endif %}{% if importacion.saldo_inicial is not None %} · saldo inicial {{ importacion.saldo_inicial|dinero }}, final {{ importacion.saldo_final|dinero }}{% endif %}</p>
 <p>{{ aplicados }} pago{{ aplicados|pluralize }} aplicado{{ aplicados|pluralize }} por {{ monto|dinero }}{% if importacion.requiere_revision %} · {% if importacion.revisada_por %}revisada por {{ importacion.revisada_por }} el {{ importacion.revisada_en|date:"d/m/Y H:i" }}{% elif aplicados %}<strong>pendiente de revisión</strong>{% else %}sin pagos que revisar{% endif %}{% endif %}</p>
-{% if importacion.retenida %}<p class="mensaje{% if not importacion.liberada_en %} warning{% endif %}">{% if importacion.liberada_en %}Llegó por la carpeta vigilada sin continuidad; la liberó {{ importacion.liberada_por }} el {{ importacion.liberada_en|date:"d/m/Y H:i" }}.{% else %}Llegó por la carpeta vigilada y no continúa un estado anterior: sus pagos no se aplican hasta que alguien que concilia la revise contra el banco y la libere.{% endif %}</p>{% endif %}
-{% if puede_liberar %}<form method="post" action="{% url 'conciliacion:liberar' importacion.pk %}" class="acciones">{% csrf_token %}<button class="boton" type="submit" data-confirmar="¿Revisaste esta importación contra el banco? Se aplicarán sus pagos identificados.">Revisada: aplicar sus pagos</button></form>{% endif %}
+{% if importacion.retenida and importacion.liberada_en %}<p class="mensaje">Llegó por la carpeta vigilada con señales de sospecha; la liberó {{ importacion.liberada_por }} y el último movimiento retenido se liberó el {{ importacion.liberada_en|date:"d/m/Y H:i" }}.</p>{% endif %}
+{% if retenidos %}
+<section class="panel alerta">
+  <h2>Movimientos retenidos ({{ retenidos|length }})</h2>
+  <p>Llegaron por la carpeta vigilada y tienen una señal de sospecha: no se aplican hasta que alguien que concilia los compare con el banco y los libere. Quien libera no puede marcar la importación como revisada.</p>
+  {% if puede_liberar %}<form method="post" action="{% url 'conciliacion:liberar' importacion.pk %}">{% csrf_token %}{% endif %}
+  <table class="tabla compacta">
+  <thead><tr>{% if puede_liberar %}<th>Liberar</th>{% endif %}<th>Fecha</th><th>Referencia y concepto</th><th>Importe</th><th>Matrícula sugerida</th><th>Motivo de la retención</th></tr></thead>
+  <tbody>{% for m in retenidos %}<tr>{% if puede_liberar %}<td><input type="checkbox" name="movimiento" value="{{ m.pk }}" aria-label="Liberar el movimiento del {{ m.fecha|date:'d/m/Y' }}"></td>{% endif %}<td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.referencia }} {{ m.concepto }}</td><td>{{ m.importe|dinero }}</td><td>{{ m.sugerencia }}</td><td>{% for motivo in m.motivos_retencion %}{{ motivo }}{% if not forloop.last %}; {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% if puede_liberar %}<div class="acciones">
+    <button class="boton" type="submit" name="alcance" value="elegidos" data-confirmar="¿Comparaste con el banco los movimientos marcados? Se aplicarán sus pagos.">Liberar los marcados</button>
+    <button class="boton secundario" type="submit" name="alcance" value="todos" data-confirmar="¿Comparaste con el banco todos los movimientos retenidos? Se aplicarán sus pagos.">Liberar todos</button>
+  </div></form>{% endif %}
+</section>
+{% endif %}
 {% if puede_revisar %}<form method="post" action="{% url 'conciliacion:revisada' importacion.pk %}" class="acciones">{% csrf_token %}<button class="boton" type="submit" data-confirmar="¿Revisaste esta importación contra el banco?">Marcar como revisada</button></form>{% endif %}
 <p>{{ importacion.nuevos }} nuevos · {{ importacion.aplicados }} aplicados · {{ importacion.sugeridos }} sugeridos · {{ importacion.sin_pista }} sin pista · {{ importacion.depositos_emparejados }} depósitos de caja · {{ importacion.duplicados }} repetidos</p>
 <table class="tabla compacta">
 <thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th>Estado</th><th>Aplicado a</th></tr></thead>
-<tbody>{% for m in movimientos %}<tr><td>{% if "sugerir_conciliacion" in permisos or "conciliar_banco" in permisos %}<a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a>{% else %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td><td>{{ m.descripcion }}</td><td>{% if m.sentido == "cargo" %}−{% endif %}{{ m.importe|dinero }}</td><td>{{ m.get_estado_display }}</td><td>{% if m.pago %}{{ m.pago.titular.nombre_completo }} · {% if "ver_titulares" in permisos %}<a href="{% url 'cobros:recibo' m.pago.recibo.pk %}">{{ m.pago.recibo }}</a>{% else %}{{ m.pago.recibo }}{% endif %}{% endif %}</td></tr>{% endfor %}</tbody>
+<tbody>{% for m in movimientos %}<tr><td>{% if "sugerir_conciliacion" in permisos or "conciliar_banco" in permisos %}<a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a>{% else %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td><td>{{ m.descripcion }}</td><td>{% if m.sentido == "cargo" %}−{% endif %}{{ m.importe|dinero }}</td><td>{{ m.get_estado_display }}{% if m.retenido %} · retenido{% endif %}{% if m.sin_respaldo %} · <strong>sin respaldo en el estado</strong>{% endif %}</td><td>{% if m.pago %}{{ m.pago.titular.nombre_completo }} · {% if "ver_titulares" in permisos %}<a href="{% url 'cobros:recibo' m.pago.recibo.pk %}">{{ m.pago.recibo }}</a>{% else %}{{ m.pago.recibo }}{% endif %}{% endif %}</td></tr>{% endfor %}</tbody>
 </table>
 {% endblock %}

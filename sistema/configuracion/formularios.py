@@ -152,6 +152,15 @@ class FormularioParametros(forms.Form):
     def clean_serie_retiros(self):
         return self._serie("serie_retiros")
 
+    def clean_serie_devoluciones(self):
+        return self._serie("serie_devoluciones")
+
+    def clean_dias_sin_respaldo_alerta(self):
+        valor = self.cleaned_data["dias_sin_respaldo_alerta"]
+        if valor < 1:
+            raise forms.ValidationError("Debe ser al menos 1.")
+        return valor
+
     def clean_intentos_verificar_recibo_por_hora(self):
         valor = self.cleaned_data["intentos_verificar_recibo_por_hora"]
         if valor < 1:
@@ -444,8 +453,16 @@ def guardar_caja(valores):
         Parametro.objects.update_or_create(clave=clave, defaults={"valor": texto})
 
 
+TOPES_CARPETA = ("tope_aplicado_sin_respaldo", "tope_pago_carpeta")
+
+
 class FormularioCarpetaBanco(forms.Form):
     carpeta_banco = forms.CharField(label="Carpeta vigilada del banco (opcional; ruta absoluta donde se deja el archivo descargado del banco)", max_length=400, required=False)
+    tope_aplicado_sin_respaldo = CampoImporte(label="Tope de pagos aplicados desde archivos editables sin un estado en PDF que los respalde (en 0, todo archivo editable queda retenido hasta que alguien lo libere)", required=False, maximo=10 ** 11)
+    tope_pago_carpeta = CampoImporte(label="Importe máximo de un pago que se aplica solo desde un archivo editable (0 sin tope individual)", required=False, maximo=10 ** 11)
+
+    def topes(self):
+        return {clave: self.cleaned_data.get(clave) or 0 for clave in TOPES_CARPETA}
 
     def clean_carpeta_banco(self):
         from banco.carpeta import ErrorCarpeta, validar_carpeta
@@ -462,7 +479,7 @@ class FormularioCarpetaBanco(forms.Form):
 class FormularioAsistenteCortes(FormularioCarpetaBanco):
     carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
     carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)
-    field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco"]
+    field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco", "tope_aplicado_sin_respaldo", "tope_pago_carpeta"]
 
     def __init__(self, *args, niveles=None, carpeta="", carpeta_banco="", pide_clave=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -472,6 +489,10 @@ class FormularioAsistenteCortes(FormularioCarpetaBanco):
             self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=NIVELES, initial=(niveles or {}).get(tipo, "solo_nombres"))
         self.initial.setdefault("carpeta_respaldo", carpeta)
         self.initial.setdefault("carpeta_banco", carpeta_banco)
+        from .models import parametro
+
+        for clave in TOPES_CARPETA:
+            self.initial.setdefault(clave, int(parametro(clave)))
         if pide_clave:
             self.fields["guardada"] = forms.BooleanField(label="Ya imprimí la clave de recuperación y la guardé fuera de este equipo", required=True)
 
