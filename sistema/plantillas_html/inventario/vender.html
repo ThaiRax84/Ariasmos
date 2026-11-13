@@ -5,7 +5,7 @@
     <span class="antetitulo">Inventario</span>
     <h1>Vender artículos</h1>
   </div>
-  <div class="encabezado-lado"><a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Vender sin {{ voc.matricula|lower }} (público en general)</a></div>
+  <div class="encabezado-lado">{% include "inventario/_a_quien.html" %}</div>
 </div>
 <form method="get" class="busqueda">
   <input type="search" name="q" value="{{ q }}" placeholder="{{ voc.matricula }} o nombre" aria-label="Buscar" maxlength="60" autofocus>

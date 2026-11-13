@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% load formato %}
+{% load static %}
 {% block transicion %}{% endblock %}
+{% block cabeza %}<script src="{% static 'js/piezas.js' %}" defer></script>{% endblock %}
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
     <span class="antetitulo">Cobrar en efectivo</span>
-    <h1>Cobrar a {{ titular.nombre_completo }}</h1>
+    <h1>{{ titular.nombre_completo }}</h1>
     <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %}{% if titular.familia %} · {{ voc.familia }} <a href="{% url 'titulares:familia' titular.familia.pk %}">{{ titular.familia }}</a>{% endif %}</p>
   </div>
   <div class="encabezado-lado">
@@ -49,9 +51,11 @@
       {% for campo in piezas.formulario.hidden_fields %}{{ campo }}{% endfor %}
       <div class="campo">
         <span class="etiqueta">{% if piezas.listo %}Piezas que te pagaron{% else %}2 · Con qué te pagaron{% endif %}</span>
-        <span class="ayuda">Escribe cuántas piezas recibiste de cada billete o moneda.</span>
-        {% include "caja/_piezas.html" with campos=piezas.formulario.campos_recibidas prefijo="Recibí: piezas de" %}
+        <span class="ayuda" data-ayuda-sin-js>Escribe cuántas piezas recibiste de cada billete o moneda.</span>
+        <span class="ayuda" data-ayuda-con-js hidden>Toca cada billete o moneda que recibas; con «−» quitas una.</span>
+        {% include "caja/_piezas.html" with campos=piezas.formulario.campos_recibidas prefijo="Recibí: piezas de" mosaicos=True %}
       </div>
+      {% if not piezas.listo %}<div class="cuadros" data-recibido-cuadro hidden><div class="cuadro"><span class="etiqueta">Recibido</span><span class="valor" data-recibido></span></div><div class="cuadro"><span class="etiqueta">Importe a cobrar</span><span class="valor">{{ importe|dinero }}</span></div></div>{% endif %}
       {% if piezas.listo %}
       <div class="cuadros">
         <div class="cuadro"><span class="etiqueta">Recibido</span><span class="valor">{{ importe|add:piezas.cambio|dinero }}</span></div>
@@ -64,10 +68,10 @@
       </div>{% endif %}
       <details class="campo"{% if piezas.formulario.errors or piezas.aviso %} open{% endif %}>
         <summary class="enlace">{% if piezas.aviso %}Piezas que entregas de cambio{% else %}Di el cambio con otras piezas{% endif %}</summary>
-        {% include "caja/_piezas.html" with campos=piezas.formulario.campos_cambio prefijo="Entrego de cambio: piezas de" %}
+        {% include "caja/_piezas.html" with campos=piezas.formulario.campos_cambio prefijo="Entrego de cambio: piezas de" mosaicos=True %}
       </details>
       {% endif %}
-      <div class="acciones columna"><button class="boton grande ancho" type="submit">Confirmar y emitir recibo</button></div>
+      <div class="acciones columna"><button class="boton grande ancho" type="submit">Confirmar y dar recibo</button></div>
       {% else %}
       <div class="acciones columna"><button class="boton grande ancho" type="submit">Calcular el cambio</button></div>
       {% endif %}
@@ -79,7 +83,7 @@
       <input type="hidden" name="importe" value="{{ importe }}">
       <input type="hidden" name="ficha" value="{{ ficha }}">
       {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
-      <button class="boton grande ancho" type="submit">Confirmar y emitir recibo</button>
+      <button class="boton grande ancho" type="submit">Confirmar y dar recibo</button>
     </form>
     {% endif %}
     <p class="acciones"><a class="enlace" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir el importe</a> · <a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular|lower }}</a></p>
