@@ -70,6 +70,11 @@ def _mutada(**cambios):
         (bytes_de(_mutada(campos_contacto=[{"etiqueta": "A", "tipo": "telefono", "extra": 1}])), "claves no permitidas"),
         (bytes_de(_mutada(motivos_baja=["Uno", "uno"])), "repetido"),
     ],
+    ids=[
+        "demasiado-grande", "no-utf8", "json-invalido", "anidado-profundo", "no-es-objeto", "clave-de-codigo", "permiso-inexistente",
+        "tipo-de-concepto", "demasiados-conceptos", "demasiados-motivos", "rol-inicial-sin-permisos", "sin-roles", "nombre-largo",
+        "prioridad-booleana", "aplica-a-agrupacion", "vocabulario-extra", "faltan-politicas", "campo-con-clave-extra", "motivo-repetido",
+    ],
 )
 def test_plantillas_maliciosas_o_malformadas_rechazadas(contenido, mensaje):
     with pytest.raises(esquema.PlantillaInvalida) as error:

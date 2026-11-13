@@ -88,6 +88,7 @@ def test_instancia_existente_recibe_claves_nuevas(tmp_path):
         ("", ""),
         ("...", ""),
     ],
+    ids=["normal", "espacio", "punto-y-coma", "metacaracteres", "guiones", "acentos", "largo", "vacio", "solo-puntos"],
 )
 def test_saneado_del_nombre_del_equipo(crudo, esperado):
     assert equipo.sanear(crudo) == esperado
