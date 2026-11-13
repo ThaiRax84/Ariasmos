@@ -45,6 +45,12 @@ class AccionLibro:
     def llave(self, datos):
         return {}
 
+    def exige_solicitud(self, usuario, titular, datos):
+        return False
+
+    def puede_resolver(self, usuario, datos):
+        return True
+
     def rechazar(self, titular, datos, contexto=None):
         pass
 
@@ -141,6 +147,15 @@ class Condonar(Cancelar):
 class Revertir(AccionLibro):
     def llave(self, datos):
         return {"datos__pago": datos.get("pago")}
+
+    def _cobrador(self, datos):
+        return Pago.objects.filter(pk=datos.get("pago")).values_list("registrado_por_id", flat=True).first()
+
+    def exige_solicitud(self, usuario, titular, datos):
+        return self._cobrador(datos) == usuario.pk
+
+    def puede_resolver(self, usuario, datos):
+        return self._cobrador(datos) != usuario.pk
 
     def validar(self, titular, datos):
         pago = Pago.objects.filter(pk=datos.get("pago"), titular=titular).first()

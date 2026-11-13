@@ -41,6 +41,12 @@ class Manejador:
     def llave(self, datos):
         return {}
 
+    def exige_solicitud(self, usuario, titular, datos):
+        return False
+
+    def puede_resolver(self, usuario, datos):
+        return True
+
     def rechazar(self, titular, datos, contexto=None):
         pass
 
@@ -221,11 +227,14 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
         if Solicitud.objects.filter(titular=titular, accion=accion, estado=Solicitud.PENDIENTE, **manejador.llave(datos)).exists():
             raise ErrorSolicitud("Ya hay una solicitud pendiente para esta acción.")
         contexto = Contexto(ejecutor=usuario, autorizador=usuario, solicitante=usuario, request=request)
-        if usuario.tiene_permiso_de_rol(politica.permiso_directo):
+        forzada = manejador.exige_solicitud(usuario, titular, datos)
+        if forzada:
+            registrar("solicitud_obligatoria", usuario=usuario, objeto=titular, datos={"accion": accion, "motivo": "pago_cobrado_por_quien_revierte"}, request=request)
+        if not forzada and usuario.tiene_permiso_de_rol(politica.permiso_directo):
             cambios, detalle = _aplicar(manejador, titular, datos, contexto)
             registrar(f"{accion}_aplicada", usuario=usuario, objeto=titular, datos={"via": "directa", **datos, **detalle, "cambios": cambios}, request=request)
             return Resultado("directa", objeto=contexto.resultado)
-        if politica.permite_delegacion:
+        if politica.permite_delegacion and not forzada:
             delegacion = usar_delegacion(usuario, politica.permiso_directo, request=request, contexto={"accion": accion, "titular": titular.pk})
             if delegacion is not None:
                 contexto.autorizador = delegacion.otorgante
@@ -238,7 +247,7 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
                     request=request,
                 )
                 return Resultado("delegacion", objeto=contexto.resultado)
-        if not usuario.tiene_permiso(politica.permiso_solicitar):
+        if not forzada and not usuario.tiene_permiso(politica.permiso_solicitar):
             raise PermissionDenied
         solicitud = Solicitud.objects.create(
             accion=accion,
@@ -260,6 +269,9 @@ def _verificar_resolvible(solicitud, usuario, request, evento):
     if usuario.pk == solicitud.solicitante_id:
         registrar(evento, usuario=usuario, objeto=solicitud, datos={"motivo": "autoaprobacion"}, request=request)
         raise ErrorSolicitud("Nadie puede resolver su propia solicitud.")
+    if not MANEJADORES[solicitud.accion].puede_resolver(usuario, solicitud.datos):
+        registrar(evento, usuario=usuario, objeto=solicitud, datos={"motivo": "cobro_propio"}, request=request)
+        raise ErrorSolicitud("Nadie resuelve la reversión de un pago que él mismo cobró.")
 
 
 def _autorizar_resolucion(solicitud, usuario, politica, request):
@@ -349,6 +361,9 @@ def autorizar_con_codigo(solicitud, capturista, autorizador, codigo, request=Non
     if autorizador.pk == solicitud.solicitante_id:
         registrar("aprobacion_rechazada", usuario=capturista, objeto=solicitud, datos={"motivo": "autoaprobacion"}, request=request)
         raise ErrorSolicitud("Nadie puede autorizar su propia solicitud.")
+    if not MANEJADORES[solicitud.accion].puede_resolver(autorizador, solicitud.datos):
+        registrar("aprobacion_rechazada", usuario=capturista, objeto=solicitud, datos={"motivo": "cobro_propio", "autorizador": autorizador.pk}, request=request)
+        raise ErrorSolicitud("Nadie autoriza la reversión de un pago que él mismo cobró.")
     if solicitud.estado != Solicitud.PENDIENTE:
         raise ErrorSolicitud("La solicitud ya no está pendiente.")
     if solicitud.caduca_en <= timezone.now():
