@@ -91,3 +91,4 @@ tr.revertido td:first-child, tr.revertido td:last-child { text-decoration: none;
 .con-adorno input:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .clave-autenticador { font-family: monospace; font-size: 1.4rem; letter-spacing: .08em; word-spacing: .4em; }
 .qr-autenticador svg { width: 220px; height: 220px; background: #fff; }
+.pie-pagina { text-align: center; color: var(--suave); font-size: .8rem; padding: 1rem 0 2rem; }

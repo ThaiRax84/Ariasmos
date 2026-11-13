@@ -59,6 +59,11 @@ def validar_ruta(texto, crear=True):
             prueba = ruta / f".prueba-escritura-{secrets.token_hex(6)}"
             prueba.write_bytes(b"ok")
             prueba.unlink()
+        except PermissionError:
+            raise ErrorEntrega(
+                "El servicio no tiene permiso para escribir en esa carpeta. En el equipo donde está instalado, abre «Dar permiso a una carpeta» "
+                "desde el menú Inicio (Ariasmos), escribe esta ruta y vuelve a intentarlo."
+            )
         except OSError as error:
             raise ErrorEntrega(f"No se puede escribir en la carpeta: {error.strerror or error}")
     return str(ruta)

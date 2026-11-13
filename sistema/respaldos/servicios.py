@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import tarfile
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, time
 from datetime import timezone as dt_timezone
 from zoneinfo import ZoneInfo
@@ -107,8 +108,18 @@ def abrir_sqlite(ruta, **opciones):
     return base
 
 
+@contextmanager
+def conexion(ruta, **opciones):
+    base = abrir_sqlite(ruta, **opciones)
+    try:
+        yield base
+        base.commit()
+    finally:
+        base.close()
+
+
 def _conteos_db(ruta):
-    with abrir_sqlite(ruta) as base:
+    with conexion(ruta) as base:
         return {nombre: base.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0] for nombre, tabla in TABLAS.items()}
 
 
@@ -272,7 +283,7 @@ def _cadena_valida(ruta_base, clave_auditoria):
     consulta = "SELECT numero, momento, usuario_id, usuario_texto, equipo, accion, objeto_tipo, objeto_id, titular, datos, ip, sello_anterior, sello FROM auditoria_evento ORDER BY numero"
     anterior = cadena.GENESIS
     esperado = 1
-    with abrir_sqlite(ruta_base) as base:
+    with conexion(ruta_base) as base:
         for fila in base.execute(consulta):
             numero, sello_anterior, sello = fila[0], fila[11], fila[12]
             if numero != esperado or sello_anterior != anterior or cadena.sellar(clave_auditoria, anterior, _contenido(fila[:11])) != sello:
@@ -283,7 +294,7 @@ def _cadena_valida(ruta_base, clave_auditoria):
 
 
 def verificar_paquete(extraidos):
-    with abrir_sqlite(extraidos[BASE]) as base:
+    with conexion(extraidos[BASE]) as base:
         resultado = base.execute("PRAGMA integrity_check").fetchone()[0]
     if resultado != "ok":
         raise ErrorRespaldo(f"La base del respaldo no está íntegra: {resultado}")

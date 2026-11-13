@@ -8,6 +8,8 @@ def main():
     if str(raiz) not in sys.path:
         sys.path.insert(0, str(raiz))
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "proyecto.ajustes")
+    if sys.argv[1:2] == ["version"]:
+        sys.argv[1] = "ariasmos_version"
     from django.core.management import execute_from_command_line
 
     execute_from_command_line(sys.argv)

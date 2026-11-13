@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Conectar otra computadora</h1>
+<p>Las demás computadoras no instalan el programa: entran con el navegador. Antes, cada una debe confiar en el certificado de este equipo, una sola vez.</p>
+{% if hay_certificado %}
+<ol class="pasos">
+  <li>En la otra computadora (con Windows y conectada a la misma red), abre el navegador y entra a esta misma página, o descarga aquí los archivos y pásalos con una memoria USB.</li>
+  <li>Descarga <a href="{% url 'conectar_instalador' %}">instalar-certificado.cmd</a>. Ya trae dentro el certificado público de este equipo; no contiene contraseñas ni datos.</li>
+  <li>En la otra computadora, haz clic derecho sobre el archivo y elige <strong>Ejecutar como administrador</strong>. Si Windows avisa que el archivo viene de internet, elige <strong>Más información</strong> y luego <strong>Ejecutar de todas formas</strong>.</li>
+  <li>Cierra y vuelve a abrir el navegador y entra a {% for n in nombres %}<code>https://{{ n }}/</code>{% if not forloop.last %} o {% endif %}{% empty %}la dirección de este equipo{% endfor %}.</li>
+  <li>El navegador quedará pendiente de aprobación: apruébalo en <a href="{% url 'dispositivos' %}">Equipos</a>.</li>
+</ol>
+<p>Si prefieres instalarlo a mano, descarga el <a href="{% url 'conectar_certificado' %}">certificado raíz (ariasmos-raiz.crt)</a> y agrégalo a «Entidades de certificación raíz de confianza» del equipo.</p>
+{% else %}
+<p class="mensaje warning">Este equipo todavía no tiene un certificado raíz publicado. El instalador lo prepara al terminar; si instalaste el programa a mano, configura la ruta del certificado público en la instancia (<code>certificado_raiz</code>) y vuelve a esta página.</p>
+{% endif %}
+{% endblock %}
