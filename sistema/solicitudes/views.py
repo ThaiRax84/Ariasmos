@@ -4,13 +4,48 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from auditoria.servicios import diferencias, registrar
+from cobros import libro
+from cobros.models import Cargo, ConceptoCobro, Pago
 from cuentas.decoradores import requiere_permiso
+from nucleo.dinero import formatear
+from titulares.models import Familia
 
 from . import motor
 from .formularios import FormularioCodigoTelefono, FormularioPolitica, FormularioRechazo
 from .models import PoliticaAccion, Solicitud
 
 VEN_BANDEJA = ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes")
+
+
+def describir(solicitud):
+    datos = solicitud.datos or {}
+    filas = []
+    if solicitud.accion == "beca":
+        concepto = ConceptoCobro.objects.filter(pk=datos.get("concepto")).first()
+        enteros, resto = divmod(int(datos.get("puntos_base") or 0), 100)
+        filas += [("Concepto", str(concepto) if concepto else "—"), ("Porcentaje", f"{enteros}.{resto:02d} %"), ("Vigencia", f"{datos.get('desde')} a {datos.get('hasta') or 'sin fin'}")]
+    elif solicitud.accion in ("prorroga", "cancelar_cargo", "condonar_recargo"):
+        cargo = libro.con_saldo(Cargo.objects.filter(pk=datos.get("cargo"))).first()
+        if cargo is not None:
+            filas += [("Cargo", str(cargo)), ("Saldo actual", formatear(cargo.saldo)), ("Vence", cargo.vencimiento.strftime("%d/%m/%Y"))]
+        if datos.get("fecha_limite"):
+            filas.append(("Nueva fecha límite", datos["fecha_limite"]))
+        if datos.get("importe"):
+            filas.append(("Importe", formatear(datos["importe"])))
+    elif solicitud.accion == "revertir_pago":
+        pago = Pago.objects.filter(pk=datos.get("pago")).select_related("recibo").first()
+        if pago is not None:
+            filas += [("Recibo", str(pago.recibo)), ("Importe", formatear(pago.importe)), ("Medio", pago.get_medio_display())]
+    elif solicitud.accion == "pago_sobre_tope":
+        filas.append(("Importe recibido", formatear(int(datos.get("importe") or 0))))
+    elif solicitud.accion == "cambio_familia":
+        modo = {"ligar": "Ligar a", "crear": "Crear y ligar a", "desligar": "Desligar de"}.get(datos.get("modo"), "")
+        familia = Familia.objects.filter(pk=datos.get("familia")).first()
+        destino = datos.get("nombre") or (str(familia) if familia else str(solicitud.titular.familia or ""))
+        filas.append((modo, destino))
+    if datos.get("motivo"):
+        filas.append(("Motivo", datos["motivo"]))
+    return filas
 
 
 def puede_ver(usuario, solicitud):
@@ -48,6 +83,7 @@ def detalle(request, pk):
         "puede_codigo": solicitud.estado == Solicitud.PENDIENTE and solicitud.solicitante_id == request.user.pk and politica.permite_codigo,
         "formulario_rechazo": FormularioRechazo(),
         "resaltada": solicitud.resaltada(politica),
+        "descripcion": describir(solicitud),
     }
     return render(request, "solicitudes/detalle.html", contexto)
 

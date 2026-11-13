@@ -3,7 +3,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django import forms
 
 from banco.models import MedioPago
+from caja.models import Caja, Denominacion
 from cobros.formularios import CampoImporte
+from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
@@ -82,7 +84,23 @@ class FormularioParametros(forms.Form):
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
         for clave, (defecto, descripcion) in PARAMETROS.items():
-            self.fields[clave] = forms.IntegerField(label=descripcion, min_value=0, max_value=100000, initial=(valores or {}).get(clave, defecto))
+            inicial = (valores or {}).get(clave, defecto)
+            if isinstance(defecto, str):
+                self.fields[clave] = forms.CharField(label=descripcion, max_length=200, initial=inicial)
+            else:
+                self.fields[clave] = forms.IntegerField(label=descripcion, min_value=0, max_value=10 ** 11, initial=inicial)
+
+    def clean_orden_reparto(self):
+        try:
+            return validar_orden(self.cleaned_data["orden_reparto"])
+        except ErrorLibro as error:
+            raise forms.ValidationError(str(error))
+
+    def clean_dia_generacion_cargos(self):
+        dia = self.cleaned_data["dia_generacion_cargos"]
+        if not 1 <= dia <= 28:
+            raise forms.ValidationError("El día va de 1 a 28.")
+        return dia
 
 
 class FormularioAgrupacion(forms.ModelForm):
@@ -101,6 +119,35 @@ class FormularioRelacion(forms.ModelForm):
     class Meta:
         model = RelacionContacto
         fields = ["nombre", "activa"]
+
+
+class FormularioCaja(forms.ModelForm):
+    class Meta:
+        model = Caja
+        fields = ["nombre", "serie_recibos", "activa"]
+        labels = {"serie_recibos": "Serie de los recibos (letras mayúsculas y números)"}
+
+    def clean_serie_recibos(self):
+        serie = self.cleaned_data["serie_recibos"].strip().upper()
+        if not (serie.isascii() and serie.isalnum() and 1 <= len(serie) <= 10):
+            raise forms.ValidationError("Solo letras y números, hasta 10.")
+        if self.instance.pk and self.instance.serie_recibos != serie and self.instance.turnos.exists():
+            raise forms.ValidationError("La caja ya emitió recibos: la serie no se cambia.")
+        return serie
+
+
+class FormularioDenominacion(forms.ModelForm):
+    valor = CampoImporte(label="Valor")
+
+    class Meta:
+        model = Denominacion
+        fields = ["valor", "activa"]
+
+    def clean_valor(self):
+        valor = self.cleaned_data["valor"]
+        if not valor or valor <= 0:
+            raise forms.ValidationError("El valor debe ser mayor que cero.")
+        return valor
 
 
 class FormularioMedioPago(forms.ModelForm):
@@ -145,6 +192,22 @@ class FormularioAsistenteInicio(forms.Form):
         datos = super().clean()
         if datos.get("plantilla") == IMPORTAR and not datos.get("archivo"):
             self.add_error("archivo", "Elige el archivo de plantilla que quieres importar.")
+        return datos
+
+
+class FormularioRevisarPlantilla(forms.Form):
+    confirmo = forms.BooleanField(label="Leí las advertencias y quiero aplicar la plantilla así", required=False)
+
+    def __init__(self, *args, advertencias=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.advertencias = advertencias
+        if not advertencias:
+            del self.fields["confirmo"]
+
+    def clean(self):
+        datos = super().clean()
+        if self.advertencias and not datos.get("confirmo"):
+            raise forms.ValidationError("La plantilla tiene advertencias: confirma explícitamente para aplicarla.")
         return datos
 
 

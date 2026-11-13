@@ -2,6 +2,8 @@ from django.shortcuts import render
 
 from auditoria.servicios import MOTIVOS, ultima_verificacion
 from banco.models import CuentaBancaria
+from caja.models import Traslado
+from caja.servicios import alertas as alertas_caja
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
@@ -22,6 +24,9 @@ def inicio(request):
         "delegaciones": Delegacion.objects.vigentes().filter(receptor=usuario).select_related("otorgante"),
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
+    if usuario.tiene_permiso("recibir_efectivo"):
+        contexto["alertas"] = alertas_caja()
+        contexto["por_recibir"] = Traslado.objects.filter(destino=usuario, estado=Traslado.PENDIENTE).count()
     if usuario.tiene_permiso("administrar_configuracion"):
         contexto["falta_cuenta"] = CuentaBancaria.principal_activa() is None
     if usuario.tiene_permiso("ver_auditoria"):
