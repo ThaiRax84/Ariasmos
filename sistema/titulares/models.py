@@ -145,3 +145,21 @@ class Contacto(models.Model):
 
     def valor(self, campo):
         return self.valores.get(str(campo.pk), "")
+
+
+class LotePadron(models.Model):
+    nombre_archivo = models.CharField(max_length=120)
+    sha256 = models.CharField(max_length=64)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    creado = models.DateTimeField(auto_now_add=True)
+    filas = models.PositiveIntegerField(default=0)
+    creados = models.PositiveIntegerField(default=0)
+    duplicados = models.PositiveIntegerField(default=0)
+    con_error = models.PositiveIntegerField(default=0)
+    familias = models.PositiveIntegerField(default=0)
+    cargos = models.PositiveIntegerField(default=0)
+    a_favor = models.PositiveIntegerField(default=0)
+    resultado = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ["-creado"]
