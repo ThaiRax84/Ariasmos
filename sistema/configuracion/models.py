@@ -55,6 +55,7 @@ class Negocio(models.Model):
     longitud_matricula = models.PositiveSmallIntegerField(default=7)
     contador_matricula = models.BigIntegerField(default=0)
     cobro_desde = models.DateField(null=True, blank=True)
+    periodo_cerrado_hasta = models.DateField(null=True, blank=True)
     plantilla = models.CharField(max_length=40, blank=True)
     configurado = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)

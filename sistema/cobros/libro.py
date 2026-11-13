@@ -17,7 +17,7 @@ from nucleo import reparto
 from configuracion.moneda import formatear
 from titulares.models import Titular
 
-from .models import Aplicacion, CancelacionCargo, Cargo, Pago, Recibo, ReversionPago, SerieRecibo
+from .models import Aplicacion, CancelacionCargo, Cargo, Pago, Recibo, ReversionPago, SerieRecibo, cerrado_hasta, dia_contable
 
 ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
@@ -193,6 +193,16 @@ def fecha_local(momento):
     return timezone.localtime(momento, zona).date()
 
 
+def fecha_contable(momento):
+    ahora = timezone.now()
+    if momento is None:
+        return ahora, None
+    limite = cerrado_hasta()
+    if limite is not None and dia_contable(momento) <= limite:
+        return ahora, dia_contable(momento)
+    return momento, None
+
+
 def emitir_recibo(pago, serie):
     SerieRecibo.objects.get_or_create(nombre=serie)
     SerieRecibo.objects.filter(nombre=serie).update(siguiente=F("siguiente") + 1)
@@ -230,10 +240,11 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
         if medio == Pago.EFECTIVO:
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Se necesita un turno de caja abierto.")
+        fecha, fecha_banco = fecha_contable(fecha)
         partes, resto = proponer_reparto(titular, importe)
         pago = Pago.objects.create(
             titular=titular, importe=importe, medio=medio, turno=turno, ficha=ficha or None, registrado_por=usuario,
-            solicitud=solicitud, fecha=fecha or timezone.now(), movimiento=movimiento,
+            solicitud=solicitud, fecha=fecha, fecha_banco=fecha_banco, movimiento=movimiento,
         )
         cargos = {c.pk: c for c in Cargo.objects.filter(pk__in=[p.cargo for p in partes])}
         for parte in partes:
