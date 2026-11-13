@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.8 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.9 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -293,12 +293,24 @@ Hoy no existe en México una API bancaria abierta y gratuita para leer los movim
 | Adaptador | Costo | Cómo llega | Estado |
 |---|---|---|---|
 | `archivo` | Gratis | Se sube el archivo de movimientos de la banca en línea, o se deja en una carpeta vigilada | Fase 3 |
-| `estado_pdf` | Gratis | Estado de cuenta mensual en PDF | Fase 3, respaldo |
+| `estado_pdf` | Gratis | Estado de cuenta en PDF | Fase 3. Formato de Santander PyME documentado en `docs/formatos/` |
 | `correo` | Gratis | Avisos de abono leídos del buzón | Posterior, si el banco los envía con concepto |
 | `convenio` | De pago | Archivo diario de cobranza referenciada | Posterior |
 | `clabe_virtual` | De pago | Una CLABE por titular vía proveedor, por consulta periódica | Posterior |
 
 El adaptador `archivo` no depende de un formato fijo: detecta encabezados y columnas por nombre y contenido (fecha, descripción, referencia, cargo, abono, saldo) y guarda la correspondencia aprendida por cuenta. Subir el archivo es el único paso manual; todo lo demás es automático.
+
+Toda importación debe **cuadrar al centavo** (saldo inicial + depósitos − retiros = saldo final) o se rechaza completa. El sentido de cada movimiento se decide por el saldo, no por la posición de la columna.
+
+Lo que un movimiento trae para identificar a quien paga depende de cómo pagó:
+
+| Forma de pago | Referencia numérica | Concepto | Cuenta y nombre del pagador |
+|---|:-:|:-:|:-:|
+| SPEI desde otro banco | ✓ | ✓ | ✓ |
+| Transferencia desde el mismo banco | — | ✓ | — |
+| Depósito en efectivo | — | — | — |
+
+Por eso la ficha pide siempre la matrícula en referencia **y** en concepto, y la matrícula nunca empieza en cero.
 
 Cada movimiento lleva una **huella** (cuenta, fecha, importe, referencia, descripción normalizada y ordinal dentro del día) para que reimportar el mismo archivo no duplique nada.
 
@@ -311,7 +323,7 @@ Para cada abono:
    - Una sola matrícula válida y existente → **aplicación automática**.
    - Ninguna válida → se buscan matrículas existentes a un error de distancia (dígito cambiado, faltante, sobrante o intercambiado) y se ordenan por coincidencia de importe con lo que debe el titular y por historial del pagador. Va a la cola «por identificar» como sugerencia.
    - Varias válidas o ninguna pista → cola «por identificar» sin sugerencia.
-3. **Aprender.** Cuando una persona confirma a quién pertenece un abono, se guarda una `ReglaPagador` (cuenta u ordenante → titular). Tras el número de confirmaciones configurado, los siguientes abonos de ese pagador se sugieren en primer lugar; solo se aplican solos si la política lo permite.
+3. **Aprender.** Cuando una persona confirma a quién pertenece un abono, se guarda una `ReglaPagador` (CLABE del pagador → titular o familia). Tras el número de confirmaciones configurado, los siguientes abonos de ese pagador se sugieren en primer lugar; solo se aplican solos si la política lo permite.
 4. **Aplicar.** El pago se reparte según §5.1.
 
 Operación puede sugerir la identificación; Supervisión la confirma. Los depósitos de efectivo de §7 se emparejan contra los traslados registrados, no contra titulares.
