@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Turno de {{ turno.usuario }} en {{ turno.caja }}</h1>
+<p>Abierto {{ turno.abierto_en|date:"d/m/Y H:i" }}{% if turno.cerrado_en %} · cerrado {{ turno.cerrado_en|date:"d/m/Y H:i" }}{% endif %} · {{ cobros }} cobro{{ cobros|pluralize }}.</p>
+{% if arqueo %}
+<section class="panel{% if arqueo.supera_umbral %} alerta{% endif %}">
+  <h2>Arqueo</h2>
+  <dl class="datos">
+    <dt>Contado</dt><dd>{{ arqueo.contado|dinero }}</dd>
+    <dt>Esperado</dt><dd>{{ arqueo.esperado|dinero }} (incluye fondo de {{ turno.fondo_inicial|dinero }})</dd>
+    <dt>Diferencia</dt><dd><strong>{{ arqueo.diferencia|dinero }}</strong></dd>
+    {% if arqueo.nota %}<dt>Nota</dt><dd>{{ arqueo.nota }}</dd>{% endif %}
+  </dl>
+</section>
+{% elif turno.abierto %}<p>El turno sigue abierto: lo esperado se muestra hasta que se cierre con su arqueo.</p>{% endif %}
+{% endblock %}

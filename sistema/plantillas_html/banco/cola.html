@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Movimientos por identificar</h1>
+<table class="tabla">
+<thead><tr><th>Fecha</th><th>Importe</th><th>Referencia</th><th>Concepto</th><th>Pagador</th><th>Sugerencia</th><th>Propuesta</th></tr></thead>
+<tbody>{% for m in movimientos %}<tr><td><a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a></td><td>{{ m.importe|dinero }}</td><td>{{ m.referencia }}</td><td>{{ m.concepto|default:m.descripcion }}</td><td>{{ m.nombre_pagador }}</td><td>{{ m.sugerencia }}</td><td>{% if m.propuesta %}{{ m.propuesta.matricula_formateada }}{% endif %}</td></tr>{% empty %}<tr><td colspan="7">No hay movimientos por identificar.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

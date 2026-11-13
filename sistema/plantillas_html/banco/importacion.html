@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Importación del {{ importacion.creada|date:"d/m/Y H:i" }}</h1>
+<p>{{ importacion.nombre_archivo }} · {{ importacion.cuenta }} · {{ importacion.get_adaptador_display }} · huella {{ importacion.sha256|slice:":12" }}…</p>
+<p>Importó {{ importacion.creada_por }} · clasificación: <strong>{{ importacion.get_continuidad_display }}</strong>{% if importacion.periodo_inicio %} · periodo {{ importacion.periodo_inicio|date:"d/m/Y" }} a {{ importacion.periodo_fin|date:"d/m/Y" }}{% endif %}{% if importacion.saldo_inicial is not None %} · saldo inicial {{ importacion.saldo_inicial|dinero }}, final {{ importacion.saldo_final|dinero }}{% endif %}</p>
+<p>{{ aplicados }} pago{{ aplicados|pluralize }} aplicado{{ aplicados|pluralize }} por {{ monto|dinero }}{% if importacion.requiere_revision %} · {% if importacion.revisada_por %}revisada por {{ importacion.revisada_por }} el {{ importacion.revisada_en|date:"d/m/Y H:i" }}{% elif aplicados %}<strong>pendiente de revisión</strong>{% else %}sin pagos que revisar{% endif %}{% endif %}</p>
+{% if puede_revisar %}<form method="post" action="{% url 'conciliacion:revisada' importacion.pk %}" class="acciones">{% csrf_token %}<button class="boton" type="submit" data-confirmar="¿Revisaste esta importación contra el banco?">Marcar como revisada</button></form>{% endif %}
+<p>{{ importacion.nuevos }} nuevos · {{ importacion.aplicados }} aplicados · {{ importacion.sugeridos }} sugeridos · {{ importacion.sin_pista }} sin pista · {{ importacion.depositos_emparejados }} depósitos de caja · {{ importacion.duplicados }} repetidos</p>
+<table class="tabla compacta">
+<thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th>Estado</th><th>Aplicado a</th></tr></thead>
+<tbody>{% for m in movimientos %}<tr><td>{% if "sugerir_conciliacion" in permisos or "conciliar_banco" in permisos %}<a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a>{% else %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td><td>{{ m.descripcion }}</td><td>{% if m.sentido == "cargo" %}−{% endif %}{{ m.importe|dinero }}</td><td>{{ m.get_estado_display }}</td><td>{% if m.pago %}{{ m.pago.titular.nombre_completo }} · {% if "ver_titulares" in permisos %}<a href="{% url 'cobros:recibo' m.pago.recibo.pk %}">{{ m.pago.recibo }}</a>{% else %}{{ m.pago.recibo }}{% endif %}{% endif %}</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

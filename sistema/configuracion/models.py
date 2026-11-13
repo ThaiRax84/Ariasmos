@@ -1,5 +1,8 @@
+from zoneinfo import ZoneInfo
+
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 VOCABULARIO_BASE = {
     "titular": "Titular",
@@ -7,6 +10,8 @@ VOCABULARIO_BASE = {
     "matricula": "Matrícula",
     "agrupacion": "Agrupación",
     "agrupaciones": "Agrupaciones",
+    "familia": "Familia",
+    "familias": "Familias",
 }
 
 PARAMETROS = {
@@ -20,6 +25,19 @@ PARAMETROS = {
     "intentos_codigo_por_solicitud": (5, "Códigos erróneos permitidos por solicitud antes de exigir la bandeja"),
     "intentos_codigo_por_hora": (5, "Códigos por teléfono erróneos por hora, por capturista y por autorizador, antes de bloquear esa vía"),
     "maximo_equipos_pendientes": (50, "Equipos pendientes de aprobación como máximo; los de más de 24 horas se depuran solos"),
+    "dia_generacion_cargos": (1, "Día del mes en que se generan los cargos recurrentes"),
+    "orden_reparto": ("recargos,vencimiento,prioridad", "Orden en que un pago cubre los cargos (recargos, vencimiento, prioridad, separados por comas)"),
+    "tope_pago_individual": (5000000, "Importe máximo en centavos de un pago individual sin autorización"),
+    "umbral_diferencia_arqueo": (1000, "Diferencia en centavos a partir de la cual el arqueo pide nota y avisa a Supervisión"),
+    "dias_maximos_efectivo_sin_trasladar": (2, "Días que el efectivo puede quedarse con una persona sin entregarse ni depositarse"),
+    "dias_maximos_deposito_sin_conciliar": (5, "Días que un depósito registrado puede quedar sin aparecer en el banco antes de alertar"),
+    "confirmaciones_pagador_confiable": (2, "Confirmaciones de un pagador para considerarlo confiable"),
+    "aplicar_solo_por_pagador": (0, "1 para aplicar sin revisión los abonos de un pagador confiable aunque no traigan matrícula; 0 para solo sugerirlos"),
+    "dias_tolerancia_deposito": (3, "Días de diferencia aceptados entre un depósito de caja y su abono en el banco"),
+    "serie_recibos_banco": ("B", "Serie de los recibos de pagos por banco"),
+    "serie_recibos_saldo_inicial": ("S", "Serie de los recibos de saldo inicial a favor"),
+    "dias_alerta_recibos_cancelados": (7, "Días que un recibo cancelado aparece en las alertas"),
+    "segundos_ciclo_trabajador": (300, "Segundos entre ciclos del trabajador"),
     "horas_validez_codigo_activacion": (72, "Horas que vale un código de activación de cuenta"),
     "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
@@ -29,12 +47,13 @@ PARAMETROS = {
 
 class Negocio(models.Model):
     nombre = models.CharField(max_length=150)
-    instrucciones_pago = models.TextField(blank=True)
+    nota_ficha = models.TextField(blank=True)
     zona_horaria = models.CharField(max_length=64, default="America/Mexico_City")
     sede = models.PositiveSmallIntegerField(default=0)
     ranuras = models.PositiveSmallIntegerField(default=10)
     longitud_matricula = models.PositiveSmallIntegerField(default=7)
     contador_matricula = models.BigIntegerField(default=0)
+    cobro_desde = models.DateField(null=True, blank=True)
     plantilla = models.CharField(max_length=40, blank=True)
     configurado = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)
@@ -87,7 +106,30 @@ def parametro(clave):
     valor = Parametro.objects.filter(clave=clave).values_list("valor", flat=True).first()
     if valor is None:
         return base
+    if isinstance(base, str):
+        return valor
     try:
         return int(valor)
     except ValueError:
         return base
+
+
+def hoy_negocio():
+    negocio = Negocio.actual()
+    zona = ZoneInfo(negocio.zona_horaria) if negocio else timezone.get_default_timezone()
+    return timezone.localtime(timezone.now(), zona).date()
+
+
+class Tarea(models.Model):
+    nombre = models.CharField(max_length=60, unique=True)
+    ultima_ejecucion = models.DateTimeField(null=True, blank=True)
+    ultima_fecha = models.DateField(null=True, blank=True)
+    exito = models.BooleanField(default=True)
+    resultado = models.CharField(max_length=500, blank=True)
+    ejecuciones = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Importar el padrón inicial</h1>
+<p>Sube el padrón que ya tienes en Excel o CSV. No hace falta un formato fijo: propondremos qué es cada columna y no se guarda nada hasta que confirmes.</p>
+<form method="post" enctype="multipart/form-data" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Revisar archivo</button></div>
+</form>
+{% endblock %}

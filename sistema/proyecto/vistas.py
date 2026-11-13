@@ -1,6 +1,10 @@
 from django.shortcuts import render
 
 from auditoria.servicios import MOTIVOS, ultima_verificacion
+from banco import conciliacion
+from banco.models import CuentaBancaria, Importacion, MovimientoBancario
+from caja.models import Traslado
+from caja.servicios import alertas as alertas_caja
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
@@ -21,7 +25,18 @@ def inicio(request):
         "delegaciones": Delegacion.objects.vigentes().filter(receptor=usuario).select_related("otorgante"),
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
+    if usuario.tiene_permiso("recibir_efectivo"):
+        contexto["alertas"] = alertas_caja()
+        contexto["por_recibir"] = Traslado.objects.filter(destino=usuario, estado=Traslado.PENDIENTE).count()
+    if usuario.tiene_permiso("conciliar_banco"):
+        contexto["banco_pendientes"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).count()
+        contexto["banco_propuestos"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR, propuesta__isnull=False).count()
+        contexto["ultima_importacion"] = Importacion.objects.order_by("-creada").first()
+        contexto["muestra_banco"] = True
+    if usuario.tiene_permiso("administrar_configuracion"):
+        contexto["falta_cuenta"] = CuentaBancaria.principal_activa() is None
     if usuario.tiene_permiso("ver_auditoria"):
+        contexto["importaciones_por_revisar"] = list(conciliacion.pendientes_de_revision()[:50])
         verificacion = ultima_verificacion()
         if verificacion is not None and not verificacion.valida:
             contexto["bitacora_fallida"] = verificacion

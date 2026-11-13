@@ -1,0 +1,13 @@
+{% load formato %}
+{% if alertas.depositos_sin_conciliar or alertas.sin_trasladar or alertas.entregas_pendientes or alertas.diferencias or alertas.recibos_cancelados %}
+<section class="panel alerta">
+  <h2>Alertas de efectivo</h2>
+  <ul class="lista">
+    {% for t in alertas.depositos_sin_conciliar %}<li>Depósito sin conciliar de {{ t.importe|dinero }} registrado por {{ t.origen }} el {{ t.creado|date:"d/m/Y" }} en {{ t.cuenta_bancaria }} (referencia {{ t.referencia }}): no ha aparecido en el banco.</li>{% endfor %}
+    {% for f in alertas.sin_trasladar %}<li>{{ f.usuario }} tiene {{ f.custodia|dinero }} sin entregar ni depositar desde {{ f.desde|date:"d/m/Y" }}.</li>{% endfor %}
+    {% for t in alertas.entregas_pendientes %}<li>Entrega de {{ t.importe|dinero }} de {{ t.origen }} a {{ t.destino }} sin confirmar.</li>{% endfor %}
+    {% for a in alertas.diferencias %}<li>Diferencia de arqueo de {{ a.diferencia|dinero }} en el turno de {{ a.turno.usuario }} ({{ a.turno.caja }}, {{ a.creado|date:"d/m/Y" }}): {{ a.nota }}</li>{% endfor %}
+    {% for r in alertas.recibos_cancelados %}<li>Recibo {{ r }} cancelado ({{ r.pago.titular.nombre_completo }}, {{ r.pago.importe|dinero }}): {{ r.pago.reversion.motivo }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}

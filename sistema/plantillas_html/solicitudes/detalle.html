@@ -8,6 +8,7 @@
     <dt>Solicitó</dt><dd>{{ solicitud.solicitante }} · {{ solicitud.creada|date:"d/m/Y H:i" }}</dd>
     <dt>Caduca</dt><dd>{{ solicitud.caduca_en|date:"d/m/Y H:i" }}</dd>
     {% if solicitud.accion == "correccion_nombre" %}<dt>Nombre actual</dt><dd>{{ solicitud.titular.nombre_completo }}</dd><dt>Nombre propuesto</dt><dd><strong>{{ solicitud.datos.nombre }} {{ solicitud.datos.apellidos }}</strong></dd>{% if solicitud.estado != "pendiente" and solicitud.datos.nombre_anterior %}<dt>Nombre antes de la solicitud</dt><dd>{{ solicitud.datos.nombre_anterior }} {{ solicitud.datos.apellidos_anterior }}</dd>{% endif %}{% endif %}
+    {% for etiqueta, valor in descripcion %}<dt>{{ etiqueta }}</dt><dd>{{ valor }}</dd>{% endfor %}
     {% if solicitud.datos.nota %}<dt>Nota</dt><dd>{{ solicitud.datos.nota }}</dd>{% endif %}
     {% if solicitud.resuelta_por %}<dt>Resolvió</dt><dd>{{ solicitud.resuelta_por }} · {{ solicitud.get_via_display }} · {{ solicitud.resuelta_en|date:"d/m/Y H:i" }}</dd>{% endif %}
     {% if solicitud.nota_resolucion %}<dt>Nota de resolución</dt><dd>{{ solicitud.nota_resolucion }}</dd>{% endif %}

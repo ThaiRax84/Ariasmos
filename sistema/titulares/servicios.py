@@ -6,7 +6,7 @@ from configuracion.models import Negocio
 from nucleo import matricula as generador
 
 from . import contactos
-from .models import CampoContacto, Contacto, Titular
+from .models import CampoContacto, Contacto, Familia, Titular
 
 
 def foto_titular(titular):
@@ -46,9 +46,12 @@ def siguiente_matricula(negocio):
             return propuesta, contador
 
 
-def crear_titular(usuario, datos, contacto=None, conceptos=(), request=None):
+def crear_titular(usuario, datos, contacto=None, conceptos=(), request=None, familia_nueva=None):
     with transaction.atomic():
         negocio = Negocio.objects.get(pk=1)
+        if familia_nueva:
+            datos = dict(datos, familia=Familia.objects.create(nombre=familia_nueva))
+            registrar("familia_creada", usuario=usuario, objeto=datos["familia"], datos={"nombre": familia_nueva}, request=request)
         asignada, contador = siguiente_matricula(negocio)
         Negocio.objects.filter(pk=1).update(contador_matricula=contador)
         titular = Titular.objects.create(matricula=asignada, creado_por=usuario, estado=Titular.PENDIENTE, **datos)
@@ -62,22 +65,26 @@ def crear_titular(usuario, datos, contacto=None, conceptos=(), request=None):
             request=request,
         )
         if contacto is not None:
-            guardar_contacto(usuario, titular, contacto, principal=True, request=request)
+            if familia_nueva:
+                guardar_contacto(usuario, None, contacto, principal=True, request=request, familia=titular.familia)
+            else:
+                guardar_contacto(usuario, titular, contacto, principal=True, request=request)
     return titular
 
 
-def guardar_contacto(usuario, titular, datos, contacto=None, principal=None, request=None):
+def guardar_contacto(usuario, titular, datos, contacto=None, principal=None, request=None, familia=None):
+    duenio = {"familia": familia} if familia is not None else {"titular": titular}
     with transaction.atomic():
         nuevo = contacto is None
         if nuevo:
-            contacto = Contacto(titular=titular)
+            contacto = Contacto(**duenio)
             antes = {}
         else:
             antes = foto_contacto(contacto)
         if principal is None:
-            principal = contacto.principal if not nuevo else not Contacto.objects.filter(titular=titular, principal=True).exists()
+            principal = contacto.principal if not nuevo else not Contacto.objects.filter(principal=True, **duenio).exists()
         if principal:
-            for otro in Contacto.objects.filter(titular=titular, principal=True).exclude(pk=contacto.pk):
+            for otro in Contacto.objects.filter(principal=True, **duenio).exclude(pk=contacto.pk):
                 otro.principal = False
                 otro.save(update_fields=["principal", "actualizado"])
                 registrar("contacto_editado", usuario=usuario, objeto=otro, datos={"contacto": otro.nombre, "cambios": {"Contacto principal": ["Sí", "No"]}}, request=request)
@@ -92,7 +99,7 @@ def guardar_contacto(usuario, titular, datos, contacto=None, principal=None, req
                 "contacto_creado" if nuevo else "contacto_editado",
                 usuario=usuario,
                 objeto=contacto,
-                datos={"contacto": contacto.nombre, "cambios": cambios},
+                datos={"contacto": contacto.nombre, "familia": familia.pk if familia is not None else None, "cambios": cambios},
                 request=request,
             )
     return contacto

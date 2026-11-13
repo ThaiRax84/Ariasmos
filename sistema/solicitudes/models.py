@@ -6,7 +6,19 @@ from django.utils import timezone
 
 from cuentas.permisos import OPCIONES
 
-ACCIONES = [("alta", "Alta"), ("baja", "Baja"), ("reactivacion", "Reactivación"), ("correccion_nombre", "Corrección de nombre")]
+ACCIONES = [
+    ("alta", "Alta"),
+    ("baja", "Baja"),
+    ("reactivacion", "Reactivación"),
+    ("correccion_nombre", "Corrección de nombre"),
+    ("cambio_familia", "Cambio de familia"),
+    ("beca", "Beca"),
+    ("prorroga", "Prórroga"),
+    ("cancelar_cargo", "Cancelación de cargo"),
+    ("condonar_recargo", "Condonación de recargo"),
+    ("revertir_pago", "Reversión de pago"),
+    ("pago_sobre_tope", "Pago mayor al tope"),
+]
 
 
 class PoliticaAccion(models.Model):

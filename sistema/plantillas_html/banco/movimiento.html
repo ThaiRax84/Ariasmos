@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Movimiento del {{ movimiento.fecha|date:"d/m/Y" }} por {{ movimiento.importe|dinero }}</h1>
+<section class="panel">
+  <dl class="datos">
+    <dt>Estado</dt><dd>{{ movimiento.get_estado_display }}</dd>
+    <dt>Cuenta</dt><dd>{{ movimiento.cuenta }}</dd>
+    <dt>Tipo</dt><dd>{{ movimiento.get_clase_display }} · {{ movimiento.get_sentido_display }}</dd>
+    <dt>Descripción</dt><dd>{{ movimiento.descripcion }}</dd>
+    <dt>Referencia</dt><dd>{{ movimiento.referencia|default:"—" }}</dd>
+    <dt>Concepto</dt><dd>{{ movimiento.concepto|default:"—" }}</dd>
+    <dt>Pagador</dt><dd>{{ movimiento.nombre_pagador|default:"—" }}{% if movimiento.banco_origen %} · {{ movimiento.banco_origen }}{% endif %}</dd>
+    <dt>Cuenta del pagador</dt><dd>{% if concilia %}{{ movimiento.cuenta_pagador|default:"—" }}{% else %}{{ movimiento.cuenta_pagador_enmascarada|default:"—" }}{% endif %}</dd>
+    {% if movimiento.rastreo %}<dt>Clave de rastreo</dt><dd>{{ movimiento.rastreo }}</dd>{% endif %}
+    {% if movimiento.pago %}<dt>Aplicado a</dt><dd><a href="{% url 'titulares:detalle' movimiento.pago.titular.pk %}">{{ movimiento.pago.titular.nombre_completo }}</a> · <a href="{% url 'cobros:recibo' movimiento.pago.recibo.pk %}">{{ movimiento.pago.recibo }}</a></dd>{% endif %}
+    {% if movimiento.traslado %}<dt>Depósito de caja</dt><dd>{{ movimiento.traslado.origen }} · {{ movimiento.traslado.fecha_deposito|date:"d/m/Y" }} · {{ movimiento.traslado.referencia }}</dd>{% endif %}
+    {% if movimiento.nota %}<dt>Nota</dt><dd>{{ movimiento.nota }}</dd>{% endif %}
+    {% if movimiento.propuesta %}<dt>Propuesta</dt><dd>{{ movimiento.propuesta.matricula_formateada }} · {{ movimiento.propuesta.nombre_completo }} (de {{ movimiento.propuesta_por }})</dd>{% endif %}
+  </dl>
+  {% if sugeridos %}<p>Sugerencias: {% for t in sugeridos %}<strong>{{ t.matricula_formateada }}</strong> {{ t.nombre_completo }}{% if not forloop.last %} · {% endif %}{% endfor %}{% if movimiento.coincide_importe %} (el importe coincide con lo que debe){% endif %}</p>{% endif %}
+</section>
+{% if movimiento.estado == "por_identificar" %}
+<div class="rejilla">
+  <form method="post" action="{% url 'conciliacion:proponer' movimiento.pk %}" class="formulario">{% csrf_token %}{% include "comun/_campos.html" %}<button class="boton secundario" type="submit">Proponer a quién pertenece</button></form>
+  {% if concilia %}
+  <form method="post" action="{% url 'conciliacion:confirmar' movimiento.pk %}" class="formulario">{% csrf_token %}{% include "comun/_campos.html" %}<button class="boton" type="submit">Confirmar y aplicar el pago</button></form>
+  <form method="post" action="{% url 'conciliacion:no_cobro' movimiento.pk %}" class="formulario">{% csrf_token %}{% include "comun/_campos.html" with formulario=motivo %}<button class="boton peligro" type="submit">No es un cobro</button></form>
+  {% for t in depositos %}<form method="post" action="{% url 'conciliacion:emparejar' movimiento.pk %}" class="formulario">{% csrf_token %}<input type="hidden" name="traslado" value="{{ t.pk }}"><p>Depósito de caja de {{ t.origen }} del {{ t.fecha_deposito|date:"d/m/Y" }} ({{ t.referencia }})</p><button class="boton" type="submit">Emparejar</button></form>{% endfor %}
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -18,6 +18,8 @@ INSTALLED_APPS = [
     "titulares",
     "solicitudes",
     "cobros",
+    "banco",
+    "caja",
 ]
 
 MIDDLEWARE = [
@@ -94,6 +96,9 @@ PROXIES_CONFIABLES = ["127.0.0.1", "::1"]
 COOKIE_DISPOSITIVO = "dispositivo"
 COOKIE_DISPOSITIVO_SEGURA = True
 EDAD_COOKIE_DISPOSITIVO = 60 * 60 * 24 * 365 * 5
+
+FILE_UPLOAD_HANDLERS = ["proyecto.subidas.SubidaLimitada"]
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
 
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 

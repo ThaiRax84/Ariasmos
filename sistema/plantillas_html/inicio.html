@@ -9,6 +9,29 @@
   <a class="boton" href="{% url 'auditoria:lista' %}">Ver bitácora</a>
 </section>
 {% endif %}
+{% if alertas %}{% include "caja/_alertas.html" %}{% endif %}
+{% if importaciones_por_revisar %}
+<section class="panel alerta">
+  <h2>Importaciones bancarias por revisar</h2>
+  <p>Aplicaron pagos y no se pudieron comprobar contra un estado anterior. Revísalas contra el banco; quien importó no puede marcarlas.</p>
+  <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.creada_por }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if muestra_banco %}
+<section class="panel{% if banco_pendientes %} alerta{% endif %}">
+  <h2>Banco: {{ banco_pendientes }} movimiento{{ banco_pendientes|pluralize }} por identificar{% if banco_propuestos %} ({{ banco_propuestos }} con propuesta){% endif %}</h2>
+  <p>{% if ultima_importacion %}Última importación: {{ ultima_importacion.creada|date:"d/m/Y H:i" }} ({{ ultima_importacion.nombre_archivo }}).{% else %}Todavía no se ha importado ningún estado de cuenta.{% endif %}</p>
+  <a class="boton" href="{% url 'conciliacion:cola' %}">Ver cola</a> <a class="boton secundario" href="{% url 'conciliacion:importar' %}">Importar estado de cuenta</a>
+</section>
+{% endif %}
+{% if por_recibir %}<section class="panel alerta"><h2>Tienes {{ por_recibir }} entrega{{ por_recibir|pluralize }} de efectivo por confirmar</h2><a class="boton" href="{% url 'caja:traslados' %}">Revisar</a></section>{% endif %}
+{% if falta_cuenta %}
+<section class="panel alerta">
+  <h2>Faltan los datos de pago</h2>
+  <p>No hay una cuenta bancaria principal: la ficha de pago no muestra a dónde pagar.</p>
+  <a class="boton" href="{% url 'banco:nueva' %}">Agregar cuenta</a>
+</section>
+{% endif %}
 {% if por_revisar or bloqueos %}
 <section class="panel alerta">
   <h2>Avisos sobre tu código de autorización</h2>
@@ -19,7 +42,8 @@
 {% endif %}
 <div class="atajos">
   {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}
-  {% if "ver_titulares" in permisos %}<a class="boton grande secundario" href="{% url 'titulares:lista' %}">Buscar {{ voc.titular|lower }}</a>{% endif %}
+  {% if "registrar_pago_efectivo" in permisos %}<a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
+  {% if "ver_titulares" in permisos %}<a class="boton grande secundario" href="{% url 'titulares:lista' %}">Buscar {{ voc.titular|lower }}</a><a class="boton grande secundario" href="{% url 'cobros:verificar' %}">Verificar recibo</a>{% endif %}
   {% if dispositivos_pendientes %}<a class="boton grande secundario" href="{% url 'dispositivos' %}">Equipos por aprobar ({{ dispositivos_pendientes }})</a>{% endif %}
 </div>
 {% if "aprobar_solicitudes" in permisos %}

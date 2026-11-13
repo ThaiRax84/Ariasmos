@@ -1,0 +1,571 @@
+{
+  "fuente": "Banco de México, lista de instituciones del CEP",
+  "url": "https://www.banxico.org.mx/cep-scl/listaInstituciones.do",
+  "consultado": "2026-11-12",
+  "nota": "La clave son los tres últimos dígitos de la clave de institución del SPEI y coincide con los tres primeros de la CLABE. La lista puede no estar completa.",
+  "niveles_de_soporte": {
+    "archivo_verificado": "El formato del archivo de movimientos de este banco está probado.",
+    "archivo_generico": "Se importa con el lector genérico; el formato de este banco no se ha probado.",
+    "convenio": "Hay adaptador para su archivo de cobranza referenciada."
+  },
+  "bancos": [
+    {
+      "clave": "133",
+      "nombre": "ACTINVER",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "062",
+      "nombre": "AFIRME",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "721",
+      "nombre": "albo",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "660",
+      "nombre": "Altor",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "706",
+      "nombre": "ARCUS FI",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "659",
+      "nombre": "ASP INTEGRA OPC",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "127",
+      "nombre": "AZTECA",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "166",
+      "nombre": "BaBien",
+      "tipo": "banca_desarrollo",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "030",
+      "nombre": "BAJIO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "002",
+      "nombre": "BANAMEX",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "154",
+      "nombre": "BANCO COVALTO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "160",
+      "nombre": "BANCO S3",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "006",
+      "nombre": "BANCOMEXT",
+      "tipo": "banca_desarrollo",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "137",
+      "nombre": "BANCOPPEL",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "152",
+      "nombre": "BANCREA",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "019",
+      "nombre": "BANJERCITO",
+      "tipo": "banca_desarrollo",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "106",
+      "nombre": "BANK OF AMERICA",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "159",
+      "nombre": "BANK OF CHINA",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "147",
+      "nombre": "BANKAOOL",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "009",
+      "nombre": "BANOBRAS",
+      "tipo": "banca_desarrollo",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "072",
+      "nombre": "BANORTE",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "058",
+      "nombre": "BANREGIO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "060",
+      "nombre": "BANSI",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "129",
+      "nombre": "BARCLAYS",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "145",
+      "nombre": "BBASE",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "012",
+      "nombre": "BBVA MEXICO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "112",
+      "nombre": "BMONEX",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "677",
+      "nombre": "CAJA POP MEXICA",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "683",
+      "nombre": "CAJA TELEFONIST",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "715",
+      "nombre": "CASHI CUENTA",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "124",
+      "nombre": "CITI MEXICO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "730",
+      "nombre": "Clip",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "130",
+      "nombre": "COMPARTAMOS",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "140",
+      "nombre": "CONSUBANCO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "725",
+      "nombre": "COOPDESARROLLO",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "652",
+      "nombre": "CREDICAPITAL",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "688",
+      "nombre": "CREDICLUB",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "680",
+      "nombre": "CRISTOBAL COLON",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "723",
+      "nombre": "Cuenca",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "729",
+      "nombre": "Dep y Pag Dig",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "151",
+      "nombre": "DONDE",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "616",
+      "nombre": "FINAMEX",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "734",
+      "nombre": "FINCO PAY",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "634",
+      "nombre": "FINCOMUN",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "738",
+      "nombre": "FINTOC",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "699",
+      "nombre": "FONDEADORA",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "685",
+      "nombre": "FONDO (FIRA)",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "601",
+      "nombre": "GBM",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "167",
+      "nombre": "HEY BANCO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "168",
+      "nombre": "HIPOTECARIA FED",
+      "tipo": "banca_desarrollo",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "021",
+      "nombre": "HSBC",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "155",
+      "nombre": "ICBC",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "036",
+      "nombre": "INBURSA",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "150",
+      "nombre": "INMOBILIARIO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "136",
+      "nombre": "INTERCAM BANCO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "059",
+      "nombre": "INVEX",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "110",
+      "nombre": "JP MORGAN",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "128",
+      "nombre": "KAPITAL",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "661",
+      "nombre": "KLAR",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "653",
+      "nombre": "KUSPIT",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "670",
+      "nombre": "LIBERTAD",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "602",
+      "nombre": "MASARI",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "722",
+      "nombre": "Mercado Pago W",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "720",
+      "nombre": "MexPago",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "042",
+      "nombre": "MIFEL",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "158",
+      "nombre": "MIZUHO BANK",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "600",
+      "nombre": "MONEXCB",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "108",
+      "nombre": "MUFG",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "132",
+      "nombre": "MULTIVA BANCO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "135",
+      "nombre": "NAFIN",
+      "tipo": "banca_desarrollo",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "638",
+      "nombre": "NUBANK",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "710",
+      "nombre": "NVIO",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "148",
+      "nombre": "PAGATODO",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "732",
+      "nombre": "Peibo",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "714",
+      "nombre": "PPBALANCEMX",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "620",
+      "nombre": "PROFUTURO",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "170",
+      "nombre": "REVOLUT BANK",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "156",
+      "nombre": "SABADELL",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "014",
+      "nombre": "SANTANDER",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "044",
+      "nombre": "SCOTIABANK",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "157",
+      "nombre": "SHINHAN",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "728",
+      "nombre": "SPIN BY OXXO",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "646",
+      "nombre": "STP",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "703",
+      "nombre": "TESORED",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "684",
+      "nombre": "TRANSFER",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "727",
+      "nombre": "TRANSFER DIRECT",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "631",
+      "nombre": "TRF",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "138",
+      "nombre": "UALA",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "656",
+      "nombre": "UNAGRA",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "617",
+      "nombre": "VALMEX",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "605",
+      "nombre": "VALUE",
+      "tipo": "no_bancario",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "113",
+      "nombre": "VE POR MAS",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    },
+    {
+      "clave": "141",
+      "nombre": "VOLKSWAGEN",
+      "tipo": "banco",
+      "soporte": "archivo_generico"
+    }
+  ]
+}

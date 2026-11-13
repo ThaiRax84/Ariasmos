@@ -1,15 +1,24 @@
 from django.contrib import messages
 from django.db import transaction
 from django.forms.models import model_to_dict
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicios import diferencias, registrar
 from cuentas.decoradores import requiere_permiso
+from banco.models import MedioPago
+from caja.models import Caja, Denominacion
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
+
+from . import plantillas
 
 from .formularios import (
     FormularioAgrupacion,
+    FormularioAjustesAvanzados,
+    FormularioCaja,
     FormularioCampoContacto,
+    FormularioDenominacion,
+    FormularioMedioPago,
     FormularioMotivo,
     FormularioNegocio,
     FormularioParametros,
@@ -37,6 +46,42 @@ def negocio(request):
         messages.success(request, "Configuración guardada.")
         return redirect("configuracion:indice")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Datos del negocio", "boton": "Guardar", "volver": "configuracion:indice"})
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def avanzado(request):
+    actual = Negocio.objects.get(pk=1)
+    antes = model_to_dict(actual, fields=["longitud_matricula", "sede", "ranuras"])
+    formulario = FormularioAjustesAvanzados(request.POST if request.method == "POST" else None, instance=actual)
+    if request.method == "POST":
+        if actual.matriculas_emitidas:
+            registrar("ajustes_avanzados_rechazados", usuario=request.user, objeto=actual, datos={"motivo": "matriculas_emitidas"}, request=request)
+            messages.error(request, "Ya se emitieron matrículas: estos ajustes no se pueden cambiar.")
+            return redirect("configuracion:avanzado")
+        if formulario.is_valid():
+            with transaction.atomic():
+                bloqueado = Negocio.objects.filter(pk=1, contador_matricula=0).exists()
+                if not bloqueado:
+                    messages.error(request, "Ya se emitieron matrículas: estos ajustes no se pueden cambiar.")
+                    return redirect("configuracion:avanzado")
+                guardado = formulario.save()
+                registrar("configuracion_cambiada", usuario=request.user, objeto=guardado, datos={"cambios": diferencias(antes, model_to_dict(guardado, fields=list(antes)))}, request=request)
+            messages.success(request, "Ajustes guardados.")
+            return redirect("configuracion:indice")
+    return render(request, "configuracion/avanzado.html", {"formulario": formulario, "bloqueado": actual.matriculas_emitidas})
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def exportar(request):
+    try:
+        datos = plantillas.exportar()
+    except plantillas.ErrorPlantilla as error:
+        messages.error(request, str(error))
+        return redirect("configuracion:indice")
+    registrar("plantilla_exportada", usuario=request.user, datos={"roles": len(datos["roles"]), "conceptos": len(datos["conceptos"])}, request=request)
+    respuesta = HttpResponse(plantillas.a_json(datos), content_type="application/json; charset=utf-8")
+    respuesta["Content-Disposition"] = 'attachment; filename="plantilla.json"'
+    return respuesta
 
 
 @requiere_permiso(PERMISO, reingreso=True)
@@ -72,6 +117,9 @@ CATALOGOS = {
     "motivos": (MotivoBaja, FormularioMotivo, "motivo_baja"),
     "relaciones": (RelacionContacto, FormularioRelacion, "relacion_contacto"),
     "campos": (CampoContacto, FormularioCampoContacto, "campo_contacto"),
+    "medios": (MedioPago, FormularioMedioPago, "medio_pago"),
+    "cajas": (Caja, FormularioCaja, "caja"),
+    "denominaciones": (Denominacion, FormularioDenominacion, "denominacion"),
 }
 
 TITULOS = {
@@ -79,6 +127,9 @@ TITULOS = {
     "motivos": "Motivos de baja",
     "relaciones": "Relaciones de contacto",
     "campos": "Campos de contacto",
+    "medios": "Medios de pago",
+    "cajas": "Cajas",
+    "denominaciones": "Denominaciones para el arqueo",
 }
 
 

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>¿Qué es cada columna?</h1>
+<p>{{ carga.nombre_archivo }}. Revisa la propuesta; se recordará para esta cuenta.</p>
+<table class="tabla compacta"><tbody>{% for fila in muestra %}<tr>{% for celda in fila %}<td>{{ celda }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Continuar</button><a class="boton secundario" href="{% url 'conciliacion:importar' %}">Cancelar</a></div>
+</form>
+{% endblock %}

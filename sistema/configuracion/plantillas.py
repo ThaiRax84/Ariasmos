@@ -4,85 +4,79 @@ from django.conf import settings
 from django.db import transaction
 
 from auditoria.servicios import registrar
+from banco.models import MedioPago
+from caja.models import Caja, Denominacion
 from cobros.models import ConceptoCobro
 from cuentas.models import PermisoRol, Rol
-from cuentas.permisos import PERMISOS
+from cuentas.permisos import INDISPENSABLES
 from solicitudes.models import PoliticaAccion
 from titulares.models import CampoContacto, MotivoBaja, RelacionContacto
 
-from .models import VOCABULARIO_BASE, Vocabulario
+from . import esquema
+from .models import VOCABULARIO_BASE, Vocabulario, vocabulario
+
+ErrorPlantilla = esquema.PlantillaInvalida
 
 
-class ErrorPlantilla(ValueError):
-    pass
+def _archivos():
+    return {ruta.stem: ruta for ruta in sorted(settings.PLANTILLAS_NEGOCIO.glob("*.json")) if ruta.stem.isidentifier()}
 
 
 def disponibles():
-    carpeta = settings.PLANTILLAS_NEGOCIO
     resultado = {}
-    for ruta in sorted(carpeta.glob("*.json")):
-        with ruta.open(encoding="utf-8") as archivo:
-            datos = json.load(archivo)
-        resultado[ruta.stem] = datos.get("nombre", ruta.stem)
+    for nombre, ruta in _archivos().items():
+        try:
+            resultado[nombre] = esquema.desde_bytes(ruta.read_bytes())["nombre"]
+        except esquema.PlantillaInvalida:
+            continue
     return resultado
 
 
 def leer(nombre):
-    if nombre not in disponibles():
+    ruta = _archivos().get(nombre)
+    if ruta is None:
         raise ErrorPlantilla("plantilla desconocida")
-    with (settings.PLANTILLAS_NEGOCIO / f"{nombre}.json").open(encoding="utf-8") as archivo:
-        return json.load(archivo)
+    return esquema.desde_bytes(ruta.read_bytes())
 
 
 def cargar(nombre, usuario=None):
-    datos = leer(nombre)
+    return cargar_datos(leer(nombre), nombre, usuario)
+
+
+def cargar_datos(datos, origen, usuario=None, request=None):
+    datos = esquema.validar(datos)
     with transaction.atomic():
-        for clave, texto in datos.get("vocabulario", {}).items():
-            if clave in VOCABULARIO_BASE:
-                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": texto})
-        for definicion in datos.get("roles", []):
-            desconocidos = set(definicion["permisos"]) - set(PERMISOS)
-            if desconocidos:
-                raise ErrorPlantilla(f"permisos desconocidos: {sorted(desconocidos)}")
+        for clave, texto in datos["vocabulario"].items():
+            Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": texto})
+        for definicion in datos["roles"]:
             rol, _ = Rol.objects.update_or_create(
                 nombre=definicion["nombre"],
-                defaults={
-                    "nivel": definicion.get("nivel", 1),
-                    "minutos_inactividad": definicion.get("minutos_inactividad", 30),
-                    "requiere_totp": definicion.get("requiere_totp", False),
-                },
+                defaults={"nivel": definicion["nivel"], "minutos_inactividad": definicion["minutos_inactividad"], "requiere_totp": definicion["requiere_totp"]},
             )
             for permiso in definicion["permisos"]:
                 PermisoRol.objects.get_or_create(rol=rol, permiso=permiso)
-        for definicion in datos.get("politicas", []):
+        for definicion in datos["politicas"]:
             PoliticaAccion.objects.update_or_create(accion=definicion["accion"], defaults={k: v for k, v in definicion.items() if k != "accion"})
-        for motivo in datos.get("motivos_baja", []):
+        for motivo in datos["motivos_baja"]:
             MotivoBaja.objects.get_or_create(nombre=motivo)
-        for relacion in datos.get("relaciones_contacto", []):
+        for relacion in datos["relaciones_contacto"]:
             RelacionContacto.objects.get_or_create(nombre=relacion)
-        for orden, campo in enumerate(datos.get("campos_contacto", []), start=1):
-            if campo.get("principal"):
+        for nombre in datos["cajas"]:
+            Caja.objects.get_or_create(nombre=nombre)
+        for valor in datos["denominaciones"]:
+            Denominacion.objects.get_or_create(valor=valor)
+        for orden, medio in enumerate(datos["medios_pago"], start=1):
+            MedioPago.objects.get_or_create(nombre=medio, defaults={"orden": orden * 10})
+        for campo in datos["campos_contacto"]:
+            if campo["principal"]:
                 CampoContacto.objects.filter(principal=True).exclude(etiqueta=campo["etiqueta"]).update(principal=False)
-            CampoContacto.objects.update_or_create(
-                etiqueta=campo["etiqueta"],
-                defaults={
-                    "tipo": campo["tipo"],
-                    "obligatorio": campo.get("obligatorio", False),
-                    "principal": campo.get("principal", False),
-                    "orden": campo.get("orden", orden * 10),
-                },
-            )
-        for definicion in datos.get("conceptos", []):
+            CampoContacto.objects.update_or_create(etiqueta=campo["etiqueta"], defaults={k: v for k, v in campo.items() if k != "etiqueta"})
+        for definicion in datos["conceptos"]:
             ConceptoCobro.objects.get_or_create(
                 nombre=definicion["nombre"],
-                defaults={
-                    "tipo": definicion["tipo"],
-                    "periodicidad": definicion.get("periodicidad", ""),
-                    "aplica_a": definicion.get("aplica_a", ConceptoCobro.MANUAL),
-                    "prioridad": definicion.get("prioridad", 100),
-                },
+                defaults={"tipo": definicion["tipo"], "periodicidad": definicion["periodicidad"], "aplica_a": definicion["aplica_a"], "prioridad": definicion["prioridad"]},
             )
-        registrar("plantilla_cargada", usuario=usuario, datos={"plantilla": nombre})
+        registrar("plantilla_cargada", usuario=usuario, datos={"plantilla": origen, "nombre": datos["nombre"]}, request=request)
     return datos
 
 
@@ -90,5 +84,65 @@ def rol_inicial(datos):
     return Rol.objects.get(nombre=datos["rol_inicial"])
 
 
-def conceptos_con_recargo(datos):
-    return {c["nombre"] for c in datos.get("conceptos", []) if c.get("recargo")}
+def recargos(datos):
+    return {c["nombre"]: c["recargo"] for c in datos["conceptos"] if c["recargo"]}
+
+
+def exportar():
+    roles = list(Rol.objects.prefetch_related("asignaciones").order_by("nivel", "nombre"))
+    definiciones = [
+        {"nombre": r.nombre, "nivel": r.nivel, "minutos_inactividad": r.minutos_inactividad, "requiere_totp": r.requiere_totp, "permisos": sorted(a.permiso for a in r.asignaciones.all())}
+        for r in roles
+    ]
+    candidatos = [d for d in definiciones if set(INDISPENSABLES) <= set(d["permisos"]) and d["requiere_totp"]]
+    if not candidatos:
+        raise ErrorPlantilla("Ningún rol administra usuarios y roles con autenticador; no se puede exportar.")
+    conceptos = []
+    for concepto in ConceptoCobro.objects.filter(activo=True).exclude(aplica_a=ConceptoCobro.AGRUPACION).select_related("regla_recargo"):
+        regla = concepto.regla_recargo
+        conceptos.append(
+            {
+                "nombre": concepto.nombre,
+                "tipo": concepto.tipo,
+                "periodicidad": concepto.periodicidad,
+                "aplica_a": concepto.aplica_a,
+                "prioridad": min(concepto.prioridad, 1000),
+                "recargo": {"tipo": regla.tipo, "dias_gracia": min(regla.dias_gracia, 60), "se_repite": regla.se_repite} if regla else False,
+            }
+        )
+    datos = {
+        "nombre": "Configuración exportada",
+        "descripcion": "Plantilla generada desde la configuración de una instalación, sin cifras ni datos de personas.",
+        "vocabulario": {clave: texto for clave, texto in vocabulario().items() if clave in VOCABULARIO_BASE},
+        "roles": definiciones,
+        "rol_inicial": max(candidatos, key=lambda d: d["nivel"])["nombre"],
+        "politicas": [
+            {
+                "accion": p.accion,
+                "permiso_directo": p.permiso_directo,
+                "permiso_solicitar": p.permiso_solicitar,
+                "permiso_aprobar": p.permiso_aprobar,
+                "horas_caducidad": p.horas_caducidad,
+                "horas_resaltar": p.horas_resaltar,
+                "permite_delegacion": p.permite_delegacion,
+                "permite_codigo": p.permite_codigo,
+            }
+            for p in PoliticaAccion.objects.all()
+        ],
+        "motivos_baja": list(MotivoBaja.objects.filter(activo=True).values_list("nombre", flat=True)),
+        "relaciones_contacto": list(RelacionContacto.objects.filter(activa=True).values_list("nombre", flat=True)),
+        "campos_contacto": [
+            {"etiqueta": c.etiqueta, "tipo": c.tipo, "obligatorio": c.obligatorio, "principal": c.principal, "orden": c.orden}
+            for c in CampoContacto.objects.filter(activo=True)
+        ],
+        "conceptos": conceptos,
+        "medios_pago": list(MedioPago.objects.filter(activo=True).values_list("nombre", flat=True)),
+        "cajas": list(Caja.objects.filter(activa=True).values_list("nombre", flat=True)),
+        "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
+    }
+    esquema.validar(datos)
+    return datos
+
+
+def a_json(datos):
+    return json.dumps(datos, ensure_ascii=False, indent=2) + "\n"

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Cerrar turno en {{ turno.caja }}</h1>
+<p>Cuenta el efectivo de la caja, incluido el fondo, y escribe cuántas piezas hay de cada denominación. El sistema te mostrará la diferencia después de guardar.</p>
+<form method="post" class="formulario angosto" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Cerrar el turno con este conteo?">Cerrar turno</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
+</form>
+{% endblock %}
