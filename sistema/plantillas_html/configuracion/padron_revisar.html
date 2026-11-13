@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Importar padrón: {{ carga.nombre_archivo }}</h1>
+<table class="tabla compacta"><tbody>{% for fila in muestra %}<tr>{% for celda in fila %}<td>{{ celda }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="paso" value="revisar">
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton" type="submit">Ver vista previa</button></div>
+</form>
+{% if analisis %}
+<section class="panel">
+  <h2>Vista previa: {{ validos }} se darán de alta</h2>
+  <table class="tabla compacta">
+  <thead><tr><th>Renglón</th><th>Nombre</th><th>Apellidos</th><th>{{ voc.agrupacion }}</th><th>Responsable</th><th>Teléfono</th><th>Saldos</th><th>Situación</th></tr></thead>
+  <tbody>{% for f in analisis.filas %}<tr class="{% if f.errores or f.duplicado %}resaltada{% endif %}"><td>{{ f.numero }}</td><td>{{ f.nombre }}</td><td>{{ f.apellidos }}</td><td>{{ f.agrupacion }}</td><td>{{ f.responsable }}</td><td>{{ f.telefono }}</td><td>{% for s in f.saldos %}{{ s.1|dinero }} {% endfor %}</td><td>{% if f.errores %}Error: {{ f.errores|join:"; " }}{% elif f.duplicado %}Duplicado: {{ f.duplicado }}{% else %}Se dará de alta{% endif %}</td></tr>{% endfor %}</tbody>
+  </table>
+  <form method="post" class="formulario">
+    {% csrf_token %}
+    <input type="hidden" name="paso" value="confirmar">
+    {% if analisis.familias %}<h3>{{ voc.familias }} propuestas (mismo responsable y teléfono)</h3>
+    {% for fam in analisis.familias %}<div class="campo casilla"><input type="checkbox" name="familia" value="{{ forloop.counter0 }}" id="familia-{{ forloop.counter0 }}" checked><label for="familia-{{ forloop.counter0 }}">{{ fam.responsable }} · {{ fam.telefono }}: {{ fam.miembros|join:", " }}</label></div>{% endfor %}{% endif %}
+    <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Dar de alta {{ validos }} registros?">Confirmar importación</button></div>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

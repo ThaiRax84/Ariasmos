@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.10 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.11 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -344,6 +344,14 @@ Otras reglas de la importación:
 - De quien paga se guarda lo necesario para identificarlo (banco, CLABE, nombre, clave de rastreo, referencia y concepto). El RFC no se guarda.
 - Operación ve fecha, importe, referencia, concepto y nombre del pagador; la CLABE completa solo la ve quien concilia.
 - Deshacer una aplicación bancaria es una reversión de pago por el motor de aprobaciones; el movimiento vuelve a la cola.
+
+**Continuidad y revisión de importaciones.** Quien puede importar podría subir un archivo fabricado para acreditar pagos que no existieron. El sistema no puede comprobar un archivo contra el banco, así que lo acota de tres formas:
+
+- *Continuidad.* Un estado de cuenta en PDF cuyo periodo empieza al día siguiente del último estado importado de esa cuenta debe abrir con el saldo con que aquel cerró; si no, se rechaza completo. Cada importación queda clasificada: `verificada` (encadena con la anterior), `primera`, `con_hueco` (hay días sin importar entre ambas) o `no_verificable` (archivo genérico de Excel o CSV, que cualquiera puede editar).
+- *Revisión por otra persona.* Toda importación `con_hueco` o `no_verificable` que haya aplicado pagos aparece como pendiente en el inicio de quien puede ver la bitácora, hasta que alguien distinto de quien la importó la marca como revisada. Marcarla queda en la bitácora.
+- *Cruce con el estado oficial.* El corte mayor (Fase 4) compara lo aplicado por banco contra el estado de cuenta en PDF del mes.
+
+Riesgo que queda: dos personas de acuerdo, una que importa y otra que revisa, pueden acreditar un pago inexistente; lo delata el cruce con el estado oficial.
 
 ## 9. Cortes y reportes
 

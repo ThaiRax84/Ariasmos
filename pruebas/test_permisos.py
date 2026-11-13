@@ -2,14 +2,14 @@ import pytest
 from django.urls import URLPattern, URLResolver, get_resolver, reverse
 from django.utils import timezone
 
-from banco.models import Banco, CuentaBancaria
+from banco.models import Banco, CargaTemporal, CuentaBancaria, Importacion, MovimientoBancario
 from caja.models import Caja, Traslado
 from caja.servicios import abrir_turno
 from cobros import libro
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
-from titulares.models import Agrupacion, Contacto, Familia, Titular
+from titulares.models import Agrupacion, Contacto, Familia, LotePadron, Titular
 from titulares.servicios import crear_titular
 
 from .conftest import cliente, configurar, nuevo_usuario
@@ -100,7 +100,28 @@ MATRIZ = {
     "caja:custodia": ("recibir_efectivo",),
     "auditoria:lista": ("ver_auditoria",),
     "auditoria:verificar": ("ver_auditoria",),
+    "titulares:estado_pdf": ("ver_titulares",),
+    "titulares:familia_estado_pdf": ("ver_titulares",),
+    "conciliacion:importar": ("conciliar_banco",),
+    "conciliacion:columnas": ("conciliar_banco",),
+    "conciliacion:previa": ("conciliar_banco",),
+    "conciliacion:importaciones": ("conciliar_banco",),
+    "conciliacion:importacion": ("conciliar_banco", "ver_auditoria"),
+    "conciliacion:revisada": ("ver_auditoria",),
+    "conciliacion:cola": ("sugerir_conciliacion", "conciliar_banco"),
+    "conciliacion:movimiento": ("sugerir_conciliacion", "conciliar_banco"),
+    "conciliacion:proponer": ("sugerir_conciliacion", "conciliar_banco"),
+    "conciliacion:confirmar": ("conciliar_banco",),
+    "conciliacion:no_cobro": ("conciliar_banco",),
+    "conciliacion:emparejar": ("conciliar_banco",),
+    "configuracion:padron_subir": ("administrar_configuracion",),
+    "configuracion:padron_revisar": ("administrar_configuracion",),
+    "configuracion:padron_lote": ("administrar_configuracion",),
+    "configuracion:padron_matriculas": ("administrar_configuracion",),
+    "configuracion:padron_fichas": ("administrar_configuracion",),
 }
+
+CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
 
 OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}}
 
@@ -145,7 +166,28 @@ def escenario(db):
     pago = libro.registrar_pago(titular, 50000, "efectivo", usuarios["Operación"], turno=turno)
     entrega = Traslado.objects.create(tipo="entrega", origen=usuarios["Operación"], destino=usuarios["Supervisión"], importe=100, estado="pendiente")
     cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
+    importacion = Importacion.objects.create(cuenta=cuenta, nombre_archivo="estado.pdf", sha256="0" * 64, adaptador=Importacion.ESTADO_PDF, creada_por=usuarios["Dirección"])
+    movimiento = MovimientoBancario.objects.create(cuenta=cuenta, importacion=importacion, fecha=timezone.now().date(), importe=1000, sentido="abono", clase="spei", huella="h-matriz", estado="por_identificar")
+    ajeno = nuevo_usuario("ajeno", roles["Dirección"])
+    carga_banco = CargaTemporal.objects.create(token="b" * 43, tipo=CargaTemporal.BANCO_PDF, usuario=ajeno, nombre_archivo="x.pdf", sha256="0" * 64, datos={})
+    carga_padron = CargaTemporal.objects.create(token="p" * 43, tipo=CargaTemporal.PADRON, usuario=ajeno, nombre_archivo="x.csv", sha256="0" * 64, datos={})
+    lote = LotePadron.objects.create(nombre_archivo="x.csv", sha256="0" * 64, creado_por=ajeno, resultado={"titulares": [titular.pk]})
     argumentos = {
+        "titulares:estado_pdf": {"pk": titular.pk},
+        "titulares:familia_estado_pdf": {"pk": familia.pk},
+        "conciliacion:columnas": {"token": carga_banco.token},
+        "conciliacion:previa": {"token": carga_banco.token},
+        "conciliacion:importacion": {"pk": importacion.pk},
+        "conciliacion:revisada": {"pk": importacion.pk},
+        "conciliacion:movimiento": {"pk": movimiento.pk},
+        "conciliacion:proponer": {"pk": movimiento.pk},
+        "conciliacion:confirmar": {"pk": movimiento.pk},
+        "conciliacion:no_cobro": {"pk": movimiento.pk},
+        "conciliacion:emparejar": {"pk": movimiento.pk},
+        "configuracion:padron_revisar": {"token": carga_padron.token},
+        "configuracion:padron_lote": {"pk": lote.pk},
+        "configuracion:padron_matriculas": {"pk": lote.pk, "formato": "csv"},
+        "configuracion:padron_fichas": {"pk": lote.pk},
         "titulares:detalle": {"pk": titular.pk},
         "titulares:ficha_pago": {"pk": titular.pk},
         "titulares:historial": {"pk": titular.pk},
@@ -209,7 +251,8 @@ def test_matriz_url_por_rol(escenario, nombre):
         usuario = usuarios[nombre_rol]
         respuesta = cliente(usuario).get(url)
         if permitido(usuario.rol, nombre):
-            assert respuesta.status_code in (200, 302, 405), (nombre, nombre_rol, respuesta.status_code)
+            esperados = (404,) if nombre in CARGA_DE_OTRO else (200, 302, 405)
+            assert respuesta.status_code in esperados, (nombre, nombre_rol, respuesta.status_code)
             if respuesta.status_code == 302:
                 assert reverse("entrar") not in respuesta.url
         else:

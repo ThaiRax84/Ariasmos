@@ -90,7 +90,8 @@ class Traslado(models.Model):
     CONFIRMADO = "confirmado"
     RECHAZADO = "rechazado"
     POR_CONCILIAR = "por_conciliar"
-    ESTADOS = [(PENDIENTE, "Pendiente de confirmar"), (CONFIRMADO, "Confirmado"), (RECHAZADO, "Rechazado"), (POR_CONCILIAR, "Por conciliar")]
+    CONCILIADO = "conciliado"
+    ESTADOS = [(PENDIENTE, "Pendiente de confirmar"), (CONFIRMADO, "Confirmado"), (RECHAZADO, "Rechazado"), (POR_CONCILIAR, "Por conciliar"), (CONCILIADO, "Conciliado con el banco")]
 
     tipo = models.CharField(max_length=10, choices=TIPOS)
     origen = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="traslados_enviados")
@@ -113,7 +114,7 @@ class Traslado(models.Model):
             models.CheckConstraint(condition=~Q(origen=F("destino")), name="traslado_a_otra_persona"),
             models.CheckConstraint(
                 condition=(Q(tipo="entrega") & Q(destino__isnull=False) & Q(estado__in=["pendiente", "confirmado", "rechazado"]))
-                | (Q(tipo="deposito") & Q(destino__isnull=True) & Q(cuenta_bancaria__isnull=False) & Q(fecha_deposito__isnull=False) & Q(estado="por_conciliar")),
+                | (Q(tipo="deposito") & Q(destino__isnull=True) & Q(cuenta_bancaria__isnull=False) & Q(fecha_deposito__isnull=False) & Q(estado__in=["por_conciliar", "conciliado"])),
                 name="traslado_coherente",
             ),
         ]

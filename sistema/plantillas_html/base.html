@@ -17,7 +17,8 @@
     {% if "registrar_pago_efectivo" in permisos %}<a href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
     {% if "turno_caja" in permisos %}<a href="{% url 'caja:inicio' %}">Mi caja</a>{% endif %}
     {% if "recibir_efectivo" in permisos %}<a href="{% url 'caja:custodia' %}">Efectivo</a>{% endif %}
-    {% if "solicitar_alta_baja" in permisos or "aprobar_solicitudes" in permisos or "alta_baja_directa" in permisos %}<a href="{% url 'solicitudes:bandeja' %}">Solicitudes</a>{% endif %}
+    {% if "conciliar_banco" in permisos or "sugerir_conciliacion" in permisos %}<a href="{% url 'conciliacion:cola' %}">Banco</a>{% endif %}
+    {% if "solicitar_alta_baja" in permisos or "aprob_solicitudes" in permisos or "alta_baja_directa" in permisos %}<a href="{% url 'solicitudes:bandeja' %}">Solicitudes</a>{% endif %}
     {% if "administrar_conceptos" in permisos %}<a href="{% url 'cobros:conceptos' %}">Conceptos</a>{% endif %}
     {% if "otorgar_delegaciones" in permisos %}<a href="{% url 'delegaciones' %}">Delegaciones</a>{% endif %}
     {% if "aprobar_dispositivos" in permisos %}<a href="{% url 'dispositivos' %}">Equipos</a>{% endif %}
