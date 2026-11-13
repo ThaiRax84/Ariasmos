@@ -1,15 +1,19 @@
 from django import forms
 
 from nucleo.dinero import ErrorImporte, a_centavos, a_texto
+from proyecto.captura import EntradaDinero, EntradaPorcentaje
 from titulares.models import Agrupacion, Titular
 
 from .models import ConceptoCobro, PlanCobro, ReglaRecargo
 
 
 class CampoImporte(forms.CharField):
+    acepta = "dinero"
+    maximo_tecleo = 16
+
     def __init__(self, *args, maximo=None, **kwargs):
         kwargs.setdefault("max_length", 20)
-        kwargs.setdefault("widget", forms.TextInput(attrs={"inputmode": "decimal"}))
+        kwargs.setdefault("widget", EntradaDinero(attrs={"autocomplete": "off"}))
         self.maximo = maximo
         super().__init__(*args, **kwargs)
 
@@ -49,10 +53,18 @@ class CampoImportePositivo(CampoImporte):
 
 
 class CampoPorcentaje(forms.CharField):
+    acepta = "porcentaje"
+    maximo_tecleo = 6
+
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("max_length", 7)
-        kwargs.setdefault("widget", forms.TextInput(attrs={"inputmode": "decimal"}))
+        kwargs.setdefault("widget", EntradaPorcentaje(attrs={"autocomplete": "off"}))
         super().__init__(*args, **kwargs)
+
+    def prepare_value(self, valor):
+        if isinstance(valor, int):
+            return a_texto(valor)
+        return valor
 
     def clean(self, valor):
         valor = super().clean(valor)
@@ -112,19 +124,42 @@ class FormularioVerificarRecibo(forms.Form):
     codigo = forms.CharField(label="Código de verificación", max_length=20)
 
 
+def valor_de_recargo(tipo, importe, porcentaje):
+    if tipo == ReglaRecargo.PORCENTAJE:
+        if porcentaje is None:
+            raise forms.ValidationError("Para un recargo en porcentaje escribe el porcentaje.")
+        return porcentaje
+    if importe is None:
+        raise forms.ValidationError("Para un recargo fijo escribe el importe.")
+    return importe
+
+
 class FormularioRegla(forms.ModelForm):
-    valor = CampoImporte(label="Valor (importe o porcentaje)")
+    valor_importe = CampoImporte(label="Importe fijo del recargo (si el tipo es fijo)", required=False)
+    valor_porcentaje = CampoPorcentaje(label="Porcentaje del recargo (si el tipo es porcentaje)", required=False)
     tope_centavos = CampoImporte(label="Tope (opcional)", required=False)
 
     class Meta:
         model = ReglaRecargo
-        fields = ["nombre", "tipo", "valor", "dias_gracia", "se_repite", "tope_centavos", "activa"]
+        fields = ["nombre", "tipo", "dias_gracia", "se_repite", "tope_centavos", "activa"]
         labels = {"dias_gracia": "Días de gracia", "se_repite": "Se repite cada periodo", "activa": "Activa"}
+
+    field_order = ["nombre", "tipo", "valor_importe", "valor_porcentaje", "dias_gracia", "se_repite", "tope_centavos", "activa"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            clave = "valor_porcentaje" if self.instance.tipo == ReglaRecargo.PORCENTAJE else "valor_importe"
+            self.initial.setdefault(clave, self.instance.valor)
 
     def clean(self):
         datos = super().clean()
-        if datos.get("tipo") == ReglaRecargo.PORCENTAJE and (datos.get("valor") or 0) > 10000:
-            raise forms.ValidationError("El porcentaje no puede pasar de 100.")
+        tipo = datos.get("tipo")
+        if tipo:
+            try:
+                self.instance.valor = valor_de_recargo(tipo, datos.get("valor_importe"), datos.get("valor_porcentaje"))
+            except forms.ValidationError as error:
+                self.add_error("valor_porcentaje" if tipo == ReglaRecargo.PORCENTAJE else "valor_importe", error)
         return datos
 
 
