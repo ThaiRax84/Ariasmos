@@ -330,26 +330,62 @@ def bomba_zip():
     return memoria.getvalue()
 
 
-def xlsx_con_dimension_falsa():
+XLSX_MINIMO = {
+    "[Content_Types].xml": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        "</Types>"
+    ),
+    "_rels/.rels": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    ),
+    "xl/workbook.xml": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheets><sheet name="Hoja1" sheetId="1" r:id="rId1"/></sheets>'
+        "</workbook>"
+    ),
+    "xl/_rels/workbook.xml.rels": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        "</Relationships>"
+    ),
+}
+
+
+def xlsx_minimo(dimension):
     import io
     import zipfile
 
-    from openpyxl import Workbook
-
-    libro_xlsx = Workbook()
-    libro_xlsx.active.append(["fecha", "importe"])
-    memoria = io.BytesIO()
-    libro_xlsx.save(memoria)
-    entrada = zipfile.ZipFile(io.BytesIO(memoria.getvalue()))
+    hoja = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<dimension ref="{dimension}"/>'
+        '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>fecha</t></is></c><c r="B1" t="inlineStr"><is><t>importe</t></is></c></row></sheetData>'
+        "</worksheet>"
+    )
     salida = io.BytesIO()
-    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as nuevo:
-        for nombre in entrada.namelist():
-            datos = entrada.read(nombre)
-            if nombre == "xl/worksheets/sheet1.xml":
-                datos = datos.replace(b'<dimension ref="A1:B1"/>', b'<dimension ref="A1:B1000000"/>')
-                assert b"B1000000" in datos
-            nuevo.writestr(nombre, datos)
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as archivo:
+        for nombre, contenido in XLSX_MINIMO.items():
+            archivo.writestr(nombre, contenido)
+        archivo.writestr("xl/worksheets/sheet1.xml", hoja)
     return salida.getvalue()
+
+
+def xlsx_con_dimension_falsa():
+    return xlsx_minimo("A1:B1000000")
+
+
+def test_el_xlsx_minimo_se_lee_cuando_la_dimension_es_real():
+    assert lectura.filas_de_xlsx(xlsx_minimo("A1:B1"))[0][:2] == ["fecha", "importe"]
 
 
 def test_archivos_hostiles_se_rechazan(base):
