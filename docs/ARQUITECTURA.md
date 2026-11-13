@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.15 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.16 · 13/11/2026 · Estado: fases 1 a 4b construidas; fase 5a (cambios de motor, §15) en construcción; fase 5b (interfaz) en diseño.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -277,7 +277,7 @@ Objetivo: que Operación cobre sin esperar a nadie y que cada billete tenga due�
 
 1. **Turno.** Quien cobra abre un turno en su caja. Un turno, una persona.
 2. **Cobro.** Registra el pago; el sistema lo aplica al titular de inmediato y emite un recibo foliado. El pago queda como «efectivo en caja».
-3. **Arqueo ciego.** Al cerrar, captura lo que contó por denominación **sin ver** lo esperado. El sistema calcula la diferencia. Si supera el umbral configurado, pide una nota y avisa a Supervisión. No bloquea el cierre.
+3. **Arqueo ciego.** Al cerrar, captura lo que contó por denominación **sin ver** lo esperado. El sistema calcula la diferencia. Si supera el umbral configurado, pide una nota y avisa a Supervisión. No bloquea el cierre. Desde la versión 0.16 el arqueo admite un reconteo y lleva piezas por denominación (§15.2).
 4. **Traslado.** El efectivo sale de la caja de dos formas:
    - **Entrega** a Supervisión: quien recibe confirma el importe con su propia sesión (doble firma).
    - **Depósito** bancario: se registra con su importe y fecha; la conciliación lo cierra cuando aparece en el banco.
@@ -491,12 +491,83 @@ instancia/         (ignorada) claves, base, configuración local
 | 3 | Estado de cuenta en PDF, importación inicial desde Excel, importación bancaria, identificación y conciliación |
 | 4a | Cortes (diario, mayor, lista de cobranza), destinos, cierre de periodo, respaldo y cifrado de secretos |
 | 4b | Instalador `.exe`, HTTPS en la red local, compilación automática y guías |
-| 5 | Diseño de la interfaz, con el motor ya terminado |
+| 5a | Calendario de cortes, piezas por denominación, retiros de caja, QR en recibos, carpeta vigilada del banco (§15) |
+| 5b | Interfaz nueva: marca Ariasmos y marca del negocio, pantallas rediseñadas, transiciones |
 
 ## 14. Pendientes de decisión
 
 1. Formato real del archivo de movimientos del banco: hace falta una muestra para afinar el adaptador.
 2. Si el negocio contrata cobranza referenciada: longitud y dígito verificador que exija el banco.
-3. Facturación (CFDI): fuera del alcance de esta versión.
+3. Facturación (CFDI): en investigación; se diseña cuando se conozcan requisitos y costos.
+6. Inventario opcional por negocio: en definición.
+7. Avisos de abono del banco por correo como «depósito por confirmar»: se diseña cuando exista una muestra real del aviso.
+8. Reflejo de transferencias en minutos sin intervención (proveedor de cobranza SPEI u otra vía): por evaluar con costos.
 4. Varias sedes: hoy una instalación por sede con `sede` distinta; la consolidación central se diseña cuando exista la segunda.
 5. El programa es propietario: sin licencia de código abierto, el instalador se publica sin firma digital salvo que se compre un certificado.
+
+## 15. Versión 0.16: cambios de motor de la fase 5a
+
+Donde este apartado contradiga a uno anterior, manda este. Nada de aquí cambia `nucleo/`.
+
+### 15.1 Calendario de cortes de caja
+
+- Cada negocio decide **qué días de la semana** hay corte de caja y **la hora límite de cada día**. Parámetro `calendario_corte`: un mapa de día de la semana (0 = lunes … 6 = domingo) a `HH:MM`; un día ausente no pide corte. Sustituye a `hora_limite_corte_diario`.
+- Migración: el valor anterior se copia a los siete días, para no cambiar el comportamiento de una instalación existente. El asistente propone lunes a sábado.
+- Un turno abierto en un día con corte debe cerrarse antes de la hora límite de ese día; si se abrió en un día sin corte, antes de la hora límite del siguiente día que sí tenga. Con esa regla se calculan `tardío` y la alerta «corte diario pendiente».
+- Validación: horas `HH:MM` reales; al menos un día con corte si el negocio usa caja; se guarda con su evento de bitácora (valor anterior y nuevo).
+
+### 15.2 Piezas por denominación y arqueo con reconteo
+
+Objetivo: saber cuántas piezas de cada denominación debe haber en la caja sin perder el arqueo ciego.
+
+- Parámetro del negocio `control_denominaciones` (sí/no). Apagado, todo sigue como en §7.
+- Encendido:
+  - **Apertura.** El fondo inicial se captura por denominación; la suma es el fondo.
+  - **Cobro en efectivo.** Además del importe se capturan las piezas **recibidas** (su suma debe ser mayor o igual al importe). El cambio es la diferencia. El sistema **propone las piezas del cambio** con las que la caja debería tener (cambio con existencias acotadas; si no hay combinación exacta lo dice) y pide entregar exactamente esas. Si la persona entrega otras, las corrige en pantalla antes de confirmar: la suma del cambio capturado debe ser exactamente el cambio. No se bloquea un cobro por existencias: la realidad manda y el desajuste aparece en el corte.
+  - **Retiros, devoluciones y traslados** que salen de la caja capturan sus piezas igual.
+  - Cada movimiento de piezas es un renglón inmutable (`MovimientoPiezas`: turno, origen, denominación, piezas con signo, referencia al pago, retiro o traslado). Una reversión agrega renglones contrarios; nada se edita.
+- **Arqueo.** El conteo sigue siendo ciego. Antes de que el conteo quede cerrado, **ninguna respuesta del servidor** (página, fragmento, mensaje de error, PDF, corte, exportación) revela el total esperado del turno ni las piezas esperadas a quien lo tiene abierto.
+  1. La persona captura su conteo. Se guarda como «primer conteo» y ya no se puede editar.
+  2. Si coincide con lo esperado, el turno se cierra.
+  3. Si no coincide, el sistema solo dice **que no coincide**, sin importe ni sentido, y ofrece **un único reconteo** o cerrar con el primer conteo.
+  4. Con el reconteo (o al cerrar sin él) el turno queda cerrado y **entonces** se muestra: esperado, contado y diferencia, en total y por denominación. Ambos conteos quedan en el arqueo y en la bitácora.
+- Las piezas son una guía: el umbral, la nota obligatoria y las alertas se siguen calculando con el **total**.
+
+### 15.3 Retiros de caja
+
+Sacar efectivo de la caja para un gasto del negocio. Operación los hace sin esperar a nadie mientras respete los topes; Supervisión los controla después.
+
+- **Datos:** folio propio (serie de retiros), turno, importe, motivo (catálogo `MotivoRetiro` que administra Supervisión), nota, piezas si §15.2 está encendido, y **comprobante** (foto o PDF del ticket o recibo).
+- **Topes**, definidos en el asistente y editables por Dirección: importe máximo por retiro; periodo de conteo (`dia` o `semana`, de lunes a domingo, en la zona horaria del negocio); importe máximo del periodo; número máximo de retiros del periodo; efectivo máximo en caja (solo aviso para entregar). Los topes se cuentan **por caja**.
+- **Dentro de los topes** el retiro se registra de inmediato. **Fuera de ellos** se convierte en una solicitud (`retiro_caja`) que usa el motor de aprobaciones con sus tres vías; valen las reglas fijas: nadie aprueba su propia solicitud.
+- La comprobación de topes y el registro ocurren en la misma transacción (`BEGIN IMMEDIATE`): dos retiros simultáneos no pueden rebasar juntos un tope.
+- **Solo se retira efectivo que el turno tiene** (la custodia nunca queda negativa). El rechazo por este motivo no dice cuánto hay. Cada rechazo queda en bitácora; al tercero en un mismo turno, los retiros de ese turno pasan a requerir autorización, para que no sirvan de sonda del total esperado.
+- **Comprobante.**
+  - Se puede adjuntar al registrar o después («pendiente»). Un turno con comprobantes pendientes **no se puede cerrar** hasta adjuntarlos o declarar cada uno «sin comprobante» con su motivo; esa declaración avisa a Supervisión.
+  - Solo JPEG, PNG o PDF, hasta 5 MB. El tipo se decide por el contenido, no por el nombre ni por lo que diga el navegador. Las imágenes se vuelven a codificar (se pierden metadatos como la ubicación). Un PDF con contenido activo (JavaScript, acciones de lanzamiento, archivos incrustados) o cifrado se rechaza.
+  - Se guarda fuera de cualquier carpeta que el servidor sirva, con nombre aleatorio, y su SHA-256 queda en el retiro y en la bitácora. Se entrega solo por una vista con sesión y permiso, como descarga (`Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`). Entra en los respaldos cifrados.
+  - Lo ven quien lo registró, Supervisión y Dirección.
+- **Revisión.** Cada retiro nace «por revisar». Quien tenga el permiso `revisar_retiros` lo marca «revisado» u «observado» con nota; **nadie revisa un retiro propio**. Avisos en el tablero de Supervisión: periodo al 80 % de un tope, retiro sin comprobante, retiros por revisar con más días de los configurados.
+- **Sin borrado.** Un retiro solo se revierte por solicitud aprobada por otra persona; la reversión regresa el efectivo al turno abierto de quien la ejecuta.
+- Entra en el esperado del arqueo, en el corte diario y el corte mayor (como salida de efectivo con folio, motivo e importe) y en la bitácora.
+- Permisos nuevos: `retirar_efectivo` (Operación), `revisar_retiros` (Supervisión), `administrar_motivos_retiro` (Supervisión).
+
+### 15.4 Recibos con QR
+
+- El recibo (pantalla, impresión y PDF) lleva un QR además del código. El QR contiene **solo** el texto `AR1|<serie>|<folio>|<código>`: ni nombre, ni matrícula, ni importe, ni una dirección web.
+- La pantalla «Verificar recibo» acepta el código tecleado o el texto del QR (un lector USB lo escribe como teclado). Busca por serie y folio, compara el código en tiempo constante y comprueba el recibo contra el libro; responde válido, cancelado o no reconocido.
+- La verificación exige sesión, equipo aprobado y permiso de ver titulares. Los intentos fallidos se limitan por usuario y por equipo y quedan en bitácora.
+- El código no cambia: sigue derivándose con HMAC de serie, folio, importe, fecha y titular.
+
+### 15.5 Carpeta vigilada del banco
+
+- Parámetro `carpeta_banco`: una carpeta donde alguien deja el archivo descargado del banco. El trabajador la revisa cada pocos minutos e importa lo nuevo con el **mismo camino y las mismas defensas** que una importación manual (continuidad con el estado anterior, revisión de importaciones, un movimiento que llega por dos vías cuenta una vez).
+- Quien importa es el actor de sistema «carpeta vigilada». Como nadie responde por ese archivo, una importación de la carpeta que no se pueda encadenar con un estado anterior **no aplica pagos** hasta que la revise una persona con permiso de conciliación.
+- Solo se toman archivos regulares (sin seguir enlaces), con extensión admitida por algún adaptador, hasta el tamaño máximo de importación y cuyo tamaño no cambió entre dos revisiones. Un archivo ya visto (por SHA-256) no se vuelve a importar.
+- Lo importado se mueve a `procesados/` y lo rechazado a `rechazados/` con un archivo de texto que dice por qué. La carpeta no puede estar dentro del programa ni de sus datos.
+- Cada importación automática queda en bitácora y aparece en el inicio de quien concilia.
+
+### 15.6 Asistente
+
+Ocho pasos. El nuevo paso 5, «Caja: cortes y retiros», pide el calendario de cortes (§15.1), si se capturan piezas por denominación (§15.2) y los topes de retiros (§15.3). El paso 6, «Entrega y respaldo», conserva las carpetas, los niveles de detalle y la clave de recuperación, y agrega la carpeta vigilada del banco (§15.5). Las plantillas y su esquema incluyen los valores nuevos.
+
