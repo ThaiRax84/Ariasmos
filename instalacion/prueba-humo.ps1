@@ -131,7 +131,7 @@ function Comprobar-SinSecretos {
     $claves = @('clave_django', 'clave_matricula', 'clave_auditoria', 'clave_respaldo', 'clave_secretos') | ForEach-Object { [string]$configuracion.$_ } | Where-Object { $_ }
     $archivos = @(Get-ChildItem -LiteralPath (Join-Path $Programa 'servicios') -Filter '*.xml') + @(Get-Item -LiteralPath (Join-Path $Datos 'caddy\caddy.json')) + @(Get-ChildItem -LiteralPath $Registros -File)
     foreach ($archivo in $archivos) {
-        $texto = Get-Content -LiteralPath $archivo.FullName -Raw
+        $texto = "$(Get-Content -LiteralPath $archivo.FullName -Raw)"
         foreach ($clave in $claves) { if ($texto.Contains($clave)) { Fallar "$($archivo.FullName) contiene una clave de la instancia." } }
     }
     foreach ($ambito in @('Machine', 'User')) {
