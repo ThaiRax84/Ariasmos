@@ -88,6 +88,9 @@ def cerrar_turno(turno, usuario, conteo, nota="", request=None):
         )
         if supera:
             registrar("diferencia_de_arqueo", usuario=usuario, objeto=turno, datos={"diferencia": diferencia, "diferencia_texto": formatear(diferencia), "nota": arqueo.nota}, request=request)
+        from cortes.servicios import crear_diario
+
+        crear_diario(turno, arqueo, request)
     return arqueo
 
 

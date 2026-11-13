@@ -42,6 +42,11 @@ PARAMETROS = {
     "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
     "digitos_telefono_nacional": (10, "Dígitos de un teléfono nacional sin prefijo de país"),
+    "hora_limite_corte_diario": ("18:00", "Hora límite del corte diario de caja (HH:MM, hora del negocio)"),
+    "dia_corte_mayor": (1, "Día del mes en que se genera el corte mayor del mes anterior (1 a 28)"),
+    "dias_plazo_corte_mayor": (5, "Días para cerrar el corte mayor antes de que se cierre solo marcado sin revisar"),
+    "dia_semana_cobranza": (1, "Día de la semana de la lista de cobranza automática (1 lunes a 7 domingo; 0 para no generarla)"),
+    "hora_respaldo": ("02:00", "Hora del respaldo diario (HH:MM, hora del negocio)"),
 }
 
 
@@ -56,6 +61,8 @@ class Negocio(models.Model):
     contador_matricula = models.BigIntegerField(default=0)
     cobro_desde = models.DateField(null=True, blank=True)
     periodo_cerrado_hasta = models.DateField(null=True, blank=True)
+    carpeta_respaldo = models.CharField(max_length=400, blank=True)
+    clave_recuperacion_pendiente = models.BooleanField(default=True)
     plantilla = models.CharField(max_length=40, blank=True)
     configurado = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)

@@ -9,7 +9,7 @@ from .base import base_de_datos
 _datos = instancia.leer()
 
 if _datos is None:
-    if "inicializar" not in sys.argv:
+    if "inicializar" not in sys.argv and "restaurar" not in sys.argv:
         raise ImproperlyConfigured(
             f"No existe {instancia.ruta_archivo()}. Ejecuta: python manage.py inicializar"
         )
@@ -17,6 +17,7 @@ if _datos is None:
     CLAVE_MATRICULA = b""
     CLAVE_AUDITORIA = b""
     CLAVE_SECRETOS = b""
+    CLAVE_RESPALDO = b""
     RUTA_INSTANCIA = ""
     RUTA_ANCLA_AUDITORIA = ""
     DATABASES = base_de_datos(":memory:")
@@ -30,6 +31,7 @@ else:
     if "clave_secretos" not in _datos and "inicializar" not in sys.argv:
         raise ImproperlyConfigured("Faltan claves nuevas en la instancia. Ejecuta: python manage.py inicializar")
     CLAVE_SECRETOS = bytes.fromhex(_datos.get("clave_secretos", ""))
+    CLAVE_RESPALDO = bytes.fromhex(_datos.get("clave_respaldo", ""))
     RUTA_INSTANCIA = str(instancia.carpeta())
     RUTA_ANCLA_AUDITORIA = str(instancia.carpeta() / instancia.ANCLA)
     DATABASES = base_de_datos(_datos["base_datos"])

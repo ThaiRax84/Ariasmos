@@ -141,6 +141,30 @@ class FormularioParametros(forms.Form):
             raise forms.ValidationError("Debe ser al menos 1.")
         return valor
 
+    def _hora(self, clave):
+        texto = self.cleaned_data[clave].strip()
+        if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", texto):
+            raise forms.ValidationError("Escribe la hora como HH:MM, por ejemplo 18:00.")
+        return texto
+
+    def clean_hora_limite_corte_diario(self):
+        return self._hora("hora_limite_corte_diario")
+
+    def clean_hora_respaldo(self):
+        return self._hora("hora_respaldo")
+
+    def clean_dia_corte_mayor(self):
+        dia = self.cleaned_data["dia_corte_mayor"]
+        if not 1 <= dia <= 28:
+            raise forms.ValidationError("El día va de 1 a 28.")
+        return dia
+
+    def clean_dia_semana_cobranza(self):
+        dia = self.cleaned_data["dia_semana_cobranza"]
+        if dia > 7:
+            raise forms.ValidationError("Usa 1 (lunes) a 7 (domingo), o 0 para no generarla.")
+        return dia
+
     def clean_dia_generacion_cargos(self):
         dia = self.cleaned_data["dia_generacion_cargos"]
         if not 1 <= dia <= 28:
