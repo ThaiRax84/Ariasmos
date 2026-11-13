@@ -53,10 +53,10 @@ class Command(BaseCommand):
         generacion.generar_recargos(hoy)
         caja = Caja.objects.filter(activa=True).first() or Caja.objects.create(nombre="Caja 1")
         abrir_turno(Usuario.objects.get(usuario="operacion"), caja, 50000)
-        self._banco(direccion)
+        self._banco(Usuario.objects.get(usuario="supervision"))
         self.stdout.write("Datos de cobro: 4 titulares (2 en una familia), cargos de los últimos 3 meses con recargos y un turno abierto para operacion.")
 
-    def _banco(self, direccion):
+    def _banco(self, importador):
         cuenta = CuentaBancaria.principal_activa() or CuentaBancaria.objects.create(
             banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="Negocio de demostración", contacto_dudas="5500000000", principal=True
         )
@@ -74,8 +74,8 @@ class Command(BaseCommand):
                     "rastreo": "", "referencia": referencia, "concepto": concepto, "huella": f"{cuenta.clabe}|demostracion|{numero}",
                 }
             )
-        importacion = conciliacion.importar(cuenta, movimientos, Importacion.ARCHIVO, "demostracion.csv", "0" * 64, direccion)
-        self.stdout.write(f"Banco: cuenta ficticia {cuenta.clabe}; {importacion.aplicados} abono aplicado solo y {importacion.sugeridos + importacion.sin_pista} en la cola por identificar.")
+        importacion = conciliacion.importar(cuenta, movimientos, Importacion.ARCHIVO, "demostracion.csv", "0" * 64, importador)
+        self.stdout.write(f"Banco: cuenta ficticia {cuenta.clabe}; {importacion.aplicados} abono aplicado solo y {importacion.sugeridos + importacion.sin_pista} en la cola por identificar; la importación queda pendiente de revisión para direccion.")
 
     def handle(self, *args, **opciones):
         negocio = Negocio.actual()
