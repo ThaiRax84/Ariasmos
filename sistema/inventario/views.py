@@ -134,7 +134,16 @@ def vender_titular(request, pk):
                 return redirect(reverse("cobros:cobrar", args=[titular.pk]) + f"?venta={venta.pk}")
             messages.success(request, f"Venta {venta} registrada{' y cargada a su adeudo' if venta.modo == Venta.ADEUDO else ''}.")
             return redirect("inventario:venta", pk=venta.pk)
-    return render(request, "inventario/venta_nueva.html", {"formulario": formulario, "titular": titular, "catalogo": servicios.para_vender()})
+    return render(request, "inventario/venta_nueva.html", {"formulario": formulario, "titular": titular, "catalogo": _catalogo(formulario), "puede_cobrar": request.user.tiene_permiso("registrar_pago_efectivo")})
+
+
+def _catalogo(formulario):
+    filas = []
+    for fila in servicios.para_vender():
+        campo = formulario.campo_de(fila["articulo"])
+        if campo is not None:
+            filas.append({**fila, "campo": campo})
+    return filas
 
 
 def _avisar_sin_existencia(request, venta):
@@ -143,14 +152,12 @@ def _avisar_sin_existencia(request, venta):
         messages.warning(request, f"La existencia del sistema no alcanzaba para: {', '.join(faltan)}. La venta quedó registrada y Supervisión la revisará.")
 
 
-def _renglones_ocultos(formulario):
-    return [(campo, formulario.data.get(campo, "")) for par in formulario.lineas for campo in par if formulario.data.get(campo)]
-
-
 def _pantalla_publico(request, formulario, turno, **extra):
-    contexto = {"formulario": formulario, "turno": turno, "publico": True, "con_piezas": control_piezas.activo(), "catalogo": servicios.para_vender(), **extra}
+    contexto = {"formulario": formulario, "turno": turno, "publico": True, "con_piezas": control_piezas.activo(), "catalogo": _catalogo(formulario), **extra}
     if formulario.is_bound and formulario.is_valid():
-        contexto["ocultos"] = _renglones_ocultos(formulario)
+        contexto["ocultos"] = formulario.capturadas()
+        precios = {a.pk: a for a in formulario.articulos}
+        contexto["elegidos"] = [{"articulo": precios[pk], "cantidad": cantidad, "importe": precios[pk].precio * cantidad} for pk, cantidad in formulario.cleaned_data["renglones"]]
     return render(request, "inventario/venta_nueva.html", contexto)
 
 
