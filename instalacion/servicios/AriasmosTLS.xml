@@ -1,0 +1,26 @@
+<service>
+  <id>AriasmosTLS</id>
+  <name>Ariasmos TLS</name>
+  <description>Atiende la red local por HTTPS (puerto 443) con una autoridad de certificados interna y reenvía a la aplicación en 127.0.0.1:8000.</description>
+  <executable>%BASE%\..\caddy\caddy.exe</executable>
+  <arguments>run --config "%ProgramData%\Ariasmos\caddy\Caddyfile" --adapter caddyfile</arguments>
+  <workingdirectory>%ProgramData%\Ariasmos\caddy</workingdirectory>
+  <env name="XDG_DATA_HOME" value="%ProgramData%\Ariasmos\caddy\datos"/>
+  <env name="XDG_CONFIG_HOME" value="%ProgramData%\Ariasmos\caddy\config"/>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart/>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>30 sec</stoptimeout>
+  <logpath>%ProgramData%\Ariasmos\registros</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>5120</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>
