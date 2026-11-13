@@ -1,10 +1,18 @@
 {% extends "base.html" %}
 {% block contenido %}
 <h1>Cerrar turno en {{ turno.caja }}</h1>
-<p>Cuenta el efectivo de la caja, incluido el fondo, y escribe cuántas piezas hay de cada denominación. El sistema te mostrará la diferencia después de guardar.</p>
+{% if pendientes %}
+<section class="panel alerta">
+  <h2>Hay retiros con comprobante pendiente</h2>
+  <p>Adjunta el comprobante de cada uno o declara que no lo hay antes de cerrar el turno.</p>
+  <ul class="lista">{% for r in pendientes %}<li><a href="{% url 'caja:retiro' r.pk %}">Retiro {{ r }}</a></li>{% endfor %}</ul>
+</section>
+{% else %}
+<p>Cuenta el efectivo de la caja, incluido el fondo, y escribe cuántas piezas hay de cada denominación. Este primer conteo queda guardado y ya no se puede cambiar. Si coincide, el turno se cierra; si no, podrás recontar una sola vez.</p>
 <form method="post" class="formulario angosto" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Cerrar el turno con este conteo?">Cerrar turno</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
+  <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Guardar este conteo? Ya no se podrá cambiar.">Guardar conteo</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
 </form>
+{% endif %}
 {% endblock %}

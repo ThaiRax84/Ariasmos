@@ -4,6 +4,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from auditoria.servicios import diferencias, registrar
+from caja.models import MotivoRetiro, RetiroCaja, Turno
+from caja.retiros import MOTIVOS_TOPE
 from cobros import libro
 from cobros.models import Cargo, ConceptoCobro, Pago
 from cuentas.decoradores import requiere_permiso
@@ -38,6 +40,18 @@ def describir(solicitud):
             filas += [("Recibo", str(pago.recibo)), ("Importe", formatear(pago.importe)), ("Medio", pago.get_medio_display())]
     elif solicitud.accion == "pago_sobre_tope":
         filas.append(("Importe recibido", formatear(int(datos.get("importe") or 0))))
+    elif solicitud.accion == "retiro_caja":
+        turno = Turno.objects.filter(pk=datos.get("turno")).select_related("caja").first()
+        motivo = MotivoRetiro.objects.filter(pk=datos.get("motivo")).first()
+        filas += [("Caja", str(turno.caja) if turno else "—"), ("Importe", formatear(int(datos.get("importe") or 0))), ("Motivo del retiro", str(motivo) if motivo else "—")]
+        filas.append(("Por qué pide autorización", "; ".join(MOTIVOS_TOPE.get(m, m) for m in datos.get("excede") or [])))
+        if datos.get("nota"):
+            filas.append(("Nota del retiro", datos["nota"]))
+        return filas
+    elif solicitud.accion == "revertir_retiro":
+        retiro = RetiroCaja.objects.filter(pk=datos.get("retiro")).select_related("registrado_por", "motivo").first()
+        if retiro is not None:
+            filas += [("Retiro", str(retiro)), ("Importe", formatear(retiro.importe)), ("Registró", str(retiro.registrado_por)), ("Motivo del retiro", str(retiro.motivo))]
     elif solicitud.accion == "cambio_familia":
         modo = {"ligar": "Ligar a", "crear": "Crear y ligar a", "desligar": "Desligar de"}.get(datos.get("modo"), "")
         familia = Familia.objects.filter(pk=datos.get("familia")).first()

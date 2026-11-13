@@ -4,6 +4,7 @@ from auditoria.servicios import MOTIVOS, ultima_verificacion
 from banco import conciliacion
 from banco.models import CuentaBancaria, Importacion, MovimientoBancario
 from caja.models import Denominacion, Traslado
+from caja import retiros
 from caja.servicios import alertas as alertas_caja
 from configuracion.models import Negocio
 from cortes import servicios as cortes
@@ -36,9 +37,13 @@ def inicio(request):
             contexto["certificado_por_vencer"] = datos_certificado
     if usuario.tiene_permiso("recibir_efectivo"):
         contexto["diarios_pendientes"] = cortes.diarios_pendientes()
-        contexto["alertas"] = alertas_caja()
+        contexto["alertas"] = alertas_caja(usuario)
         contexto["por_recibir"] = Traslado.objects.filter(destino=usuario, estado=Traslado.PENDIENTE).count()
+    if usuario.tiene_permiso("revisar_retiros"):
+        contexto["avisos_retiros"] = retiros.avisos(usuario)
     if usuario.tiene_permiso("conciliar_banco"):
+        contexto["retenidas"] = list(Importacion.objects.filter(retenida=True, liberada_en__isnull=True).select_related("cuenta__banco"))
+        contexto["automaticas"] = list(Importacion.objects.filter(origen=Importacion.CARPETA).select_related("cuenta__banco")[:5])
         contexto["banco_pendientes"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).count()
         contexto["banco_propuestos"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR, propuesta__isnull=False).count()
         contexto["ultima_importacion"] = Importacion.objects.order_by("-creada").first()

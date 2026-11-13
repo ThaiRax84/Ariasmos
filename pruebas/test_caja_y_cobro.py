@@ -119,12 +119,16 @@ def test_arqueo_ciego(caja):
     texto = supervisor.get(reverse("caja:turno", args=[turno.pk])).content.decode()
     assert "1,234.56" not in texto
     assert supervisor.get(reverse("caja:cerrar", args=[turno.pk])).status_code == 403
-    respuesta = op.post(reverse("caja:cerrar", args=[turno.pk]), {"d_100000": 1})
-    assert respuesta.status_code == 200 and "supera el umbral" in respuesta.content.decode()
-    assert "1,234.56" not in respuesta.content.decode()
+    respuesta = op.post(reverse("caja:cerrar", args=[turno.pk]), {"d_100000": 1}, follow=True)
+    assert respuesta.status_code == 200 and "no coincide" in respuesta.content.decode()
+    assert "1,234.56" not in respuesta.content.decode() and "234.56" not in respuesta.content.decode()
     turno.refresh_from_db()
     assert turno.abierto
-    op.post(reverse("caja:cerrar", args=[turno.pk]), {"d_100000": 1, "nota": "Faltó dinero"})
+    sin_nota = op.post(reverse("caja:reconteo", args=[turno.pk]), {"accion": "primero"})
+    assert sin_nota.status_code == 200 and "1,234.56" not in sin_nota.content.decode()
+    turno.refresh_from_db()
+    assert turno.abierto
+    op.post(reverse("caja:reconteo", args=[turno.pk]), {"accion": "primero", "nota": "Faltó dinero"})
     arqueo = Arqueo.objects.get()
     assert (arqueo.contado, arqueo.esperado, arqueo.diferencia, arqueo.supera_umbral) == (100000, 123456, -23456, True)
     assert "1,234.56" in op.get(reverse("caja:turno", args=[turno.pk])).content.decode()

@@ -42,6 +42,9 @@ def _motivo(datos):
 
 
 class AccionLibro:
+    motivo_obligatoria = "pago_cobrado_por_quien_revierte"
+    mensaje_propio = "Nadie resuelve la reversión de un pago que él mismo cobró."
+
     def llave(self, datos):
         return {}
 
@@ -174,7 +177,8 @@ class Revertir(AccionLibro):
             turno = turno_abierto(responsable)
             if turno is None:
                 raise ErrorAccion(f"Para devolver efectivo, {responsable} necesita un turno de caja abierto.")
-        contexto.resultado = libro.revertir_pago(pago, _motivo(datos), contexto.ejecutor, turno, contexto.autorizador, contexto.solicitud, contexto.request)
+        piezas = datos.get("piezas") if pago.medio == Pago.EFECTIVO else None
+        contexto.resultado = libro.revertir_pago(pago, _motivo(datos), contexto.ejecutor, turno, contexto.autorizador, contexto.solicitud, contexto.request, piezas=piezas)
         return {"pago": pago.pk, "importe": pago.importe}
 
 
@@ -196,7 +200,7 @@ class PagoSobreTope(AccionLibro):
         if turno is None:
             raise ErrorAccion(f"{contexto.solicitante} necesita un turno de caja abierto para registrar el pago.")
         try:
-            pago = libro.registrar_pago(titular, importe, Pago.EFECTIVO, contexto.solicitante, turno=turno, ficha=datos["ficha"], request=contexto.request, solicitud=contexto.solicitud)
+            pago = libro.registrar_pago(titular, importe, Pago.EFECTIVO, contexto.solicitante, turno=turno, ficha=datos["ficha"], request=contexto.request, solicitud=contexto.solicitud, piezas=datos.get("piezas"))
         except libro.ErrorLibro as error:
             raise ErrorAccion(str(error))
         contexto.resultado = pago

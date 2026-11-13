@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Retirar efectivo de la caja</h1>
+{% if not turno %}
+<p class="mensaje warning">Abre tu turno de caja para retirar efectivo. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>
+{% else %}
+<p>El retiro sale del efectivo de tu turno en {{ turno.caja }}. Si pasa de los topes del negocio queda como solicitud para que otra persona lo autorice. Adjunta el ticket o recibo ahora o después; el turno no se puede cerrar con comprobantes pendientes.</p>
+<form method="post" class="formulario angosto" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Registrar retiro</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
+</form>
+{% endif %}
+{% endblock %}

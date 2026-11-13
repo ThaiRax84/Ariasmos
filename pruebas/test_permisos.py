@@ -3,7 +3,8 @@ from django.urls import URLPattern, URLResolver, get_resolver, reverse
 from django.utils import timezone
 
 from banco.models import Banco, CargaTemporal, CuentaBancaria, Importacion, MovimientoBancario
-from caja.models import Caja, Traslado
+from caja import retiros
+from caja.models import Caja, MotivoRetiro, Traslado
 from caja.servicios import abrir_turno
 from cobros import libro
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
@@ -17,7 +18,7 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
 
 SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
@@ -103,6 +104,21 @@ MATRIZ = {
     "caja:confirmar": ("recibir_efectivo",),
     "caja:rechazar": ("recibir_efectivo",),
     "caja:custodia": ("recibir_efectivo",),
+    "caja:reconteo": ("turno_caja",),
+    "caja:retiros": ("retirar_efectivo", "revisar_retiros"),
+    "caja:retiro_nuevo": ("retirar_efectivo",),
+    "caja:retiro": ("retirar_efectivo", "revisar_retiros"),
+    "caja:retiro_comprobante": ("retirar_efectivo",),
+    "caja:retiro_sin_comprobante": ("retirar_efectivo",),
+    "caja:retiro_descargar": ("retirar_efectivo", "revisar_retiros"),
+    "caja:retiro_revisar": ("revisar_retiros",),
+    "caja:retiro_revertir": ("retirar_efectivo", "revisar_retiros"),
+    "caja:motivos": ("administrar_motivos_retiro",),
+    "caja:motivo_nuevo": ("administrar_motivos_retiro",),
+    "caja:motivo_editar": ("administrar_motivos_retiro",),
+    "configuracion:caja": ("administrar_configuracion",),
+    "configuracion:carpeta_banco": ("administrar_configuracion",),
+    "conciliacion:liberar": ("conciliar_banco",),
     "auditoria:lista": ("ver_auditoria",),
     "auditoria:verificar": ("ver_auditoria",),
     "titulares:estado_pdf": ("ver_titulares",),
@@ -143,7 +159,7 @@ MATRIZ = {
 
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar", "conectar_certificado", "conectar_instalador"}
 
-OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
+OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
 
 def nombres_de_rutas(patrones=None, prefijo=""):
@@ -185,6 +201,8 @@ def escenario(db):
     turno = abrir_turno(usuarios["Operación"], Caja.objects.get_or_create(nombre="Caja 1")[0], 0)
     pago = libro.registrar_pago(titular, 50000, "efectivo", usuarios["Operación"], turno=turno)
     entrega = Traslado.objects.create(tipo="entrega", origen=usuarios["Operación"], destino=usuarios["Supervisión"], importe=100, estado="pendiente")
+    motivo_retiro = MotivoRetiro.objects.create(nombre="Insumos de prueba")
+    retiro = retiros.crear(turno, usuarios["Operación"], 1000, motivo_retiro, "", {})
     cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
     importacion = Importacion.objects.create(cuenta=cuenta, nombre_archivo="estado.pdf", sha256="0" * 64, adaptador=Importacion.ESTADO_PDF, creada_por=usuarios["Dirección"])
     movimiento = MovimientoBancario.objects.create(cuenta=cuenta, importacion=importacion, fecha=timezone.now().date(), importe=1000, sentido="abono", clase="spei", huella="h-matriz", estado="por_identificar")
@@ -257,6 +275,15 @@ def escenario(db):
         "caja:turno": {"pk": turno.pk},
         "caja:cerrar": {"pk": turno.pk},
         "caja:confirmar": {"pk": entrega.pk},
+        "caja:reconteo": {"pk": turno.pk},
+        "caja:retiro": {"pk": retiro.pk},
+        "caja:retiro_comprobante": {"pk": retiro.pk},
+        "caja:retiro_sin_comprobante": {"pk": retiro.pk},
+        "caja:retiro_descargar": {"pk": retiro.pk},
+        "caja:retiro_revisar": {"pk": retiro.pk},
+        "caja:retiro_revertir": {"pk": retiro.pk},
+        "caja:motivo_editar": {"pk": motivo_retiro.pk},
+        "conciliacion:liberar": {"pk": importacion.pk},
         "caja:rechazar": {"pk": entrega.pk},
     }
     return usuarios, argumentos

@@ -6,7 +6,7 @@
   <h2>Códigos erróneos a tu nombre</h2>
   <ul class="lista">
   {% for b in bloqueos %}
-    <li>{{ b.momento|date:"d/m/Y H:i" }} · {{ b.capturista }}{% if b.solicitud %} · {{ b.solicitud.get_accion_display }} de {{ b.solicitud.titular }}{% endif %} · la vía de código quedó bloqueada una hora
+    <li>{{ b.momento|date:"d/m/Y H:i" }} · {{ b.capturista }}{% if b.solicitud %} · {{ b.solicitud }}{% endif %} · la vía de código quedó bloqueada una hora
       <form method="post" action="{% url 'aviso_enterado' b.pk %}" class="en-linea">{% csrf_token %}<button class="boton secundario" type="submit">Enterado</button></form></li>
   {% endfor %}
   </ul>
@@ -20,7 +20,7 @@
 <tr class="{% if c.revision == 'por_revisar' %}resaltada{% endif %}">
   <td>{{ c.usado_en|date:"d/m/Y H:i" }}</td>
   <td>{{ c.usado_por }}</td>
-  <td>{% if c.solicitud %}{{ c.solicitud.get_accion_display }} · {{ c.solicitud.titular }}{% endif %}</td>
+  <td>{% if c.solicitud %}{{ c.solicitud }}{% endif %}</td>
   <td>{{ c.get_revision_display }}</td>
   <td>{% if c.revision == 'por_revisar' %}
     <form method="post" action="{% url 'revisar_autorizacion' c.pk %}" class="en-linea">{% csrf_token %}<input type="hidden" name="decision" value="confirmar"><button class="boton" type="submit">Confirmar</button></form>

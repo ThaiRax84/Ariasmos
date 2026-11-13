@@ -7,6 +7,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 ARCHIVO = "configuracion.json"
 ANCLA = "ancla_auditoria.json"
+COMPROBANTES = "comprobantes"
 
 
 def carpeta():

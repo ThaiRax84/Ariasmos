@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ solicitud.get_accion_display }} · {{ solicitud.titular }}</h1>
+<h1>{{ solicitud }}</h1>
 <section class="panel{% if resaltada %} resaltada{% endif %}">
   <dl class="datos">
-    <dt>{{ voc.matricula }}</dt><dd><a href="{% url 'titulares:detalle' solicitud.titular.pk %}">{{ solicitud.titular.matricula_formateada }}</a></dd>
+    {% if solicitud.titular %}<dt>{{ voc.matricula }}</dt><dd><a href="{% url 'titulares:detalle' solicitud.titular.pk %}">{{ solicitud.titular.matricula_formateada }}</a></dd>{% endif %}
     <dt>Estado</dt><dd>{{ solicitud.get_estado_display }}</dd>
     <dt>Solicitó</dt><dd>{{ solicitud.solicitante }} · {{ solicitud.creada|date:"d/m/Y H:i" }}</dd>
     <dt>Caduca</dt><dd>{{ solicitud.caduca_en|date:"d/m/Y H:i" }}</dd>

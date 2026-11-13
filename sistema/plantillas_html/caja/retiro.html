@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Retiro {{ retiro }}</h1>
+<section class="panel{% if retiro.revision == 'observado' or retiro.comprobante == 'sin_comprobante' %} alerta{% endif %}">
+  <dl class="datos">
+    <dt>Fecha</dt><dd>{{ retiro.creado|date:"d/m/Y H:i" }}</dd>
+    <dt>Caja</dt><dd>{{ retiro.caja }}</dd>
+    <dt>Registró</dt><dd>{{ retiro.registrado_por }}</dd>
+    <dt>Importe</dt><dd><strong>{{ retiro.importe|dinero }}</strong></dd>
+    <dt>Motivo</dt><dd>{{ retiro.motivo }}</dd>
+    {% if retiro.nota %}<dt>Nota</dt><dd>{{ retiro.nota }}</dd>{% endif %}
+    {% if retiro.autorizado_por %}<dt>Autorizó</dt><dd>{{ retiro.autorizado_por }}</dd>{% endif %}
+    {% if piezas %}<dt>Piezas</dt><dd>{% for p in piezas %}{{ p.piezas|stringformat:"d" }} × {{ p.denominacion|dinero }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>{% endif %}
+    <dt>Comprobante</dt><dd>{{ retiro.get_comprobante_display }}{% if archivo %} · <a href="{% url 'caja:retiro_descargar' retiro.pk %}">Descargar</a> · huella {{ archivo.sha256|slice:":16" }}…{% endif %}{% if retiro.motivo_sin_comprobante %} · {{ retiro.motivo_sin_comprobante }}{% endif %}</dd>
+    <dt>Revisión</dt><dd>{{ retiro.get_revision_display }}{% if retiro.revisado_por %} por {{ retiro.revisado_por }} el {{ retiro.revisado_en|date:"d/m/Y H:i" }}{% endif %}{% if retiro.nota_revision %} · {{ retiro.nota_revision }}{% endif %}</dd>
+    {% if reversion %}<dt>Revertido</dt><dd>{{ reversion.creada|date:"d/m/Y H:i" }} · {{ reversion.motivo }}</dd>{% endif %}
+  </dl>
+</section>
+{% if puede_adjuntar %}
+<section class="panel">
+  <h2>Adjuntar comprobante</h2>
+  <form method="post" action="{% url 'caja:retiro_comprobante' retiro.pk %}" class="formulario angosto" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% include "comun/_campos.html" with formulario=formulario_comprobante %}
+    <div class="acciones"><button class="boton" type="submit">Adjuntar</button></div>
+  </form>
+  <form method="post" action="{% url 'caja:retiro_sin_comprobante' retiro.pk %}" class="formulario angosto" novalidate>
+    {% csrf_token %}
+    {% include "comun/_campos.html" with formulario=formulario_sin %}
+    <div class="acciones"><button class="boton secundario" type="submit" data-confirmar="¿Declarar el retiro sin comprobante? Supervisión recibirá el aviso.">Declarar sin comprobante</button></div>
+  </form>
+</section>
+{% endif %}
+{% if puede_revisar %}
+<section class="panel">
+  <h2>Revisar</h2>
+  <form method="post" action="{% url 'caja:retiro_revisar' retiro.pk %}" class="formulario angosto" novalidate>
+    {% csrf_token %}
+    {% include "comun/_campos.html" with formulario=formulario_revision %}
+    <div class="acciones"><button class="boton" type="submit">Guardar revisión</button></div>
+  </form>
+</section>
+{% endif %}
+{% if not reversion %}<p><a class="boton secundario" href="{% url 'caja:retiro_revertir' retiro.pk %}">Solicitar reversión</a></p>{% endif %}
+{% endblock %}

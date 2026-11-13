@@ -38,6 +38,8 @@ CONFIGURACION = "configuracion.json"
 ANCLA = "ancla_auditoria.json"
 MANIFIESTO = "manifiesto.json"
 MIEMBROS = {BASE, CONFIGURACION, ANCLA, MANIFIESTO}
+COMPROBANTES = "comprobantes"
+PATRON_COMPROBANTE = re.compile(r"^comprobantes/([0-9a-f]{32}\.(jpg|png|pdf))$")
 TABLAS = {"titulares": "titulares_titular", "cargos": "cobros_cargo", "pagos": "cobros_pago", "eventos": "auditoria_evento"}
 
 
@@ -141,6 +143,24 @@ def _agregar(tar, nombre, contenido):
     tar.addfile(info, io.BytesIO(contenido))
 
 
+def _comprobantes(tar):
+    from caja import comprobantes
+
+    incluidos, faltantes = {}, []
+    for nombre, huella in comprobantes.todos():
+        try:
+            contenido = comprobantes.ruta_de(nombre).read_bytes()
+        except (OSError, comprobantes.ComprobanteInvalido):
+            faltantes.append(nombre)
+            continue
+        if hashlib.sha256(contenido).hexdigest() != huella:
+            faltantes.append(nombre)
+            continue
+        _agregar(tar, f"{COMPROBANTES}/{nombre}", contenido)
+        incluidos[nombre] = huella
+    return incluidos, faltantes
+
+
 def nombre_archivo(momento):
     return f"{PREFIJO}{momento:%Y%m%d-%H%M%S}{EXTENSION}"
 
@@ -171,6 +191,10 @@ def respaldar(usuario=None, automatico=False, dia=None):
             _agregar(tar, CONFIGURACION, json.dumps(configuracion_actual(), indent=2).encode("utf-8"))
             if registro_ancla:
                 _agregar(tar, ANCLA, json.dumps(registro_ancla).encode("utf-8"))
+            manifiesto["comprobantes"], faltantes = _comprobantes(tar)
+            if faltantes:
+                manifiesto["comprobantes_faltantes"] = faltantes
+                registrar("comprobantes_faltantes_en_respaldo", usuario=usuario, datos={"archivos": faltantes})
             _agregar(tar, MANIFIESTO, json.dumps(manifiesto, indent=1).encode("utf-8"))
         nombre = nombre_archivo(momento)
         final = Path(destino) / nombre
@@ -246,9 +270,14 @@ def abrir(archivo, clave, destino):
     extraidos = {}
     with tarfile.open(paquete, "r") as tar:
         for miembro in tar.getmembers():
-            if miembro.name not in MIEMBROS or not miembro.isfile():
+            comprobante = PATRON_COMPROBANTE.match(miembro.name)
+            if (miembro.name not in MIEMBROS and comprobante is None) or not miembro.isfile():
                 raise ErrorRespaldo(f"El paquete contiene algo inesperado: {miembro.name!r}")
-            ruta = os.path.join(destino, miembro.name)
+            if comprobante is not None:
+                os.makedirs(os.path.join(destino, COMPROBANTES), exist_ok=True)
+                ruta = os.path.join(destino, COMPROBANTES, comprobante.group(1))
+            else:
+                ruta = os.path.join(destino, miembro.name)
             with tar.extractfile(miembro) as entrada, open(ruta, "wb") as salida:
                 shutil.copyfileobj(entrada, salida)
             extraidos[miembro.name] = ruta
@@ -309,6 +338,14 @@ def verificar_paquete(extraidos):
     ancla_paquete = manifiesto.get("ancla") or {}
     if ancla_paquete.get("numero") and ancla_paquete["numero"] > numero:
         raise ErrorRespaldo("La copia está por detrás del ancla de la bitácora.")
+    comprobantes = manifiesto.get("comprobantes") or {}
+    for nombre, huella in comprobantes.items():
+        ruta = extraidos.get(f"{COMPROBANTES}/{nombre}")
+        if ruta is None or hashlib.sha256(Path(ruta).read_bytes()).hexdigest() != huella:
+            raise ErrorRespaldo(f"El comprobante {nombre} del respaldo falta o no coincide con su huella.")
+    sobrantes = [m for m in extraidos if PATRON_COMPROBANTE.match(m) and PATRON_COMPROBANTE.match(m).group(1) not in comprobantes]
+    if sobrantes:
+        raise ErrorRespaldo("El respaldo trae comprobantes que su manifiesto no declara.")
     return {"conteos": conteos, "eventos": numero, "configuracion": configuracion, "manifiesto": manifiesto}
 
 

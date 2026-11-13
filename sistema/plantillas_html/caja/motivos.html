@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Motivos de retiro</h1>
+<div class="atajos"><a class="boton" href="{% url 'caja:motivo_nuevo' %}">Nuevo motivo</a></div>
+<table class="tabla">
+<thead><tr><th>Nombre</th><th>Activo</th><th></th></tr></thead>
+<tbody>{% for m in motivos %}<tr><td>{{ m.nombre }}</td><td>{{ m.activo|yesno:"Sí,No" }}</td><td><a href="{% url 'caja:motivo_editar' m.pk %}">Editar</a></td></tr>{% empty %}<tr><td colspan="3">Sin motivos.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}
