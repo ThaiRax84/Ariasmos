@@ -1,9 +1,12 @@
 import secrets
+from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from auditoria.servicios import registrar
+from banco import conciliacion
+from banco.models import Banco, CuentaBancaria, Importacion
 from caja.models import Caja
 from caja.servicios import abrir_turno
 from cobros import generacion
@@ -50,7 +53,29 @@ class Command(BaseCommand):
         generacion.generar_recargos(hoy)
         caja = Caja.objects.filter(activa=True).first() or Caja.objects.create(nombre="Caja 1")
         abrir_turno(Usuario.objects.get(usuario="operacion"), caja, 50000)
+        self._banco(direccion)
         self.stdout.write("Datos de cobro: 4 titulares (2 en una familia), cargos de los últimos 3 meses con recargos y un turno abierto para operacion.")
+
+    def _banco(self, direccion):
+        cuenta = CuentaBancaria.principal_activa() or CuentaBancaria.objects.create(
+            banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="Negocio de demostración", contacto_dudas="5500000000", principal=True
+        )
+        titulares = list(Titular.objects.order_by("pk"))
+        ayer = hoy_negocio() - timedelta(days=1)
+        mala = titulares[2].matricula[:3] + str((int(titulares[2].matricula[3]) + 1) % 10) + titulares[2].matricula[4:]
+        movimientos = []
+        for numero, (referencia, concepto, importe, nombre) in enumerate(
+            ((titulares[0].matricula, "colegiatura", 150000, "PERSONA DE DEMOSTRACION UNO"), (mala, "pago", 80000, "PERSONA DE DEMOSTRACION DOS"), ("", "pago de mi hijo", 30000, "PERSONA DE DEMOSTRACION TRES"))
+        ):
+            movimientos.append(
+                {
+                    "fecha": ayer.isoformat(), "folio": "", "descripcion": "ABONO DE DEMOSTRACION", "importe": importe, "saldo": None,
+                    "sentido": "abono", "clase": "archivo", "hora": "", "banco_origen": "", "cuenta_pagador": "", "nombre_pagador": nombre,
+                    "rastreo": "", "referencia": referencia, "concepto": concepto, "huella": f"{cuenta.clabe}|demostracion|{numero}",
+                }
+            )
+        importacion = conciliacion.importar(cuenta, movimientos, Importacion.ARCHIVO, "demostracion.csv", "0" * 64, direccion)
+        self.stdout.write(f"Banco: cuenta ficticia {cuenta.clabe}; {importacion.aplicados} abono aplicado solo y {importacion.sugeridos + importacion.sin_pista} en la cola por identificar.")
 
     def handle(self, *args, **opciones):
         negocio = Negocio.actual()
