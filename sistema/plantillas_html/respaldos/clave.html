@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Clave de recuperación</h1>
+{% if vista %}
+{% include "respaldos/_clave.html" %}
+<form method="post" class="formulario angosto">
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Listo, ya la guardé</button></div>
+</form>
+{% else %}
+<p>La clave de recuperación ya se mostró y se marcó como guardada: el sistema no la vuelve a enseñar. Si la perdiste, genera una clave nueva desde <a href="{% url 'respaldos:panel' %}">Respaldos</a>; los respaldos anteriores seguirán abriéndose solo con la clave anterior.</p>
+{% endif %}
+{% endblock %}
