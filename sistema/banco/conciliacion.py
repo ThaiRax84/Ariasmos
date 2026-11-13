@@ -280,7 +280,7 @@ def continuidad(cuenta, adaptador, resumen):
 
 
 def pendientes_de_revision():
-    aplicados = Q(lista__estado=MovimientoBancario.APLICADO)
+    aplicados = Q(lista__estado=MovimientoBancario.APLICADO, lista__confirmado_por__isnull=True)
     return (
         Importacion.objects.filter(continuidad__in=Importacion.A_REVISAR, revisada_por__isnull=True)
         .annotate(pagos=Count("lista", filter=aplicados), monto=Sum("lista__importe", filter=aplicados))
@@ -314,6 +314,35 @@ def marcar_revisada(importacion, usuario, request=None):
         )
 
 
+def otra_via(cuenta, adaptador, datos):
+    candidatos = MovimientoBancario.objects.filter(
+        cuenta=cuenta, fecha=datetime.fromisoformat(datos["fecha"]).date(), importe=datos["importe"], sentido=datos["sentido"], mismo_que__isnull=True, confirmado_por__isnull=True
+    ).exclude(importacion__adaptador=adaptador)
+    rastreo = (datos.get("rastreo") or "").strip().upper()
+    referencia, concepto = lectura.normal(datos.get("referencia", "")), lectura.normal(datos.get("concepto", ""))
+    resultado = []
+    for candidato in candidatos:
+        suyo = (candidato.rastreo or "").strip().upper()
+        if rastreo and suyo:
+            if suyo == rastreo:
+                resultado.append(candidato)
+        elif lectura.normal(candidato.referencia) == referencia and lectura.normal(candidato.concepto) == concepto:
+            resultado.append(candidato)
+    return resultado
+
+
+def ligar_otra_via(existente, datos, cuenta, importacion, adaptador):
+    nuevo = MovimientoBancario.objects.create(
+        cuenta=cuenta, importacion=importacion, estado=MovimientoBancario.MISMO, mismo_que=existente,
+        **{k: v for k, v in datos.items() if k not in ("fecha",)}, fecha=datetime.fromisoformat(datos["fecha"]).date(),
+    )
+    if adaptador == Importacion.ESTADO_PDF:
+        cambios = {campo: datos.get(campo, "") for campo in MovimientoBancario.COMPLETABLES if datos.get(campo) and not getattr(existente, campo)}
+        MovimientoBancario.objects.filter(pk=existente.pk, confirmado_por__isnull=True).update(confirmado_por=nuevo, **cambios)
+    registrar("movimiento_otra_via", objeto=nuevo, datos={"mismo_que": existente.pk, "importe": nuevo.importe, "confirma_estado_oficial": adaptador == Importacion.ESTADO_PDF})
+    return nuevo
+
+
 def candidatos_deposito(cuenta, importe, dia):
     tolerancia = timedelta(days=parametro("dias_tolerancia_deposito"))
     return Traslado.objects.filter(
@@ -334,13 +363,18 @@ def destino(movimiento, cuenta):
     return "informativo", None
 
 
-def vista_previa(cuenta, movimientos):
+def vista_previa(cuenta, movimientos, adaptador=None):
     cuentas = Counter()
     existentes = set(MovimientoBancario.objects.filter(huella__in=[m["huella"] for m in movimientos]).values_list("huella", flat=True))
     for movimiento in movimientos:
         if movimiento["huella"] in existentes:
             cuentas["duplicado"] += 1
             continue
+        if adaptador:
+            coincidencias = otra_via(cuenta, adaptador, movimiento)
+            if coincidencias:
+                cuentas["otra_via" if len(coincidencias) == 1 else "posibles_duplicados"] += 1
+                continue
         resultado, _ = destino(movimiento, cuenta)
         cuentas[resultado] += 1
     return {
@@ -351,6 +385,8 @@ def vista_previa(cuenta, movimientos):
         "sin_pista": cuentas[identificacion.SIN_PISTA],
         "depositos": cuentas["deposito"],
         "informativos": cuentas["informativo"],
+        "otra_via": cuentas["otra_via"],
+        "posibles_duplicados": cuentas["posibles_duplicados"],
         "abonos": sum(m["importe"] for m in movimientos if m["sentido"] == MovimientoBancario.ABONO),
         "cargos": sum(m["importe"] for m in movimientos if m["sentido"] == MovimientoBancario.CARGO),
     }
@@ -436,6 +472,19 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
             if MovimientoBancario.objects.filter(huella=datos["huella"]).exists():
                 cuentas["duplicados"] += 1
                 continue
+            coincidencias = otra_via(cuenta, adaptador, datos)
+            if len(coincidencias) == 1:
+                ligar_otra_via(coincidencias[0], datos, cuenta, importacion, adaptador)
+                cuentas["otra_via"] += 1
+                continue
+            if coincidencias:
+                MovimientoBancario.objects.create(
+                    cuenta=cuenta, importacion=importacion, estado=MovimientoBancario.POR_IDENTIFICAR, posible_duplicado=True,
+                    **{k: v for k, v in datos.items() if k not in ("fecha",)}, fecha=datetime.fromisoformat(datos["fecha"]).date(),
+                )
+                cuentas["nuevos"] += 1
+                cuentas["posibles_duplicados"] += 1
+                continue
             resultado, extra = destino(datos, cuenta)
             estado = MovimientoBancario.INFORMATIVO if resultado == "informativo" else MovimientoBancario.POR_IDENTIFICAR
             movimiento = MovimientoBancario.objects.create(
@@ -456,7 +505,7 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
                     )
                 cuentas["sugeridos" if resultado == identificacion.SUGERIDA else "sin_pista"] += 1
         Importacion.objects.filter(pk=importacion.pk).update(
-            nuevos=cuentas["nuevos"], duplicados=cuentas["duplicados"], aplicados=cuentas["aplicados"],
+            nuevos=cuentas["nuevos"], duplicados=cuentas["duplicados"], aplicados=cuentas["aplicados"], otra_via=cuentas["otra_via"],
             sugeridos=cuentas["sugeridos"], sin_pista=cuentas["sin_pista"], depositos_emparejados=cuentas["depositos"],
         )
         importacion.refresh_from_db()

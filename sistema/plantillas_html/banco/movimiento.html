@@ -4,7 +4,7 @@
 <h1>Movimiento del {{ movimiento.fecha|date:"d/m/Y" }} por {{ movimiento.importe|dinero }}</h1>
 <section class="panel">
   <dl class="datos">
-    <dt>Estado</dt><dd>{{ movimiento.get_estado_display }}</dd>
+    <dt>Estado</dt><dd>{{ movimiento.get_estado_display }}{% if movimiento.posible_duplicado %} · <strong>posible duplicado</strong>: se parece a varios movimientos que llegaron por otra vía; revisa antes de aplicarlo{% endif %}{% if movimiento.mismo_que_id %} · es el mismo que el movimiento <a href="{% url 'conciliacion:movimiento' movimiento.mismo_que_id %}">{{ movimiento.mismo_que_id }}</a>{% endif %}{% if movimiento.confirmado_por_id %} · confirmado por el estado oficial{% endif %}</dd>
     <dt>Cuenta</dt><dd>{{ movimiento.cuenta }}</dd>
     <dt>Tipo</dt><dd>{{ movimiento.get_clase_display }} · {{ movimiento.get_sentido_display }}</dd>
     <dt>Descripción</dt><dd>{{ movimiento.descripcion }}</dd>

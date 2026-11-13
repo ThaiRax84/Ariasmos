@@ -111,6 +111,7 @@ class Importacion(models.Model):
     sugeridos = models.PositiveIntegerField(default=0)
     sin_pista = models.PositiveIntegerField(default=0)
     depositos_emparejados = models.PositiveIntegerField(default=0)
+    otra_via = models.PositiveIntegerField(default=0)
     continuidad = models.CharField(max_length=16, choices=CONTINUIDADES, default=CON_HUECO)
     creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     creada = models.DateTimeField(auto_now_add=True)
@@ -154,8 +155,20 @@ class MovimientoBancario(models.Model):
     CONCILIADO = "conciliado"
     NO_COBRO = "no_cobro"
     INFORMATIVO = "informativo"
-    ESTADOS = [(APLICADO, "Aplicado"), (POR_IDENTIFICAR, "Por identificar"), (CONCILIADO, "Depósito de caja conciliado"), (NO_COBRO, "No es un cobro"), (INFORMATIVO, "Informativo")]
-    MUTABLES = {"estado", "pago", "traslado", "sugerencia", "alternativas", "motivo", "coincide_importe", "propuesta", "propuesta_por", "propuesta_en", "nota", "resuelto_por", "resuelto_en"}
+    MISMO = "mismo"
+    ESTADOS = [
+        (APLICADO, "Aplicado"),
+        (POR_IDENTIFICAR, "Por identificar"),
+        (CONCILIADO, "Depósito de caja conciliado"),
+        (NO_COBRO, "No es un cobro"),
+        (INFORMATIVO, "Informativo"),
+        (MISMO, "Mismo movimiento que otro ya importado"),
+    ]
+    COMPLETABLES = {"banco_origen", "cuenta_pagador", "nombre_pagador", "rastreo"}
+    MUTABLES = {
+        "estado", "pago", "traslado", "sugerencia", "alternativas", "motivo", "coincide_importe", "propuesta", "propuesta_por", "propuesta_en", "nota",
+        "resuelto_por", "resuelto_en", "confirmado_por", "posible_duplicado",
+    } | COMPLETABLES
 
     cuenta = models.ForeignKey(CuentaBancaria, on_delete=models.PROTECT, related_name="movimientos")
     importacion = models.ForeignKey(Importacion, on_delete=models.PROTECT, related_name="lista")
@@ -174,6 +187,9 @@ class MovimientoBancario(models.Model):
     referencia = models.CharField(max_length=40, blank=True)
     concepto = models.CharField(max_length=200, blank=True)
     huella = models.CharField(max_length=400, unique=True)
+    mismo_que = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="otras_vias")
+    confirmado_por = models.OneToOneField("self", null=True, blank=True, on_delete=models.PROTECT, related_name="confirma_a")
+    posible_duplicado = models.BooleanField(default=False)
     estado = models.CharField(max_length=16, choices=ESTADOS)
     pago = models.OneToOneField("cobros.Pago", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     traslado = models.OneToOneField("caja.Traslado", null=True, blank=True, on_delete=models.PROTECT, related_name="movimiento")
