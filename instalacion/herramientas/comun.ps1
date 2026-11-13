@@ -1,4 +1,7 @@
 ﻿Set-StrictMode -Version Latest
+if ($PSVersionTable.PSEdition -ne 'Core') {
+    $env:PSModulePath = @((Join-Path ${env:ProgramFiles} 'WindowsPowerShell\Modules'), (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules')) -join ';'
+}
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
