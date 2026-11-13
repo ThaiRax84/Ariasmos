@@ -3,17 +3,20 @@ from django.urls import URLPattern, URLResolver, get_resolver, reverse
 from django.utils import timezone
 
 from banco.models import Banco, CuentaBancaria
+from caja.models import Caja, Traslado
+from caja.servicios import abrir_turno
+from cobros import libro
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
-from titulares.models import Agrupacion, Contacto, Titular
+from titulares.models import Agrupacion, Contacto, Familia, Titular
 from titulares.servicios import crear_titular
 
 from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:usuario", "asistente:codigo"}
 
 SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
@@ -70,11 +73,36 @@ MATRIZ = {
     "banco:lista": ("administrar_configuracion",),
     "banco:nueva": ("administrar_configuracion",),
     "banco:editar": ("administrar_configuracion",),
+    "titulares:familias": ("ver_titulares",),
+    "titulares:familia": ("ver_titulares",),
+    "titulares:familia_contacto_nuevo": ("solicitar_alta_baja", "alta_baja_directa"),
+    "titulares:familia_contacto_editar": ("solicitar_alta_baja", "alta_baja_directa"),
+    "titulares:cambiar_familia": ("solicitar_alta_baja", "alta_baja_directa"),
+    "cobros:buscar": ("registrar_pago_efectivo",),
+    "cobros:cobrar": ("registrar_pago_efectivo",),
+    "cobros:recibo": ("ver_titulares",),
+    "cobros:recibo_pdf": ("ver_titulares",),
+    "cobros:verificar": ("ver_titulares",),
+    "cobros:cargo_manual": ("cargo_manual",),
+    "cobros:beca": ("solicitar_ajustes", "aplicar_ajustes"),
+    "cobros:prorroga": ("solicitar_ajustes", "aplicar_ajustes"),
+    "cobros:cancelar": ("solicitar_ajustes", "aplicar_ajustes"),
+    "cobros:revertir": ("solicitar_ajustes", "aplicar_ajustes"),
+    "caja:inicio": ("turno_caja",),
+    "caja:abrir": ("turno_caja",),
+    "caja:turno": ("turno_caja", "recibir_efectivo"),
+    "caja:cerrar": ("turno_caja",),
+    "caja:traslados": ("turno_caja", "recibir_efectivo"),
+    "caja:entrega": ("turno_caja", "recibir_efectivo"),
+    "caja:deposito": ("turno_caja", "recibir_efectivo"),
+    "caja:confirmar": ("recibir_efectivo",),
+    "caja:rechazar": ("recibir_efectivo",),
+    "caja:custodia": ("recibir_efectivo",),
     "auditoria:lista": ("ver_auditoria",),
     "auditoria:verificar": ("ver_auditoria",),
 }
 
-OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None}
+OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}}
 
 
 def nombres_de_rutas(patrones=None, prefijo=""):
@@ -108,6 +136,14 @@ def escenario(db):
     regla = ReglaRecargo.objects.create(nombre="Regla")
     plan = PlanCobro.objects.create(titular=titular, concepto=ConceptoCobro.objects.filter(tipo="recurrente").first(), vigente_desde=timezone.now().date())
     agrupacion = Agrupacion.objects.create(nombre="G1")
+    familia = Familia.objects.create(nombre="F1")
+    contacto_familia = Contacto.objects.create(familia=familia, nombre="Resp", principal=True)
+    Titular.objects.filter(pk=titular.pk).update(estado="activo", familia=familia)
+    titular.refresh_from_db()
+    cargo = libro.crear_cargo(titular, ConceptoCobro.objects.filter(tipo="unico").first(), 100000, timezone.now().date(), "manual")
+    turno = abrir_turno(usuarios["Operación"], Caja.objects.get_or_create(nombre="Caja 1")[0], 0)
+    pago = libro.registrar_pago(titular, 50000, "efectivo", usuarios["Operación"], turno=turno)
+    entrega = Traslado.objects.create(tipo="entrega", origen=usuarios["Operación"], destino=usuarios["Supervisión"], importe=100, estado="pendiente")
     cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
     argumentos = {
         "titulares:detalle": {"pk": titular.pk},
@@ -136,6 +172,22 @@ def escenario(db):
         "configuracion:catalogo_nuevo": {"catalogo": "agrupaciones"},
         "configuracion:catalogo_editar": {"catalogo": "agrupaciones", "pk": agrupacion.pk},
         "banco:editar": {"pk": cuenta.pk},
+        "titulares:familia": {"pk": familia.pk},
+        "titulares:familia_contacto_nuevo": {"pk": familia.pk},
+        "titulares:familia_contacto_editar": {"pk": familia.pk, "contacto_pk": contacto_familia.pk},
+        "titulares:cambiar_familia": {"pk": titular.pk},
+        "cobros:cobrar": {"pk": titular.pk},
+        "cobros:recibo": {"pk": pago.recibo.pk},
+        "cobros:recibo_pdf": {"pk": pago.recibo.pk},
+        "cobros:cargo_manual": {"pk": titular.pk},
+        "cobros:beca": {"pk": titular.pk},
+        "cobros:prorroga": {"pk": cargo.pk},
+        "cobros:cancelar": {"pk": cargo.pk},
+        "cobros:revertir": {"pk": pago.pk},
+        "caja:turno": {"pk": turno.pk},
+        "caja:cerrar": {"pk": turno.pk},
+        "caja:confirmar": {"pk": entrega.pk},
+        "caja:rechazar": {"pk": entrega.pk},
     }
     return usuarios, argumentos
 

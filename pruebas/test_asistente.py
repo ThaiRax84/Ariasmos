@@ -104,7 +104,11 @@ def test_importar_plantilla_de_punta_a_punta():
     archivo = SimpleUploadedFile("mia.json", json.dumps(datos).encode("utf-8"), content_type="application/json")
     c = Client()
     respuesta = c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "importar", archivo))
-    assert respuesta.url == reverse("asistente:personalizar")
+    assert respuesta.url == reverse("asistente:revisar")
+    assert not ConceptoCobro.objects.filter(nombre="Membresía").exists()
+    resumen = c.get(reverse("asistente:revisar")).content.decode()
+    assert "Gimnasio de ejemplo" in resumen and "Quién hace cada cosa" in resumen
+    assert c.post(reverse("asistente:revisar"), {}).url == reverse("asistente:personalizar")
     assert Negocio.objects.get().plantilla == "importada"
     assert vocabulario()["titular"] == "Miembro"
     membresia = ConceptoCobro.objects.get(nombre="Membresía")
