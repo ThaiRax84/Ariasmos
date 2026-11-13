@@ -17,7 +17,7 @@ from cobros.models import Cargo, Pago
 from configuracion.models import Parametro
 from titulares.models import Titular
 
-from .banco_ayudas import CLABE, cuenta_principal, efectivo, enlace, estado, pdf, retiro, spei
+from .banco_ayudas import CLABE, cuenta_principal, efectivo, enlace, estado, pdf, retiro, saldo_final, spei
 from .conftest import cliente
 from .libro_ayudas import familia_con_dos, preparar_conceptos, titular_activo, turno_de, verificar_sumas
 
@@ -78,8 +78,10 @@ def test_estado_sintetico_en_texto_y_en_pdf_real(base):
 
 def test_reimportar_no_duplica_y_otro_periodo_solo_agrega_lo_nuevo(base):
     personas, ana = base
-    importar_pdf(personas["sup"], [spei(3, 100000, referencia=ana.matricula)])
-    importar_pdf(personas["sup"], [spei(3, 100000, referencia=ana.matricula), spei(9, 2000, concepto="otro pago")])
+    agosto = [spei(3, 100000, referencia=ana.matricula)]
+    importar_pdf(personas["sup"], agosto)
+    importar_pdf(personas["sup"], agosto)
+    importar_pdf(personas["sup"], [spei(9, 2000, concepto="otro pago")], mes=9, saldo_inicial=saldo_final(agosto))
     assert MovimientoBancario.objects.count() == 2
     assert Pago.objects.filter(titular=ana, medio=Pago.BANCO).count() == 1
 
@@ -139,10 +141,10 @@ def test_pagador_conocido_se_sugiere_y_con_dos_parametros_se_aplica_solo(base):
     importar_texto(personas["sup"], [spei(3, 40000, concepto="pago mensual", cuenta=PAGADOR)])
     assert mov().estado == MovimientoBancario.POR_IDENTIFICAR and mov().sugerencia == ana.matricula
     parametro("aplicar_solo_por_pagador", 1)
-    importar_texto(personas["sup"], [spei(4, 100000, concepto="pago mensual", cuenta=PAGADOR, rastreo="X2")])
+    importar_texto(personas["sup"], [spei(4, 100000, concepto="pago mensual", cuenta=PAGADOR, rastreo="X2")], mes=10)
     assert Pago.objects.filter(titular=ana, medio=Pago.BANCO, importe=100000).count() == 1
     parametro("confirmaciones_pagador_confiable", 3)
-    importar_texto(personas["sup"], [spei(5, 25000, concepto="pago mensual", cuenta=PAGADOR, rastreo="X3")])
+    importar_texto(personas["sup"], [spei(5, 25000, concepto="pago mensual", cuenta=PAGADOR, rastreo="X3")], mes=12)
     assert Pago.objects.filter(medio=Pago.BANCO).count() == 1
 
 

@@ -1,3 +1,4 @@
+import calendar
 from io import BytesIO
 
 from reportlab.lib.pagesizes import landscape, letter
@@ -16,8 +17,11 @@ def cuenta_principal():
     )
 
 
-def renglon(dia, folio, descripcion, importe, saldo):
-    return f"{dia:02d}-AGO-2026 {folio} {descripcion}".ljust(96) + dinero(importe).rjust(12) + " " * 14 + dinero(saldo).rjust(12)
+MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
+
+
+def renglon(dia, folio, descripcion, importe, saldo, mes=8, anio=2026):
+    return f"{dia:02d}-{MESES[mes - 1]}-{anio} {folio} {descripcion}".ljust(96) + dinero(importe).rjust(12) + " " * 14 + dinero(saldo).rjust(12)
 
 
 def spei(dia, importe, referencia="", concepto="", cuenta="032180000118359719", nombre="PERSONA FICTICIA", rastreo=None):
@@ -41,8 +45,14 @@ def retiro(dia, importe):
     return (dia, "PAGO TRANSFERENCIA SPEI HORA 12:00:00", importe, -1, [sub("ENVIADO A BANCO FICTICIO"), sub("CONCEPTO renta")])
 
 
-def estado(movimientos, clabe=CLABE, saldo_inicial=100000, alterar=None):
-    lineas = list(ENCABEZADO) + [
+def periodo(mes, anio=2026):
+    ultimo = calendar.monthrange(anio, mes)[1]
+    return f"PERIODO DEL 01-{MESES[mes - 1]}-{anio} AL {ultimo:02d}-{MESES[mes - 1]}-{anio}"
+
+
+def estado(movimientos, clabe=CLABE, saldo_inicial=100000, alterar=None, mes=8, anio=2026):
+    encabezado = [linea.replace("PERIODO DEL 01-AGO-2026 AL 31-AGO-2026", periodo(mes, anio)) for linea in ENCABEZADO]
+    lineas = encabezado + [
         f"           CUENTA EJEMPLO PYME                            00-00000000-0         CUENTA CLABE: {clabe}",
         "",
         "        Detalle de movimientos cuenta de cheques.",
@@ -57,7 +67,7 @@ def estado(movimientos, clabe=CLABE, saldo_inicial=100000, alterar=None):
             depositos += importe
         else:
             retiros += importe
-        lineas.append(renglon(dia, f"{2000000 + n}", descripcion, importe if alterar != n else importe + 100, saldo))
+        lineas.append(renglon(dia, f"{2000000 + n}", descripcion, importe if alterar != n else importe + 100, saldo, mes, anio))
         lineas += detalle
     lineas.append(" " * 30 + "TOTAL".ljust(70) + dinero(depositos).rjust(14) + dinero(retiros).rjust(18))
     lineas.append(" " * 100 + "SALDO FINAL DEL PERIODO:".ljust(40) + "$" + dinero(saldo))
@@ -78,3 +88,7 @@ def pdf(lineas, cifrado=False):
         y -= 8
     hoja.save()
     return memoria.getvalue()
+
+
+def saldo_final(movimientos, saldo_inicial=100000):
+    return saldo_inicial + sum(signo * importe for _, _, importe, signo, _ in movimientos)
