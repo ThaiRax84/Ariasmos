@@ -29,18 +29,19 @@ class Configuracion(models.Model):
 class LlaveDeUso(models.Model):
     llave = models.CharField(max_length=44)
     recuperacion = models.CharField(max_length=44)
-    contador = models.BigIntegerField(unique=True)
+    contador = models.BigIntegerField()
     aviso = models.BinaryField()
     firma = models.BinaryField()
     aceptada_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-contador"]
+        constraints = [models.UniqueConstraint(fields=["recuperacion", "contador"], name="llave_de_uso_contador_por_recuperacion")]
 
 
 class VersionPublicada(models.Model):
     version = models.CharField(max_length=20)
-    contador = models.BigIntegerField(unique=True)
+    contador = models.BigIntegerField()
     aviso = models.BinaryField()
     firma = models.BinaryField()
     llave = models.CharField(max_length=44)
@@ -49,6 +50,7 @@ class VersionPublicada(models.Model):
 
     class Meta:
         ordering = ["-contador"]
+        constraints = [models.UniqueConstraint(fields=["llave", "contador"], name="version_publicada_contador_por_llave")]
 
     def __str__(self):
         return self.version

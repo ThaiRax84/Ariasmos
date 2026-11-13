@@ -714,6 +714,8 @@ Primera entrega: **buscar, avisar y descargar**. La instalación de un clic qued
 - El programa trae las dos llaves **públicas** en `sistema/actualizaciones/llaves.json` (`uso` y `recuperacion`). Si el archivo viene vacío, las actualizaciones no se pueden activar.
 - **Llave de uso:** firma cada versión. **Llave de recuperación:** solo firma un cambio de llave.
 - `cambio-de-llave.json`: `producto`, `contador` (propio, solo sube) y `llave_uso` (la nueva pública). Se acepta solo con firma válida de la llave de recuperación que trae el programa y contador mayor al último aceptado. Queda guardado (`LlaveDeUso`) y desde ese momento la llave anterior deja de valer. Evento `llave_de_uso_cambiada`, visible en el inicio de Dirección.
+- **Los contadores son por llave.** El de versiones cuenta dentro de la llave de uso vigente y el de cambios de llave dentro de la llave de recuperación que trae el programa. Así una llave de uso robada no puede dejar al programa sin actualizaciones publicando un contador enorme, y un programa instalado a mano con llaves nuevas empieza a contar de cero.
+- Al cambiar la llave de uso, las versiones firmadas con la anterior dejan de ofrecerse, sus descargas se retiran y sus archivos se borran (`actualizacion_rechazada`, motivo `llave_de_uso_distinta`).
 - Si se pierden las dos llaves, el programa deja de actualizarse solo; se instala a mano una versión con llaves nuevas.
 
 ### 20.5 Buscar, avisar y descargar
@@ -721,6 +723,7 @@ Primera entrega: **buscar, avisar y descargar**. La instalación de un clic qued
 - El trabajador busca al arrancar y una vez al día a un minuto variable. Dirección tiene «Buscar ahora», con límite de frecuencia.
 - Si hay versión aceptada, **todos los papeles** ven en su inicio «Hay una versión nueva: X.Y.Z» con la lista de cambios (texto escapado).
 - **Descargar** lo puede pedir cualquier persona con sesión (POST). Una descarga a la vez y a lo más tres intentos por hora. La hace el trabajador: baja el instalador a `actualizaciones/` dentro de los datos de la instalación (no se sirve por la web, permisos solo para el servicio), calculando la huella mientras baja; si el tamaño o la huella no coinciden con el aviso firmado, lo borra, registra `actualizacion_rechazada` y avisa a Dirección.
+- La descarga corre aparte de las demás tareas del trabajador, para que una conexión lenta no detenga la carpeta del banco, los cortes ni los respaldos. La firma del aviso se vuelve a comprobar con la llave vigente antes de dejar el archivo listo.
 - Descarga correcta: evento `actualizacion_descargada` con quién la pidió; Dirección lo ve en su inicio. El aviso cambia a «Lista para instalar» con las instrucciones.
 - **Instalar (esta entrega): a mano**, en la computadora del servidor, con el acceso directo «Instalar actualización» (`herramientas/instalar-actualizacion`), que **vuelve a comprobar** firma y huella justo antes de ejecutar el instalador y se niega si no coinciden. El aviso advierte si hay turnos de caja abiertos y recuerda hacer respaldo antes.
 - La pantalla de inicio de sesión y el splash siguen mostrando la versión instalada.

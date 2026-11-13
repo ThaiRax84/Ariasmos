@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from comun import EXTENSION_PRIVADA, ErrorFirma, escribir_nuevo, pedir_contrasena_nueva, principal, privada_cifrada, publica_texto
+from comun import EXTENSION_PRIVADA, RAIZ, ErrorFirma, escribir_nuevo, pedir_contrasena_nueva, principal, privada_cifrada, publica_texto
 
 
 def generar(argv=None, pedir=getpass.getpass):
@@ -18,6 +18,8 @@ def generar(argv=None, pedir=getpass.getpass):
     carpeta = Path(opciones.carpeta).resolve()
     if not carpeta.is_dir():
         raise ErrorFirma("La carpeta no existe.")
+    if carpeta == RAIZ or RAIZ in carpeta.parents:
+        raise ErrorFirma("Elige una carpeta fuera del repositorio del programa.")
     destinos = {nombre: carpeta / f"{nombre}{EXTENSION_PRIVADA}" for nombre in ("uso", "recuperacion")}
     if any(ruta.exists() for ruta in destinos.values()) or (carpeta / "llaves.json").exists():
         raise ErrorFirma("La carpeta ya tiene llaves; no se sobrescribe nada.")

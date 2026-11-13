@@ -104,7 +104,7 @@ def _bitacora(hoy):
 
 
 def _actualizaciones(hoy):
-    return actualizaciones.ciclo()
+    return actualizaciones.ciclo(en_hilo=True)
 
 
 TAREAS = (

@@ -6,12 +6,14 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
-from django.db import transaction
+from django.db import connections, transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from auditoria.servicios import registrar
@@ -40,6 +42,7 @@ TEXTOS = {
 }
 
 _buscado_al_arrancar = False
+_hilo_descarga = None
 
 
 class ErrorActualizacion(ValueError):
@@ -158,6 +161,46 @@ def toca_buscar(config, ahora=None):
     return config.proxima_busqueda is None or config.proxima_busqueda <= ahora
 
 
+def ultimo_contador_llave(recuperacion):
+    return LlaveDeUso.objects.filter(recuperacion=recuperacion).aggregate(ultimo=Max("contador"))["ultimo"] or 0
+
+
+def ultimo_contador_version(llave):
+    return VersionPublicada.objects.filter(llave=llave).aggregate(ultimo=Max("contador"))["ultimo"] or 0
+
+
+def _alinear_contadores(config):
+    llave, recuperacion = llaves.de_uso(), llaves.recuperacion()
+    de_version, de_llave = ultimo_contador_version(llave), ultimo_contador_llave(recuperacion)
+    if (config.contador_version, config.contador_llave) != (de_version, de_llave):
+        Configuracion.objects.filter(pk=1).update(contador_version=de_version, contador_llave=de_llave)
+        config.contador_version, config.contador_llave = de_version, de_llave
+
+
+def retirar_de_otra_llave():
+    llave = llaves.de_uso()
+    ajenas = Descarga.objects.exclude(version__llave=llave).filter(estado__in=(Descarga.PENDIENTE, Descarga.EN_CURSO, Descarga.LISTA)).select_related("version")
+    versiones = sorted({descarga.version.version for descarga in ajenas})
+    if not versiones:
+        return []
+    with transaction.atomic():
+        Descarga.objects.filter(pk__in=[descarga.pk for descarga in ajenas]).update(estado=Descarga.FALLIDA, en_proceso=None, terminada_en=timezone.now(), motivo="La llave de uso de las actualizaciones cambió; la descarga se retiró.")
+        registrar("actualizacion_rechazada", datos={"motivo": "llave_de_uso_distinta", "versiones": versiones[:20]})
+    try:
+        destino = carpeta()
+    except ErrorActualizacion:
+        return versiones
+    vigentes = set(VersionPublicada.objects.filter(llave=llave, descargas__estado=Descarga.LISTA).values_list("version", flat=True))
+    for version in versiones:
+        if aviso.version_valida(version) and version not in vigentes:
+            for nombre in (nombre_instalador(version), nombre_parcial(version)):
+                try:
+                    _quitar(destino / nombre)
+                except OSError:
+                    pass
+    return versiones
+
+
 def _leer_firmado(canal, recursos, nombre, firma):
     datos, firmado = recursos.get(nombre), recursos.get(firma)
     if datos is None or firmado is None:
@@ -178,10 +221,11 @@ def _cambio_de_llave(canal, recursos, config):
     except aviso.AvisoInvalido as error:
         rechazar(f"cambio_de_llave_{error.motivo}")
         return None
-    if cambio["contador"] <= config.contador_llave:
+    ultimo = ultimo_contador_llave(recuperacion)
+    if cambio["contador"] <= ultimo:
         guardada = LlaveDeUso.objects.filter(contador=cambio["contador"], recuperacion=recuperacion).first()
         if guardada is None or bytes(guardada.aviso) != bytes(datos):
-            rechazar("cambio_de_llave_contador", {"contador": cambio["contador"], "ultimo": config.contador_llave})
+            rechazar("cambio_de_llave_contador", {"contador": cambio["contador"], "ultimo": ultimo})
         return None
     with transaction.atomic():
         LlaveDeUso.objects.create(llave=cambio["llave_uso"], recuperacion=recuperacion, contador=cambio["contador"], aviso=bytes(datos), firma=bytes(firma))
@@ -208,11 +252,12 @@ def _version(canal, recursos, config):
     if actual is None:
         rechazar("version_instalada_desconocida")
         return "No se conoce la versión instalada."
-    if leida["contador"] <= config.contador_version:
-        guardada = VersionPublicada.objects.filter(contador=leida["contador"]).first()
+    ultimo = ultimo_contador_version(llave)
+    if leida["contador"] <= ultimo:
+        guardada = VersionPublicada.objects.filter(contador=leida["contador"], llave=llave).first()
         if guardada is not None and bytes(guardada.aviso) == bytes(datos):
             return f"Sin cambios: la última versión publicada es {leida['version']}."
-        rechazar("contador", {"contador": leida["contador"], "ultimo": config.contador_version, "version": leida["version"]})
+        rechazar("contador", {"contador": leida["contador"], "ultimo": ultimo, "version": leida["version"]})
         return "Se rechazó el aviso de versión."
     if not aviso.mayor(leida["version"], actual):
         if leida["version"] == actual:
@@ -257,6 +302,8 @@ def buscar(ahora=None):
         canal = _canal(config)
         recursos = canal.publicacion()
         _cambio_de_llave(canal, recursos, config)
+        retirar_de_otra_llave()
+        _alinear_contadores(config)
         texto = _version(canal, recursos, config)
     except canales.ErrorCanal as error:
         texto = _texto_error(error)
@@ -287,7 +334,10 @@ def vigente():
     actual = instalada()
     if actual is None:
         return None
-    version = VersionPublicada.objects.order_by("-contador").first()
+    llave = llaves.de_uso()
+    if llave is None:
+        return None
+    version = VersionPublicada.objects.filter(llave=llave).order_by("-contador").first()
     if version is not None and aviso.version_valida(version.version) and aviso.mayor(version.version, actual):
         return version
     return None
@@ -434,6 +484,13 @@ def _descargar(descarga):
         rechazar(motivo, {"version": version.version, "sha256_recibido": calculada})
         _terminar(descarga, Descarga.FALLIDA, "El instalador no coincide con la huella del aviso firmado; se borró." if motivo == "huella" else "El instalador no coincide con el tamaño del aviso firmado; se borró.")
         return "Descarga rechazada por huella."
+    try:
+        aviso.leer_version(bytes(version.aviso), bytes(version.firma), llaves.de_uso())
+    except aviso.AvisoInvalido as error:
+        _quitar(parcial)
+        rechazar(f"descarga_{error.motivo}", {"version": version.version})
+        _terminar(descarga, Descarga.FALLIDA, "El aviso guardado ya no es válido.")
+        return "Descarga rechazada: el aviso guardado ya no es válido."
     os.replace(parcial, final)
     _terminar(descarga, Descarga.LISTA, archivo=final.name, sha256=calculada)
     registrar(
@@ -444,7 +501,30 @@ def _descargar(descarga):
     return f"Versión {version.version} descargada y lista para instalar."
 
 
-def ciclo(ahora=None):
+def _descargar_en_hilo():
+    try:
+        descargar_pendiente()
+    except Exception as error:
+        try:
+            registrar("tarea_fallida", datos={"tarea": "descarga_actualizacion", "error": type(error).__name__})
+        except Exception:
+            pass
+    finally:
+        connections.close_all()
+
+
+def lanzar_descarga():
+    global _hilo_descarga
+    if _hilo_descarga is not None and _hilo_descarga.is_alive():
+        return "Descarga en curso."
+    if not Descarga.objects.filter(estado=Descarga.PENDIENTE).exists():
+        return None
+    _hilo_descarga = threading.Thread(target=_descargar_en_hilo, name="descarga-actualizacion", daemon=True)
+    _hilo_descarga.start()
+    return "Descarga iniciada."
+
+
+def ciclo(ahora=None, en_hilo=False):
     ahora = ahora or timezone.now()
     partes = []
     config = configuracion()
@@ -456,7 +536,7 @@ def ciclo(ahora=None):
     )
     if toca_buscar(config, ahora):
         partes.append(buscar(ahora))
-    resultado = descargar_pendiente()
+    resultado = lanzar_descarga() if en_hilo else descargar_pendiente()
     if resultado:
         partes.append(resultado)
     return " ".join(partes) or "nada que hacer"
@@ -531,13 +611,13 @@ def preparar_instalacion():
     actual = instalada()
     if actual is None:
         raise ErrorActualizacion("No se conoce la versión instalada.")
-    descarga = Descarga.objects.filter(estado=Descarga.LISTA).select_related("version").order_by("-version__contador", "-id").first()
-    if descarga is None:
-        raise ErrorActualizacion("No hay una actualización descargada.")
-    version = descarga.version
     llave = llaves.de_uso()
     if llave is None:
         raise ErrorActualizacion("Esta copia del programa no trae llaves de actualización.")
+    descarga = Descarga.objects.filter(estado=Descarga.LISTA, version__llave=llave).select_related("version").order_by("-version__contador", "-id").first()
+    if descarga is None:
+        raise ErrorActualizacion("No hay una actualización descargada.")
+    version = descarga.version
     try:
         leida = aviso.leer_version(bytes(version.aviso), bytes(version.firma), llave)
     except aviso.AvisoInvalido as error:
