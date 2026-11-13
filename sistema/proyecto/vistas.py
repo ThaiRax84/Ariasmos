@@ -36,6 +36,12 @@ def inicio(request):
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
     contexto["avisos_inventario"] = inventario.avisos(usuario)
+    if usuario.tiene_permiso("turno_caja"):
+        from caja.servicios import turno_abierto
+
+        turno = turno_abierto(usuario)
+        if turno is not None:
+            contexto["cobros_turno"] = turno.pagos.count()
     if usuario.tiene_permiso("aprobar_dispositivos"):
         datos_certificado = conectar.datos()
         if datos_certificado and datos_certificado["por_vencer"]:
@@ -63,12 +69,14 @@ def inicio(request):
         contexto["entregas_con_problema"] = cortes.entregas_con_problema().count()
     if usuario.tiene_permiso("administrar_respaldos"):
         contexto["alertas_respaldo"] = respaldos.alertas()
+        contexto["salud_respaldos"] = True
         contexto["clave_pendiente"] = Negocio.objects.filter(pk=1, clave_recuperacion_pendiente=True).exists()
     if usuario.tiene_permiso("cerrar_cortes"):
         contexto["mayores_borrador"] = Corte.objects.filter(tipo=MAYOR, estado=Corte.BORRADOR).order_by("fecha")
     if usuario.tiene_permiso("ver_auditoria"):
         contexto["importaciones_por_revisar"] = list(conciliacion.pendientes_de_revision()[:50])
         verificacion = ultima_verificacion()
+        contexto["bitacora_verificacion"] = verificacion
         if verificacion is not None and not verificacion.valida:
             contexto["bitacora_fallida"] = verificacion
             contexto["bitacora_motivo"] = MOTIVOS.get(verificacion.motivo, verificacion.motivo)

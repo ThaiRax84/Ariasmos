@@ -1,7 +1,24 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Hola, {{ user.nombre }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    {% now "l j \d\e F \d\e Y" as hoy %}<span class="antetitulo">{{ hoy|lower|capfirst }}</span>
+    <h1>Hola, {{ user.nombre }}</h1>
+  </div>
+  <div class="encabezado-lado">
+    {% if turno_sesion %}<div class="recuadro-cifra"><span class="etiqueta">Turno abierto en {{ turno_sesion.caja }}</span><span class="valor">{{ cobros_turno }} cobro{{ cobros_turno|pluralize }} · desde {{ turno_sesion.abierto_en|time:"H:i" }}</span></div>{% endif %}
+    {% if "ver_auditoria" in permisos %}<a class="boton secundario" href="{% url 'auditoria:lista' %}">Ver bitácora</a>{% endif %}
+    {% if "aprobar_dispositivos" in permisos %}<a class="boton secundario" href="{% url 'conectar' %}">Conectar otra computadora</a>{% endif %}
+  </div>
+</div>
+{% if "ver_titulares" in permisos %}
+<form method="get" action="{% url 'titulares:lista' %}" class="buscador" role="search">
+  <label class="solo-lectores" for="buscar-inicio">Buscar {{ voc.titular|lower }}</label>
+  <input id="buscar-inicio" type="search" name="q" placeholder="Buscar {{ voc.titular|lower }} por nombre o {{ voc.matricula|lower }}" maxlength="60">
+  <button class="boton chico" type="submit">Buscar</button>
+</form>
+{% endif %}
 {% if bitacora_fallida %}
 <section class="panel alerta">
   <h2>La bitácora no está íntegra</h2>
@@ -121,19 +138,31 @@
   <a class="boton" href="{% url 'conectar' %}">Conectar otra computadora</a>
 </section>
 {% endif %}
-<div class="atajos">
-  {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}
-  {% if "registrar_pago_efectivo" in permisos %}<a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
-  {% if "ver_titulares" in permisos %}<a class="boton grande secundario" href="{% url 'titulares:lista' %}">Buscar {{ voc.titular|lower }}</a><a class="boton grande secundario" href="{% url 'cobros:verificar' %}">Verificar recibo</a>{% endif %}
-  {% if dispositivos_pendientes %}<a class="boton grande secundario" href="{% url 'dispositivos' %}">Equipos por aprobar ({{ dispositivos_pendientes }})</a>{% endif %}
-</div>
+<nav class="accesos" aria-label="Accesos rápidos">
+  {% if "registrar_pago_efectivo" in permisos %}<a class="acceso principal" href="{% url 'cobros:buscar' %}"><span class="acceso-titulo">Cobrar</span><span class="acceso-detalle">Registrar un pago en efectivo</span></a>{% endif %}
+  {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="acceso" href="{% url 'titulares:nuevo' %}"><span class="acceso-titulo">Nueva alta</span><span class="acceso-detalle">Dar de alta a {{ voc.titular|lower }}</span></a>{% endif %}
+  {% if "ver_titulares" in permisos %}<a class="acceso" href="{% url 'titulares:lista' %}"><span class="acceso-titulo">Buscar {{ voc.titular|lower }}</span><span class="acceso-detalle">Ver datos, adeudo e historial</span></a><a class="acceso" href="{% url 'cobros:verificar' %}"><span class="acceso-titulo">Verificar recibo</span><span class="acceso-detalle">Comprobar un recibo con su código</span></a>{% endif %}
+  {% if dispositivos_pendientes %}<a class="acceso" href="{% url 'dispositivos' %}"><span class="acceso-titulo">Equipos por aprobar ({{ dispositivos_pendientes }})</span><span class="acceso-detalle">Navegadores que piden acceso</span></a>{% endif %}
+</nav>
+{% if bitacora_verificacion or salud_respaldos or certificado_por_vencer or dispositivos_pendientes %}
+<section class="panel">
+  <h2>Salud del sistema</h2>
+  <ul class="lista-estado">
+    {% if bitacora_verificacion %}<li><span class="renglon-texto"><span class="renglon-titulo">Bitácora</span><span class="renglon-detalle">Verificada {{ bitacora_verificacion.momento|date:"d/m/Y H:i" }}{% if bitacora_verificacion.valida %} · íntegra{% endif %}</span></span>{% if bitacora_verificacion.valida %}<span class="estado bien">Bien</span>{% else %}<span class="estado aviso">Revisar</span>{% endif %}</li>{% endif %}
+    {% if salud_respaldos %}<li><span class="renglon-texto"><span class="renglon-titulo">Respaldo</span><span class="renglon-detalle">{% if alertas_respaldo %}{{ alertas_respaldo|first }}{% else %}Al día{% endif %}</span></span>{% if alertas_respaldo %}<span class="estado aviso">Revisar</span>{% else %}<span class="estado bien">Bien</span>{% endif %}</li>{% endif %}
+    {% if certificado_por_vencer %}<li><span class="renglon-texto"><span class="renglon-titulo">Certificado del servidor</span><span class="renglon-detalle">Vence el {{ certificado_por_vencer.vence|date:"d/m/Y" }}</span></span><span class="estado aviso">Revisar</span></li>{% endif %}
+    {% if dispositivos_pendientes %}<li><span class="renglon-texto"><span class="renglon-titulo">Equipos por aprobar</span><span class="renglon-detalle">{{ dispositivos_pendientes }} equipo{{ dispositivos_pendientes|pluralize }} pidiendo acceso</span></span><span class="estado aviso">Revisar</span></li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+<div class="columnas mitades">
 {% if "aprobar_solicitudes" in permisos %}
 <section class="panel">
   <h2>Bandeja de pendientes</h2>
   {% if pendientes %}
-  <ul class="lista">
+  <ul class="lista-estado">
     {% for s, resaltada in pendientes %}
-    <li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}{% if resaltada %} · lleva tiempo esperando{% endif %}</small></li>
+    <li><span class="renglon-texto"><a class="renglon-titulo" href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a><span class="renglon-detalle">de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</span></span>{% if resaltada %}<span class="estado aviso">Lleva tiempo esperando</span>{% else %}<span class="estado calma">En espera</span>{% endif %}</li>
     {% endfor %}
   </ul>
   {% else %}<p>No hay solicitudes pendientes.</p>{% endif %}
@@ -142,7 +171,7 @@
 {% if propias %}
 <section class="panel">
   <h2>Mis solicitudes en espera</h2>
-  <ul class="lista">{% for s in propias %}<li><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}</a></li>{% endfor %}</ul>
+  <ul class="lista-estado">{% for s in propias %}<li><span class="renglon-texto"><a class="renglon-titulo" href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}</a><span class="renglon-detalle">{{ s.creada|date:"d/m/Y H:i" }}</span></span><span class="estado calma">En espera</span></li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if delegaciones %}
@@ -151,4 +180,5 @@
   <ul class="lista">{% for d in delegaciones %}<li>{{ d.permiso|nombre_permiso }} · de {{ d.otorgante }}{% if d.vence %} · vence {{ d.vence|date:"d/m/Y H:i" }}{% endif %}{% if d.usos_maximos %} · {{ d.usos }}/{{ d.usos_maximos }} usos{% endif %}</li>{% endfor %}</ul>
 </section>
 {% endif %}
+</div>
 {% endblock %}

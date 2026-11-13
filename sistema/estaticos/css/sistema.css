@@ -81,6 +81,7 @@ code { font-size: .95em; }
 
 .contenido { max-width: 1184px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 24px; view-transition-name: contenido; }
 .contenido > h1 { margin-top: 4px; }
+.contenido > .boton, .contenido > .formulario, .contenido > .en-linea { align-self: flex-start; }
 .contenido > form, .contenido > p, .contenido > ul, .contenido > table { margin: 0; }
 .pie-pagina { text-align: center; color: var(--suave); font-size: 13px; padding: 8px 0 32px; }
 .pie-pagina .nombre-ariasmos { font-size: 13px; letter-spacing: 1.5px; }
@@ -262,7 +263,8 @@ tr.revertido td:first-child, tr.revertido td:last-child { text-decoration: none;
 
 .busqueda { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; align-items: center; }
 .busqueda input, .busqueda select { width: auto; flex: 1 1 220px; }
-.buscador { display: flex; align-items: center; border: 2px solid var(--borde); border-radius: 14px; background: #fff; padding: 0 8px 0 18px; gap: 8px; flex: 1 1 320px; transition: border-color var(--t-ui) ease, box-shadow var(--t-ui) ease; }
+.buscador { display: flex; align-items: center; border: 2px solid var(--borde); border-radius: 14px; background: #fff; padding: 0 8px 0 18px; gap: 8px; flex: 0 0 auto; transition: border-color var(--t-ui) ease, box-shadow var(--t-ui) ease; }
+.fila .buscador, .busqueda .buscador { flex: 1 1 320px; }
 .buscador:focus-within { border-color: var(--tinta); box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 22%, transparent); }
 .buscador::before { content: "\2315"; font-size: 22px; color: var(--suave); line-height: 1; }
 .buscador input, .buscador input:focus { flex: 1; border: 0; box-shadow: none; padding: 16px 4px; font-size: 18px; background: transparent; min-width: 0; }
@@ -386,6 +388,7 @@ code.uri { word-break: break-all; font-size: 13px; }
 .splash-nombre { font-size: 112px; font-weight: 700; letter-spacing: 12px; color: #D9813F; line-height: 1; filter: url(#temblor); }
 .splash-raya { width: 760px; height: 4px; background: #C4662E; filter: url(#temblor); }
 .splash-texto { font-family: var(--letra); font-size: 17px; color: #D9C7A6; margin-top: 6px; }
+.splash-version { font-family: var(--letra); font-size: 20px; color: #A8977D; letter-spacing: .5px; }
 .splash-greca { display: block; }
 
 @keyframes entra-suave { from { opacity: 0; } to { opacity: 1; } }
