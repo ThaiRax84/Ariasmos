@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.3 · 12/11/2026 · Estado: base aprobada para construir la Fase 1.
+Versión 0.6 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -46,7 +46,7 @@ Dinero siempre en **centavos enteros**. Zona horaria configurable (por defecto `
 
 ### 4.1 Requisitos
 
-- Numérica y de **7 dígitos** por defecto, porque la referencia numérica de un SPEI admite hasta 7. Longitud configurable de 5 a 12 al instalar.
+- Numérica y de **7 dígitos**, porque la referencia numérica de un SPEI admite hasta 7. El asistente no pregunta la longitud; es un ajuste avanzado (5 a 12) que solo puede cambiarse antes de emitir la primera matrícula.
 - Única, nunca reutilizada, sin cero inicial (los bancos lo recortan).
 - Con dígito verificador que detecte los errores de captura comunes.
 - No secuencial: no revela cuántos titulares hay ni permite adivinar la siguiente.
@@ -106,11 +106,11 @@ Módulos (apps de Django) y entidades principales:
 | `nucleo` | — | Matrícula, dinero, cadena de auditoría. Python puro, sin Django. |
 | `configuracion` | Negocio, Parametro, Vocabulario | Un solo negocio por instalación; `sede` y `ranuras`. |
 | `cuentas` | Usuario, Rol, PermisoRol, Dispositivo, Delegacion, CodigoUsado, CodigoActivacion | §6. |
-| `titulares` | Titular, Contacto, CampoContacto, Agrupacion, MotivoBaja | Estados: `pendiente`, `activo`, `baja`, `rechazado`. Contacto en §5.2. |
+| `titulares` | Titular, Familia, Contacto, CampoContacto, Agrupacion, MotivoBaja | Estados: `pendiente`, `activo`, `baja`, `rechazado`. Contacto en §5.2, familias en §5.3. |
 | `solicitudes` | Solicitud, PoliticaAccion | Motor genérico de aprobación. |
-| `cobros` | ConceptoCobro, ReglaRecargo, PlanCobro, Cargo, Pago, Aplicacion, Recibo | Libro inmutable. |
+| `cobros` | ConceptoCobro, ReglaRecargo, PlanCobro, Beca, Prorroga, Cargo, Pago, Aplicacion, Recibo | Libro inmutable. |
 | `caja` | Caja, Turno, Arqueo, Traslado | Custodia del efectivo. |
-| `banco` | CuentaBancaria, Importacion, MovimientoBancario, ReglaPagador | Adaptadores de entrada. |
+| `banco` | CuentaBancaria, Banco, Importacion, MovimientoBancario, ReglaPagador | Datos de pago en §5.4; adaptadores de entrada en §8. |
 | `reportes` | DefinicionCorte, Corte, Destino | Frecuencias y destinos configurables. |
 | `auditoria` | Evento | Solo inserción, encadenado por hash. |
 | `respaldo` | Respaldo | Bitácora de copias y pruebas de restauración. |
@@ -119,7 +119,7 @@ Módulos (apps de Django) y entidades principales:
 
 - **ConceptoCobro** (categoría): nombre, tipo (`unico`, `recurrente`, `por_evento`), importe por defecto, periodicidad, día de vencimiento, regla de recargo, a quién aplica (`nuevos`, `todos`, `agrupacion`, `manual`), prioridad de aplicación, activo.
 - **ReglaRecargo**: fijo o porcentaje, días de gracia, se repite o no, tope.
-- **PlanCobro**: liga un concepto recurrente a un titular, con importe o descuento propio y vigencia.
+- **PlanCobro**: liga un concepto recurrente a un titular, con importe propio y vigencia.
 - **Cargo**: titular, concepto, periodo, importe, vencimiento, origen (`automatico`, `manual`, `recargo`), estado derivado (`pendiente`, `parcial`, `pagado`, `cancelado`).
 - **Pago**: titular, importe, medio (`efectivo`, `banco`, otros configurables), fecha, origen (turno de caja o movimiento bancario), estado (`aplicado`, `revertido`).
 - **Aplicacion**: reparte un pago entre cargos. Lo que sobra queda como saldo a favor.
@@ -128,6 +128,14 @@ Módulos (apps de Django) y entidades principales:
 Orden de aplicación por defecto (configurable): recargos, luego cargos por vencimiento más antiguo, luego por prioridad del concepto.
 
 Nada se edita ni se borra: una cancelación crea el asiento inverso y deja ambos visibles.
+
+**Becas.** Una beca es un descuento (porcentaje o importe fijo) sobre un concepto recurrente de un titular, con vigencia y motivo. Se aplica sola al generar cada cargo y queda visible en él. Sustituye al descuento suelto del plan.
+
+**Prórrogas.** Una prórroga mueve la fecha a partir de la cual un cargo genera recargo. No cambia el importe ni borra recargos ya generados.
+
+Becas y prórrogas son acciones del motor de aprobaciones (`beca`, `prorroga`): Operación las solicita y las autoriza un nivel superior por cualquiera de las tres vías. Cada política decide qué permiso aprueba, así que un negocio puede reservar las becas a Dirección.
+
+**Saldo inicial.** Al migrar desde otro control, lo que cada titular debía o tenía a favor entra como un cargo o un pago de tipo `saldo_inicial`, fechado al día de la migración.
 
 ### 5.2 Contacto
 
@@ -140,7 +148,38 @@ Cada titular tiene al menos un **Contacto**: nombre, relación con el titular (c
 
 La plantilla «escuela» pide un contacto responsable con **teléfono obligatorio**.
 
-### 5.3 Plantilla «escuela»
+### 5.3 Familias
+
+Una **familia** (nombre configurable; en la plantilla genérica, «cuenta») liga a varios titulares que paga la misma persona.
+
+- Cada titular se da de alta por separado y conserva **su propia matrícula**. La familia no tiene matrícula: es solo el vínculo entre titulares ya existentes.
+- Tiene un contacto responsable, compartido por sus miembros, y un **estado de cuenta único** que suma los cargos de todos.
+- Reparto de un pago hecho con la matrícula de cualquier miembro: primero a los cargos de ese titular, en el orden de §5.1; lo que sobre pasa solo a los cargos pendientes de los demás miembros, en el mismo orden (recargos, luego vencimiento más antiguo, luego prioridad); y solo si no queda nada pendiente en la familia se guarda como saldo a favor de la familia, que se usa en el siguiente cargo de cualquiera de ellos.
+- Un titular pertenece a lo sumo a una familia. Ligar, cambiar o desligar es una acción del motor de aprobaciones (`cambio_familia`), porque cambia a dónde va el dinero que sobra: Supervisión lo hace directo y Operación lo solicita.
+- Desligar no mueve pagos ya aplicados; el saldo a favor de la familia se reparte según indique quien aprueba.
+- Un titular sin familia funciona exactamente igual que antes.
+
+### 5.4 Datos de pago
+
+Lo que la ficha de pago le dice a quien paga sale de **campos**, no de un texto libre. Cada **CuentaBancaria** del negocio tiene:
+
+| Campo | Regla |
+|---|---|
+| Banco | Se elige del catálogo de bancos; se propone solo a partir de los tres primeros dígitos de la CLABE |
+| CLABE | 18 dígitos; se valida su dígito verificador y que su prefijo corresponda al banco elegido |
+| Beneficiario | Nombre del titular de la cuenta tal como lo pide el banco |
+| Número de cuenta | Opcional |
+| Convenio | Opcional, para cobranza referenciada |
+| Medios aceptados | Casillas: transferencia, depósito en ventanilla, efectivo en caja y los que el negocio agregue |
+| Dónde va la referencia | Casillas: referencia numérica, concepto o ambos (por defecto ambos) |
+| Contacto para dudas | Teléfono o correo |
+| Principal | Una sola cuenta aparece en la ficha por defecto |
+
+La ficha arma sola las instrucciones con esos campos y con la matrícula del titular. Un campo opcional de «nota adicional» queda para lo que no quepa en los anteriores.
+
+**Catálogo de bancos.** Viene dentro del programa (`datos/bancos.json`), no se consulta por internet: clave de tres dígitos, nombre y **nivel de soporte** para traer movimientos (`archivo verificado`, `archivo genérico`, `convenio`, `sin probar`). Cualquier banco que reciba SPEI sirve para identificar pagos por matrícula, porque la identificación la hace este sistema; lo que cambia de un banco a otro es el formato del archivo de movimientos. El catálogo se actualiza con cada versión.
+
+### 5.5 Plantilla «escuela»
 
 Viene en `plantillas/escuela.json` y el asistente la carga si se elige:
 
@@ -177,6 +216,8 @@ Los permisos son átomos fijos en el código; qué rol tiene cuáles se guarda e
 | Ver cortes / cerrar cortes | ver | ✓ | ✓ |
 | Aprobar dispositivos | — | ✓ | ✓ |
 | Cambiar nombre de un titular aprobado | solicita | ✓ | ✓ |
+| Beca, prórroga, cambio de familia | solicita | ✓ | ✓ |
+| Importación inicial del padrón | — | — | ✓ |
 | Usuarios, roles, políticas, configuración | — | — | ✓ |
 | Auditoría y respaldos | — | — | ✓ |
 
@@ -277,6 +318,12 @@ Un **corte** es una definición configurable: nombre, frecuencia, alcance, si ci
 
 Flujo: el sistema genera el corte solo en la fecha indicada y lo deja como borrador. Supervisión lo revisa y lo cierra con un clic. Si nadie lo cierra en el plazo configurado, se entrega marcado «sin revisar» para no detener a nadie. Al cerrar un corte que cierra periodo, ese periodo queda bloqueado: los ajustes posteriores entran en el periodo siguiente.
 
+Además existe el corte de tipo **lista de cobranza**: los adeudos vencidos a la fecha, uno por renglón, con lo necesario para que una persona o un agente externo avise a quien debe (titular o familia, concepto, importe, vencimiento, días de atraso y, según el nivel de detalle del destino, matrícula y contacto). El sistema no envía mensajes: entrega la lista.
+
+Todo corte incluye, en su archivo JSON, las cifras que un análisis externo necesita sin tener que recalcularlas: esperado y cobrado del periodo por concepto, cartera vencida por antigüedad, altas y bajas. El sistema no trae tablero de indicadores propio.
+
+**Estado de cuenta.** Por titular o por familia, en PDF: cargos, pagos, becas, prórrogas y saldo a una fecha, con los datos de pago de §5.4. Lo genera quien puede ver titulares; cada emisión queda en la bitácora.
+
 **Destinos** (enchufables): `carpeta` (PDF + CSV + JSON con un `manifiesto.json`; la ruta se elige en el asistente y se puede cambiar después), y `correo` más adelante. Cada destino define su nivel de detalle: `completo` (nombre, matrícula y contacto), `solo_nombres` (nombre, sin matrícula ni contacto) o `sin_nombres` (solo matrícula). Un agente externo puede leer la carpeta; el sistema no depende de ningún agente.
 
 Cada archivo de corte lleva un hash firmado con la clave de la instalación para detectar alteraciones.
@@ -313,10 +360,18 @@ Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol
 
 ## 11. Configuración e instalación
 
-- **Asistente de primer uso:** nombre del negocio, vocabulario (cómo se llama al titular, a la matrícula, a las agrupaciones), plantilla, conceptos e importes, roles, políticas de aprobación, cajas, cuenta bancaria, cortes y destinos, respaldo. Crea al primer usuario de Dirección y aprueba el primer dispositivo.
+- **Asistente de primer uso:** nombre del negocio, vocabulario (cómo se llama al titular, a la matrícula, a las agrupaciones), plantilla, conceptos e importes, roles, políticas de aprobación, cajas, datos de pago, cortes y destinos, respaldo. Crea al primer usuario de Dirección y aprueba el primer dispositivo.
+- **Plantillas.** Una plantilla es la configuración completa sin datos: vocabulario, conceptos, recargos, roles y permisos, políticas, campos de contacto, cortes. El asistente ofrece:
+  - `generico`: pensada para servir tal cual a la mayoría de los negocios que cobran a clientes recurrentes;
+  - `escuela`;
+  - **importar** un archivo de plantilla;
+  - partir de cualquiera y **personalizar** cada parte antes de terminar.
+
+  Desde configuración, Dirección puede **guardar la configuración actual como plantilla** (un archivo) para usarla en otra sede o compartirla. Una plantilla importada se trata como dato no confiable: se valida contra un esquema y nunca contiene código, usuarios, claves ni datos de titulares.
 - **Todo editable después** por quien tenga el permiso: Supervisión administra conceptos de cobro; Dirección lo demás.
+- **Importación inicial.** Para empezar con un padrón existente, Dirección sube un Excel o CSV. El sistema no exige un formato: propone qué columna es cada dato (nombre, apellidos, agrupación, responsable, teléfono, saldo por concepto), deja corregir la correspondencia, muestra una vista previa con los errores renglón por renglón y no escribe nada hasta confirmar. Al confirmar crea titulares activos con su matrícula, sus contactos, sus vínculos de familia (renglones con el mismo responsable y teléfono se proponen como familia; cada titular recibe su propia matrícula) y su saldo inicial. Detecta duplicados si se repite. Entrega la lista de matrículas asignadas y las fichas de pago para repartir. Todo queda en la bitácora.
 - **Repo sin datos:** `instancia/`, bases, respaldos y documentos internos están en `.gitignore`. Descargar el repo da el motor, las plantillas y el asistente, nada más.
-- **Instalación en Windows:** script que crea el entorno, genera claves, registra los dos servicios (web y trabajador) con reinicio automático y abre el asistente.
+- **Instalación en Windows:** un **instalador `.exe`** que trae todo incluido (no hay que instalar Python). Instala el programa, genera las claves, registra los servicios de Windows (web, trabajador y TLS) con arranque automático y reinicio ante fallas, y abre el asistente. Los datos viven en una carpeta aparte del programa, de modo que actualizar con un instalador nuevo los conserva y hace un respaldo antes de migrar. Las demás computadoras no instalan nada: entran por el navegador. El instalador se compila de forma automática en el repo y se publica en sus versiones.
 
 ## 12. Estructura del repo
 
@@ -335,9 +390,11 @@ instancia/         (ignorada) claves, base, configuración local
 | Fase | Entrega |
 |---|---|
 | 1 | Proyecto base, matrícula, usuarios, roles, dispositivos, titulares, solicitudes con las tres vías, conceptos de cobro, asistente, auditoría |
-| 2 | Cargos automáticos y recargos, pagos en efectivo, recibos, caja y traslados |
-| 3 | Importación bancaria, identificación y conciliación |
-| 4 | Cortes, destinos, respaldo, instalador y guías |
+| 1b | Datos de pago por campos, catálogo de bancos, plantillas propias |
+| 2 | Familias, cargos automáticos, recargos, becas y prórrogas, pagos en efectivo, recibos, caja y traslados |
+| 3 | Estado de cuenta en PDF, importación inicial desde Excel, importación bancaria, identificación y conciliación |
+| 4 | Cortes (con lista de cobranza), destinos, respaldo, instalador `.exe` y guías |
+| 5 | Diseño de la interfaz, con el motor ya terminado |
 
 ## 14. Pendientes de decisión
 
@@ -345,3 +402,4 @@ instancia/         (ignorada) claves, base, configuración local
 2. Si el negocio contrata cobranza referenciada: longitud y dígito verificador que exija el banco.
 3. Facturación (CFDI): fuera del alcance de esta versión.
 4. Varias sedes: hoy una instalación por sede con `sede` distinta; la consolidación central se diseña cuando exista la segunda.
+5. El programa es propietario: sin licencia de código abierto, el instalador se publica sin firma digital salvo que se compre un certificado.

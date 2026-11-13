@@ -24,8 +24,22 @@
   </dl>
   <section class="instrucciones">
     <h3>Cómo pagar</h3>
-    <p>{{ negocio.instrucciones_pago|linebreaksbr }}</p>
-    <p>Escribe siempre la {{ voc.matricula|lower }} <strong>{{ titular.matricula }}</strong> como referencia o concepto del pago.</p>
+    {% if pago %}
+    <dl class="datos">
+      <dt>Banco</dt><dd>{{ pago.cuenta.banco }}</dd>
+      <dt>CLABE</dt><dd><strong>{{ pago.cuenta.clabe_formateada }}</strong></dd>
+      <dt>Beneficiario</dt><dd>{{ pago.cuenta.beneficiario }}</dd>
+      {% if pago.cuenta.numero_cuenta %}<dt>Número de cuenta</dt><dd>{{ pago.cuenta.numero_cuenta }}</dd>{% endif %}
+      {% if pago.cuenta.convenio %}<dt>Convenio</dt><dd>{{ pago.cuenta.convenio }}</dd>{% endif %}
+      {% if pago.medios %}<dt>Medios aceptados</dt><dd>{{ pago.medios|join:", " }}</dd>{% endif %}
+    </dl>
+    <p class="indicacion">Escribe <strong>{{ titular.matricula }}</strong> ({{ voc.matricula|lower }}) {{ pago.lugar }}.</p>
+    {% if pago.cuenta.contacto_dudas %}<p>Dudas: {{ pago.cuenta.contacto_dudas }}</p>{% endif %}
+    {% if pago.cuenta.nota_adicional %}<p>{{ pago.cuenta.nota_adicional|linebreaksbr }}</p>{% endif %}
+    {% else %}
+    {% if negocio.nota_ficha %}<p>{{ negocio.nota_ficha|linebreaksbr }}</p>{% endif %}
+    <p class="indicacion">Escribe <strong>{{ titular.matricula }}</strong> ({{ voc.matricula|lower }}) en referencia numérica y en concepto.</p>
+    {% endif %}
   </section>
   <p class="pie">Emitida el {% now "d/m/Y" %}</p>
 </article>

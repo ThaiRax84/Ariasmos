@@ -189,5 +189,10 @@
       "prioridad": 50,
       "recargo": false
     }
+  ],
+  "medios_pago": [
+    "Transferencia SPEI",
+    "Depósito en ventanilla",
+    "Efectivo en caja"
   ]
 }

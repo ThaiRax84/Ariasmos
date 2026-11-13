@@ -9,6 +9,13 @@
   <a class="boton" href="{% url 'auditoria:lista' %}">Ver bitácora</a>
 </section>
 {% endif %}
+{% if falta_cuenta %}
+<section class="panel alerta">
+  <h2>Faltan los datos de pago</h2>
+  <p>No hay una cuenta bancaria principal: la ficha de pago no muestra a dónde pagar.</p>
+  <a class="boton" href="{% url 'banco:nueva' %}">Agregar cuenta</a>
+</section>
+{% endif %}
 {% if por_revisar or bloqueos %}
 <section class="panel alerta">
   <h2>Avisos sobre tu código de autorización</h2>

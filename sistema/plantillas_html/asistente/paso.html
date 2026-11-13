@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block contenido %}
-<p class="paso">Instalación · paso {{ paso }} de 4</p>
+<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
 <h1>{{ titulo }}</h1>
-<form method="post" class="formulario" novalidate>
+<form method="post" class="formulario" novalidate{% if formulario.is_multipart %} enctype="multipart/form-data"{% endif %}>
   {% csrf_token %}
   {% include "comun/_campos.html" %}
   <div class="acciones"><button class="boton grande" type="submit">Continuar</button></div>

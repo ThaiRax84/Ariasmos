@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Datos de pago</h1>
+<div class="atajos"><a class="boton" href="{% url 'banco:nueva' %}">Nueva cuenta</a><a class="boton secundario" href="{% url 'configuracion:catalogo' 'medios' %}">Medios de pago</a><a class="boton secundario" href="{% url 'configuracion:indice' %}">Volver</a></div>
+<table class="tabla">
+<thead><tr><th>Banco</th><th>CLABE</th><th>Beneficiario</th><th>Medios</th><th>Estado</th><th></th></tr></thead>
+<tbody>{% for c in cuentas %}<tr><td>{{ c.banco }}{% if c.banco.capturado_a_mano %} <small>(capturado a mano)</small>{% endif %}</td><td>{{ c.clabe_formateada }}</td><td>{{ c.beneficiario }}</td><td>{{ c.medios.all|join:", " }}</td><td>{% if c.principal %}<strong>Principal</strong>{% elif c.activa %}Activa{% else %}Inactiva{% endif %}</td><td><a href="{% url 'banco:editar' c.pk %}">Editar</a></td></tr>{% empty %}<tr><td colspan="6">No hay cuentas. La ficha de pago no mostrará datos bancarios hasta que agregues una.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

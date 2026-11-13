@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicios import diferencias, registrar
+from banco.ficha import datos_de_pago
 from configuracion.models import parametro, vocabulario
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
@@ -101,7 +102,7 @@ def ficha_pago(request, pk):
     titular = get_object_or_404(Titular, pk=pk)
     contacto = contactos.principal(titular)
     registrar("ficha_pago_consultada", usuario=request.user, objeto=titular, request=request)
-    contexto = {"titular": titular, "contacto": contacto, "contacto_detalle": contactos.detalle(contacto) if contacto else []}
+    contexto = {"titular": titular, "contacto": contacto, "contacto_detalle": contactos.detalle(contacto) if contacto else [], "pago": datos_de_pago()}
     return render(request, "titulares/ficha_pago.html", contexto)
 
 
