@@ -6,10 +6,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from auditoria.servicios import diferencias, registrar
-from configuracion.models import parametro
+from cobros import acciones, generacion, libro
+from configuracion.models import hoy_negocio, parametro
 from cuentas.models import CodigoUsado
 from cuentas.servicios import consumir_codigo, usar_delegacion
-from titulares.models import MotivoBaja, Titular
+from titulares.models import Familia, MotivoBaja, Titular
 from titulares.servicios import foto_titular
 
 from .models import IntentoCodigo, PoliticaAccion, Solicitud
@@ -23,55 +24,72 @@ class ErrorSolicitud(Exception):
 class Resultado:
     via: str
     solicitud: Solicitud = None
+    objeto: object = None
 
 
-class Alta:
+@dataclass
+class Contexto:
+    ejecutor: object
+    autorizador: object
+    solicitante: object
+    solicitud: Solicitud = None
+    request: object = None
+    resultado: object = None
+
+
+class Manejador:
+    def llave(self, datos):
+        return {}
+
+    def rechazar(self, titular, datos, contexto=None):
+        pass
+
+
+class Alta(Manejador):
     def validar(self, titular, datos):
         if titular.estado != Titular.PENDIENTE:
             raise ErrorSolicitud("Solo se aprueba el alta de un registro pendiente.")
 
-    def aplicar(self, titular, datos):
+    def aplicar(self, titular, datos, contexto):
         titular.estado = Titular.ACTIVO
-        titular.save(update_fields=["estado", "actualizado"])
+        titular.activo_desde = hoy_negocio()
+        titular.save(update_fields=["estado", "activo_desde", "actualizado"])
+        cargos = generacion.cargos_de_alta(titular, request=contexto.request)
+        return {"cargos_iniciales": [str(c) for c in cargos]}
 
-    def rechazar(self, titular, datos):
+    def rechazar(self, titular, datos, contexto=None):
         titular.estado = Titular.RECHAZADO
         titular.save(update_fields=["estado", "actualizado"])
 
 
-class Baja:
+class Baja(Manejador):
     def validar(self, titular, datos):
         if titular.estado != Titular.ACTIVO:
             raise ErrorSolicitud("Solo se da de baja un registro activo.")
         if not MotivoBaja.objects.filter(pk=datos.get("motivo"), activo=True).exists():
             raise ErrorSolicitud("El motivo de baja no es válido.")
 
-    def aplicar(self, titular, datos):
+    def aplicar(self, titular, datos, contexto):
         titular.estado = Titular.BAJA
         titular.motivo_baja_id = datos["motivo"]
         titular.fecha_baja = timezone.now()
         titular.save(update_fields=["estado", "motivo_baja", "fecha_baja", "actualizado"])
 
-    def rechazar(self, titular, datos):
-        pass
 
-
-class Reactivacion:
+class Reactivacion(Manejador):
     def validar(self, titular, datos):
         if titular.estado != Titular.BAJA:
             raise ErrorSolicitud("Solo se reactiva un registro dado de baja.")
 
-    def aplicar(self, titular, datos):
+    def aplicar(self, titular, datos, contexto):
         titular.estado = Titular.ACTIVO
         titular.motivo_baja = None
         titular.fecha_baja = None
-        titular.save(update_fields=["estado", "motivo_baja", "fecha_baja", "actualizado"])
-
-    def rechazar(self, titular, datos):
-        pass
+        titular.activo_desde = hoy_negocio()
+        titular.save(update_fields=["estado", "motivo_baja", "fecha_baja", "activo_desde", "actualizado"])
 
 
-class CorreccionNombre:
+class CorreccionNombre(Manejador):
     def validar(self, titular, datos):
         if titular.estado not in (Titular.ACTIVO, Titular.BAJA):
             raise ErrorSolicitud("La corrección de nombre aplica a registros activos o dados de baja.")
@@ -81,27 +99,87 @@ class CorreccionNombre:
         if nombre == titular.nombre and apellidos == titular.apellidos:
             raise ErrorSolicitud("El nombre propuesto es igual al actual.")
 
-    def aplicar(self, titular, datos):
+    def aplicar(self, titular, datos, contexto):
         titular.nombre = datos["nombre"].strip()
         titular.apellidos = datos["apellidos"].strip()
         titular.save(update_fields=["nombre", "apellidos", "actualizado"])
 
-    def rechazar(self, titular, datos):
-        pass
+
+class CambioFamilia(Manejador):
+    MODOS = ("ligar", "crear", "desligar")
+
+    def validar(self, titular, datos):
+        modo = datos.get("modo")
+        if modo not in self.MODOS:
+            raise ErrorSolicitud("Indica si se liga, se crea o se desliga la familia.")
+        if titular.estado == Titular.RECHAZADO:
+            raise ErrorSolicitud("Un registro rechazado no se liga a una familia.")
+        if modo == "ligar":
+            familia = Familia.objects.filter(pk=datos.get("familia"), activa=True).first()
+            if familia is None:
+                raise ErrorSolicitud("La familia elegida no existe o no está activa.")
+            if familia.pk == titular.familia_id:
+                raise ErrorSolicitud("Ya pertenece a esa familia.")
+            return familia
+        if modo == "crear":
+            nombre = (datos.get("nombre") or "").strip()
+            if not 0 < len(nombre) <= 100:
+                raise ErrorSolicitud("Escribe el nombre de la familia nueva.")
+            return None
+        if titular.familia_id is None:
+            raise ErrorSolicitud("No pertenece a ninguna familia.")
+        return None
+
+    def aplicar(self, titular, datos, contexto):
+        familia = self.validar(titular, datos)
+        anterior = str(titular.familia) if titular.familia_id else None
+        if datos["modo"] == "crear":
+            familia = Familia.objects.create(nombre=datos["nombre"].strip())
+            registrar("familia_creada", usuario=contexto.ejecutor, objeto=familia, titular=titular.pk, datos={"nombre": familia.nombre}, request=contexto.request)
+        titular.familia = familia if datos["modo"] != "desligar" else None
+        titular.save(update_fields=["familia", "actualizado"])
+        return {"cambios": {"familia": [anterior, str(titular.familia) if titular.familia_id else None]}}
 
 
-MANEJADORES = {"alta": Alta(), "baja": Baja(), "reactivacion": Reactivacion(), "correccion_nombre": CorreccionNombre()}
+MANEJADORES = {
+    "alta": Alta(),
+    "baja": Baja(),
+    "reactivacion": Reactivacion(),
+    "correccion_nombre": CorreccionNombre(),
+    "cambio_familia": CambioFamilia(),
+    "beca": acciones.OtorgarBeca(),
+    "prorroga": acciones.OtorgarProrroga(),
+    "cancelar_cargo": acciones.Cancelar(),
+    "condonar_recargo": acciones.Condonar(),
+    "revertir_pago": acciones.Revertir(),
+    "pago_sobre_tope": acciones.PagoSobreTope(),
+}
+
+ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro)
 
 
-def _aplicar(manejador, titular, datos):
+def _validar(manejador, titular, datos):
+    try:
+        manejador.validar(titular, datos)
+    except ERRORES_DE_ACCION as error:
+        raise ErrorSolicitud(str(error))
+
+
+def _aplicar(manejador, titular, datos, contexto):
     antes = foto_titular(titular)
-    manejador.aplicar(titular, datos)
-    return diferencias(antes, foto_titular(titular))
+    try:
+        detalle = dict(manejador.aplicar(titular, datos, contexto) or {})
+    except ERRORES_DE_ACCION as error:
+        raise ErrorSolicitud(str(error))
+    titular.refresh_from_db()
+    cambios = diferencias(antes, foto_titular(titular))
+    cambios.update(detalle.pop("cambios", {}))
+    return cambios, detalle
 
 
-def _rechazar(manejador, titular, datos):
+def _rechazar(manejador, titular, datos, contexto=None):
     antes = foto_titular(titular)
-    manejador.rechazar(titular, datos)
+    manejador.rechazar(titular, datos, contexto)
     return diferencias(antes, foto_titular(titular))
 
 
@@ -139,25 +217,27 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
     caducar_vencidas()
     with transaction.atomic():
         titular = Titular.objects.get(pk=titular.pk)
-        manejador.validar(titular, datos)
-        if Solicitud.objects.filter(titular=titular, accion=accion, estado=Solicitud.PENDIENTE).exists():
+        _validar(manejador, titular, datos)
+        if Solicitud.objects.filter(titular=titular, accion=accion, estado=Solicitud.PENDIENTE, **manejador.llave(datos)).exists():
             raise ErrorSolicitud("Ya hay una solicitud pendiente para esta acción.")
+        contexto = Contexto(ejecutor=usuario, autorizador=usuario, solicitante=usuario, request=request)
         if usuario.tiene_permiso_de_rol(politica.permiso_directo):
-            cambios = _aplicar(manejador, titular, datos)
-            registrar(f"{accion}_aplicada", usuario=usuario, objeto=titular, datos={"via": "directa", **datos, "cambios": cambios}, request=request)
-            return Resultado("directa")
+            cambios, detalle = _aplicar(manejador, titular, datos, contexto)
+            registrar(f"{accion}_aplicada", usuario=usuario, objeto=titular, datos={"via": "directa", **datos, **detalle, "cambios": cambios}, request=request)
+            return Resultado("directa", objeto=contexto.resultado)
         if politica.permite_delegacion:
             delegacion = usar_delegacion(usuario, politica.permiso_directo, request=request, contexto={"accion": accion, "titular": titular.pk})
             if delegacion is not None:
-                cambios = _aplicar(manejador, titular, datos)
+                contexto.autorizador = delegacion.otorgante
+                cambios, detalle = _aplicar(manejador, titular, datos, contexto)
                 registrar(
                     f"{accion}_aplicada",
                     usuario=usuario,
                     objeto=titular,
-                    datos={"via": "delegacion", "delegacion": delegacion.pk, "otorgante": str(delegacion.otorgante), **datos, "cambios": cambios},
+                    datos={"via": "delegacion", "delegacion": delegacion.pk, "otorgante": str(delegacion.otorgante), **datos, **detalle, "cambios": cambios},
                     request=request,
                 )
-                return Resultado("delegacion")
+                return Resultado("delegacion", objeto=contexto.resultado)
         if not usuario.tiene_permiso(politica.permiso_solicitar):
             raise PermissionDenied
         solicitud = Solicitud.objects.create(
@@ -214,14 +294,15 @@ def aprobar(solicitud, usuario, request=None):
             raise ErrorSolicitud("La solicitud ya no está pendiente.")
         via, delegacion = _autorizar_resolucion(solicitud, usuario, politica, request)
         manejador = MANEJADORES[solicitud.accion]
-        manejador.validar(solicitud.titular, solicitud.datos)
-        cambios = _aplicar(manejador, solicitud.titular, solicitud.datos)
+        _validar(manejador, solicitud.titular, solicitud.datos)
+        contexto = Contexto(ejecutor=usuario, autorizador=usuario, solicitante=solicitud.solicitante, solicitud=solicitud, request=request)
+        cambios, detalle = _aplicar(manejador, solicitud.titular, solicitud.datos, contexto)
         _cerrar(solicitud, Solicitud.APROBADA, usuario, via)
         registrar(
             "solicitud_aprobada",
             usuario=usuario,
             objeto=solicitud,
-            datos={"accion": solicitud.accion, "titular": solicitud.titular_id, "via": via, "delegacion": delegacion.pk if delegacion else None, "solicitante": str(solicitud.solicitante), "cambios": cambios},
+            datos={"accion": solicitud.accion, "titular": solicitud.titular_id, "via": via, "delegacion": delegacion.pk if delegacion else None, "solicitante": str(solicitud.solicitante), **detalle, "cambios": cambios},
             request=request,
         )
     return solicitud
@@ -238,7 +319,7 @@ def rechazar(solicitud, usuario, nota="", request=None):
         if solicitud.estado != Solicitud.PENDIENTE:
             raise ErrorSolicitud("La solicitud ya no está pendiente.")
         via, delegacion = _autorizar_resolucion(solicitud, usuario, politica, request)
-        cambios = _rechazar(MANEJADORES[solicitud.accion], solicitud.titular, solicitud.datos)
+        cambios = _rechazar(MANEJADORES[solicitud.accion], solicitud.titular, solicitud.datos, None)
         _cerrar(solicitud, Solicitud.RECHAZADA, usuario, via, nota)
         registrar(
             "solicitud_rechazada",
@@ -287,8 +368,9 @@ def autorizar_con_codigo(solicitud, capturista, autorizador, codigo, request=Non
         usado, motivo = consumir_codigo(autorizador, codigo, CodigoUsado.AUTORIZACION, usado_por=capturista, solicitud=solicitud)
         if usado is not None:
             manejador = MANEJADORES[solicitud.accion]
-            manejador.validar(solicitud.titular, solicitud.datos)
-            cambios = _aplicar(manejador, solicitud.titular, solicitud.datos)
+            _validar(manejador, solicitud.titular, solicitud.datos)
+            contexto = Contexto(ejecutor=capturista, autorizador=autorizador, solicitante=solicitud.solicitante, solicitud=solicitud, request=request)
+            cambios, detalle = _aplicar(manejador, solicitud.titular, solicitud.datos, contexto)
             _cerrar(solicitud, Solicitud.APROBADA, autorizador, Solicitud.CODIGO)
             registrar(
                 "solicitud_aprobada",
@@ -302,6 +384,7 @@ def autorizar_con_codigo(solicitud, capturista, autorizador, codigo, request=Non
                     "autorizador_usuario": autorizador.usuario,
                     "codigo_usado": usado.pk,
                     "autorizador_nombre": str(autorizador),
+                    **detalle,
                     "cambios": cambios,
                 },
                 request=request,

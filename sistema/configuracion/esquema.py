@@ -1,11 +1,13 @@
 import json
 
 from cuentas.permisos import INDISPENSABLES, PERMISOS
+from solicitudes.politicas import POR_DEFECTO, definicion
 
 LIMITE_BYTES = 256 * 1024
-MAXIMO_LISTA = {"roles": 20, "politicas": 20, "motivos_baja": 100, "relaciones_contacto": 50, "campos_contacto": 20, "conceptos": 100, "medios_pago": 30}
-VOCABULARIO = ("titular", "titulares", "matricula", "agrupacion", "agrupaciones")
-ACCIONES = ("alta", "baja", "reactivacion", "correccion_nombre")
+MAXIMO_LISTA = {"roles": 20, "politicas": 20, "motivos_baja": 100, "relaciones_contacto": 50, "campos_contacto": 20, "conceptos": 100, "medios_pago": 30, "cajas": 20, "denominaciones": 30}
+VOCABULARIO = ("titular", "titulares", "matricula", "agrupacion", "agrupaciones", "familia", "familias")
+REQUERIDAS = ("alta", "baja", "reactivacion", "correccion_nombre")
+ACCIONES = REQUERIDAS + tuple(a for a in POR_DEFECTO if a not in REQUERIDAS)
 TIPOS_CAMPO = ("telefono", "correo", "texto")
 TIPOS_CONCEPTO = ("unico", "recurrente", "por_evento")
 PERIODICIDADES = ("semanal", "quincenal", "mensual", "bimestral", "trimestral", "semestral", "anual")
@@ -23,6 +25,8 @@ RAIZ = {
     "campos_contacto": False,
     "conceptos": False,
     "medios_pago": False,
+    "cajas": False,
+    "denominaciones": False,
 }
 
 
@@ -196,12 +200,24 @@ def validar(datos):
     acciones = [p["accion"] for p in limpia["politicas"]]
     if len(set(acciones)) != len(acciones):
         _falla("politicas", "acción repetida")
-    faltantes = set(ACCIONES) - set(acciones)
+    faltantes = set(REQUERIDAS) - set(acciones)
     if faltantes:
         _falla("politicas", f"faltan políticas para: {', '.join(sorted(faltantes))}")
+    for accion in ACCIONES:
+        if accion not in acciones:
+            limpia["politicas"].append(_politica(definicion(accion), f"politicas.{accion}"))
+    nombres_roles = {p for r in limpia["roles"] for p in r["permisos"]}
+    for politica in limpia["politicas"]:
+        if politica["permiso_aprobar"] not in nombres_roles:
+            _falla(f"politicas.{politica['accion']}", "ningún rol tiene el permiso para aprobar")
     limpia["motivos_baja"] = _textos(datos, "motivos_baja", 100)
     limpia["relaciones_contacto"] = _textos(datos, "relaciones_contacto", 60)
     limpia["medios_pago"] = _textos(datos, "medios_pago", 60)
+    limpia["cajas"] = _textos(datos, "cajas", 60)
+    denominaciones = _lista(datos.get("denominaciones", []), "denominaciones", "denominaciones")
+    limpia["denominaciones"] = [_entero(v, f"denominaciones[{i}]", 1, 100000000) for i, v in enumerate(denominaciones)]
+    if len(set(limpia["denominaciones"])) != len(limpia["denominaciones"]):
+        _falla("denominaciones", "valor repetido")
     campos = _lista(datos.get("campos_contacto", []), "campos_contacto", "campos_contacto")
     limpia["campos_contacto"] = [_campo(c, f"campos_contacto[{i}]") for i, c in enumerate(campos)]
     _sin_repetidos([c["etiqueta"] for c in limpia["campos_contacto"]], "campos_contacto")
