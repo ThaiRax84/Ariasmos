@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>{{ voc.familias }}</h1>
+<ul class="lista">{% for f in familias %}<li><a href="{% url 'titulares:familia' f.pk %}">{{ f }}</a> · {{ f.total }} {% if f.total == 1 %}{{ voc.titular|lower }}{% else %}{{ voc.titulares|lower }}{% endif %}{% if not f.activa %} · inactiva{% endif %}</li>{% empty %}<li>Sin registros.</li>{% endfor %}</ul>
+{% endblock %}

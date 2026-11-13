@@ -13,7 +13,10 @@
   {% if user.is_authenticated %}
   <nav class="menu">
     <a href="{% url 'inicio' %}">Inicio</a>
-    {% if "ver_titulares" in permisos %}<a href="{% url 'titulares:lista' %}">{{ voc.titulares }}</a>{% endif %}
+    {% if "ver_titulares" in permisos %}<a href="{% url 'titulares:lista' %}">{{ voc.titulares }}</a><a href="{% url 'titulares:familias' %}">{{ voc.familias }}</a>{% endif %}
+    {% if "registrar_pago_efectivo" in permisos %}<a href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
+    {% if "turno_caja" in permisos %}<a href="{% url 'caja:inicio' %}">Mi caja</a>{% endif %}
+    {% if "recibir_efectivo" in permisos %}<a href="{% url 'caja:custodia' %}">Efectivo</a>{% endif %}
     {% if "solicitar_alta_baja" in permisos or "aprobar_solicitudes" in permisos or "alta_baja_directa" in permisos %}<a href="{% url 'solicitudes:bandeja' %}">Solicitudes</a>{% endif %}
     {% if "administrar_conceptos" in permisos %}<a href="{% url 'cobros:conceptos' %}">Conceptos</a>{% endif %}
     {% if "otorgar_delegaciones" in permisos %}<a href="{% url 'delegaciones' %}">Delegaciones</a>{% endif %}
