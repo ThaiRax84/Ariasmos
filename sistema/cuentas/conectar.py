@@ -2,14 +2,16 @@ from pathlib import Path
 
 from django.conf import settings
 
+from proyecto import certificado as modulo_certificado
+
 INICIO_PEM = "-----BEGIN CERTIFICATE-----"
 FIN_PEM = "-----END CERTIFICATE-----"
 TAMANO_MAXIMO = 64 * 1024
-NOMBRE = "ariasmos-raiz.crt"
+NOMBRE = "ariasmos-servidor.crt"
 
 
 def certificado():
-    ruta = str(getattr(settings, "CERTIFICADO_RAIZ", "") or "")
+    ruta = str(getattr(settings, "CERTIFICADO_SERVIDOR", "") or "")
     if not ruta:
         return None
     archivo = Path(ruta)
@@ -25,12 +27,34 @@ def certificado():
         return None
     inicio = texto.index(INICIO_PEM)
     fin = texto.index(FIN_PEM) + len(FIN_PEM)
-    cuerpo = texto[inicio:fin]
-    lineas = [l.strip() for l in cuerpo.splitlines() if l.strip()]
+    lineas = [l.strip() for l in texto[inicio:fin].splitlines() if l.strip()]
     base64 = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
     if any(not set(l) <= base64 for l in lineas[1:-1]):
         return None
-    return "\n".join(lineas) + "\n"
+    pem = "\n".join(lineas) + "\n"
+    try:
+        objeto = modulo_certificado.cargar(pem)
+    except modulo_certificado.ErrorCertificado:
+        return None
+    if modulo_certificado.es_autoridad(objeto):
+        return None
+    return pem
+
+
+def datos():
+    pem = certificado()
+    if pem is None:
+        return None
+    objeto = modulo_certificado.cargar(pem)
+    dns, ips = modulo_certificado.nombres_de(objeto)
+    return {
+        "pem": pem,
+        "huella": modulo_certificado.huella_legible(objeto),
+        "vence": modulo_certificado.vence(objeto),
+        "dias": modulo_certificado.dias_restantes(objeto),
+        "nombres": dns + ips,
+        "por_vencer": modulo_certificado.dias_restantes(objeto) <= modulo_certificado.DIAS_AVISO,
+    }
 
 
 def instalador(pem):
@@ -43,7 +67,7 @@ def instalador(pem):
         "  pause",
         "  exit /b 1",
         ")",
-        'set "CERT=%TEMP%\\ariasmos-raiz-%RANDOM%%RANDOM%.crt"',
+        'set "CERT=%TEMP%\\ariasmos-servidor-%RANDOM%%RANDOM%.crt"',
     ]
     for numero, linea in enumerate(pem.strip().splitlines()):
         renglones.append(f'{">" if numero == 0 else ">>"}"%CERT%" echo {linea}')

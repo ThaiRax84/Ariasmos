@@ -20,7 +20,7 @@ if _datos is None:
     CLAVE_RESPALDO = b""
     RUTA_INSTANCIA = ""
     HTTPS_ACTIVO = False
-    CERTIFICADO_RAIZ = ""
+    CERTIFICADO_SERVIDOR = ""
     RUTA_ANCLA_AUDITORIA = ""
     DATABASES = base_de_datos(":memory:")
     ALLOWED_HOSTS = []
@@ -42,7 +42,7 @@ else:
     TOKEN_ASISTENTE_HASH = _datos.get("token_asistente_hash", "")
     PROXIES_CONFIABLES = list(_datos.get("proxies_confiables", ["127.0.0.1", "::1"]))
     HTTPS_ACTIVO = bool(_datos.get("https", True))
-    CERTIFICADO_RAIZ = str(_datos.get("certificado_raiz", ""))
+    CERTIFICADO_SERVIDOR = str(_datos.get("certificado_servidor", ""))
     if _datos.get("https", True):
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True

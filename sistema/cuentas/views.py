@@ -510,7 +510,7 @@ def delegacion_revocar(request, pk):
 @requiere_permiso("aprobar_dispositivos")
 def conectar(request):
     nombres = [h for h in settings.ALLOWED_HOSTS if h not in ("localhost", "127.0.0.1", "[::1]", "testserver")]
-    return render(request, "cuentas/conectar.html", {"hay_certificado": conectar_mod.certificado() is not None, "nombres": nombres})
+    return render(request, "cuentas/conectar.html", {"certificado": conectar_mod.datos(), "nombres": nombres})
 
 
 def _descarga(contenido, tipo, nombre):

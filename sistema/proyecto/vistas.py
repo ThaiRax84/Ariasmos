@@ -8,6 +8,7 @@ from caja.servicios import alertas as alertas_caja
 from configuracion.models import Negocio
 from cortes import servicios as cortes
 from cortes.models import MAYOR, Corte
+from cuentas import conectar
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
@@ -29,6 +30,10 @@ def inicio(request):
         "delegaciones": Delegacion.objects.vigentes().filter(receptor=usuario).select_related("otorgante"),
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
+    if usuario.tiene_permiso("aprobar_dispositivos"):
+        datos_certificado = conectar.datos()
+        if datos_certificado and datos_certificado["por_vencer"]:
+            contexto["certificado_por_vencer"] = datos_certificado
     if usuario.tiene_permiso("recibir_efectivo"):
         contexto["diarios_pendientes"] = cortes.diarios_pendientes()
         contexto["alertas"] = alertas_caja()
