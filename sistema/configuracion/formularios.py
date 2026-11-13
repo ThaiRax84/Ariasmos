@@ -12,6 +12,7 @@ from cuentas.formularios import ContrasenaNueva
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
+from . import moneda
 from .models import PARAMETROS, VOCABULARIO_BASE, Negocio
 
 
@@ -47,6 +48,22 @@ class FormularioNegocio(forms.ModelForm):
 
     def clean_zona_horaria(self):
         return validar_zona(self.cleaned_data["zona_horaria"])
+
+
+class FormularioMoneda(forms.Form):
+    moneda = forms.ChoiceField(label="Moneda del negocio")
+
+    def __init__(self, *args, bloqueada=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["moneda"].choices = moneda.opciones()
+        if bloqueada:
+            self.fields["moneda"].disabled = True
+
+    def clean_moneda(self):
+        try:
+            return moneda.validar(self.cleaned_data["moneda"])
+        except moneda.ErrorMoneda:
+            raise forms.ValidationError("Elige una moneda del catálogo.")
 
 
 class FormularioAjustesAvanzados(forms.ModelForm):
@@ -203,12 +220,20 @@ class FormularioAsistenteInicio(forms.Form):
     token = forms.CharField(label="Token de instalación (lo mostró el comando inicializar)", max_length=200, widget=forms.PasswordInput)
     nombre = forms.CharField(label="Nombre del negocio", max_length=150)
     zona_horaria = forms.CharField(label="Zona horaria", max_length=64, initial="America/Mexico_City")
+    moneda = forms.ChoiceField(label="Moneda", initial=moneda.POR_DEFECTO, required=False)
     plantilla = forms.ChoiceField(label="Plantilla inicial", widget=forms.RadioSelect)
     archivo = forms.FileField(label="Archivo de plantilla (solo si eliges importar; JSON de hasta 256 KB)", required=False)
 
     def __init__(self, *args, plantillas=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["plantilla"].choices = list((plantillas or {}).items()) + [(IMPORTAR, "Importar un archivo de plantilla")]
+        self.fields["moneda"].choices = moneda.opciones()
+
+    def clean_moneda(self):
+        try:
+            return moneda.validar(self.cleaned_data["moneda"] or moneda.POR_DEFECTO)
+        except moneda.ErrorMoneda:
+            raise forms.ValidationError("Elige una moneda del catálogo.")
 
     def clean_zona_horaria(self):
         return validar_zona(self.cleaned_data["zona_horaria"])

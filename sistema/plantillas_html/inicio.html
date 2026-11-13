@@ -25,6 +25,13 @@
 </section>
 {% endif %}
 {% if por_recibir %}<section class="panel alerta"><h2>Tienes {{ por_recibir }} entrega{{ por_recibir|pluralize }} de efectivo por confirmar</h2><a class="boton" href="{% url 'caja:traslados' %}">Revisar</a></section>{% endif %}
+{% if faltan_denominaciones %}
+<section class="panel alerta">
+  <h2>Faltan las denominaciones de caja</h2>
+  <p>No hay billetes ni monedas capturados para la moneda del negocio: el arqueo de caja no podrá contar el efectivo.</p>
+  <a class="boton" href="{% url 'configuracion:catalogo' 'denominaciones' %}">Capturar denominaciones</a>
+</section>
+{% endif %}
 {% if falta_cuenta %}
 <section class="panel alerta">
   <h2>Faltan los datos de pago</h2>

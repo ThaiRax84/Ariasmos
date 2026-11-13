@@ -8,4 +8,12 @@
   {% include "comun/_campos.html" %}
   <div class="acciones">{% if not bloqueado %}<button class="boton" type="submit">Guardar</button>{% endif %}<a class="boton secundario" href="{% url 'configuracion:indice' %}">Volver</a></div>
 </form>
+<h2>Moneda</h2>
+<p>Todos los importes se capturan y se muestran en esta moneda, con su símbolo y su código.</p>
+{% if moneda_bloqueada %}<p class="mensaje warning">Ya hay cargos o pagos registrados: la moneda quedó fija, porque cambiarla alteraría el significado de lo ya cobrado.</p>{% endif %}
+<form method="post" action="{% url 'configuracion:moneda' %}" class="formulario angosto" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" with formulario=formulario_moneda %}
+  <div class="acciones">{% if not moneda_bloqueada %}<button class="boton" type="submit">Cambiar moneda</button>{% endif %}</div>
+</form>
 {% endblock %}

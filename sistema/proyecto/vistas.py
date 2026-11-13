@@ -3,7 +3,7 @@ from django.shortcuts import render
 from auditoria.servicios import MOTIVOS, ultima_verificacion
 from banco import conciliacion
 from banco.models import CuentaBancaria, Importacion, MovimientoBancario
-from caja.models import Traslado
+from caja.models import Denominacion, Traslado
 from caja.servicios import alertas as alertas_caja
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
@@ -35,6 +35,7 @@ def inicio(request):
         contexto["muestra_banco"] = True
     if usuario.tiene_permiso("administrar_configuracion"):
         contexto["falta_cuenta"] = CuentaBancaria.principal_activa() is None
+        contexto["faltan_denominaciones"] = not Denominacion.objects.filter(activa=True).exists()
     if usuario.tiene_permiso("ver_auditoria"):
         contexto["importaciones_por_revisar"] = list(conciliacion.pendientes_de_revision()[:50])
         verificacion = ultima_verificacion()
