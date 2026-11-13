@@ -1,7 +1,7 @@
 from django.shortcuts import render
 
 from auditoria.servicios import MOTIVOS, ultima_verificacion
-from banco.models import CuentaBancaria
+from banco.models import CuentaBancaria, Importacion, MovimientoBancario
 from caja.models import Traslado
 from caja.servicios import alertas as alertas_caja
 from cuentas.decoradores import requiere_sesion
@@ -27,6 +27,11 @@ def inicio(request):
     if usuario.tiene_permiso("recibir_efectivo"):
         contexto["alertas"] = alertas_caja()
         contexto["por_recibir"] = Traslado.objects.filter(destino=usuario, estado=Traslado.PENDIENTE).count()
+    if usuario.tiene_permiso("conciliar_banco"):
+        contexto["banco_pendientes"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).count()
+        contexto["banco_propuestos"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR, propuesta__isnull=False).count()
+        contexto["ultima_importacion"] = Importacion.objects.order_by("-creada").first()
+        contexto["muestra_banco"] = True
     if usuario.tiene_permiso("administrar_configuracion"):
         contexto["falta_cuenta"] = CuentaBancaria.principal_activa() is None
     if usuario.tiene_permiso("ver_auditoria"):

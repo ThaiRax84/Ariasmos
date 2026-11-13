@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Importación del {{ importacion.creada|date:"d/m/Y H:i" }}</h1>
+<p>{{ importacion.nombre_archivo }} · {{ importacion.cuenta }} · {{ importacion.get_adaptador_display }} · huella {{ importacion.sha256|slice:":12" }}…</p>
+<p>{{ importacion.nuevos }} nuevos · {{ importacion.aplicados }} aplicados · {{ importacion.sugeridos }} sugeridos · {{ importacion.sin_pista }} sin pista · {{ importacion.depositos_emparejados }} depósitos de caja · {{ importacion.duplicados }} repetidos</p>
+<table class="tabla compacta">
+<thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th>Estado</th><th>Aplicado a</th></tr></thead>
+<tbody>{% for m in movimientos %}<tr><td><a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a></td><td>{{ m.descripcion }}</td><td>{% if m.sentido == "cargo" %}−{% endif %}{{ m.importe|dinero }}</td><td>{{ m.get_estado_display }}</td><td>{% if m.pago %}{{ m.pago.titular.nombre_completo }} · <a href="{% url 'cobros:recibo' m.pago.recibo.pk %}">{{ m.pago.recibo }}</a>{% endif %}</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}
