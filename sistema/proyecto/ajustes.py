@@ -9,7 +9,7 @@ from .base import base_de_datos
 _datos = instancia.leer()
 
 if _datos is None:
-    if "inicializar" not in sys.argv and "restaurar" not in sys.argv:
+    if not {"inicializar", "restaurar", "ariasmos_version"} & set(sys.argv):
         raise ImproperlyConfigured(
             f"No existe {instancia.ruta_archivo()}. Ejecuta: python manage.py inicializar"
         )
@@ -19,6 +19,8 @@ if _datos is None:
     CLAVE_SECRETOS = b""
     CLAVE_RESPALDO = b""
     RUTA_INSTANCIA = ""
+    HTTPS_ACTIVO = False
+    CERTIFICADO_SERVIDOR = ""
     RUTA_ANCLA_AUDITORIA = ""
     DATABASES = base_de_datos(":memory:")
     ALLOWED_HOSTS = []
@@ -39,12 +41,17 @@ else:
     CSRF_TRUSTED_ORIGINS = list(_datos.get("origenes_confiables", []))
     TOKEN_ASISTENTE_HASH = _datos.get("token_asistente_hash", "")
     PROXIES_CONFIABLES = list(_datos.get("proxies_confiables", ["127.0.0.1", "::1"]))
+    HTTPS_ACTIVO = bool(_datos.get("https", True))
+    CERTIFICADO_SERVIDOR = str(_datos.get("certificado_servidor", ""))
     if _datos.get("https", True):
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
         COOKIE_DISPOSITIVO_SEGURA = True
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
         SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_SSL_REDIRECT = True
+        SILENCED_SYSTEM_CHECKS = ["security.W021"]
     else:
         SESSION_COOKIE_SECURE = False
         CSRF_COOKIE_SECURE = False

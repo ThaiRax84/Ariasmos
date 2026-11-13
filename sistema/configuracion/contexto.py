@@ -1,3 +1,5 @@
+from proyecto.version import actual as version_actual
+
 from .models import vocabulario
 
 
@@ -8,4 +10,5 @@ def general(request):
         "negocio": getattr(request, "negocio", None),
         "voc": vocabulario(),
         "permisos": permisos,
+        "version": version_actual(),
     }

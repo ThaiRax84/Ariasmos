@@ -42,5 +42,6 @@
   {% if messages %}<ul class="mensajes">{% for m in messages %}<li class="mensaje {{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
   {% block contenido %}{% endblock %}
 </main>
+<footer class="pie-pagina">Ariasmos {{ version }}</footer>
 </body>
 </html>

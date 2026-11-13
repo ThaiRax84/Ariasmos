@@ -65,6 +65,13 @@
   <a class="boton" href="{% url 'autorizaciones' %}">Revisar</a>
 </section>
 {% endif %}
+{% if certificado_por_vencer %}
+<section class="panel alerta">
+  <h2>El certificado del servidor vence pronto</h2>
+  <p>Vence el {{ certificado_por_vencer.vence|date:"d/m/Y" }} (faltan {{ certificado_por_vencer.dias }} días). Actualiza el programa en esta computadora para generar uno nuevo y después vuelve a instalarlo en las demás computadoras.</p>
+  <a class="boton" href="{% url 'conectar' %}">Conectar otra computadora</a>
+</section>
+{% endif %}
 <div class="atajos">
   {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}
   {% if "registrar_pago_efectivo" in permisos %}<a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}

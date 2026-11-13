@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.14 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.15 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -405,7 +405,7 @@ Por titular o por familia, en PDF: cargos, pagos, becas, prórrogas y saldo a un
 
 | Capa | Medida |
 |---|---|
-| Red | El servicio escucha solo en la red local; regla de firewall limitada a esa subred; TLS con autoridad interna cuyo certificado se instala en cada computadora autorizada. |
+| Red | El servicio escucha solo en la red local; regla de firewall limitada a esa subred; TLS con un certificado único del servidor, sin autoridad de certificados, que se instala en cada computadora autorizada (§11). |
 | Dispositivos | Solo entran **computadoras aprobadas**. Un navegador nuevo queda «pendiente» hasta que Supervisión o Dirección lo aprueba; recibe una credencial de dispositivo de larga duración (cookie `HttpOnly`, `Secure`, `SameSite=Strict`; en la base solo su hash). Se puede revocar. La primera se aprueba desde el propio servidor al instalar. |
 | Identidad | Una cuenta por persona, activada con código de un solo uso (§6.6). Nadie otorga ni modifica lo que excede sus propios permisos. Argon2id. Bloqueo progresivo tras intentos fallidos. Cierre por inactividad configurable por rol. TOTP obligatorio para quien aprueba. Reingreso de contraseña antes de acciones delicadas. |
 | Aplicación | Permiso verificado en el servidor en cada vista y sobre cada objeto. CSRF activo. CSP sin scripts en línea ni orígenes externos. Solo ORM. Límite de peticiones en inicio de sesión y códigos. |
@@ -461,11 +461,12 @@ Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol
 - **Repo sin datos:** `instancia/`, bases, respaldos y documentos internos están en `.gitignore`. Descargar el repo da el motor, las plantillas y el asistente, nada más.
 - **Instalación en Windows:** un **instalador `.exe`** («Ariasmos») que trae todo incluido (no hay que instalar Python).
   - Programa en `C:\Program Files\Ariasmos`; datos (base, claves, registros, certificados) en `C:\ProgramData\Ariasmos`, con permisos solo para la cuenta del servicio y los administradores.
-  - Tres servicios de Windows con arranque automático y reinicio ante fallas: web (escucha solo en el propio equipo), trabajador y TLS (proxy que atiende a la red local por HTTPS con una autoridad de certificados interna).
+  - Tres servicios de Windows con arranque automático y reinicio ante fallas: web (escucha solo en el propio equipo), trabajador y TLS (proxy que atiende a la red local por HTTPS).
+  - **Certificado del servidor.** Al instalar se genera un certificado único para este servidor, válido 10 años, que solo sirve para su nombre de equipo y para `localhost`. No hay autoridad de certificados: con ese certificado no se puede emitir ninguno más, de modo que quien lo robara solo podría suplantar a este servidor y a ningún otro sitio. Al actualizar se conserva; solo se genera otro si cambia el nombre del equipo o está por vencer, y entonces hay que volver a instalarlo en las demás computadoras. La aplicación avisa 60 días antes del vencimiento y muestra su huella para comprobarla al instalarlo.
   - Regla de firewall que abre el puerto HTTPS solo a la red local.
   - Al terminar genera las claves, muestra el token del asistente y abre el asistente en el navegador.
   - Actualizar con un instalador nuevo detiene los servicios, hace un respaldo, reemplaza el programa, migra la base y los arranca. Desinstalar conserva los datos salvo que se pida borrarlos.
-  - Las demás computadoras no instalan el programa: entran por el navegador, después de instalar una sola vez el certificado raíz, que el sistema ofrece junto con sus instrucciones.
+  - Las demás computadoras no instalan el programa: entran por el navegador, después de instalar una sola vez el certificado del servidor, que el sistema ofrece junto con sus instrucciones.
   - El instalador se compila de forma automática en el repo, con una prueba de instalación y arranque, y queda como archivo de la compilación junto con su hash; no se publica como versión.
 
 ## 12. Estructura del repo

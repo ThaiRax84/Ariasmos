@@ -1,5 +1,8 @@
 Django==5.2.19
+asgiref==3.13.0
+sqlparse==0.6.1
 argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
 waitress==3.0.2
 tzdata==2026.6
 reportlab==5.1.0
