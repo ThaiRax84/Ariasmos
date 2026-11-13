@@ -76,9 +76,11 @@ function Rutas {
         Instancia   = Join-Path $Datos 'instancia'
         Registros   = Join-Path $Datos 'registros'
         Caddy       = Join-Path $Datos 'caddy'
-        Caddyfile   = Join-Path $Datos 'caddy\Caddyfile'
-        RaizCaddy   = Join-Path $Datos 'caddy\datos\caddy\pki\authorities\local\root.crt'
-        Certificado = Join-Path $Datos 'certificado\ariasmos-raiz.crt'
+        CaddyConfig = Join-Path $Datos 'caddy\caddy.json'
+        CaddyDatos  = Join-Path $Datos 'caddy\datos'
+        CertServidor = Join-Path $Datos 'caddy\servidor.crt'
+        ClaveServidor = Join-Path $Datos 'caddy\servidor.key'
+        Certificado = Join-Path $Datos 'certificado\ariasmos-servidor.crt'
         Copias      = Join-Path $Datos 'antes-de-actualizar'
     }
 }
@@ -97,7 +99,7 @@ function Manage {
 
 function Proteger-Datos {
     param([Parameter(Mandatory = $true)]$R)
-    foreach ($carpeta in @($R.Datos, $R.Instancia, $R.Registros, $R.Caddy, (Split-Path -Parent $R.Certificado), $R.Copias)) {
+    foreach ($carpeta in @($R.Datos, $R.Instancia, $R.Registros, $R.Caddy, $R.CaddyDatos, (Split-Path -Parent $R.Certificado), $R.Copias)) {
         if (-not (Test-Path -LiteralPath $carpeta)) {
             New-Item -ItemType Directory -Path $carpeta -Force | Out-Null
         }
@@ -220,45 +222,110 @@ function Quitar-Firewall {
 function Leer-Certificado {
     param([Parameter(Mandatory = $true)][string]$Ruta)
     $texto = Get-Content -LiteralPath $Ruta -Raw -Encoding Ascii
-    if ($texto -match 'PRIVATE KEY' -or $texto -notmatch '-----BEGIN CERTIFICATE-----') {
-        throw "El archivo $Ruta no es un certificado público."
+    if ($texto -match 'PRIVATE KEY' -or ([regex]::Matches($texto, '-----BEGIN CERTIFICATE-----')).Count -ne 1) {
+        throw "El archivo $Ruta no es un único certificado público."
     }
-    return New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [System.IO.File]::ReadAllBytes($Ruta))
+    $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [System.IO.File]::ReadAllBytes($Ruta))
+    if (Es-Autoridad $certificado) { throw "El archivo $Ruta es un certificado de autoridad y no el del servidor." }
+    return $certificado
 }
 
-function Publicar-Certificado {
-    param([Parameter(Mandatory = $true)]$R)
-    $limite = (Get-Date).AddSeconds(120)
-    while (-not (Test-Path -LiteralPath $R.RaizCaddy) -and (Get-Date) -lt $limite) { Start-Sleep -Seconds 2 }
-    if (-not (Test-Path -LiteralPath $R.RaizCaddy)) { throw 'El servicio TLS no generó su autoridad de certificados a tiempo.' }
-    $certificado = Leer-Certificado -Ruta $R.RaizCaddy
-    Copy-Item -LiteralPath $R.RaizCaddy -Destination $R.Certificado -Force
-    Escribir-Registro ('Certificado raíz publicado: {0} (huella {1})' -f $R.Certificado, $certificado.Thumbprint)
+function Es-Autoridad {
+    param([Parameter(Mandatory = $true)]$Certificado)
+    foreach ($extension in $Certificado.Extensions) {
+        if ($extension -is [System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension]) {
+            return $extension.CertificateAuthority
+        }
+    }
+    return $true
+}
+
+function Huella-De {
+    param([Parameter(Mandatory = $true)][string]$Ruta)
+    if (-not (Test-Path -LiteralPath $Ruta)) { return '' }
+    try {
+        return (Leer-Certificado -Ruta $Ruta).Thumbprint
+    }
+    catch {
+        Escribir-Registro "AVISO: no se pudo leer $Ruta ($($_.Exception.Message))"
+        return ''
+    }
+}
+
+function Almacen-Raiz {
+    param([Parameter(Mandatory = $true)][scriptblock]$Accion)
     $almacen = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', 'LocalMachine')
     $almacen.Open('ReadWrite')
     try {
-        $almacen.Add($certificado)
+        & $Accion $almacen
     }
     finally {
         $almacen.Close()
     }
-    Escribir-Registro 'Certificado raíz instalado en las raíces de confianza de este equipo'
+}
+
+function Quitar-De-Raices {
+    param([Parameter(Mandatory = $true)][string]$Huella)
+    if (-not $Huella) { return }
+    Almacen-Raiz {
+        param($almacen)
+        foreach ($existente in @($almacen.Certificates.Find('FindByThumbprint', $Huella, $false))) {
+            $almacen.Remove($existente)
+            Escribir-Registro ('Certificado {0} quitado de las raíces de confianza de este equipo' -f $existente.Thumbprint)
+        }
+    }
+}
+
+function Proteger-Clave {
+    param([Parameter(Mandatory = $true)]$R)
+    if (-not (Test-Path -LiteralPath $R.ClaveServidor)) { throw "Falta la clave privada del servidor en $($R.ClaveServidor)." }
+    Ejecutar -Archivo 'icacls.exe' -Argumentos @($R.ClaveServidor, '/inheritance:r', '/grant:r', "*$($script:SidAdministradores):F", "*$($script:SidSistema):F", "*$($script:SidServicio):R", '/Q') -Descripcion 'Permisos de la clave privada del servidor: solo lectura para el servicio' | Out-Null
+}
+
+function Preparar-Certificado {
+    param([Parameter(Mandatory = $true)]$R, [Parameter(Mandatory = $true)][string]$Nombre)
+    $anteriores = @(@((Huella-De -Ruta $R.CertServidor), (Huella-De -Ruta $R.Certificado)) | Where-Object { $_ } | Select-Object -Unique)
+    $salida = Manage -R $R -Argumentos @('generar_certificado', '--nombre', $Nombre, '--cert', $R.CertServidor, '--clave', $R.ClaveServidor, '--si-hace-falta') -Descripcion 'Certificado del servidor'
+    Proteger-Clave -R $R
+    $certificado = Leer-Certificado -Ruta $R.CertServidor
+    $nuevo = @($salida | Where-Object { $_ -match '^CERTIFICADO: nuevo ' }).Count -gt 0
+    foreach ($huella in $anteriores) {
+        if ($huella -ne $certificado.Thumbprint) {
+            Quitar-De-Raices -Huella $huella
+        }
+    }
+    if ($nuevo -and @($anteriores | Where-Object { $_ -ne $certificado.Thumbprint }).Count -gt 0) {
+        Escribir-Registro 'AVISO: se generó un certificado nuevo para este servidor. Hay que volver a instalarlo en las demás computadoras (Conectar otra computadora).'
+    }
+    Copy-Item -LiteralPath $R.CertServidor -Destination $R.Certificado -Force
+    Almacen-Raiz {
+        param($almacen)
+        $almacen.Add($certificado)
+    }
+    Escribir-Registro ('Certificado del servidor publicado en {0} e instalado en las raíces de confianza (huella {1}, vence {2:yyyy-MM-dd})' -f $R.Certificado, $certificado.Thumbprint, $certificado.NotAfter)
+}
+
+function Limpiar-Autoridad-Anterior {
+    param([Parameter(Mandatory = $true)]$R)
+    $pki = Join-Path $R.CaddyDatos 'caddy\pki'
+    if (-not (Test-Path -LiteralPath $pki)) { return }
+    foreach ($archivo in @(Get-ChildItem -LiteralPath $pki -Recurse -Filter '*.crt' -File)) {
+        try {
+            $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(, [System.IO.File]::ReadAllBytes($archivo.FullName))
+            Quitar-De-Raices -Huella $certificado.Thumbprint
+        }
+        catch {
+            Escribir-Registro "AVISO: no se pudo leer $($archivo.FullName)"
+        }
+    }
+    Remove-Item -LiteralPath $pki -Recurse -Force
+    Escribir-Registro 'Se quitó la autoridad de certificados local de una versión anterior'
 }
 
 function Quitar-Certificado {
     param([Parameter(Mandatory = $true)]$R)
-    if (-not (Test-Path -LiteralPath $R.Certificado)) { return }
-    $certificado = Leer-Certificado -Ruta $R.Certificado
-    $almacen = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', 'LocalMachine')
-    $almacen.Open('ReadWrite')
-    try {
-        foreach ($existente in @($almacen.Certificates.Find('FindByThumbprint', $certificado.Thumbprint, $false))) {
-            $almacen.Remove($existente)
-            Escribir-Registro ('Certificado raíz {0} quitado de las raíces de confianza' -f $existente.Thumbprint)
-        }
-    }
-    finally {
-        $almacen.Close()
+    foreach ($huella in @(@((Huella-De -Ruta $R.Certificado), (Huella-De -Ruta $R.CertServidor)) | Where-Object { $_ } | Select-Object -Unique)) {
+        Quitar-De-Raices -Huella $huella
     }
 }
 
@@ -268,7 +335,7 @@ function Esperar-Aplicacion {
     while ((Get-Date) -lt $limite) {
         $anterior = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        $codigo = & curl.exe -s -o NUL -w '%{http_code}' 'https://localhost/' 2>$null
+        $codigo = & curl.exe -s --ssl-revoke-best-effort -o NUL -w '%{http_code}' 'https://localhost/' 2>$null
         $ErrorActionPreference = $anterior
         $ultimo = "$codigo"
         if ($ultimo -match '^(200|302)$') {

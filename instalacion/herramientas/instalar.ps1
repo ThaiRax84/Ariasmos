@@ -8,14 +8,14 @@
 
 $R = Rutas -Programa $Programa -Datos $Datos
 try {
-    Proteger-Datos -R $R
     Iniciar-Registro -Ruta (Join-Path $R.Registros 'instalacion.log')
+    Proteger-Datos -R $R
     Escribir-Registro "Modo: $Modo · versión $((Get-Content -LiteralPath (Join-Path $Programa 'app\VERSION') -Raw).Trim())"
     Proteger-Programa -R $R
     if (-not (Test-Path -LiteralPath $R.Python)) { throw "Falta $($R.Python): la copia del programa está incompleta." }
     $nombre = Nombre-Equipo
     Escribir-Registro "Nombre del equipo para HTTPS: $nombre"
-    $salida = Manage -R $R -Argumentos @('inicializar', '--host', $nombre, '--certificado-raiz', $R.Certificado) -Descripcion 'Preparando la instancia' -Silencioso
+    $salida = Manage -R $R -Argumentos @('inicializar', '--host', $nombre, '--certificado-servidor', $R.Certificado) -Descripcion 'Preparando la instancia' -Silencioso
     $token = ''
     foreach ($renglon in $salida) {
         if ($renglon -match '^Token del asistente: (\S+)$') {
@@ -28,7 +28,9 @@ try {
     Comprobar-Privado -Ruta $R.Instancia
     Manage -R $R -Argumentos @('migrate', '--noinput') -Descripcion 'Actualizando la base de datos' | Out-Null
     Manage -R $R -Argumentos @('check') -Descripcion 'Comprobando la instalación' | Out-Null
-    $argumentosCaddy = @('generar_caddyfile', '--nombre', $nombre, '--salida', $R.Caddyfile)
+    Limpiar-Autoridad-Anterior -R $R
+    Preparar-Certificado -R $R -Nombre $nombre
+    $argumentosCaddy = @('generar_config_caddy', '--nombre', $nombre, '--cert', $R.CertServidor, '--clave', $R.ClaveServidor, '--salida', $R.CaddyConfig)
     if (Puerto-Ocupado -Puerto 80) {
         Escribir-Registro 'El puerto 80 está ocupado por otro programa: no habrá redirección de HTTP a HTTPS.'
         $argumentosCaddy += '--sin-redireccion'
@@ -43,7 +45,6 @@ try {
     Instalar-Servicios -R $R
     Instalar-Firewall
     Iniciar-Servicios -R $R
-    Publicar-Certificado -R $R
     Esperar-Aplicacion | Out-Null
     Escribir-Registro 'Instalación terminada'
     if ($token -and $Modo -eq 'nueva') {

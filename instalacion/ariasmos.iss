@@ -89,14 +89,23 @@ function EjecutarScript(const Script, Extra: String; var Salida: TArrayOfString)
 var
   Resultado: TExecOutput;
   Codigo: Integer;
+  I: Integer;
 begin
   SetArrayLength(Salida, 0);
+  Log('Ejecutando ' + Script);
   if not ExecAndCaptureOutput(PowerShell(), ParametrosScript(Script, Extra), ExpandConstant('{app}\herramientas'), SW_HIDE, ewWaitUntilTerminated, Codigo, Resultado) then
   begin
+    Log('No se pudo ejecutar ' + Script + ': ' + SysErrorMessage(Codigo));
     Result := -1;
     Exit;
   end;
   Salida := Resultado.StdOut;
+  for I := 0 to GetArrayLength(Resultado.StdOut) - 1 do
+    if Pos('TOKEN-ASISTENTE:', Resultado.StdOut[I]) = 0 then
+      Log(Script + ': ' + Resultado.StdOut[I]);
+  for I := 0 to GetArrayLength(Resultado.StdErr) - 1 do
+    Log(Script + ' (error): ' + Resultado.StdErr[I]);
+  Log(Script + ' terminó con código ' + IntToStr(Codigo));
   Result := Codigo;
 end;
 
