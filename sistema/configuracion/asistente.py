@@ -15,6 +15,7 @@ from banco.models import CuentaBancaria
 from banco.servicios import guardar_cuenta
 from banco.views import avisar as avisar_banco
 from cobros.models import ConceptoCobro, ReglaRecargo
+from cuentas import qr
 from cuentas import servicios as cuentas_servicios
 from cuentas.formularios import FormularioCodigo
 from cuentas.models import CodigoUsado, Usuario
@@ -272,7 +273,8 @@ def codigo(request):
         "paso": 6,
         "total": TOTAL_PASOS,
         "titulo": "Autenticador del primer usuario",
-        "secreto": secreto,
-        "uri": totp.uri(secreto, nuevo.usuario, negocio.nombre),
+        **qr.contexto(secreto, nuevo.usuario, negocio.nombre),
     }
-    return render(request, "asistente/codigo.html", contexto)
+    respuesta = render(request, "asistente/codigo.html", contexto)
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta

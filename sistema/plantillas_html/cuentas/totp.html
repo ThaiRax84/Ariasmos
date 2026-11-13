@@ -1,12 +1,7 @@
 {% extends "base.html" %}
 {% block contenido %}
 <h1>Activa tu autenticador</h1>
-<ol class="pasos">
-  <li>Abre tu aplicación autenticadora en el teléfono y elige agregar una cuenta con clave.</li>
-  <li>Escribe esta clave: <code class="clave">{{ secreto }}</code></li>
-  <li>O, si tu aplicación lo admite, pega este enlace: <code class="uri">{{ uri }}</code></li>
-  <li>Escribe aquí el código de 6 dígitos que aparece.</li>
-</ol>
+{% include "comun/_autenticador.html" %}
 <form method="post" class="formulario angosto">
   {% csrf_token %}
   {% include "comun/_campos.html" %}
