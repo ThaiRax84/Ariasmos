@@ -59,11 +59,17 @@ Si te saltaste ese paso, Dirección verá un aviso en el inicio hasta que la gua
 
 Las demás computadoras **no instalan nada del programa**: entran con el navegador. Solo necesitan confiar una vez en el certificado del servidor.
 
+Ese certificado (`ariasmos-servidor.crt`) es como una credencial del servidor: **solo sirve para que las demás computadoras reconozcan a este servidor** y sepan que hablan con él y no con otro. No contiene contraseñas ni datos del negocio, no permite reconocer a ningún otro sitio de internet y **vence en 10 años**. El instalador lo crea solo; su parte secreta nunca sale del servidor (se queda en `C:\ProgramData\Ariasmos\caddy\`).
+
 1. En el servidor, entra con un usuario de Supervisión o Dirección y abre **Equipos** → **Conectar otra computadora**.
-2. Descarga **instalar-certificado.cmd** y pásalo a la otra computadora (por la red o con una memoria USB).
+2. En esa pantalla aparecen la **huella SHA-256** y la **fecha de vencimiento** del certificado. Descarga **instalar-certificado.cmd** y pásalo a la otra computadora (por la red o con una memoria USB).
 3. En la otra computadora: clic derecho sobre el archivo → **Ejecutar como administrador**. Si Windows avisa que el archivo viene de internet, elige **Más información** → **Ejecutar de todas formas**.
 4. Cierra y vuelve a abrir el navegador y entra a `https://NOMBRE-DEL-SERVIDOR/` (el nombre aparece en esa misma pantalla).
 5. La primera vez el navegador queda **pendiente**: apruébalo desde el servidor en **Equipos**.
+
+Si prefieres hacerlo a mano, descarga `ariasmos-servidor.crt` desde la misma pantalla, comprueba que su huella coincide con la que se muestra y agrégalo en la otra computadora a **Entidades de certificación raíz de confianza** del **equipo local**.
+
+Cuando falten 60 días o menos para el vencimiento, quienes aprueban equipos verán un aviso en el inicio. Basta con volver a ejecutar el instalador en el servidor (paso 7): genera un certificado nuevo y después hay que repetir esta sección en cada computadora.
 
 ## 6. Dar permiso a una carpeta
 
@@ -81,12 +87,13 @@ Si la pantalla dice que el servicio no tiene permiso para escribir en la carpeta
 1. Descarga el instalador nuevo y comprueba su hash (paso 1).
 2. Ejecútalo en el servidor. Detecta la instalación existente, detiene el sistema, guarda una copia de la carpeta de datos en `C:\ProgramData\Ariasmos\antes-de-actualizar\` y, si hay carpeta de respaldo configurada, hace un respaldo cifrado.
 3. Reemplaza el programa, actualiza la base de datos y vuelve a arrancar. No se muestra token: tus usuarios y datos siguen igual.
+4. El certificado del servidor se conserva, así que las demás computadoras siguen funcionando sin hacer nada. Solo se genera uno nuevo si cambió el nombre del equipo o faltan menos de 60 días para que venza; en ese caso el registro de la instalación lo indica y hay que volver a conectar las demás computadoras (sección 5).
 
 ## 8. Desinstalar
 
 Panel de control → Programas → **Ariasmos** → Desinstalar (o menú Inicio → Ariasmos → Desinstalar Ariasmos).
 
-- Se detienen y quitan los servicios, la regla del cortafuegos y el certificado.
+- Se detienen y quitan los servicios, la regla del cortafuegos y el certificado del servidor de las raíces de confianza de este equipo. En las demás computadoras puedes quitarlo a mano desde «Administrar certificados de equipo» (aparece como «Ariasmos NOMBRE-DEL-SERVIDOR»).
 - El instalador pregunta si quieres **borrar también los datos**. La respuesta recomendada es **No**: los datos se conservan en `C:\ProgramData\Ariasmos` y una instalación nueva los vuelve a usar.
 - Si eliges **Sí**, se borran la base, las claves y los registros. No se puede deshacer.
 
