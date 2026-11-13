@@ -9,6 +9,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from auditoria.servicios import registrar
+from banco.models import MovimientoBancario
 from caja.models import Turno
 from caja.servicios import personas_con_efectivo
 from configuracion.models import Negocio, parametro
@@ -218,7 +219,7 @@ def proponer_reparto(titular, importe):
     return reparto.repartir(importe, pendientes_de(miembros), titular.pk, miembros, orden_reparto())
 
 
-def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, request=None, solicitud=None, serie=None):
+def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, request=None, solicitud=None, serie=None, fecha=None, movimiento=None):
     if not isinstance(importe, int) or isinstance(importe, bool) or importe <= 0:
         raise ErrorLibro("El importe debe ser mayor que cero.")
     with transaction.atomic():
@@ -230,7 +231,10 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Se necesita un turno de caja abierto.")
         partes, resto = proponer_reparto(titular, importe)
-        pago = Pago.objects.create(titular=titular, importe=importe, medio=medio, turno=turno, ficha=ficha or None, registrado_por=usuario, solicitud=solicitud)
+        pago = Pago.objects.create(
+            titular=titular, importe=importe, medio=medio, turno=turno, ficha=ficha or None, registrado_por=usuario,
+            solicitud=solicitud, fecha=fecha or timezone.now(), movimiento=movimiento,
+        )
         cargos = {c.pk: c for c in Cargo.objects.filter(pk__in=[p.cargo for p in partes])}
         for parte in partes:
             _aplicar(pago, cargos[parte.cargo], parte.importe)
@@ -246,6 +250,7 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
                 "medio": medio,
                 "recibo": str(recibo),
                 "turno": turno.pk if turno else None,
+                "movimiento": movimiento.pk if movimiento is not None else None,
                 "aplicaciones": [{"cargo": p.cargo, "titular": p.titular, "importe": p.importe} for p in partes],
                 "saldo_a_favor": resto,
             },
@@ -289,6 +294,8 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
                     f"{quien_tiene_efectivo(pago)}"
                 )
         aplicaciones = list(pago.aplicaciones.values("cargo", "importe"))
+        if pago.movimiento_id:
+            MovimientoBancario.objects.filter(pk=pago.movimiento_id, pago=pago).update(estado=MovimientoBancario.POR_IDENTIFICAR, pago=None, resuelto_por=None, resuelto_en=None)
         reversion = ReversionPago.objects.create(pago=pago, motivo=motivo[:300], turno=turno if pago.medio == Pago.EFECTIVO else None, ejecutada_por=ejecutor, autorizada_por=autorizador, solicitud=solicitud)
         recibo = getattr(pago, "recibo", None)
         registrar(

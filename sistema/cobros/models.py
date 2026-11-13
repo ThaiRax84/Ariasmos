@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
+from django.utils import timezone
 
 from nucleo.dinero import formatear
 
@@ -221,8 +222,9 @@ class Pago(Asiento):
     titular = models.ForeignKey("titulares.Titular", on_delete=models.PROTECT, related_name="pagos")
     importe = models.PositiveBigIntegerField()
     medio = models.CharField(max_length=15, choices=MEDIOS)
-    fecha = models.DateTimeField(auto_now_add=True)
+    fecha = models.DateTimeField(default=timezone.now)
     turno = models.ForeignKey("caja.Turno", null=True, blank=True, on_delete=models.PROTECT, related_name="pagos")
+    movimiento = models.ForeignKey("banco.MovimientoBancario", null=True, blank=True, on_delete=models.PROTECT, related_name="pagos")
     ficha = models.CharField(max_length=64, null=True, blank=True, unique=True)
     registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     solicitud = models.ForeignKey("solicitudes.Solicitud", null=True, blank=True, on_delete=models.PROTECT, related_name="+")

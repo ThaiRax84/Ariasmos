@@ -1,3 +1,4 @@
+import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django import forms
@@ -95,6 +96,30 @@ class FormularioParametros(forms.Form):
             return validar_orden(self.cleaned_data["orden_reparto"])
         except ErrorLibro as error:
             raise forms.ValidationError(str(error))
+
+    def _serie(self, clave):
+        serie = self.cleaned_data[clave].strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]{1,10}", serie):
+            raise forms.ValidationError("Usa de 1 a 10 letras mayúsculas o números.")
+        return serie
+
+    def clean_serie_recibos_banco(self):
+        return self._serie("serie_recibos_banco")
+
+    def clean_serie_recibos_saldo_inicial(self):
+        return self._serie("serie_recibos_saldo_inicial")
+
+    def clean_aplicar_solo_por_pagador(self):
+        valor = self.cleaned_data["aplicar_solo_por_pagador"]
+        if valor not in (0, 1):
+            raise forms.ValidationError("Escribe 0 o 1.")
+        return valor
+
+    def clean_confirmaciones_pagador_confiable(self):
+        valor = self.cleaned_data["confirmaciones_pagador_confiable"]
+        if valor < 1:
+            raise forms.ValidationError("Debe ser al menos 1.")
+        return valor
 
     def clean_dia_generacion_cargos(self):
         dia = self.cleaned_data["dia_generacion_cargos"]
