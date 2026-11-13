@@ -7,6 +7,7 @@ from auditoria.servicios import registrar
 from banco.models import MedioPago
 from caja.models import Caja, Denominacion
 from cobros.models import ConceptoCobro
+from cortes.models import DefinicionCorte
 from cuentas.models import PermisoRol, Rol
 from cuentas.permisos import INDISPENSABLES
 from solicitudes.models import PoliticaAccion
@@ -67,6 +68,8 @@ def cargar_datos(datos, origen, usuario=None, request=None):
         if datos["moneda"] == (negocio.moneda if negocio else moneda.POR_DEFECTO):
             for valor in datos["denominaciones"]:
                 Denominacion.objects.get_or_create(valor=valor)
+        for definicion in datos["cortes"]:
+            DefinicionCorte.objects.update_or_create(tipo=definicion["tipo"], defaults={"nombre": definicion["nombre"], "nivel": definicion["nivel"], "activa": definicion["activa"]})
         for orden, medio in enumerate(datos["medios_pago"], start=1):
             MedioPago.objects.get_or_create(nombre=medio, defaults={"orden": orden * 10})
         for campo in datos["campos_contacto"]:
@@ -142,6 +145,7 @@ def exportar():
         "medios_pago": list(MedioPago.objects.filter(activo=True).values_list("nombre", flat=True)),
         "cajas": list(Caja.objects.filter(activa=True).values_list("nombre", flat=True)),
         "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
+        "cortes": [{"tipo": d.tipo, "nombre": d.nombre, "nivel": d.nivel, "activa": d.activa} for d in DefinicionCorte.objects.all()],
     }
     esquema.validar(datos)
     return datos

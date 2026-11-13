@@ -21,6 +21,8 @@
     <li><strong>{{ resumen.depositos }}</strong> depósitos se emparejarán con depósitos de caja.</li>
     <li>{{ resumen.informativos }} se guardan solo para cuadrar (cargos y devoluciones).</li>
     <li>{{ resumen.duplicados }} ya estaban importados y no se repetirán.</li>
+    <li>{{ resumen.otra_via }} ya llegaron por otra vía (otro archivo o el estado oficial): se ligan al existente y no producen otro pago.</li>
+    {% if resumen.posibles_duplicados %}<li><strong>{{ resumen.posibles_duplicados }}</strong> se parecen a varios movimientos ya importados: quedarán en la cola marcados como posible duplicado.</li>{% endif %}
   </ul>
   <form method="post" class="acciones">{% csrf_token %}<button class="boton grande" type="submit">Confirmar importación</button><a class="boton secundario" href="{% url 'conciliacion:importar' %}">Cancelar</a></form>
 </section>

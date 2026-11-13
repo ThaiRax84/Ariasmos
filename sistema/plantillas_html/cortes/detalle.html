@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>{{ corte.get_tipo_display }} · {% if corte.tipo == "mayor" %}{{ corte.fecha|date:"m/Y" }}{% else %}{{ corte.fecha|date:"d/m/Y" }}{% endif %}</h1>
+<p>{{ corte.get_estado_display }}{% if corte.tardio %} · <strong>tardío</strong>{% endif %}{% if corte.sin_revisar %} · <strong>sin revisar</strong>{% endif %}{% if corte.cerrado %} · cerrado {% if corte.cerrado_por %}por {{ corte.cerrado_por }} {% endif %}el {{ corte.cerrado_en|date:"d/m/Y H:i" }} · huella {{ corte.hash|slice:":16" }}…{% else %} · borrador: las cifras se recalculan cada vez que se abre{% endif %}</p>
+<div class="atajos">
+  <a class="boton secundario" href="{% url 'cortes:descargar' corte.pk 'pdf' %}">PDF</a>
+  <a class="boton secundario" href="{% url 'cortes:descargar' corte.pk 'csv' %}">CSV</a>
+  <a class="boton secundario" href="{% url 'cortes:descargar' corte.pk 'json' %}">JSON</a>
+</div>
+{% if puede_cerrar %}
+<form method="post" action="{% url 'cortes:cerrar' corte.pk %}" class="panel">
+  {% csrf_token %}
+  <p>Al cerrarlo, el corte queda como fotografía con su huella y el mes queda bloqueado: nada podrá fecharse dentro de él.</p>
+  <button class="boton" type="submit" data-confirmar="¿Cerrar el corte y bloquear el mes?">Cerrar el corte</button>
+</form>
+{% endif %}
+<table class="tabla compacta"><tbody>{% for etiqueta, valor in resumen %}<tr><th>{{ etiqueta }}</th><td>{{ valor }}</td></tr>{% endfor %}</tbody></table>
+{% for t in tablas %}
+<h2>{{ t.titulo }}</h2>
+{% if t.filas %}
+<div class="desplazable"><table class="tabla compacta">
+<thead><tr>{% for c in t.columnas %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+<tbody>{% for fila in t.filas %}<tr>{% for v in fila %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p>Sin renglones.</p>{% endif %}
+{% endfor %}
+{% if entregas %}
+<h2>Entregas</h2>
+<ul class="lista">{% for e in entregas %}<li>{{ e.destino }} · {{ e.get_nivel_display }} · {{ e.get_estado_display }}{% if e.ultimo_error %} · último error: {{ e.ultimo_error }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

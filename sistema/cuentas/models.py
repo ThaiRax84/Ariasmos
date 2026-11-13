@@ -43,7 +43,7 @@ class Usuario(AbstractBaseUser):
     nombre = models.CharField(max_length=150)
     rol = models.ForeignKey(Rol, null=True, blank=True, on_delete=models.PROTECT, related_name="usuarios")
     activo = models.BooleanField(default=True)
-    totp_secreto = models.CharField(max_length=64, blank=True)
+    totp_cifrado = models.CharField(max_length=255, blank=True)
     totp_confirmado = models.BooleanField(default=False)
     intentos_fallidos = models.PositiveIntegerField(default=0)
     bloqueado_hasta = models.DateTimeField(null=True, blank=True)

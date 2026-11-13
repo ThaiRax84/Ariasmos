@@ -82,6 +82,28 @@ Cada navegador nuevo queda **pendiente** y muestra un código; Supervisión o Di
 
 *Configuración → Importar padrón inicial* (Dirección, con reingreso de contraseña) acepta el Excel o CSV que ya se tenga. Se proponen las columnas (nombre y apellidos o nombre completo, agrupación, responsable, teléfono, correo y saldo por concepto o total) y se muestra una vista previa con los errores de cada renglón, los duplicados (mismo nombre y teléfono, en el padrón o dentro del archivo) y las familias propuestas (mismo responsable y teléfono), que se pueden desmarcar. Nada se escribe hasta confirmar; entonces, en una sola operación, se dan de alta los titulares activos con su matrícula, sus contactos, las familias y el saldo inicial (cargo si debe, pago de la serie `serie_recibos_saldo_inicial` si tiene a favor). Al final se descargan las matrículas asignadas (Excel y CSV) y todas las fichas de pago en un PDF. Si el nombre completo viene en una sola columna, las dos últimas palabras se toman como apellidos.
 
+## Cortes
+
+- **Corte diario de caja.** Al cerrar un turno con cobros o devoluciones (después del arqueo ciego) se genera el corte de esa caja: recibos uno por uno, devoluciones, total cobrado, fondo, contado, diferencia, nota y traslados. Cada persona ve solo los suyos; quien tiene «Ver cortes» ve todos. Si a la hora límite (`hora_limite_corte_diario`, 18:00) hay un turno con cobros del día sin cerrar, o uno abierto de un día anterior, quien recibe efectivo ve la alerta «corte diario pendiente»; nada se bloquea y el corte que se hace después queda marcado **tardío**.
+- **Corte mayor.** El trabajador lo genera como borrador el día `dia_corte_mayor` (1) del mes siguiente y se pone al día si estuvo apagado. Mientras es borrador se recalcula al abrirlo. Quien tiene «Cerrar cortes» lo cierra con reingreso de contraseña; si pasan `dias_plazo_corte_mayor` (5) días, el trabajador lo cierra marcado **sin revisar**. No se cierra un mes si el anterior sigue en borrador. Al cerrarlo queda como fotografía con su huella y el mes queda **bloqueado**: el libro rechaza cualquier asiento fechado dentro de él; un pago bancario tardío se registra con fecha de hoy y conserva la fecha del banco como referencia.
+- **Lista de cobranza.** Cada semana (`dia_semana_cobranza`, 1 = lunes; 0 la apaga) y a demanda: un renglón por cargo vencido con saldo, con los datos de pago del negocio en el encabezado.
+- **Entrega a carpeta.** En *Configuración → Destinos de cortes* (o en el asistente) se elige una carpeta y, por tipo de corte, si se entrega y con qué nivel de detalle: `completo`, `solo_nombres` (sin matrícula ni contacto) o `sin_nombres` (solo matrícula). Cada entrega deja PDF, CSV y JSON con nombres generados por el sistema y actualiza un `manifiesto.json` con la huella de cada archivo, el ancla de la bitácora y una firma; `python manage.py verificar_entrega <carpeta>` la comprueba. Si la carpeta no está disponible, la entrega se reintenta con espera creciente y aparece como alerta.
+- **Permisos.** «Ver cortes» y «Cerrar cortes». En las plantillas, Operación ya no trae «Ver cortes» (ve sus cortes diarios con «Abrir y cerrar su turno de caja»). No hay instalaciones en producción: los roles de una instalación ya creada no se cambian solos; si los hubiera, se ajustan en *Roles*.
+
+## Respaldo y restauración
+
+- **Clave de recuperación.** Se genera con la instancia y se muestra una sola vez (en el asistente, o en *Respaldos → Clave de recuperación* para quien tiene «Administrar respaldos»), hasta marcar «ya la guardé». Imprímela y guárdala fuera del equipo: sin ella ningún respaldo se abre. «Generar clave nueva» cambia la clave de los respaldos futuros; los anteriores siguen abriéndose solo con la clave anterior.
+- **Respaldo diario** a la hora `hora_respaldo` (02:00) en la carpeta configurada: copia consistente de la base, claves y ancla, cifrada con AES-256-GCM, como `ariasmos-AAAAMMDD-HHMMSS.respaldo`. Se conservan 30 diarios y 12 mensuales. Una vez al mes se abre el último en una carpeta temporal y se comprueban la integridad de la base, los conteos y la bitácora. Si no hay carpeta, si el último respaldo correcto tiene más de 48 horas o si la prueba falla, hay alerta.
+- **Restaurar** en un equipo nuevo (con la carpeta de instancia vacía) o sobre una instalación existente (guarda antes una copia):
+
+  ```bash
+  python manage.py restaurar --archivo D:\Respaldos\ariasmos-20261112-020000.respaldo --clave "XXXX-XXXX-..."
+  python manage.py restaurar --archivo ... --clave "..." --reemplazar
+  python manage.py migrate
+  ```
+
+- El secreto del autenticador de cada usuario se guarda cifrado con `clave_secretos` de la instancia. `python manage.py inicializar` añade `clave_respaldo` y `clave_secretos` a una instancia existente.
+
 ## Cuentas de usuario
 
 Nadie teclea la contraseña de otra persona. Al crear una cuenta (o con «Restablecer acceso» al editarla) el sistema muestra una sola vez un **código de activación** (`XXXXX-XXXXX`) que vence en 72 horas por defecto. La persona entra en «Tengo un código de activación», escribe su usuario y el código y elige su contraseña; si su rol lo exige, después da de alta su autenticador.
@@ -104,7 +126,7 @@ En una instalación vacía (después de `migrate`):
 python manage.py demostracion --contrasena "una-contrasena-larga"
 ```
 
-Crea un negocio de demostración con la plantilla `escuela`, los usuarios `operacion`, `supervision` y `direccion` (imprime los secretos de autenticador), cuatro titulares (dos en una familia) con cargos de los últimos tres meses y sus recargos, un turno de caja abierto para `operacion` y una cuenta bancaria ficticia con tres abonos importados: uno aplicado solo y dos en la cola por identificar; como es un archivo genérico importado por `supervision`, `direccion` la ve pendiente de revisión. Después aprueba tu navegador con `aprobar_dispositivo`.
+Crea un negocio de demostración con la plantilla `escuela`, los usuarios `operacion`, `supervision` y `direccion` (imprime los secretos de autenticador), cuatro titulares (dos en una familia) con cargos de los últimos tres meses y sus recargos, un turno de caja abierto para `operacion` y una cuenta bancaria ficticia con tres abonos importados: uno aplicado solo y dos en la cola por identificar; como es un archivo genérico importado por `supervision`, `direccion` la ve pendiente de revisión. También deja un corte diario cerrado, los cortes mayores de los meses anteriores en borrador (con un plazo de cierre de 31 días para que se puedan revisar) y una carpeta temporal de entrega con sus archivos y su manifiesto. Después aprueba tu navegador con `aprobar_dispositivo`.
 
 ## Pruebas
 
@@ -122,7 +144,12 @@ Se corren desde la raíz del repositorio. No necesitan `instancia/`.
 | `inicializar` | Crea `instancia/` con claves aleatorias |
 | `servir` | Servidor de producción (waitress) |
 | `aprobar_dispositivo CODIGO` | Aprueba un equipo desde el servidor |
-| `trabajador` | Tareas periódicas: cargos, recargos, solicitudes, equipos y bitácora |
+| `trabajador` | Tareas periódicas: cargos, recargos, solicitudes, equipos, cortes, entregas, respaldo y bitácora |
+| `respaldar` | Hace un respaldo cifrado ahora |
+| `probar_respaldo` | Abre el último respaldo en una carpeta temporal y lo verifica |
+| `restaurar --archivo ... --clave ...` | Restaura una instalación desde un respaldo |
+| `verificar_entrega <carpeta>` | Comprueba la firma del manifiesto y las huellas de una carpeta de entrega |
+| `cifrar_secretos` | Cifra los secretos del autenticador que estén en claro |
 | `cargar_bancos` | Carga o actualiza el catálogo de bancos sin borrar ni duplicar |
 | `verificar_auditoria` | Verifica la cadena de hashes de la auditoría |
 | `demostracion` | Configura una instalación de prueba |

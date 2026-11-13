@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block contenido %}
+<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
+<h1>{{ titulo }}</h1>
+<p>Los cortes diarios, el corte mayor de cada mes y la lista de cobranza se pueden dejar en una carpeta como PDF, CSV y JSON. El respaldo diario cifrado va a otra carpeta, de preferencia fuera del equipo. Puedes omitir este paso y configurarlo después.</p>
+{% if texto_clave %}
+<h2>Clave de recuperación de los respaldos</h2>
+{% include "respaldos/_clave.html" with texto=texto_clave %}
+{% endif %}
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones">
+    <button class="boton grande" type="submit">Guardar y continuar</button>
+    <button class="boton secundario" type="submit" name="omitir" value="1" formnovalidate>Omitir por ahora</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.13 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.14 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -342,6 +342,7 @@ Otras reglas de la importación:
 
 - El archivo debe ser de una cuenta bancaria registrada del negocio (misma CLABE); si no, se rechaza.
 - Un movimiento nunca produce dos pagos: la huella es única y la aplicación va dentro de la misma transacción.
+- Un mismo movimiento real que llega por dos vías (primero en un archivo descargado durante el mes y después en el estado de cuenta oficial) es **un solo movimiento**: el segundo se reconoce por cuenta, fecha, importe y clave de rastreo (o, si no hay clave de rastreo, por referencia y concepto), se liga al primero como «confirmado por el estado oficial» y nunca produce otro pago.
 - De quien paga se guarda lo necesario para identificarlo (banco, CLABE, nombre, clave de rastreo, referencia y concepto). El RFC no se guarda.
 - Operación ve fecha, importe, referencia, concepto y nombre del pagador; la CLABE completa solo la ve quien concilia.
 - Deshacer una aplicación bancaria es una reversión de pago por el motor de aprobaciones; el movimiento vuelve a la cola.
@@ -381,6 +382,8 @@ Un **corte** es una definición configurable: nombre, tipo, frecuencia, quién l
   - **caja:** efectivo cobrado frente a efectivo en custodia y depositado, diferencias de arqueo, depósitos sin conciliar;
   - **banco:** lo aplicado por banco frente al estado de cuenta oficial del mes; pagos que vinieron de importaciones no verificables y que no aparecen en el estado oficial; importaciones pendientes de revisión; movimientos por identificar;
   - reversos, cancelaciones y condonaciones del mes, con quién los autorizó.
+- **Un corte cerrado es una fotografía.** Sus archivos y sus cifras se guardan tal como quedaron, con su hash; nada posterior los recalcula.
+- **Cómo se cuenta.** Cada asiento tiene una fecha contable (el pago, cuando se registró; el cargo, cuando nació; el reverso, cuando se hizo). El corte incluye los asientos cuya fecha contable cae en el periodo. *Ingresos* son los pagos vigentes del periodo por medio de pago y, por concepto, sus aplicaciones. *Esperado* es el importe final, menos cancelaciones, de los cargos que vencen en el periodo; *cobrado de lo esperado*, lo aplicado a esos cargos hasta el día del corte. *Cartera vencida* son los saldos de cargos vencidos al día del corte, en tramos de 1 a 30, 31 a 60, 61 a 90 y más de 90 días.
 - **Cierre de periodo.** Al cerrarlo, el mes queda bloqueado: ningún cargo, pago ni reverso puede fecharse dentro de él. Lo que llegue después (un pago bancario tardío, la corrección de un error) se registra con fecha del periodo abierto y conserva como referencia la fecha original.
 
 ### 9.3 Lista de cobranza

@@ -10,6 +10,7 @@ urlpatterns = [
     path("personalizar/", asistente.personalizar, name="personalizar"),
     path("conceptos/", asistente.conceptos, name="conceptos"),
     path("pago/", asistente.pago, name="pago"),
+    path("cortes/", asistente.cortes, name="cortes"),
     path("usuario/", asistente.usuario, name="usuario"),
     path("codigo/", asistente.codigo, name="codigo"),
 ]

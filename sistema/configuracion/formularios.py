@@ -141,6 +141,30 @@ class FormularioParametros(forms.Form):
             raise forms.ValidationError("Debe ser al menos 1.")
         return valor
 
+    def _hora(self, clave):
+        texto = self.cleaned_data[clave].strip()
+        if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", texto):
+            raise forms.ValidationError("Escribe la hora como HH:MM, por ejemplo 18:00.")
+        return texto
+
+    def clean_hora_limite_corte_diario(self):
+        return self._hora("hora_limite_corte_diario")
+
+    def clean_hora_respaldo(self):
+        return self._hora("hora_respaldo")
+
+    def clean_dia_corte_mayor(self):
+        dia = self.cleaned_data["dia_corte_mayor"]
+        if not 1 <= dia <= 28:
+            raise forms.ValidationError("El día va de 1 a 28.")
+        return dia
+
+    def clean_dia_semana_cobranza(self):
+        dia = self.cleaned_data["dia_semana_cobranza"]
+        if dia > 7:
+            raise forms.ValidationError("Usa 1 (lunes) a 7 (domingo), o 0 para no generarla.")
+        return dia
+
     def clean_dia_generacion_cargos(self):
         dia = self.cleaned_data["dia_generacion_cargos"]
         if not 1 <= dia <= 28:
@@ -328,6 +352,46 @@ class FormularioAsistenteConceptos(forms.Form):
             except forms.ValidationError as error:
                 self.add_error(f"recargo_porcentaje_{concepto.pk}" if tipo == ReglaRecargo.PORCENTAJE else f"recargo_importe_{concepto.pk}", error)
         return datos
+
+
+class FormularioAsistenteCortes(forms.Form):
+    carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
+    hora_limite_corte_diario = forms.CharField(label="Hora límite del corte diario de caja (HH:MM)", max_length=5)
+    carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)
+
+    def __init__(self, *args, niveles=None, hora="18:00", carpeta="", pide_clave=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        from cortes.models import NIVELES, TIPOS
+
+        for tipo, nombre in TIPOS:
+            self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=NIVELES, initial=(niveles or {}).get(tipo, "solo_nombres"))
+        self.initial.setdefault("hora_limite_corte_diario", hora)
+        self.initial.setdefault("carpeta_respaldo", carpeta)
+        if pide_clave:
+            self.fields["guardada"] = forms.BooleanField(label="Ya imprimí la clave de recuperación y la guardé fuera de este equipo", required=True)
+
+    def _ruta(self, clave):
+        from cortes.entrega import ErrorEntrega, validar_ruta
+
+        valor = self.cleaned_data.get(clave, "").strip()
+        if not valor:
+            return ""
+        try:
+            return validar_ruta(valor)
+        except ErrorEntrega as error:
+            raise forms.ValidationError(str(error))
+
+    def clean_carpeta_entrega(self):
+        return self._ruta("carpeta_entrega")
+
+    def clean_carpeta_respaldo(self):
+        return self._ruta("carpeta_respaldo")
+
+    def clean_hora_limite_corte_diario(self):
+        texto = self.cleaned_data["hora_limite_corte_diario"].strip()
+        if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", texto):
+            raise forms.ValidationError("Escribe la hora como HH:MM, por ejemplo 18:00.")
+        return texto
 
 
 class FormularioAsistenteUsuario(ContrasenaNueva):

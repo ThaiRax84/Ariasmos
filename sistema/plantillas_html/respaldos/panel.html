@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Respaldos</h1>
+{% for a in alertas %}<p class="mensaje warning">{{ a }}</p>{% endfor %}
+{% if pendiente %}<section class="panel alerta"><h2>Falta guardar la clave de recuperación</h2><p>Sin ella ningún respaldo se puede abrir.</p><a class="boton" href="{% url 'respaldos:clave' %}">Ver la clave de recuperación</a></section>{% endif %}
+<p>Carpeta: {% if carpeta %}<code>{{ carpeta }}</code>{% else %}sin configurar{% endif %} · <a href="{% url 'respaldos:carpeta' %}">cambiar</a></p>
+<p>Se hace un respaldo cifrado cada día a la hora configurada, se conservan 30 diarios y 12 mensuales, y una vez al mes se prueba que se pueda restaurar.</p>
+<div class="atajos">
+  <form method="post" action="{% url 'respaldos:respaldar' %}">{% csrf_token %}<button class="boton" type="submit">Respaldar ahora</button></form>
+  <form method="post" action="{% url 'respaldos:probar' %}">{% csrf_token %}<button class="boton secundario" type="submit">Probar el último respaldo</button></form>
+  <form method="post" action="{% url 'respaldos:clave_nueva' %}">{% csrf_token %}<button class="boton peligro" type="submit" data-confirmar="Los respaldos anteriores seguirán abriéndose solo con la clave anterior. ¿Generar una clave nueva?">Generar clave nueva</button></form>
+</div>
+<table class="tabla compacta">
+<thead><tr><th>Fecha</th><th>Tipo</th><th>Resultado</th><th>Archivo</th><th>Tamaño</th><th>Detalle</th></tr></thead>
+<tbody>{% for r in registros %}<tr><td>{{ r.creado|date:"d/m/Y H:i" }}</td><td>{{ r.get_tipo_display }}</td><td>{{ r.get_resultado_display }}</td><td>{{ r.archivo }}</td><td>{{ r.tamano|filesizeformat }}</td><td>{{ r.mensaje }}{% if r.conteos %} {{ r.conteos.titulares }} titulares · {{ r.conteos.pagos }} pagos · {{ r.conteos.eventos }} eventos{% endif %}</td></tr>{% empty %}<tr><td colspan="6">Todavía no hay respaldos.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

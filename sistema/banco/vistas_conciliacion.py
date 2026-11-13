@@ -146,7 +146,7 @@ def previa(request, token):
             return redirect("conciliacion:importar")
         messages.success(request, f"Importación lista: {importacion.aplicados} aplicados, {importacion.sugeridos + importacion.sin_pista} por identificar, {importacion.duplicados} ya estaban.")
         return redirect("conciliacion:importacion", pk=importacion.pk)
-    resumen = conciliacion.vista_previa(cuenta, datos["movimientos"])
+    resumen = conciliacion.vista_previa(cuenta, datos["movimientos"], datos["adaptador"])
     try:
         clasificacion, rechazo = conciliacion.continuidad(cuenta, datos["adaptador"], datos.get("resumen")), ""
     except conciliacion.ErrorConciliacion as error:

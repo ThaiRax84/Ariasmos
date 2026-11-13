@@ -5,6 +5,7 @@ from django.test import Client
 from django.urls import reverse
 
 from auditoria.models import Evento
+from cuentas import secretos
 from cuentas.models import CodigoActivacion, Dispositivo, PermisoRol, Rol
 from cuentas.permisos import PERMISOS
 from solicitudes.models import Solicitud
@@ -129,7 +130,7 @@ def test_nadie_toma_la_cuenta_de_alguien_con_mas_permisos(personas, roles):
     limitado = nuevo_usuario("limitado", _rol_con("Personal", ["administrar_usuarios"]))
     c = cliente(limitado)
     direccion = personas["dir"]
-    secreto = direccion.totp_secreto
+    secreto = secretos.leer(direccion)
     c.post(
         reverse("usuario_editar", args=[direccion.pk]),
         {"nombre": direccion.nombre, "rol": roles["Dirección"].pk, "activo": "on", "restablecer_acceso": "on", "reiniciar_totp": "on"},
@@ -137,7 +138,7 @@ def test_nadie_toma_la_cuenta_de_alguien_con_mas_permisos(personas, roles):
     direccion.refresh_from_db()
     assert direccion.check_password(CONTRASENA)
     assert not CodigoActivacion.objects.filter(usuario=direccion).exists()
-    assert direccion.totp_secreto == secreto and direccion.totp_confirmado
+    assert secretos.leer(direccion) == secreto and direccion.totp_confirmado
     c.post(reverse("usuario_editar", args=[direccion.pk]), {"nombre": direccion.nombre, "rol": roles["Dirección"].pk})
     direccion.refresh_from_db()
     assert direccion.activo

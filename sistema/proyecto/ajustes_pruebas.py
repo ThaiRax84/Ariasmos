@@ -17,6 +17,9 @@ class Argon2Pruebas(Argon2PasswordHasher):
 SECRET_KEY = "clave-solo-para-pruebas-no-usar-en-produccion-0123456789"
 CLAVE_MATRICULA = bytes(range(32))
 CLAVE_AUDITORIA = bytes(range(32, 64))
+CLAVE_SECRETOS = bytes(range(64, 96))
+CLAVE_RESPALDO = bytes(range(96, 128))
+RUTA_INSTANCIA = ""
 RUTA_ANCLA_AUDITORIA = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-ancla-{os.getpid()}.json")
 TOKEN_ASISTENTE = "token-de-pruebas"
 TOKEN_ASISTENTE_HASH = hashlib.sha256(TOKEN_ASISTENTE.encode()).hexdigest()

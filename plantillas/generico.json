@@ -24,8 +24,7 @@
         "turno_caja",
         "solicitar_ajustes",
         "cargo_manual",
-        "sugerir_conciliacion",
-        "ver_cortes"
+        "sugerir_conciliacion"
       ]
     },
     {
@@ -272,5 +271,22 @@
     200,
     100,
     50
+  ],
+  "cortes": [
+    {
+      "tipo": "diario",
+      "nombre": "Corte diario de caja",
+      "nivel": "solo_nombres"
+    },
+    {
+      "tipo": "mayor",
+      "nombre": "Corte mayor",
+      "nivel": "solo_nombres"
+    },
+    {
+      "tipo": "cobranza",
+      "nombre": "Lista de cobranza",
+      "nivel": "completo"
+    }
   ]
 }

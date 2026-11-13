@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from configuracion import plantillas
 from configuracion.models import Negocio
+from cuentas import secretos
 from cuentas.models import Dispositivo, Rol, Usuario
 from cuentas.servicios import hash_credencial
 from nucleo import totp
@@ -25,7 +26,7 @@ def nuevo_usuario(usuario, rol, con_totp=None):
     if con_totp is None:
         con_totp = rol.requiere_totp if rol else False
     if con_totp:
-        creado.totp_secreto = totp.generar_secreto()
+        secretos.guardar(creado, totp.generar_secreto())
         creado.totp_confirmado = True
         creado.save()
     return creado
@@ -50,7 +51,7 @@ def cliente(usuario=None, credencial=None, reingreso=True):
 
 
 def codigo_actual(usuario, desfase=0):
-    return totp.codigo(usuario.totp_secreto, totp.paso_actual() + desfase)
+    return totp.codigo(secretos.leer(usuario), totp.paso_actual() + desfase)
 
 
 @pytest.fixture(autouse=True)

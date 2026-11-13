@@ -55,7 +55,9 @@ def test_asistente_completo_deja_instalacion_usable():
     colegiatura.refresh_from_db()
     assert colegiatura.importe_centavos == 150050 and colegiatura.dia_vencimiento == 10 and colegiatura.regla_recargo.valor == 1000
     respuesta = c.post(reverse("asistente:pago"), {"clabe": "002 010 07777777777 1", "beneficiario": "Mi negocio SA", "medios": [], "referencia_en": "ambos", "contacto_dudas": "55 1234 5678"})
-    assert respuesta.url == reverse("asistente:usuario")
+    assert respuesta.url == reverse("asistente:cortes")
+    assert "Clave de recuperación" in c.get(reverse("asistente:cortes")).content.decode()
+    assert c.post(reverse("asistente:cortes"), {"omitir": "1"}).url == reverse("asistente:usuario")
     cuenta = CuentaBancaria.objects.get()
     assert cuenta.principal and cuenta.clabe == CLABE_PRUEBA and cuenta.banco.clave == "002"
     assert terminar(c).url == reverse("inicio")
