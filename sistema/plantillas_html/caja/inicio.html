@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Mi caja</h1>
+{% if turno %}
+<section class="panel">
+  <h2>Turno abierto en {{ turno.caja }}</h2>
+  <p>Desde {{ turno.abierto_en|date:"d/m/Y H:i" }} · {{ cobros }} cobro{{ cobros|pluralize }} registrado{{ cobros|pluralize }}.</p>
+  <div class="acciones"><a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a><a class="boton secundario" href="{% url 'caja:cerrar' turno.pk %}">Cerrar turno</a></div>
+</section>
+{% else %}
+<form method="post" action="{% url 'caja:abrir' %}" class="formulario angosto" novalidate>
+  {% csrf_token %}
+  <h2>Abrir turno</h2>
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Abrir turno</button></div>
+</form>
+{% endif %}
+<section class="panel">
+  <h2>Efectivo de turnos cerrados por trasladar: {{ disponible|dinero }}</h2>
+  <div class="acciones"><a class="boton secundario" href="{% url 'caja:traslados' %}">Entregas y depósitos</a></div>
+</section>
+{% if turnos %}<section class="panel"><h2>Turnos cerrados</h2><ul class="lista">{% for t in turnos %}<li><a href="{% url 'caja:turno' t.pk %}">{{ t.caja }} · {{ t.cerrado_en|date:"d/m/Y H:i" }}</a>{% if t.arqueo.supera_umbral %} · <strong>diferencia {{ t.arqueo.diferencia|dinero }}</strong>{% endif %}</li>{% endfor %}</ul></section>{% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Custodia del efectivo</h1>
+{% include "caja/_alertas.html" %}
+<table class="tabla">
+<thead><tr><th>Persona</th><th>Debe tener</th><th>Sin entregas pendientes</th><th>Desde</th></tr></thead>
+<tbody>{% for f in personas %}<tr><td>{{ f.usuario }}</td><td>{{ f.custodia|dinero }}</td><td>{{ f.disponible|dinero }}</td><td>{{ f.desde|date:"d/m/Y H:i"|default:"—" }}</td></tr>{% empty %}<tr><td colspan="4">Nadie tiene efectivo.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% load static formato %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recibo {{ recibo }}</title>
+<link rel="stylesheet" href="{% static 'css/sistema.css' %}">
+<script src="{% static 'js/sistema.js' %}" defer></script>
+</head>
+<body class="ficha">
+<div class="no-imprimir acciones">
+  <button class="boton" type="button" id="imprimir">Imprimir</button>
+  <a class="boton secundario" href="{% url 'cobros:recibo_pdf' recibo.pk %}">PDF</a>
+  <a class="boton secundario" href="{% url 'titulares:detalle' titular.pk %}">Volver</a>
+</div>
+<article class="hoja">
+  <h1>{{ negocio.nombre }}</h1>
+  <h2>Recibo {{ recibo }}</h2>
+  {% if cancelado %}<p class="sello-cancelado">CANCELADO</p>{% endif %}
+  <dl class="datos">
+    <dt>Fecha</dt><dd>{{ pago.fecha|date:"d/m/Y H:i" }}</dd>
+    <dt>{{ voc.titular }}</dt><dd>{{ titular.nombre_completo }}</dd>
+    <dt>{{ voc.matricula }}</dt><dd>{{ titular.matricula_formateada }}</dd>
+    <dt>Importe</dt><dd><strong>{{ pago.importe|dinero }}</strong> ({{ pago.get_medio_display|lower }})</dd>
+  </dl>
+  <h3>Aplicado a</h3>
+  <ul>{% for a in aplicaciones %}<li>{{ a.cargo }}{% if a.cargo.titular_id != titular.pk %} ({{ a.cargo.titular.nombre_completo }}){% endif %}: {{ a.importe|dinero }}</li>{% empty %}<li>Sin cargos pendientes al momento del pago.</li>{% endfor %}
+  {% if a_favor %}<li>Queda a favor: {{ a_favor|dinero }}</li>{% endif %}</ul>
+  <p>Código de verificación: <strong>{{ recibo.codigo }}</strong></p>
+  <p class="pie">Recibió: {{ pago.registrado_por }}</p>
+</article>
+</body>
+</html>

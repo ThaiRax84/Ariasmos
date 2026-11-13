@@ -33,6 +33,85 @@ class CampoImporte(forms.CharField):
         return centavos
 
 
+MAXIMO_ABSURDO = 10 ** 12
+
+
+class CampoImportePositivo(CampoImporte):
+    def clean(self, valor):
+        centavos = super().clean(valor)
+        if centavos is None:
+            return None
+        if centavos <= 0:
+            raise forms.ValidationError("El importe debe ser mayor que cero.")
+        if centavos >= MAXIMO_ABSURDO:
+            raise forms.ValidationError("El importe no es razonable.")
+        return centavos
+
+
+class CampoPorcentaje(forms.CharField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("max_length", 7)
+        kwargs.setdefault("widget", forms.TextInput(attrs={"inputmode": "decimal"}))
+        super().__init__(*args, **kwargs)
+
+    def clean(self, valor):
+        valor = super().clean(valor)
+        if valor in ("", None):
+            return None
+        try:
+            puntos = a_centavos(str(valor).replace("%", ""))
+        except ErrorImporte:
+            raise forms.ValidationError("Escribe un porcentaje de 0.01 a 100, con hasta dos decimales.")
+        if not 1 <= puntos <= 10000:
+            raise forms.ValidationError("El porcentaje va de 0.01 a 100.")
+        return puntos
+
+
+class FormularioPago(forms.Form):
+    importe = CampoImportePositivo(label="Importe recibido")
+
+
+class FormularioCargoManual(forms.Form):
+    concepto = forms.ModelChoiceField(label="Concepto", queryset=ConceptoCobro.objects.none())
+    cantidad = forms.IntegerField(label="Cantidad", min_value=1, max_value=1000, initial=1)
+    importe_unitario = CampoImportePositivo(label="Importe por unidad (vacío = el del concepto)", required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["concepto"].queryset = ConceptoCobro.objects.filter(activo=True, tipo=ConceptoCobro.POR_EVENTO)
+
+
+class FormularioBeca(forms.Form):
+    concepto = forms.ModelChoiceField(label="Concepto recurrente", queryset=ConceptoCobro.objects.none())
+    porcentaje = CampoPorcentaje(label="Porcentaje de beca (de 0.01 a 100)")
+    desde = forms.DateField(label="Vigente desde", widget=forms.DateInput(attrs={"type": "date"}))
+    hasta = forms.DateField(label="Vigente hasta (opcional)", required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    motivo = forms.CharField(label="Motivo", max_length=300)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["concepto"].queryset = ConceptoCobro.objects.filter(activo=True, tipo=ConceptoCobro.RECURRENTE)
+
+
+class FormularioProrroga(forms.Form):
+    fecha_limite = forms.DateField(label="Nueva fecha límite sin recargo", widget=forms.DateInput(attrs={"type": "date"}))
+    motivo = forms.CharField(label="Motivo", max_length=300)
+
+
+class FormularioCancelacion(forms.Form):
+    importe = CampoImportePositivo(label="Importe a cancelar")
+    motivo = forms.CharField(label="Motivo", max_length=300)
+
+
+class FormularioReversion(forms.Form):
+    motivo = forms.CharField(label="Motivo", max_length=300)
+
+
+class FormularioVerificarRecibo(forms.Form):
+    folio = forms.RegexField(label="Folio (serie-número)", regex=r"^[A-Za-z0-9]{1,10}-[0-9]{1,12}$", max_length=24)
+    codigo = forms.CharField(label="Código de verificación", max_length=20)
+
+
 class FormularioRegla(forms.ModelForm):
     valor = CampoImporte(label="Valor (importe o porcentaje)")
     tope_centavos = CampoImporte(label="Tope (opcional)", required=False)

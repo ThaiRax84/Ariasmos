@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Cobrar a {{ titular.nombre_completo }}</h1>
+<p>{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.familia %} · {{ voc.familia }} <a href="{% url 'titulares:familia' titular.familia.pk %}">{{ titular.familia }}</a>{% endif %}</p>
+{% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
+{% if propuesta %}
+<section class="panel alerta">
+  <h2>Confirma el pago de {{ importe|dinero }}</h2>
+  {% if sobre_tope %}<p><strong>Este importe pasa del tope de un pago individual: necesitará autorización.</strong></p>{% endif %}
+  <ul class="lista">
+    {% for cargo, parte in propuesta.partes %}<li>{{ cargo }}{% if cargo.titular_id != titular.pk %} ({{ cargo.titular.nombre_completo }}){% endif %}: {{ parte|dinero }}</li>{% empty %}<li>No hay cargos pendientes.</li>{% endfor %}
+    {% if propuesta.resto %}<li>Queda a favor: <strong>{{ propuesta.resto|dinero }}</strong></li>{% endif %}
+  </ul>
+  <form method="post" class="acciones">
+    {% csrf_token %}
+    <input type="hidden" name="paso" value="confirmar">
+    <input type="hidden" name="importe" value="{{ importe }}">
+    <input type="hidden" name="ficha" value="{{ ficha }}">
+    <button class="boton grande" type="submit">Confirmar y emitir recibo</button>
+    <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}">Corregir</a>
+  </form>
+</section>
+{% elif turno %}
+<form method="post" class="formulario angosto" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Ver cómo se aplica</button></div>
+</form>
+{% endif %}
+{% include "cobros/_estado_cuenta.html" with varios=estado.titulares|length|add:"-1" %}
+{% endblock %}

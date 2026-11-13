@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Verificar recibo</h1>
+<form method="get" class="formulario angosto" novalidate>
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton" type="submit">Verificar</button></div>
+</form>
+{% if resultado %}
+<section class="panel{% if not resultado.valido or resultado.cancelado %} alerta{% endif %}">
+  {% if resultado.valido %}
+  <h2>{% if resultado.cancelado %}Recibo auténtico, pero CANCELADO{% else %}Recibo auténtico{% endif %}</h2>
+  <p>{{ resultado.recibo }} · {{ resultado.recibo.pago.titular.nombre_completo }} · {{ resultado.recibo.pago.importe|dinero }} · {{ resultado.recibo.pago.fecha|date:"d/m/Y" }}</p>
+  {% else %}<h2>El folio y el código no corresponden a un recibo emitido.</h2>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

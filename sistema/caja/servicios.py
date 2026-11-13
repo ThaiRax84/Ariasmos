@@ -105,12 +105,23 @@ def disponible(usuario):
     return custodia(usuario) - reservado
 
 
+def neto_turno_abierto(usuario):
+    turno = turno_abierto(usuario)
+    if turno is None:
+        return 0
+    return esperado_de(turno) - turno.fondo_inicial
+
+
+def disponible_para_trasladar(usuario):
+    return disponible(usuario) - neto_turno_abierto(usuario)
+
+
 def _validar_traslado(usuario, importe):
     if importe is None or importe <= 0:
         raise ErrorCaja("El importe debe ser mayor que cero.")
-    libre = disponible(usuario)
+    libre = disponible_para_trasladar(usuario)
     if importe > libre:
-        raise ErrorCaja(f"No puedes trasladar más de lo que tienes en custodia ({formatear(max(libre, 0))}).")
+        raise ErrorCaja(f"No puedes trasladar más de lo que tienes de turnos cerrados ({formatear(max(libre, 0))}).")
 
 
 def entregar(origen, destino, importe, nota="", request=None):
