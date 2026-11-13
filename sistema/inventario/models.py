@@ -191,6 +191,7 @@ class RenglonDevolucion(Inmutable):
     renglon = models.ForeignKey(RenglonVenta, on_delete=models.PROTECT, related_name="devueltos")
     cantidad = models.PositiveIntegerField()
     buen_estado = models.BooleanField(default=True)
+    importe_dinero = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["id"]

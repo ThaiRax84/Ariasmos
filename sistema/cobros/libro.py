@@ -344,6 +344,8 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
     with transaction.atomic():
         if ReversionPago.objects.filter(pago=pago).exists():
             raise ErrorLibro("El pago ya fue revertido.")
+        if (pago.medio == Pago.EFECTIVO or _interno(pago.titular)) and _cubre_devoluciones_con_dinero(pago):
+            raise ErrorLibro("Este pago cubre artículos cuya devolución ya regresó dinero: no se puede revertir completo. Lo que falte se devuelve desde la venta.")
         if pago.medio == Pago.EFECTIVO:
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Para devolver efectivo se necesita un turno de caja abierto de quien lo devuelve.")
@@ -376,6 +378,12 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
             request=request,
         )
     return reversion
+
+
+def _cubre_devoluciones_con_dinero(pago):
+    from inventario.models import RenglonDevolucion
+
+    return RenglonDevolucion.objects.filter(importe_dinero__gt=0, renglon__cargo__in=pago.aplicaciones.values("cargo")).exists()
 
 
 def efectivo_devolvible(turno):

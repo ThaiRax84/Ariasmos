@@ -13,7 +13,7 @@ from caja import piezas as control_piezas
 from caja.models import MovimientoPiezas, Turno
 from caja.servicios import neto_de, recibe_movimientos
 from cobros import libro
-from cobros.models import CancelacionCargo, Cargo, Pago
+from cobros.models import Aplicacion, CancelacionCargo, Cargo, Pago
 from configuracion.models import hoy_negocio, parametro
 from configuracion.moneda import formatear
 from nucleo.exportar import neutralizar
@@ -266,8 +266,14 @@ def _cancelar(renglon, valor, motivo, usuario, autorizador, solicitud, request):
     return cancelado
 
 
-def _regresar(devolucion, renglon, cantidad, buen_estado, usuario):
-    RenglonDevolucion.objects.create(devolucion=devolucion, renglon=renglon, cantidad=cantidad, buen_estado=buen_estado)
+def _por_regresar(renglon, valor, cancelado):
+    pagado = Aplicacion.objects.filter(cargo=renglon.cargo, pago__reversion__isnull=True).aggregate(t=Sum("importe"))["t"] or 0
+    regresado = RenglonDevolucion.objects.filter(renglon__cargo=renglon.cargo).aggregate(t=Sum("importe_dinero"))["t"] or 0
+    return max(0, min(valor - cancelado, pagado - regresado))
+
+
+def _regresar(devolucion, renglon, cantidad, buen_estado, usuario, dinero=0):
+    RenglonDevolucion.objects.create(devolucion=devolucion, renglon=renglon, cantidad=cantidad, buen_estado=buen_estado, importe_dinero=dinero)
     MovimientoInventario.objects.create(articulo=renglon.articulo, tipo=MovimientoInventario.DEVOLUCION, cantidad=cantidad, usuario=usuario, devolucion=devolucion)
     if not buen_estado:
         MovimientoInventario.objects.create(articulo=renglon.articulo, tipo=MovimientoInventario.MERMA, cantidad=-cantidad, usuario=usuario, devolucion=devolucion, nota="Devuelto en mal estado")
@@ -290,8 +296,12 @@ def devolver(venta, cantidades, medio, usuario, motivo, request=None, turno=None
         if venta.titular.interno and medio != Devolucion.EFECTIVO:
             raise ErrorInventario("Una venta sin matrícula solo se devuelve en efectivo.")
         valor = sum(renglon.precio_unitario * cantidad for renglon, cantidad, _ in limpio.values())
-        cancelado = sum(_cancelar(renglon, renglon.precio_unitario * cantidad, motivo, usuario, autorizador, solicitud, request) for renglon, cantidad, _ in limpio.values())
-        dinero = valor - cancelado
+        cancelado, partes = 0, {}
+        for renglon, cantidad, _ in limpio.values():
+            del_renglon = _cancelar(renglon, renglon.precio_unitario * cantidad, motivo, usuario, autorizador, solicitud, request)
+            cancelado += del_renglon
+            partes[renglon.pk] = _por_regresar(renglon, renglon.precio_unitario * cantidad, del_renglon)
+        dinero = sum(partes.values())
         if dinero == 0:
             medio = Devolucion.SIN_DINERO
         elif medio == Devolucion.SIN_DINERO:
@@ -318,7 +328,7 @@ def devolver(venta, cantidades, medio, usuario, motivo, request=None, turno=None
             solicitud=solicitud, turno=turno if medio == Devolucion.EFECTIVO else None, pago_credito=pago_credito, revision=revision,
         )
         for renglon, cantidad, buen_estado in limpio.values():
-            _regresar(devolucion, renglon, cantidad, buen_estado, usuario)
+            _regresar(devolucion, renglon, cantidad, buen_estado, usuario, partes[renglon.pk])
         if medio == Devolucion.EFECTIVO and piezas:
             control_piezas.registrar(turno, usuario, MovimientoPiezas.DEVOLUCION_ARTICULOS, piezas, -1, devolucion_articulos=devolucion)
         registrar(
