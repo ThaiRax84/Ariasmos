@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Ventas de artículos</h1>
+<table class="tabla">
+<thead><tr><th>Venta</th><th>Fecha</th><th>{{ voc.titular }}</th><th>Cómo se paga</th><th>Total</th><th>Recibo</th><th>Vendió</th></tr></thead>
+<tbody>{% for v in ventas %}<tr><td><a href="{% url 'inventario:venta' v.pk %}">{{ v }}</a></td><td>{{ v.creada|date:"d/m/Y H:i" }}</td><td>{{ v.titular.nombre_completo }}</td><td>{{ v.get_modo_display }}</td><td>{{ v.total|dinero }}</td><td>{% if v.pago %}{{ v.pago.recibo }}{% endif %}</td><td>{{ v.usuario }}</td></tr>{% empty %}<tr><td colspan="7">Sin ventas.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

@@ -3,7 +3,7 @@
 <h1>{{ solicitud }}</h1>
 <section class="panel{% if resaltada %} resaltada{% endif %}">
   <dl class="datos">
-    {% if solicitud.titular %}<dt>{{ voc.matricula }}</dt><dd><a href="{% url 'titulares:detalle' solicitud.titular.pk %}">{{ solicitud.titular.matricula_formateada }}</a></dd>{% endif %}
+    {% if solicitud.titular and not solicitud.titular.interno %}<dt>{{ voc.matricula }}</dt><dd><a href="{% url 'titulares:detalle' solicitud.titular.pk %}">{{ solicitud.titular.matricula_formateada }}</a></dd>{% endif %}
     <dt>Estado</dt><dd>{{ solicitud.get_estado_display }}</dd>
     <dt>Solicitó</dt><dd>{{ solicitud.solicitante }} · {{ solicitud.creada|date:"d/m/Y H:i" }}</dd>
     <dt>Caduca</dt><dd>{{ solicitud.caduca_en|date:"d/m/Y H:i" }}</dd>

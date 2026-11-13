@@ -1,3 +1,4 @@
+import faulthandler
 import secrets
 
 import pytest
@@ -52,6 +53,17 @@ def cliente(usuario=None, credencial=None, reingreso=True):
 
 def codigo_actual(usuario, desfase=0):
     return totp.codigo(secretos.leer(usuario), totp.paso_actual() + desfase)
+
+
+def pytest_configure(config):
+    faulthandler.dump_traceback_later(900, exit=True)
+
+
+@pytest.fixture(autouse=True)
+def limite_por_prueba():
+    faulthandler.dump_traceback_later(240, exit=True)
+    yield
+    faulthandler.dump_traceback_later(900, exit=True)
 
 
 @pytest.fixture(autouse=True)

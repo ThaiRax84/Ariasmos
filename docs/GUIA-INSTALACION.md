@@ -15,7 +15,7 @@ Esta guía es para la persona que instala el sistema en el equipo que hará de s
 2. Comprueba que el instalador no se dañó ni fue cambiado. Abre **PowerShell** (menú Inicio → escribe «PowerShell») y escribe, cambiando la ruta por la de tu carpeta de descargas:
 
    ```
-   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.5.0-instalador.exe" -Algorithm SHA256
+   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.6.0-instalador.exe" -Algorithm SHA256
    ```
 
 3. El texto largo que aparece en la columna **Hash** debe ser **igual** al que viene en `SHA256SUMS.txt` (no importan mayúsculas o minúsculas). Si no es igual, **no instales**: vuelve a descargarlo.
@@ -37,12 +37,12 @@ Si perdiste el token antes de terminar el asistente: menú Inicio → **Ariasmos
 
 El navegador se abre en `https://localhost/`. El asistente te lleva paso a paso:
 
-1. **Datos del negocio**: pega el token, escribe el nombre, elige la zona horaria, la moneda y la plantilla («escuela» o «genérico»).
+1. **Datos del negocio**: pega el token, escribe el nombre, elige la zona horaria, la moneda y la plantilla («escuela» o «genérico»), y marca si el negocio lleva **inventario** de artículos (se puede cambiar después en *Configuración → Inventario*).
 2. **Vocabulario y conceptos**: cómo se llaman las personas a las que se cobra y qué conceptos se cobran. Se puede dejar como viene.
 3. **Importes** de cada concepto y, si aplica, el recargo por pago tardío.
 4. **Datos de pago**: la cuenta bancaria (CLABE y beneficiario) que aparece en las fichas de pago. Se puede completar después.
 5. **Caja: cortes y retiros**: qué días de la semana hay corte de caja y la hora límite de cada uno (propone lunes a sábado a las 18:00; deja vacío el día que no tenga corte), si se capturan las piezas de cada billete y moneda, y los topes de los retiros de caja (importe máximo por retiro, importe y número máximo de retiros por día o por semana y efectivo máximo en caja). Lo que pase de un tope necesita la autorización de otra persona.
-6. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** (ver abajo). Aquí aparece la **clave de recuperación** (ver abajo).
+6. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** con sus dos topes (ver abajo). Aquí aparece la **clave de recuperación** (ver abajo).
 7. **Primer usuario de Dirección**: tu usuario y contraseña.
 8. **Autenticador**: instala en tu teléfono una aplicación gratuita como Google Authenticator, Microsoft Authenticator, Authy o 2FAS, escanea el código QR y escribe el código de 6 dígitos.
 
@@ -53,7 +53,10 @@ Es una carpeta donde alguien deja el archivo descargado de la banca en línea (e
 - Solo toma archivos `.pdf`, `.xlsx` y `.csv` que ya terminaron de copiarse; un archivo que ya se importó no se vuelve a importar.
 - Lo importado pasa a la subcarpeta `procesados`; lo rechazado, a `rechazados`, junto con un archivo `.motivo.txt` que dice por qué.
 - Un Excel o CSV solo se reconoce si antes se importó a mano uno con las mismas columnas.
-- Si el archivo no continúa el estado de cuenta anterior (por ejemplo, el primero o un Excel), sus pagos **no se aplican** hasta que alguien con permiso de conciliar lo revise contra el banco y elija **Revisada: aplicar sus pagos**.
+- Un **estado de cuenta en PDF que continúa al anterior** aplica sus pagos de inmediato. Si no continúa (por ejemplo, el primero), sus pagos **no se aplican** hasta que alguien con permiso de conciliar los revise contra el banco y los libere.
+- Un **Excel o CSV** aplica sus pagos de inmediato, salvo los movimientos con alguna señal de sospecha, que quedan **retenidos uno por uno** con su motivo: importe mayor que lo que debe la familia, mayor que el **tope por pago**, fecha futura o ya cubierta por un estado en PDF que no lo trae, titular que no está activo o segundo pago de la misma matrícula en el archivo. Todo el archivo queda retenido si sus saldos no cuadran, si no continúan el último saldo conocido, o si con él se rebasaría el **tope de pagos sin respaldo** (la suma de lo aplicado desde Excel o CSV que todavía no confirma un estado en PDF).
+- Los dos topes se piden en este paso y en *Configuración → Carpeta vigilada del banco*. Empiezan en **0**: con el tope de pagos sin respaldo en 0, todo Excel o CSV queda retenido como antes. Aplicar de inmediato es una decisión del negocio al subir ese tope.
+- Cuando llega el estado en PDF del mes, cada pago que se aplicó desde un Excel o CSV y no aparece en él queda marcado **«sin respaldo en el estado»** y se avisa a Supervisión y Dirección. No se revierte solo.
 - La carpeta no puede estar dentro de la carpeta del programa ni de la de datos. Si es una carpeta de tu usuario, dale permiso como se explica en la sección 6.
 
 ## 4. La clave de recuperación

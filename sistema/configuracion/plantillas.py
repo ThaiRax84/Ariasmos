@@ -68,7 +68,7 @@ def cargar_datos(datos, origen, usuario=None, request=None):
             Caja.objects.get_or_create(nombre=nombre)
         for nombre in datos["motivos_retiro"]:
             MotivoRetiro.objects.get_or_create(nombre=nombre)
-        for clave, valor in datos["caja"].items():
+        for clave, valor in list(datos["caja"].items()) + list(datos["inventario"].items()):
             Parametro.objects.update_or_create(clave=clave, defaults={"valor": _texto_parametro(clave, valor)})
         negocio = Negocio.actual()
         if datos["moneda"] == (negocio.moneda if negocio else moneda.POR_DEFECTO):
@@ -104,6 +104,13 @@ def _caja_exportada():
     for clave, maximo in esquema.TOPES_CAJA.items():
         caja[clave] = max(0, min(int(parametro(clave)), maximo))
     return caja
+
+
+def _inventario_exportado():
+    inventario = {clave: bool(parametro(clave)) for clave in esquema.LOGICOS_INVENTARIO}
+    for clave, maximo in esquema.DIAS_INVENTARIO.items():
+        inventario[clave] = max(0 if clave == "dias_devolucion" else 1, min(int(parametro(clave)), maximo))
+    return inventario
 
 
 def rol_inicial(datos):
@@ -167,6 +174,7 @@ def exportar():
         "cajas": list(Caja.objects.filter(activa=True).values_list("nombre", flat=True)),
         "motivos_retiro": list(MotivoRetiro.objects.filter(activo=True).values_list("nombre", flat=True)),
         "caja": _caja_exportada(),
+        "inventario": _inventario_exportado(),
         "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
         "cortes": [{"tipo": d.tipo, "nombre": d.nombre, "nivel": d.nivel, "activa": d.activa} for d in DefinicionCorte.objects.all()],
     }

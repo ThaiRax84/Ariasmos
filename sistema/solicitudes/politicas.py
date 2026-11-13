@@ -1,6 +1,8 @@
 ALTAS = ("alta_baja_directa", "solicitar_alta_baja", "aprobar_solicitudes")
 AJUSTES = ("aplicar_ajustes", "solicitar_ajustes", "aprobar_solicitudes")
 RETIROS = ("aprobar_solicitudes", "retirar_efectivo", "aprobar_solicitudes")
+CONTEO = ("aprobar_solicitudes", "subir_conteo_inventario", "aprobar_solicitudes")
+DEVOLUCION = ("aprobar_solicitudes", "devolver_articulos", "aprobar_solicitudes")
 
 POR_DEFECTO = {
     "correccion_nombre": ALTAS,
@@ -13,6 +15,8 @@ POR_DEFECTO = {
     "pago_sobre_tope": AJUSTES,
     "retiro_caja": RETIROS,
     "revertir_retiro": RETIROS,
+    "conteo_inventario": CONTEO,
+    "devolucion_efectivo": DEVOLUCION,
 }
 
 

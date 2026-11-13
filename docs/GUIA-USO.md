@@ -38,6 +38,21 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 5. Cada negocio decide qué días hay corte y a qué hora. Un turno abierto en un día con corte debe cerrarse antes de la hora de ese día; si se abrió en un día sin corte, antes de la hora del siguiente día que sí tenga. Si cierras después, el corte queda marcado como **tardío**; no pasa nada más.
 6. Entrega el efectivo a Supervisión desde **Mi caja** → **Entregar efectivo**; quien lo recibe lo confirma en su sesión.
 
+### Vender artículos
+
+Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [guía de inventario](GUIA-INVENTARIO.md).
+
+1. **Inventario** → **Vender a un titular** (o **Vender artículos** desde su ficha): elige artículos y cantidades. El precio lo pone cada artículo.
+2. Elige cómo se paga: **Lo paga ahora** pasa al cobro, que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás.
+3. **Vender sin matrícula** es para quien no es titular: se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
+4. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
+
+### Devoluciones, entradas, mermas y conteo
+
+- **Devolución**: busca la venta por su número o por el recibo (código o QR). Lo no pagado se cancela; lo pagado regresa como **saldo a favor** al momento o en **efectivo**, que siempre se solicita y autoriza otra persona (sale de tu turno al aprobarse).
+- **Entrada o merma**: artículo, cantidad, motivo y, si lo hay, el comprobante (JPEG, PNG o PDF de hasta 5 MB). No pide permiso; Supervisión la revisa después.
+- **Conteo mensual**: descarga la lista para contar (no trae existencias), cuenta y sube el Excel o CSV con clave y cantidad, o captúralo en pantalla. Al guardarlo queda fijo, ves las diferencias y otra persona lo aprueba.
+
 ### Verificar un recibo
 
 - **Verificar recibo** acepta el código del recibo con su folio, o el texto del QR: con un lector de códigos conectado por USB basta con leer el QR del recibo.
@@ -57,7 +72,8 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 2. Revisa la vista previa: cuántos pagos se aplican solos, cuántos quedan por identificar y cuántos ya estaban.
 3. En la **cola** de movimientos por identificar, confirma a quién pertenece cada uno, o márcalo como «no es un cobro».
 4. Los depósitos de efectivo de caja se emparejan con los movimientos del banco.
-5. Una importación de la carpeta vigilada que no continúa el estado anterior queda **retenida**: no aplica pagos. Revísala contra el banco y elige **Revisada: aplicar sus pagos**.
+5. Lo que llega por la carpeta vigilada se aplica solo, salvo los movimientos **retenidos**: un estado en PDF que no continúa al anterior, o los movimientos de un Excel o CSV con una señal de sospecha (o todo el archivo si sus saldos no cuadran o rebasaría el tope de pagos sin respaldo). En el Inicio aparece la importación; ábrela, compara cada movimiento retenido con el banco (se ve su motivo), marca los que existen y elige **Liberar los marcados** o **Liberar todos**. Quien libera no puede marcar la importación como revisada.
+6. **Pagos sin respaldo en el estado**: al importar el estado en PDF del mes, cada pago aplicado desde un Excel o CSV que no aparezca en él sale en el Inicio con un enlace para **solicitar su reversión**. El sistema no lo revierte solo. También avisa si un pago así lleva más de 45 días sin un estado que lo cubra.
 
 ### Efectivo
 
@@ -70,10 +86,16 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 - En el **Inicio** aparecen avisos cuando una caja llega al 80 % de un tope del periodo, cuando un retiro se declara sin comprobante y cuando hay retiros sin revisar desde hace varios días.
 - **Motivos de retiro** permite agregar o desactivar motivos.
 
+### Inventario
+
+- **Inventario** → **Revisión**: entradas, mermas, devoluciones a saldo a favor y ventas sin existencia por revisar; márcalas **Revisado** u **Observado**. Nadie revisa lo propio.
+- Los conteos y las devoluciones en efectivo llegan a la bandeja de **Solicitudes**. Al aprobar un conteo se ajusta cada artículo con la diferencia del momento del conteo.
+- **Artículos**: alta, precio, mínimo y concepto de cobro; un artículo no se borra, se desactiva. El Inicio avisa de los artículos en o bajo su mínimo.
+
 ### Corte mayor
 
 1. El día 1 de cada mes el sistema prepara el **corte mayor** del mes anterior como borrador. Aparece en el **Inicio** y en **Cortes**.
-2. Revísalo: ingresos por medio y por concepto, estado de cada titular, cartera vencida, caja y banco.
+2. Revísalo: ingresos por medio y por concepto, estado de cada titular, cartera vencida, caja, banco y, si se lleva, el resumen de inventario.
 3. Elige **Cerrar el corte** (pide tu contraseña). El mes queda bloqueado: nada puede registrarse con fecha dentro de él.
 4. Si nadie lo cierra en 5 días, el sistema lo cierra solo marcado como «sin revisar».
 
@@ -91,7 +113,7 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** e importación inicial del padrón.
+- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope de pagos sin respaldo y el tope por pago), **Inventario** (encenderlo, devoluciones y plazos) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
 
 ### Respaldos
@@ -103,7 +125,8 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 ### Revisión de importaciones
 
 - Cuando alguien importa un archivo de banco que no se puede comprobar contra el estado de cuenta anterior y con él se aplicaron pagos, aparece en tu Inicio como **importación por revisar**.
-- Ábrela, compárala con el banco y elige **Marcar como revisada**. Quien la importó, o quien la liberó si llegó por la carpeta vigilada, no puede marcarla.
+- Ábrela, compárala con el banco y elige **Marcar como revisada**. Quien la importó, o quien liberó alguno de sus movimientos si llegó por la carpeta vigilada, no puede marcarla.
+- Si el negocio lleva inventario, el Inicio te avisa cuando un conteo lleva más días de los configurados sin aprobarse.
 
 ### Bitácora
 

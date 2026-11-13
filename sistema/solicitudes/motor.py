@@ -11,6 +11,8 @@ from cobros import acciones, generacion, libro
 from configuracion.models import hoy_negocio, parametro
 from cuentas.models import CodigoUsado
 from cuentas.servicios import consumir_codigo, usar_delegacion
+from inventario import acciones as inventario_acciones
+from inventario.servicios import ErrorInventario
 from titulares.models import Familia, MotivoBaja, Titular
 from titulares.servicios import foto_titular
 
@@ -165,9 +167,11 @@ MANEJADORES = {
     "pago_sobre_tope": acciones.PagoSobreTope(),
     "retiro_caja": retiros_acciones.RetiroSobreTope(),
     "revertir_retiro": retiros_acciones.RevertirRetiro(),
+    "conteo_inventario": inventario_acciones.ConteoInventario(),
+    "devolucion_efectivo": inventario_acciones.DevolucionEfectivo(),
 }
 
-ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion)
+ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion, inventario_acciones.ErrorAccion, ErrorInventario)
 
 
 def _validar(manejador, titular, datos):
@@ -233,7 +237,9 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
         raise PermissionDenied
     caducar_vencidas()
     with transaction.atomic():
-        titular = Titular.objects.get(pk=titular.pk) if titular is not None else None
+        titular = Titular.todos.get(pk=titular.pk) if titular is not None else None
+        if titular is not None and titular.interno and not getattr(manejador, "admite_interno", False):
+            raise ErrorSolicitud("Esta acción no aplica a la cuenta interna del negocio.")
         _validar(manejador, titular, datos)
         if Solicitud.objects.filter(titular=titular, accion=accion, estado=Solicitud.PENDIENTE, **manejador.llave(datos)).exists():
             raise ErrorSolicitud("Ya hay una solicitud pendiente para esta acción.")

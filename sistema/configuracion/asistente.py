@@ -34,11 +34,12 @@ from .formularios import (
     FormularioCajaCortes,
     FormularioPersonalizar,
     FormularioRevisarPlantilla,
+    TOPES_CARPETA,
     guardar_caja,
     valores_caja,
 )
 from .resumen import resumir
-from .models import VOCABULARIO_BASE, Negocio, Vocabulario, hoy_negocio, vocabulario
+from .models import VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, hoy_negocio, parametro, vocabulario
 
 CLAVE_SESION = "asistente"
 
@@ -106,6 +107,7 @@ def inicio(request):
                 defaults={"nombre": formulario.cleaned_data["nombre"], "zona_horaria": formulario.cleaned_data["zona_horaria"], "moneda": formulario.cleaned_data["moneda"], "plantilla": origen, "configurado": False},
             )
             registrar("asistente_negocio", objeto=guardado, datos={"nombre": guardado.nombre, "plantilla": origen, "moneda": guardado.moneda}, request=request)
+        _guardar_estado(request, inventario=bool(formulario.cleaned_data.get("inventario")))
         if origen == "importada":
             _guardar_estado(request, autorizado=True, pendiente=datos)
             return redirect("asistente:revisar")
@@ -117,6 +119,9 @@ def inicio(request):
 def _aplicar_plantilla(request, datos, origen):
     with transaction.atomic():
         plantillas.cargar_datos(datos, origen, request=request)
+        inventario = bool(_estado(request).get("inventario"))
+        Parametro.objects.update_or_create(clave="modulo_inventario", defaults={"valor": "1" if inventario else "0"})
+        registrar("asistente_inventario", datos={"modulo_inventario": inventario, "origen": "asistente"}, request=request)
     _guardar_estado(request, autorizado=True, pendiente=None, rol_inicial=datos["rol_inicial"], recargos=plantillas.recargos(datos))
 
 
@@ -262,6 +267,11 @@ def cortes(request):
                 DefinicionCorte.objects.filter(tipo=tipo).update(nivel=datos[f"nivel_{tipo}"])
             if datos["carpeta_respaldo"]:
                 Negocio.objects.filter(pk=1).update(carpeta_respaldo=datos["carpeta_respaldo"])
+            antes_topes = {clave: int(parametro(clave)) for clave in TOPES_CARPETA}
+            for clave, valor in formulario.topes().items():
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+            if antes_topes != formulario.topes():
+                registrar("carpeta_banco_topes", objeto=negocio, datos={"cambios": diferencias(antes_topes, formulario.topes()), "origen": "asistente"}, request=request)
             if datos["carpeta_banco"] != negocio.carpeta_banco:
                 Negocio.objects.filter(pk=1).update(carpeta_banco=datos["carpeta_banco"])
                 registrar("carpeta_banco_cambiada", objeto=negocio, datos={"cambios": {"carpeta_banco": [negocio.carpeta_banco, datos["carpeta_banco"]]}, "origen": "asistente"}, request=request)

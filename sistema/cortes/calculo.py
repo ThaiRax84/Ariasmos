@@ -8,7 +8,7 @@ from django.utils import timezone
 from banco.ficha import datos_de_pago
 from banco.models import Importacion, MovimientoBancario
 from caja.models import Arqueo, RetiroCaja, ReversionRetiro, Traslado, Turno
-from caja.servicios import custodia
+from caja.servicios import custodia, devoluciones_articulos
 from cobros import libro
 from cobros.models import Aplicacion, Beca, CancelacionCargo, Cargo, ConceptoCobro, Pago, Prorroga, ReversionPago
 from configuracion import moneda
@@ -100,10 +100,15 @@ def cifras_diario(turno, arqueo):
         {"folio": str(r.retiro), "hora": f"{local(r.creada):%H:%M}", "importe": r.retiro.importe, "motivo": r.motivo}
         for r in ReversionRetiro.objects.filter(turno=turno).select_related("retiro").order_by("creada", "id")
     ]
+    articulos = [
+        {"folio": str(d), "venta": str(d.venta), "hora": f"{local(d.creada):%H:%M}", "titular": titular(d.venta.titular), "importe": d.importe_dinero, "autorizo": persona(d.autorizada_por), "motivo": d.motivo}
+        for d in turno.devoluciones_articulos.select_related("venta__titular__familia", "autorizada_por").order_by("creada", "id")
+    ]
     cobrado = sum(p.importe for p in pagos)
     devuelto = sum(d.pago.importe for d in devoluciones)
     retirado = sum(r["importe"] for r in retiros)
     regresado = sum(r["importe"] for r in regresos)
+    devuelto_articulos = sum(d["importe"] for d in articulos)
     datos = base("diario", "Corte diario de caja", local(turno.abierto_en).date(), local(hasta).date())
     datos["encabezado"] = {
         "caja": turno.caja.nombre,
@@ -117,6 +122,7 @@ def cifras_diario(turno, arqueo):
         "total_devuelto": devuelto,
         "total_retirado": retirado,
         "total_regresado": regresado,
+        "total_devuelto_articulos": devuelto_articulos,
         "recibos": len(recibos),
         "esperado": arqueo.esperado,
         "contado": arqueo.contado,
@@ -128,6 +134,7 @@ def cifras_diario(turno, arqueo):
     datos["secciones"] = [
         seccion("recibos", "Recibos del turno", recibos),
         seccion("devoluciones", "Devoluciones", filas_devoluciones),
+        seccion("devoluciones_articulos", "Devoluciones de artículos en efectivo", articulos),
         seccion("retiros", "Retiros de caja", retiros),
         seccion("retiros_revertidos", "Retiros revertidos que regresaron a esta caja", regresos),
         seccion("traslados", "Traslados", traslados),
@@ -143,7 +150,7 @@ def cifras_diario(turno, arqueo):
 
 def _vigentes(inicio, fin):
     desde, hasta = limites(inicio, fin)
-    return Pago.objects.filter(fecha__gte=desde, fecha__lt=hasta, reversion__isnull=True)
+    return Pago.objects.filter(fecha__gte=desde, fecha__lt=hasta, reversion__isnull=True, medio__in=Pago.INGRESOS)
 
 
 def _estado_concepto(cargos):
@@ -201,7 +208,7 @@ def cifras_mayor(inicio, fin, al_dia=None):
         fila["prorrogas"] = prorrogas.get(persona_titular.pk, [])
         filas_titular.append(fila)
     cartera = {clave: 0 for clave, _, _ in TRAMOS}
-    for cargo in libro.con_saldo(Cargo.objects.filter(vencimiento__lt=al_dia)).filter(saldo__gt=0):
+    for cargo in libro.con_saldo(Cargo.objects.filter(vencimiento__lt=al_dia, titular__interno=False)).filter(saldo__gt=0):
         dias = (al_dia - cargo.vencimiento).days
         for clave, minimo, maximo in TRAMOS:
             if dias >= minimo and (maximo is None or dias <= maximo):
@@ -213,6 +220,7 @@ def cifras_mayor(inicio, fin, al_dia=None):
     devuelto_total = ReversionPago.objects.filter(turno__in=cerrados).aggregate(t=Sum("pago__importe"))["t"] or 0
     retirado_total = RetiroCaja.objects.filter(turno__in=cerrados).aggregate(t=Sum("importe"))["t"] or 0
     regresado_total = ReversionRetiro.objects.filter(turno__in=cerrados).aggregate(t=Sum("retiro__importe"))["t"] or 0
+    articulos_total = devoluciones_articulos().filter(turno__in=cerrados).aggregate(t=Sum("importe_dinero"))["t"] or 0
     depositado_total = Traslado.objects.filter(tipo=Traslado.DEPOSITO).aggregate(t=Sum("importe"))["t"] or 0
     abiertos = Turno.objects.filter(estado=Turno.ABIERTO)
     en_custodia = sum(custodia(u) for u in Usuario.objects.all()) - sum(_neto(t) for t in abiertos)
@@ -274,11 +282,11 @@ def cifras_mayor(inicio, fin, al_dia=None):
         "cartera_vencida": cartera,
         "altas": len(altas),
         "bajas": len(bajas),
-        "efectivo_cobrado_neto": efectivo_total - devuelto_total,
+        "efectivo_cobrado_neto": efectivo_total - devuelto_total - articulos_total,
         "efectivo_retirado_neto": retirado_total - regresado_total,
         "efectivo_en_custodia": en_custodia,
         "efectivo_depositado": depositado_total,
-        "efectivo_cuadra": efectivo_total - devuelto_total - retirado_total + regresado_total == en_custodia + depositado_total,
+        "efectivo_cuadra": efectivo_total - devuelto_total - articulos_total - retirado_total + regresado_total == en_custodia + depositado_total,
         "nota_efectivo": "Las cifras de efectivo cuentan solo turnos cerrados.",
         "retiros_del_mes": sum(r["importe"] for r in retiros_mes),
         "efectivo_del_mes": pagos.filter(medio=Pago.EFECTIVO).aggregate(t=Sum("importe"))["t"] or 0,
@@ -299,6 +307,13 @@ def cifras_mayor(inicio, fin, al_dia=None):
         seccion("reversos", "Reversos de pago", reversos),
         seccion("cancelaciones", "Cancelaciones y condonaciones", cancelaciones),
     ]
+    from inventario import servicios as inventario
+
+    filas_inventario = inventario.resumen(inicio, fin, desde, hasta)
+    if filas_inventario:
+        datos["secciones"].append(seccion("inventario", "Inventario: existencias, ventas, devoluciones, entradas, mermas y ajustes", filas_inventario))
+        devoluciones_mes = devoluciones_articulos().filter(creada__gte=desde, creada__lt=hasta)
+        datos["totales"]["devoluciones_articulos_efectivo"] = devoluciones_mes.aggregate(t=Sum("importe_dinero"))["t"] or 0
     return datos
 
 
@@ -375,7 +390,7 @@ def contacto_principal(objeto):
 
 def cifras_cobranza(fecha):
     filas = []
-    cargos = libro.con_saldo(Cargo.objects.filter(vencimiento__lt=fecha)).filter(saldo__gt=0).select_related("titular__familia", "concepto").prefetch_related("prorrogas").order_by("titular__apellidos", "titular__nombre", "vencimiento", "id")
+    cargos = libro.con_saldo(Cargo.objects.filter(vencimiento__lt=fecha, titular__interno=False)).filter(saldo__gt=0).select_related("titular__familia", "concepto").prefetch_related("prorrogas").order_by("titular__apellidos", "titular__nombre", "vencimiento", "id")
     contactos_cache = {}
     for cargo in cargos:
         vence = _vencimiento_efectivo(cargo)

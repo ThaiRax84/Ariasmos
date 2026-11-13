@@ -1,6 +1,6 @@
 from proyecto.version import actual as version_actual
 
-from .models import vocabulario
+from .models import inventario_activo, vocabulario
 
 
 def general(request):
@@ -11,4 +11,5 @@ def general(request):
         "voc": vocabulario(),
         "permisos": permisos,
         "version": version_actual(),
+        "inventario_activo": inventario_activo() if permisos else False,
     }

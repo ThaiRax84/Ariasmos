@@ -92,7 +92,7 @@ def generar_recargos(hoy=None, request=None):
     hoy = hoy or hoy_negocio()
     creados = 0
     base = libro.con_saldo(
-        Cargo.objects.filter(origen__in=[Cargo.AUTOMATICO, Cargo.MANUAL, Cargo.SALDO_INICIAL], concepto__regla_recargo__activa=True, vencimiento__lt=hoy).select_related("concepto__regla_recargo", "titular")
+        Cargo.objects.filter(origen__in=[Cargo.AUTOMATICO, Cargo.MANUAL, Cargo.SALDO_INICIAL], concepto__regla_recargo__activa=True, vencimiento__lt=hoy, titular__interno=False).select_related("concepto__regla_recargo", "titular")
     ).filter(saldo__gt=0)
     for cargo in base:
         regla = cargo.concepto.regla_recargo

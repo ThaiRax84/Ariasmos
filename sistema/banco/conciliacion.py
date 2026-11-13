@@ -10,7 +10,7 @@ from auditoria.servicios import registrar
 from caja.models import Traslado
 from cobros import libro
 from cobros.models import Pago
-from configuracion.models import Negocio, parametro
+from configuracion.models import Negocio, hoy_negocio, parametro
 from nucleo import identificacion, reparto
 from configuracion.moneda import formatear
 from nucleo.lectores import santander_pyme
@@ -110,22 +110,26 @@ def proponer_columnas(filas, cuenta=None):
     return encabezado, propuesta
 
 
-def _cuadrar(movimientos):
-    if any(m["saldo"] is None for m in movimientos):
-        return False
-    for orden in (movimientos, list(reversed(movimientos))):
-        ok = True
-        for anterior, actual in zip(orden, orden[1:]):
-            signo = 1 if actual["sentido"] == MovimientoBancario.ABONO else -1
-            if anterior["saldo"] + signo * actual["importe"] != actual["saldo"]:
-                ok = False
-                break
-        if ok:
-            return True
+def _signo(movimiento):
+    return 1 if movimiento["sentido"] == MovimientoBancario.ABONO else -1
+
+
+def orden_cronologico(movimientos):
+    if not movimientos or any(m.get("saldo") is None for m in movimientos):
+        return None
+    for orden in (list(movimientos), list(reversed(movimientos))):
+        if all(anterior["saldo"] + _signo(actual) * actual["importe"] == actual["saldo"] for anterior, actual in zip(orden, orden[1:])):
+            return orden
     return None
 
 
-def movimientos_de_filas(filas, encabezado, columnas, cuenta):
+def _cuadrar(movimientos):
+    if any(m["saldo"] is None for m in movimientos):
+        return False
+    return True if orden_cronologico(movimientos) is not None else None
+
+
+def movimientos_de_filas(filas, encabezado, columnas, cuenta, exigir_cuadre=True):
     columnas = {papel: int(indice) for papel, indice in columnas.items() if indice not in (None, "")}
     if "fecha" not in columnas:
         raise ErrorConciliacion("Indica qué columna es la fecha.")
@@ -182,7 +186,7 @@ def movimientos_de_filas(filas, encabezado, columnas, cuenta):
         raise ErrorConciliacion(" ".join(errores[:10]) + (f" (y {len(errores) - 10} más)" if len(errores) > 10 else ""))
     if not movimientos:
         raise ErrorConciliacion("El archivo no tiene movimientos.")
-    if "saldo" in columnas and _cuadrar(movimientos) is None:
+    if exigir_cuadre and "saldo" in columnas and _cuadrar(movimientos) is None:
         raise ErrorConciliacion("Los saldos del archivo no cuadran con los importes; revisa las columnas o el archivo.")
 
     def llave(m):
@@ -298,16 +302,40 @@ class ErrorLiberacion(ErrorConciliacion):
     pass
 
 
-def liberar(importacion, usuario, request=None):
+def retenidos(importacion):
+    return importacion.lista.filter(estado=MovimientoBancario.POR_IDENTIFICAR, liberado_en__isnull=True).exclude(retencion="")
+
+
+def con_retenidos():
+    pendientes = Q(lista__estado=MovimientoBancario.POR_IDENTIFICAR, lista__liberado_en__isnull=True) & ~Q(lista__retencion="")
+    return (
+        Importacion.objects.annotate(retenidos=Count("lista", filter=pendientes), monto_retenido=Sum("lista__importe", filter=pendientes))
+        .filter(retenidos__gt=0)
+        .select_related("cuenta__banco")
+        .order_by("creada", "id")
+    )
+
+
+def liberar(importacion, usuario, request=None, movimientos=None):
     if not usuario.tiene_permiso("conciliar_banco"):
-        raise ErrorLiberacion("Solo quien concilia libera una importación retenida.")
+        raise ErrorLiberacion("Solo quien concilia libera movimientos retenidos.")
     with transaction.atomic():
-        hechos = Importacion.objects.filter(pk=importacion.pk, retenida=True, liberada_en__isnull=True).update(liberada_por=usuario, liberada_en=timezone.now())
-        if hechos != 1:
-            raise ErrorLiberacion("La importación no está retenida o ya se liberó.")
+        consulta = retenidos(importacion)
+        if movimientos is not None:
+            consulta = consulta.filter(pk__in=[int(m) for m in movimientos])
+        lista = list(consulta.order_by("id"))
+        if not lista:
+            raise ErrorLiberacion("No hay movimientos retenidos que liberar en esta importación.")
         aplicados = depositos = 0
+        liberados = []
         cuenta = importacion.cuenta
-        for movimiento in importacion.lista.filter(estado=MovimientoBancario.POR_IDENTIFICAR, propuesta__isnull=True, posible_duplicado=False).order_by("id"):
+        for movimiento in lista:
+            hechos = MovimientoBancario.objects.filter(pk=movimiento.pk, liberado_en__isnull=True, estado=MovimientoBancario.POR_IDENTIFICAR).update(liberado_por=usuario, liberado_en=timezone.now())
+            if hechos != 1:
+                continue
+            liberados.append({"movimiento": movimiento.pk, "importe": movimiento.importe, "motivos": movimiento.retencion})
+            if movimiento.propuesta_id is not None or movimiento.posible_duplicado:
+                continue
             datos = {
                 "sentido": movimiento.sentido, "clase": movimiento.clase, "importe": movimiento.importe, "fecha": movimiento.fecha.isoformat(),
                 "referencia": movimiento.referencia, "concepto": movimiento.concepto, "cuenta_pagador": movimiento.cuenta_pagador,
@@ -320,15 +348,30 @@ def liberar(importacion, usuario, request=None):
                 aplicar(movimiento, _titular(extra.matricula), usuario, request)
                 MovimientoBancario.objects.filter(pk=movimiento.pk).update(motivo="")
                 aplicados += 1
+        if not liberados:
+            raise ErrorLiberacion("Los movimientos ya se habían liberado.")
+        Importacion.objects.filter(pk=importacion.pk, liberada_por__isnull=True).update(liberada_por=usuario)
+        if not retenidos(importacion).exists():
+            Importacion.objects.filter(pk=importacion.pk, liberada_en__isnull=True).update(liberada_en=timezone.now())
         Importacion.objects.filter(pk=importacion.pk).update(aplicados=F("aplicados") + aplicados, depositos_emparejados=F("depositos_emparejados") + depositos)
-        registrar("importacion_liberada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "aplicados": aplicados, "depositos": depositos}, request=request)
+        registrar(
+            "importacion_liberada",
+            usuario=usuario,
+            objeto=importacion,
+            datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "aplicados": aplicados, "depositos": depositos, "liberados": liberados, "parcial": movimientos is not None},
+            request=request,
+        )
     return aplicados, depositos
 
 
+def libero_algo(importacion, usuario):
+    return importacion.liberada_por_id == usuario.pk or importacion.lista.filter(liberado_por=usuario).exists()
+
+
 def marcar_revisada(importacion, usuario, request=None):
-    if importacion.liberada_por_id == usuario.pk:
+    if libero_algo(importacion, usuario):
         registrar("revision_propia_denegada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo, "motivo": "la_libero"}, request=request)
-        raise RevisionPropia("Quien liberó la importación no puede revisarla.")
+        raise RevisionPropia("Quien liberó movimientos de la importación no puede revisarla.")
     if importacion.creada_por_id == usuario.pk:
         registrar("revision_propia_denegada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo}, request=request)
         raise RevisionPropia("Quien importó no puede revisar su propia importación.")
@@ -346,6 +389,44 @@ def marcar_revisada(importacion, usuario, request=None):
             datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "importo": str(importacion.importo), "pagos": aplicados["n"], "monto": aplicados["t"] or 0},
             request=request,
         )
+
+
+def sin_respaldo_vigentes():
+    return MovimientoBancario.objects.filter(sin_respaldo=True, estado=MovimientoBancario.APLICADO).select_related("pago__titular", "pago__recibo", "cuenta__banco").order_by("fecha", "id")
+
+
+def _aplicados_editables():
+    return MovimientoBancario.objects.filter(estado=MovimientoBancario.APLICADO, importacion__adaptador=Importacion.ARCHIVO, confirmado_por__isnull=True)
+
+
+def expuesto():
+    return _aplicados_editables().aggregate(t=Sum("importe"))["t"] or 0
+
+
+def antiguos_sin_respaldo(hoy=None):
+    hoy = hoy or hoy_negocio()
+    limite = hoy - timedelta(days=max(int(parametro("dias_sin_respaldo_alerta")), 1))
+    return _aplicados_editables().filter(sin_respaldo=False, fecha__lt=limite).select_related("pago__titular", "pago__recibo", "cuenta__banco").order_by("fecha", "id")
+
+
+def marcar_sin_respaldo(importacion, request=None):
+    if importacion.adaptador != Importacion.ESTADO_PDF or importacion.periodo_inicio is None or importacion.periodo_fin is None:
+        return 0
+    candidatos = _aplicados_editables().filter(cuenta=importacion.cuenta, sin_respaldo=False, fecha__gte=importacion.periodo_inicio, fecha__lte=importacion.periodo_fin).select_related("pago__recibo")
+    marcados = 0
+    for movimiento in candidatos:
+        hechos = MovimientoBancario.objects.filter(pk=movimiento.pk, sin_respaldo=False, confirmado_por__isnull=True).update(sin_respaldo=True, sin_respaldo_en=timezone.now())
+        if hechos != 1:
+            continue
+        marcados += 1
+        registrar(
+            "pago_sin_respaldo",
+            objeto=movimiento,
+            titular=movimiento.pago.titular_id,
+            datos={"importe": movimiento.importe, "fecha": movimiento.fecha, "recibo": str(movimiento.pago.recibo), "estado_oficial": importacion.nombre_archivo, "importacion_editable": movimiento.importacion_id},
+            request=request,
+        )
+    return marcados
 
 
 def otra_via(cuenta, adaptador, datos):
@@ -450,6 +531,8 @@ def aplicar(movimiento, titular, usuario, request=None):
         hechos = MovimientoBancario.objects.filter(pk=fresco.pk, pago__isnull=True).update(estado=MovimientoBancario.APLICADO, pago=pago, resuelto_por=usuario, resuelto_en=timezone.now())
         if hechos != 1:
             raise ErrorConciliacion("El movimiento ya está resuelto.")
+        if fresco.retencion and fresco.liberado_en is None and usuario is not None:
+            MovimientoBancario.objects.filter(pk=fresco.pk, liberado_en__isnull=True).update(liberado_por=usuario, liberado_en=timezone.now())
     return pago
 
 
@@ -487,15 +570,63 @@ def conciliar_deposito(movimiento, traslado, usuario, request=None):
         registrar("deposito_conciliado", usuario=usuario, objeto=traslado, datos={"movimiento": fresco.pk, "importe": fresco.importe, "registro": str(traslado.origen)}, request=request)
 
 
+def senales_de_saldo(cuenta, importacion, movimientos):
+    if not movimientos or any(m.get("saldo") is None for m in movimientos):
+        return []
+    orden = orden_cronologico(movimientos)
+    if orden is None:
+        return ["saldos_no_cuadran"]
+    apertura = orden[0]["saldo"] - _signo(orden[0]) * orden[0]["importe"]
+    cadena = {apertura} | {m["saldo"] for m in orden}
+    conocido = (
+        MovimientoBancario.objects.filter(cuenta=cuenta, saldo__isnull=False)
+        .exclude(importacion=importacion)
+        .exclude(retencion__contains="saldos_no_cuadran")
+        .exclude(retencion__contains="saldo_no_continua")
+        .order_by("-fecha", "-id")
+        .first()
+    )
+    if conocido is None or conocido.saldo not in cadena:
+        return ["saldo_no_continua"]
+    return []
+
+
+def senales_de_movimiento(movimiento, titular, repetida, hoy):
+    motivos = []
+    if titular.estado != Titular.ACTIVO:
+        motivos.append("titular_inactivo")
+    tope = int(parametro("tope_pago_carpeta"))
+    if tope and movimiento.importe > tope:
+        motivos.append("tope_pago")
+    if movimiento.fecha > hoy:
+        motivos.append("fecha_futura")
+    elif Importacion.objects.filter(cuenta=movimiento.cuenta, adaptador=Importacion.ESTADO_PDF, periodo_inicio__lte=movimiento.fecha, periodo_fin__gte=movimiento.fecha).exists():
+        motivos.append("fuera_de_estado")
+    if repetida:
+        motivos.append("matricula_repetida")
+    adeudo = sum(p.saldo for p in libro.pendientes_de(libro.miembros_de(titular)))
+    if movimiento.importe > adeudo:
+        motivos.append("excede_adeudo")
+    return motivos
+
+
+def _retener(movimiento, motivos, resultado, extra):
+    cambios = {"retencion": ",".join(dict.fromkeys(motivos))[:200]}
+    if resultado == identificacion.AUTOMATICA:
+        cambios.update(sugerencia=extra.matricula, alternativas=list(extra.alternativas), motivo="retenido_sin_revision", coincide_importe=extra.coincide_importe)
+    MovimientoBancario.objects.filter(pk=movimiento.pk).update(**cambios)
+
+
 def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=None, request=None, origen=Importacion.MANUAL):
     resumen = resumen or {}
     if origen == Importacion.MANUAL and usuario is None:
         raise ErrorConciliacion("Una importación manual necesita a la persona que la hace.")
     with transaction.atomic():
         clasificacion = continuidad(cuenta, adaptador, resumen)
-        retener = origen == Importacion.CARPETA and clasificacion != Importacion.VERIFICADA
+        vigilado = origen == Importacion.CARPETA and adaptador == Importacion.ARCHIVO
+        pdf_sin_cadena = origen == Importacion.CARPETA and adaptador == Importacion.ESTADO_PDF and clasificacion != Importacion.VERIFICADA
         importacion = Importacion.objects.create(
-            continuidad=clasificacion, origen=origen, retenida=retener,
+            continuidad=clasificacion, origen=origen, retenida=pdf_sin_cadena,
             cuenta=cuenta, nombre_archivo=lectura.nombre_saneado(nombre), sha256=sha256, adaptador=adaptador,
             periodo_inicio=resumen.get("periodo_inicio") or min(m["fecha"] for m in movimientos),
             periodo_fin=resumen.get("periodo_fin") or max(m["fecha"] for m in movimientos),
@@ -505,6 +636,7 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
             movimientos=len(movimientos), creada_por=usuario,
         )
         cuentas = Counter()
+        candidatos = []
         for datos in movimientos:
             if MovimientoBancario.objects.filter(huella=datos["huella"]).exists():
                 cuentas["duplicados"] += 1
@@ -529,23 +661,45 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
                 **{k: v for k, v in datos.items() if k not in ("fecha",)}, fecha=datetime.fromisoformat(datos["fecha"]).date(),
             )
             cuentas["nuevos"] += 1
-            if retener and resultado in ("deposito", identificacion.AUTOMATICA):
-                if resultado == identificacion.AUTOMATICA:
-                    MovimientoBancario.objects.filter(pk=movimiento.pk).update(sugerencia=extra.matricula, alternativas=list(extra.alternativas), motivo="retenido_sin_revision", coincide_importe=extra.coincide_importe)
-                cuentas["retenidos"] += 1
-                continue
-            if resultado == "deposito":
-                conciliar_deposito(movimiento, extra, usuario, request)
-                cuentas["depositos"] += 1
-            elif resultado == identificacion.AUTOMATICA:
-                aplicar(movimiento, _titular(extra.matricula), usuario, request)
-                cuentas["aplicados"] += 1
+            if resultado in ("deposito", identificacion.AUTOMATICA):
+                candidatos.append((movimiento, resultado, extra))
             elif resultado in (identificacion.SUGERIDA, identificacion.SIN_PISTA):
                 if extra is not None:
                     MovimientoBancario.objects.filter(pk=movimiento.pk).update(
                         sugerencia=extra.matricula, alternativas=list(extra.alternativas), motivo=extra.motivo, coincide_importe=extra.coincide_importe
                     )
                 cuentas["sugeridos" if resultado == identificacion.SUGERIDA else "sin_pista"] += 1
+        del_archivo = []
+        if pdf_sin_cadena:
+            del_archivo = ["sin_continuidad"]
+        elif vigilado:
+            del_archivo = senales_de_saldo(cuenta, importacion, movimientos)
+            por_aplicar = sum(m.importe for m, resultado, _ in candidatos if resultado == identificacion.AUTOMATICA)
+            if por_aplicar and expuesto() + por_aplicar > int(parametro("tope_aplicado_sin_respaldo")):
+                del_archivo.append("tope_exposicion")
+        if del_archivo and candidatos:
+            Importacion.objects.filter(pk=importacion.pk).update(retenida=True)
+        hoy = hoy_negocio()
+        vistas = Counter()
+        for movimiento, resultado, extra in candidatos:
+            if del_archivo:
+                _retener(movimiento, del_archivo, resultado, extra)
+                cuentas["retenidos"] += 1
+                continue
+            if resultado == "deposito":
+                conciliar_deposito(movimiento, extra, usuario, request)
+                cuentas["depositos"] += 1
+                continue
+            titular = _titular(extra.matricula)
+            if vigilado:
+                vistas[titular.pk] += 1
+                motivos = senales_de_movimiento(movimiento, titular, vistas[titular.pk] > 1, hoy)
+                if motivos:
+                    _retener(movimiento, motivos, resultado, extra)
+                    cuentas["retenidos"] += 1
+                    continue
+            aplicar(movimiento, titular, usuario, request)
+            cuentas["aplicados"] += 1
         Importacion.objects.filter(pk=importacion.pk).update(
             nuevos=cuentas["nuevos"], duplicados=cuentas["duplicados"], aplicados=cuentas["aplicados"], otra_via=cuentas["otra_via"],
             sugeridos=cuentas["sugeridos"], sin_pista=cuentas["sin_pista"], depositos_emparejados=cuentas["depositos"],
@@ -556,13 +710,15 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
             usuario=usuario,
             objeto=importacion,
             datos={
-                "archivo": importacion.nombre_archivo, "sha256": sha256, "cuenta": str(cuenta), "adaptador": adaptador, "continuidad": clasificacion, "origen": origen, "retenida": retener,
+                "archivo": importacion.nombre_archivo, "sha256": sha256, "cuenta": str(cuenta), "adaptador": adaptador, "continuidad": clasificacion, "origen": origen, "retenida": importacion.retenida,
                 "periodo": [str(importacion.periodo_inicio), str(importacion.periodo_fin)], "saldo_inicial": importacion.saldo_inicial, "saldo_final": importacion.saldo_final,
                 "total_abonos": importacion.depositos, "total_cargos": importacion.retiros, "movimientos": len(movimientos),
-                "aplicados_monto": importacion.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(t=Sum("importe"))["t"] or 0, **dict(cuentas),
+                "aplicados_monto": importacion.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(t=Sum("importe"))["t"] or 0,
+                "senales_archivo": del_archivo, **dict(cuentas),
             },
             request=request,
         )
+        marcar_sin_respaldo(importacion, request)
     return importacion
 
 

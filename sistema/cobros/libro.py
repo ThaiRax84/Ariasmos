@@ -27,6 +27,10 @@ class ErrorLibro(ValueError):
     pass
 
 
+def _interno(titular):
+    return bool(getattr(titular, "interno", False))
+
+
 class PagoDuplicado(ErrorLibro):
     def __init__(self, pago):
         super().__init__("Ese pago ya se registró.")
@@ -112,7 +116,7 @@ def _aplicar(pago, cargo, importe):
 
 
 def aplicar_saldo_a_favor(cargo, request=None):
-    titular = Titular.objects.select_related("familia").get(pk=cargo.titular_id)
+    titular = Titular.todos.select_related("familia").get(pk=cargo.titular_id)
     pendiente = saldo_de(cargo)
     aplicaciones = []
     if pendiente <= 0:
@@ -134,9 +138,11 @@ def aplicar_saldo_a_favor(cargo, request=None):
     return aplicaciones
 
 
-def crear_cargo(titular, concepto, importe_original, vencimiento, origen, periodo="", descripcion="", beca=None, descuento=0, cargo_base=None, fecha_recargo=None, cantidad=1, usuario=None, request=None):
+def crear_cargo(titular, concepto, importe_original, vencimiento, origen, periodo="", descripcion="", beca=None, descuento=0, cargo_base=None, fecha_recargo=None, cantidad=1, usuario=None, request=None, permitir_interno=False):
     if importe_original < 0 or descuento < 0 or descuento > importe_original:
         raise ErrorLibro("importe de cargo inválido")
+    if _interno(titular) and not (permitir_interno and origen == Cargo.MANUAL):
+        raise ErrorLibro("La cuenta interna solo recibe los cargos de una venta sin matrícula.")
     try:
         with transaction.atomic():
             cargo = Cargo.objects.create(
@@ -225,9 +231,25 @@ def pendientes_de(titulares_ids):
     ]
 
 
-def proponer_reparto(titular, importe):
+def proponer_reparto(titular, importe, primero=None):
     miembros = miembros_de(titular)
-    return reparto.repartir(importe, pendientes_de(miembros), titular.pk, miembros, orden_reparto())
+    pendientes = pendientes_de(miembros)
+    if not primero:
+        return reparto.repartir(importe, pendientes, titular.pk, miembros, orden_reparto())
+    por_id = {p.id: p for p in pendientes if p.titular == titular.pk}
+    partes, resto = [], importe
+    for cargo in dict.fromkeys(primero):
+        pendiente = por_id.get(cargo)
+        if pendiente is None or resto == 0:
+            continue
+        aplicado = min(resto, pendiente.saldo)
+        partes.append(reparto.Parte(pendiente.id, pendiente.titular, aplicado))
+        resto -= aplicado
+    if resto == 0:
+        return partes, 0
+    usados = {p.cargo for p in partes}
+    demas, resto = reparto.repartir(resto, [p for p in pendientes if p.id not in usados], titular.pk, miembros, orden_reparto())
+    return partes + demas, resto
 
 
 def _piezas_de_cobro(importe, medio, piezas):
@@ -241,9 +263,11 @@ def _piezas_de_cobro(importe, medio, piezas):
         raise ErrorLibro(str(error))
 
 
-def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, request=None, solicitud=None, serie=None, fecha=None, movimiento=None, piezas=None):
+def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, request=None, solicitud=None, serie=None, fecha=None, movimiento=None, piezas=None, primero=None, permitir_interno=False):
     if not isinstance(importe, int) or isinstance(importe, bool) or importe <= 0:
         raise ErrorLibro("El importe debe ser mayor que cero.")
+    if _interno(titular) and not (permitir_interno and medio == Pago.EFECTIVO):
+        raise ErrorLibro("La cuenta interna solo recibe el pago en efectivo de una venta sin matrícula.")
     piezas = _piezas_de_cobro(importe, medio, piezas)
     with transaction.atomic():
         if ficha:
@@ -256,7 +280,7 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
             if not recibe_movimientos(turno):
                 raise ErrorLibro("El turno ya está en arqueo: no recibe cobros nuevos.")
         fecha, fecha_banco = fecha_contable(fecha)
-        partes, resto = proponer_reparto(titular, importe)
+        partes, resto = proponer_reparto(titular, importe, primero)
         pago = Pago.objects.create(
             titular=titular, importe=importe, medio=medio, turno=turno, ficha=ficha or None, registrado_por=usuario,
             solicitud=solicitud, fecha=fecha, fecha_banco=fecha_banco, movimiento=movimiento,
@@ -283,6 +307,7 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
                 "aplicaciones": [{"cargo": p.cargo, "titular": p.titular, "importe": p.importe} for p in partes],
                 "saldo_a_favor": resto,
                 "piezas": piezas or {},
+                "primero": list(primero or []),
             },
             request=request,
         )
@@ -319,6 +344,8 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
     with transaction.atomic():
         if ReversionPago.objects.filter(pago=pago).exists():
             raise ErrorLibro("El pago ya fue revertido.")
+        if (pago.medio == Pago.EFECTIVO or _interno(pago.titular)) and _cubre_devoluciones_con_dinero(pago):
+            raise ErrorLibro("Este pago cubre artículos cuya devolución ya regresó dinero: no se puede revertir completo. Lo que falte se devuelve desde la venta.")
         if pago.medio == Pago.EFECTIVO:
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Para devolver efectivo se necesita un turno de caja abierto de quien lo devuelve.")
@@ -335,6 +362,12 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
         reversion = ReversionPago.objects.create(pago=pago, motivo=motivo[:300], turno=turno if pago.medio == Pago.EFECTIVO else None, ejecutada_por=ejecutor, autorizada_por=autorizador, solicitud=solicitud)
         if piezas and pago.medio == Pago.EFECTIVO:
             control_piezas.registrar(turno, turno.usuario, MovimientoPiezas.DEVOLUCION, piezas, -1, reversion=reversion)
+        if _interno(pago.titular):
+            for fila in aplicaciones:
+                cargo = Cargo.objects.get(pk=fila["cargo"])
+                pendiente = saldo_de(cargo)
+                if pendiente > 0:
+                    cancelar_cargo(cargo, pendiente, CancelacionCargo.CANCELACION, f"Reversión del pago de una venta sin matrícula: {motivo}"[:300], ejecutor, autorizador, solicitud, request)
         recibo = getattr(pago, "recibo", None)
         registrar(
             "pago_revertido",
@@ -345,6 +378,12 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
             request=request,
         )
     return reversion
+
+
+def _cubre_devoluciones_con_dinero(pago):
+    from inventario.models import RenglonDevolucion
+
+    return RenglonDevolucion.objects.filter(importe_dinero__gt=0, renglon__cargo__in=pago.aplicaciones.values("cargo")).exists()
 
 
 def efectivo_devolvible(turno):

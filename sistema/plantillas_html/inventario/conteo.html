@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Conteo de inventario</h1>
+<p>1. Descarga la lista para contar (no trae existencias). 2. Cuenta en físico. 3. Sube el archivo con clave y cantidad, o captúralo aquí. Al subirlo el conteo queda fijo y se muestran las diferencias; otra persona lo aprueba. Mientras tanto se sigue vendiendo.</p>
+<p><a class="boton secundario" href="{% url 'inventario:conteo_lista' %}">Descargar la lista para contar (CSV)</a></p>
+{% if en_espera %}
+<p class="mensaje warning">Ya hay un conteo en espera de aprobación (<a href="{% url 'inventario:conteo_detalle' en_espera.pk %}">conteo {{ en_espera.pk }}</a>, de {{ en_espera.usuario }}). Solo puede haber uno a la vez.</p>
+{% else %}
+<section class="panel">
+  <h2>Subir el archivo</h2>
+  <form method="post" class="formulario angosto" enctype="multipart/form-data" novalidate>{% csrf_token %}<input type="hidden" name="forma" value="archivo">{% include "comun/_campos.html" with formulario=subida %}<div class="acciones"><button class="boton" type="submit" data-confirmar="Al subirlo el conteo queda fijo. ¿Continuar?">Subir conteo</button></div></form>
+</section>
+<section class="panel">
+  <h2>O capturarlo en pantalla</h2>
+  <p>Deja en blanco lo que no contaste.</p>
+  <form method="post" class="formulario" novalidate>{% csrf_token %}<input type="hidden" name="forma" value="pantalla">{% include "comun/_campos.html" with formulario=captura %}<div class="acciones"><button class="boton" type="submit" data-confirmar="Al guardarlo el conteo queda fijo. ¿Continuar?">Guardar conteo</button></div></form>
+</section>
+{% endif %}
+{% if conteos %}
+<h2>Conteos</h2>
+<ul class="lista">{% for c in conteos %}<li><a href="{% url 'inventario:conteo_detalle' c.pk %}">Conteo {{ c.pk }}</a> · {{ c.creado|date:"d/m/Y H:i" }} · {{ c.usuario }} · {% if c.aplicado_en %}aprobado por {{ c.aplicado_por }}{% elif c.solicitud %}{{ c.solicitud.get_estado_display }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

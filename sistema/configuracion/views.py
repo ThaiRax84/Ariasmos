@@ -28,6 +28,7 @@ from .formularios import (
     FormularioParametros,
     FormularioRelacion,
     FormularioVocabulario,
+    TOPES_CARPETA,
     guardar_caja,
     valores_caja,
 )
@@ -144,7 +145,7 @@ def parametros(request):
     formulario = FormularioParametros(request.POST if request.method == "POST" else None, valores=antes)
     if request.method == "POST" and formulario.is_valid():
         with transaction.atomic():
-            for clave in PARAMETROS:
+            for clave in formulario.fields:
                 Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(formulario.cleaned_data[clave])})
             registrar("parametros_cambiados", usuario=request.user, datos={"cambios": diferencias(antes, {clave: parametro(clave) for clave in PARAMETROS})}, request=request)
         messages.success(request, "Parámetros guardados.")
@@ -176,15 +177,48 @@ def caja(request):
 @requiere_permiso(PERMISO, reingreso=True)
 def carpeta_banco(request):
     actual = Negocio.objects.get(pk=1)
-    formulario = FormularioCarpetaBanco(request.POST if request.method == "POST" else None, initial={"carpeta_banco": actual.carpeta_banco})
+    antes_topes = {clave: int(parametro(clave)) for clave in TOPES_CARPETA}
+    formulario = FormularioCarpetaBanco(request.POST if request.method == "POST" else None, initial={"carpeta_banco": actual.carpeta_banco, **antes_topes})
     if request.method == "POST" and formulario.is_valid():
         nueva = formulario.cleaned_data["carpeta_banco"]
         with transaction.atomic():
             Negocio.objects.filter(pk=1).update(carpeta_banco=nueva)
-            registrar("carpeta_banco_cambiada", usuario=request.user, objeto=actual, datos={"cambios": {"carpeta_banco": [actual.carpeta_banco, nueva]}}, request=request)
+            for clave, valor in formulario.topes().items():
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+            cambios = diferencias({"carpeta_banco": actual.carpeta_banco, **antes_topes}, {"carpeta_banco": nueva, **formulario.topes()})
+            registrar("carpeta_banco_cambiada", usuario=request.user, objeto=actual, datos={"cambios": cambios}, request=request)
         messages.success(request, "Carpeta vigilada guardada." if nueva else "Carpeta vigilada desactivada.")
         return redirect("configuracion:indice")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "boton": "Guardar", "volver": "configuracion:indice"})
+
+
+CLAVES_INVENTARIO = ("modulo_inventario", "devoluciones_inventario", "dias_devolucion", "dias_conteo_sin_aprobar")
+
+
+def valores_inventario():
+    valores = {clave: int(parametro(clave)) for clave in CLAVES_INVENTARIO}
+    valores["modulo_inventario"] = bool(valores["modulo_inventario"])
+    valores["devoluciones_inventario"] = bool(valores["devoluciones_inventario"])
+    return valores
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def inventario(request):
+    from inventario.formularios import FormularioConfiguracion
+
+    antes = valores_inventario()
+    formulario = FormularioConfiguracion(request.POST if request.method == "POST" else None, initial=antes)
+    if request.method == "POST" and formulario.is_valid():
+        with transaction.atomic():
+            for clave in CLAVES_INVENTARIO:
+                valor = formulario.cleaned_data[clave]
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(int(valor))})
+            cambios = diferencias(antes, valores_inventario())
+            if cambios:
+                registrar("inventario_configurado", usuario=request.user, datos={"cambios": cambios}, request=request)
+        messages.success(request, "Inventario guardado.")
+        return redirect("configuracion:indice")
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Inventario", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 CATALOGOS = {

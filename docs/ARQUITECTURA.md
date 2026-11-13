@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.16 · 13/11/2026 · Estado: fases 1 a 4b construidas; fase 5a (cambios de motor, §15) en construcción; fase 5b (interfaz) en diseño.
+Versión 0.18 · 13/11/2026 · Estado: fases 1 a 6a construidas; fase 5b (interfaz, `docs/DISENO.md`) en construcción; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -492,14 +492,15 @@ instancia/         (ignorada) claves, base, configuración local
 | 4a | Cortes (diario, mayor, lista de cobranza), destinos, cierre de periodo, respaldo y cifrado de secretos |
 | 4b | Instalador `.exe`, HTTPS en la red local, compilación automática y guías |
 | 5a | Calendario de cortes, piezas por denominación, retiros de caja, QR en recibos, carpeta vigilada del banco (§15) |
-| 5b | Interfaz nueva: marca Ariasmos y marca del negocio, pantallas rediseñadas, transiciones |
+| 5b | Interfaz nueva según `docs/DISENO.md`: marca Ariasmos y marca del negocio configurable, todas las pantallas con el nuevo sistema de diseño, splash y transiciones |
+| 6a | Carpeta del banco que aplica de inmediato salvo sospecha (§15.5); inventario opcional, venta a titular o sin matrícula, devoluciones y conteo mensual (§16) |
+| 6b | Facturación electrónica opcional con proveedor intercambiable (§17) |
 
 ## 14. Pendientes de decisión
 
 1. Formato real del archivo de movimientos del banco: hace falta una muestra para afinar el adaptador.
 2. Si el negocio contrata cobranza referenciada: longitud y dígito verificador que exija el banco.
-3. Facturación (CFDI): en investigación; se diseña cuando se conozcan requisitos y costos.
-6. Inventario opcional por negocio: en definición.
+3. Facturación (CFDI): diseñada en §17; falta elegir proveedor de timbrado y las decisiones fiscales del contador de cada negocio.
 7. Avisos de abono del banco por correo como «depósito por confirmar»: se diseña cuando exista una muestra real del aviso.
 8. Reflejo de transferencias en minutos sin intervención (proveedor de cobranza SPEI u otra vía): por evaluar con costos.
 4. Varias sedes: hoy una instalación por sede con `sede` distinta; la consolidación central se diseña cuando exista la segunda.
@@ -562,13 +563,101 @@ Sacar efectivo de la caja para un gasto del negocio. Operación los hace sin esp
 ### 15.5 Carpeta vigilada del banco
 
 - Parámetro `carpeta_banco`: una carpeta donde alguien deja el archivo descargado del banco. El trabajador la revisa cada pocos minutos e importa lo nuevo con el **mismo camino y las mismas defensas** que una importación manual (continuidad con el estado anterior, revisión de importaciones, un movimiento que llega por dos vías cuenta una vez).
-- Quien importa es el actor de sistema «carpeta vigilada». Como nadie responde por ese archivo, una importación de la carpeta que no se pueda encadenar con un estado anterior **no aplica pagos** hasta que la revise una persona con permiso de conciliación.
+- Quien importa es el actor de sistema «carpeta vigilada».
 - Solo se toman archivos regulares (sin seguir enlaces), con extensión admitida por algún adaptador, hasta el tamaño máximo de importación y cuyo tamaño no cambió entre dos revisiones. Un archivo ya visto (por SHA-256) no se vuelve a importar.
 - Lo importado se mueve a `procesados/` y lo rechazado a `rechazados/` con un archivo de texto que dice por qué. La carpeta no puede estar dentro del programa ni de sus datos. Tampoco puede ser la carpeta de respaldo ni una de entrega de cortes, ni contenerlas o estar dentro de ellas.
 - `procesados/` y `rechazados/` deben ser carpetas normales: si alguna es un enlace, la revisión se detiene sin mover nada y queda un aviso en bitácora, para que el servicio nunca escriba fuera de la carpeta vigilada.
 - Cada importación automática queda en bitácora y aparece en el inicio de quien concilia.
 
+**Qué se aplica solo y qué se retiene.** El objetivo es que el pago se refleje en cuanto llega el archivo, sin perder el control cuando algo se ve raro.
+
+- Un **estado en PDF que continúa al anterior** aplica sus pagos de inmediato. Si no se puede encadenar, queda retenido completo.
+- Un **archivo editable** (Excel o CSV de movimientos del día) no se puede comprobar por sí mismo. Sus movimientos identificados se **aplican de inmediato**, salvo los que tengan una señal de sospecha, que quedan **retenidos uno por uno** con su motivo hasta que los libere quien concilia. Lo ya aplicado se comprueba después contra el estado mensual.
+- **Señales por movimiento** (retienen ese movimiento):
+  1. El importe es mayor que el adeudo vigente de la familia del titular (dejaría saldo a favor).
+  2. El importe pasa de `tope_pago_carpeta` (0 = sin tope individual).
+  3. La fecha es futura, o cae en un periodo que ya cubre un estado en PDF importado y el movimiento no está en ese estado.
+  4. El titular no está activo.
+  5. La misma matrícula ya recibió otro pago en el mismo archivo.
+- **Señales del archivo** (retienen todos sus movimientos):
+  1. Trae columna de saldo y los saldos no cuadran renglón a renglón con los importes.
+  2. Trae columna de saldo y no continúa el último saldo conocido de esa cuenta.
+  3. **Tope de exposición:** la suma de pagos aplicados desde archivos editables que todavía no respalda un estado, más los de este archivo, pasa de `tope_aplicado_sin_respaldo`. En 0 (valor inicial) **todo archivo editable queda retenido**: aplicar de inmediato es una decisión que el negocio toma al fijar ese tope en el asistente o en Configuración.
+- **Liberar.** Quien concilia libera un movimiento, varios o todos los retenidos de una importación; queda en bitácora con su nombre. Quien libera no puede marcar la importación como revisada.
+- **Comprobación contra el estado.** Al importar un estado en PDF, cada pago aplicado desde un archivo editable con fecha dentro de ese periodo debe corresponder a un movimiento del estado. El que no aparezca queda marcado **«sin respaldo en el estado»**: alerta en el inicio de Supervisión y Dirección, evento en bitácora y acceso directo a solicitar su reversión. No se revierte solo.
+- **Alerta de antigüedad:** pagos aplicados desde archivos editables que llevan más de `dias_sin_respaldo_alerta` (45) sin un estado que los cubra.
+- El asistente (paso 6) y Configuración piden `tope_aplicado_sin_respaldo` y `tope_pago_carpeta` junto a la carpeta. Las plantillas no llevan importes.
+
 ### 15.6 Asistente
 
 Ocho pasos. El nuevo paso 5, «Caja: cortes y retiros», pide el calendario de cortes (§15.1), si se capturan piezas por denominación (§15.2) y los topes de retiros (§15.3). El paso 6, «Entrega y respaldo», conserva las carpetas, los niveles de detalle y la clave de recuperación, y agrega la carpeta vigilada del banco (§15.5). Las plantillas y su esquema incluyen los valores nuevos.
+
+## 16. Versión 0.17: inventario (opcional, fase 6a)
+
+Pensado para inventarios pequeños. Se enciende con el parámetro `modulo_inventario` (asistente, paso 1, o Configuración). Apagado, nada de este apartado aparece. Nada de aquí cambia `nucleo/`.
+
+### 16.1 Artículos y existencias
+
+- **Artículo:** clave única, nombre, precio, existencia mínima, activo y el concepto de cobro al que pertenece.
+- La existencia no es un campo editable: es la suma de **movimientos inmutables** (`MovimientoInventario`: artículo, tipo, cantidad con signo, usuario, fecha, nota y referencia a la venta, devolución, entrada o conteo). Tipos: carga inicial, entrada, venta, devolución, merma, ajuste por conteo.
+
+### 16.2 Venta
+
+- **A un titular.** Operación elige artículos y cantidades y **cómo se paga**:
+  - **Lo paga ahora:** se crean los cargos de la venta y pasa al cobro; ese pago se aplica **primero a los cargos de esa venta** y el resto, si lo hay, por el reparto normal.
+  - **Se va a su adeudo:** se crean los cargos y quedan pendientes; se cobran después con lo demás, por el reparto normal.
+- **Sin matrícula.** Para quien no es titular. Solo «lo paga ahora». Se registra contra una cuenta interna del negocio, «Público en general», que no aparece en el padrón, en la cobranza ni en los cargos automáticos y **nunca puede quedar con adeudo**: los cargos y su pago ocurren en la misma transacción o no ocurre nada. Recibo, corte, bitácora y reversión funcionan igual que con cualquier pago.
+- La venta (`Venta` con sus renglones: artículo, cantidad, precio unitario al momento) crea los cargos y los movimientos de inventario en la misma transacción. El precio lo pone el artículo; quien vende no lo teclea.
+- Si la existencia del sistema no alcanza, la venta **no se bloquea**: avisa, el renglón queda marcado «sin existencia» y aparece en la revisión de Supervisión.
+
+### 16.3 Devoluciones
+
+- Parámetros del negocio: `devoluciones_inventario` (sí/no) y `dias_devolucion`.
+- Se parte del recibo (código o QR) o de la venta: comprueba que la venta existe, que está dentro del plazo y cuánto de cada renglón no se ha devuelto. No se devuelve más de lo vendido.
+- El artículo regresa a existencias si está en buen estado; si no, sale como merma en el mismo acto.
+- El dinero regresa de una de dos formas:
+  - **Saldo a favor** del titular: Operación lo hace al momento; nace «por revisar» para Supervisión.
+  - **Efectivo:** siempre por solicitud que resuelve otra persona, y con las reglas fijas del efectivo (sale del turno abierto de quien la ejecuta y solo si ese turno tiene ese efectivo; captura piezas si §15.2 está encendido). Entra en el esperado del arqueo y en los cortes.
+- Una venta sin matrícula solo se devuelve en efectivo. Una venta que se fue al adeudo y no se ha pagado se devuelve cancelando lo pendiente de ese cargo, sin mover dinero.
+- **Nunca regresa más dinero del que entró.** Por cada renglón, el dinero que regresa es a lo más lo realmente pagado de su cargo (aplicaciones de pagos vigentes) menos lo ya regresado; lo cancelado, condonado o descontado no se regresa.
+- Un pago en efectivo, o de una venta sin matrícula, que cubre artículos cuya devolución ya regresó dinero **no se puede revertir completo**: lo que falte se devuelve desde la venta. Así una misma venta no saca dinero dos veces.
+- Revertir completo el pago de una venta sigue el camino de reversiones existente y pregunta, renglón por renglón, si el artículo regresó.
+
+### 16.4 Entradas y mermas
+
+- Operación registra entradas (compras) y mermas con cantidad, motivo y, si lo hay, comprobante (mismo manejo de adjuntos que §15.3).
+- No piden permiso previo. Nacen «por revisar»; quien tenga `revisar_inventario` las marca revisadas u observadas. Nadie revisa lo propio.
+
+### 16.5 Conteo mensual
+
+1. Operación descarga la lista para contar, que **no trae existencias**, cuenta en físico y sube un Excel o CSV con clave y cantidad, o captura en pantalla.
+2. Al subirlo, el conteo queda fijo. El sistema guarda, por artículo, lo contado y lo que debía haber **en ese momento**, y entonces muestra las diferencias.
+3. El conteo es una solicitud (`conteo_inventario`) que aprueba otra persona por las tres vías del motor: una sola aprobación para todo el conteo. Nadie aprueba su propio conteo.
+4. Mientras se aprueba se sigue vendiendo y recibiendo. Al aprobar se crea, por artículo con diferencia, un ajuste igual a la diferencia del momento del conteo; los movimientos posteriores al conteo no se tocan.
+5. Solo puede haber un conteo en espera. Si pasan `dias_conteo_sin_aprobar` avisa a Dirección.
+
+- La carga inicial del inventario es un primer conteo aprobado.
+- Los archivos subidos son datos no confiables: límites de tamaño y de filas, tipo por contenido, sin evaluar fórmulas, claves desconocidas o repetidas se rechazan con su renglón. Lo exportado a CSV neutraliza las celdas que empiezan con `=`, `+`, `-` o `@`.
+
+### 16.6 Avisos, reportes y permisos
+
+- **Quien vende ve el número de existencias** de cada artículo; cuando es cero no se muestra nada. La lista para contar sigue sin traer existencias.
+- **Existencia baja:** un artículo está bajo cuando su existencia es de 20 % o menos (`porcentaje_existencia_baja`) de su nivel de referencia, que es la existencia que tenía justo después de su última entrada o de su último conteo aprobado; también cuando está en o bajo su mínimo, si se le fijó uno. Avisa a quien vende (marca «pocas» en la venta) y a Supervisión en su inicio. Resumen de existencias, ventas, devoluciones, mermas y ajustes del periodo en el corte mayor, en los tres niveles de detalle.
+- Permisos: `vender_articulos`, `registrar_movimientos_inventario`, `subir_conteo_inventario`, `devolver_articulos` (Operación); `revisar_inventario`, `administrar_articulos` (Supervisión). Aprobar el conteo y las devoluciones en efectivo se define en las políticas, como las demás solicitudes.
+- Todo queda en bitácora. Las plantillas llevan permisos, políticas y parámetros sin importes; no llevan artículos.
+
+## 17. Versión 0.17: facturación electrónica (opcional, fase 6b; no construir en 6a)
+
+Primer módulo que necesita internet; el resto del sistema funciona sin él. Nada aquí es asesoría fiscal: los valores los decide el contador de cada negocio.
+
+- **Configuración, toda editable:** emisor (RFC, nombre, régimen, código postal de expedición, serie); por concepto de cobro, clave de producto o servicio y de unidad del SAT, objeto de impuesto, tratamiento de IVA y si el precio ya lo incluye; políticas (plazo para pedir factura, periodicidad de la global, qué hacer con un pago que ya entró en una global, equivalencia entre medio de pago y forma de pago del SAT).
+- **Proveedor de timbrado por adaptador intercambiable** (timbrar, consultar, cancelar, descargar XML y PDF), más un adaptador simulado para pruebas. Proveedor real sin elegir.
+- **Alcance inicial:** una factura por pago ya recibido. Sin parcialidades ni complemento de pago. La factura global se prepara como reporte y se timbra con confirmación de Supervisión o Dirección.
+- **Flujo:** desde un recibo se elige o captura el perfil fiscal del receptor (por familia); validación local de formato y dígito verificador del RFC (aviso, no bloqueo: existen RFC válidos que no lo cumplen), código postal y compatibilidad de régimen y uso; la solicitud entra a una cola que envía el trabajador, de modo que nadie espera y sin internet queda «en espera»; timbrada, se guardan folio fiscal, XML y PDF; si el pago se revierte se genera la cancelación con su motivo sin detener la reversión.
+- Un pago tiene a lo más una factura vigente; cada envío lleva una clave propia que impide timbrar dos veces ante un reintento.
+- **Seguridad:** de preferencia el sello digital no vive en el servidor local y solo se guarda la llave de la API, cifrada como los demás secretos; si se termina sellando en local, el sello se guarda cifrado igual. Solo conexiones salientes HTTPS con verificación de certificado al proveedor configurado; respuestas tratadas como no confiables (XML sin entidades externas). Datos fiscales de receptores con acceso por permiso, bitácora y respaldo cifrado. Modo de pruebas visible.
+
+## 18. Negocios que no usan matrícula (idea en trabajo; no construir)
+
+Un negocio sin matrícula puede querer que las transferencias de sus clientes se reflejen solas. La matrícula del motor serviría como «referencia de pago» de cada cliente con otro nombre (el vocabulario ya lo permite). Faltaría una opción que la mantenga fuera de las pantallas diarias y la muestre solo en la ficha de pago.
 

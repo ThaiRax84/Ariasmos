@@ -284,6 +284,7 @@ class MovimientoPiezas(Inmutable):
     RETIRO = "retiro"
     REVERSION_RETIRO = "reversion_retiro"
     DEVOLUCION = "devolucion"
+    DEVOLUCION_ARTICULOS = "devolucion_articulos"
     TRASLADO = "traslado"
     ORIGENES = [
         (APERTURA, "Fondo de apertura"),
@@ -292,6 +293,7 @@ class MovimientoPiezas(Inmutable):
         (RETIRO, "Retiro de caja"),
         (REVERSION_RETIRO, "Reversión de retiro"),
         (DEVOLUCION, "Devolución de un pago"),
+        (DEVOLUCION_ARTICULOS, "Devolución de artículos"),
         (TRASLADO, "Entrega o depósito"),
     ]
 
@@ -304,6 +306,7 @@ class MovimientoPiezas(Inmutable):
     retiro = models.ForeignKey(RetiroCaja, null=True, blank=True, on_delete=models.PROTECT, related_name="piezas")
     traslado = models.ForeignKey(Traslado, null=True, blank=True, on_delete=models.PROTECT, related_name="piezas")
     reversion = models.ForeignKey("cobros.ReversionPago", null=True, blank=True, on_delete=models.PROTECT, related_name="piezas")
+    devolucion_articulos = models.ForeignKey("inventario.Devolucion", null=True, blank=True, on_delete=models.PROTECT, related_name="piezas")
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,13 +1,14 @@
 # Ariasmos
 
-Sistema local y multiusuario de cobro y control de titulares: padrón con matrícula única como referencia de pago, cobro en efectivo y por banco con conciliación, aprobaciones, cortes diario y mensual, bitácora sellada y respaldos cifrados. Se instala en un equipo con Windows y las demás computadoras entran con el navegador. El repositorio no trae datos de ningún negocio.
+Sistema local y multiusuario de cobro y control de titulares: padrón con matrícula única como referencia de pago, cobro en efectivo y por banco con conciliación, inventario opcional, aprobaciones, cortes diario y mensual, bitácora sellada y respaldos cifrados. Se instala en un equipo con Windows y las demás computadoras entran con el navegador. El repositorio no trae datos de ningún negocio.
 
 ## Guías
 
 - [Guía de instalación](docs/GUIA-INSTALACION.md): instalar, conectar otras computadoras, clave de recuperación, actualizar y desinstalar.
 - [Guía de uso](docs/GUIA-USO.md): el trabajo de cada rol.
+- [Guía de inventario](docs/GUIA-INVENTARIO.md): artículos, ventas, devoluciones, entradas, mermas y conteo mensual (opcional).
 - [Restaurar en un equipo nuevo](docs/RESTAURAR.md).
-- [Referencia técnica](docs/REFERENCIA.md): cobro, caja, banco, cortes, respaldos, comandos y demostración.
+- [Referencia técnica](docs/REFERENCIA.md): cobro, caja, banco, inventario, cortes, respaldos, comandos y demostración.
 - [Arquitectura](docs/ARQUITECTURA.md).
 
 ## Desarrollo
