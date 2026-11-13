@@ -3,7 +3,7 @@ from io import BytesIO
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadhandler import FileUploadHandler
 
-LIMITE = 256 * 1024
+LIMITE = 10 * 1024 * 1024
 
 
 class SubidaLimitada(FileUploadHandler):
