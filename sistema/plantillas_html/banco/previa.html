@@ -2,7 +2,7 @@
 {% load formato %}
 {% block contenido %}
 <h1>Vista previa de la importación</h1>
-<p>{{ carga.nombre_archivo }} · {{ cuenta }}{% if estado %} · periodo {{ estado.periodo_inicio }} a {{ estado.periodo_fin }} · saldo inicial {{ estado.saldo_inicial|dinero }}, final {{ estado.saldo_final|dinero }}{% endif %}</p>
+<p>{{ carga.nombre_archivo }} · {{ cuenta }}{% if estado %} · periodo {{ estado.periodo_inicio|date:"d/m/Y" }} a {{ estado.periodo_fin|date:"d/m/Y" }} · saldo inicial {{ estado.saldo_inicial|dinero }}, final {{ estado.saldo_final|dinero }}{% endif %}</p>
 <section class="panel">
   <h2>Qué pasará</h2>
   <ul class="lista">
@@ -18,6 +18,6 @@
 </section>
 <table class="tabla compacta">
 <thead><tr><th>Fecha</th><th>Descripción</th><th>Referencia</th><th>Concepto</th><th>Importe</th></tr></thead>
-<tbody>{% for m in movimientos %}<tr><td>{{ m.fecha }}</td><td>{{ m.descripcion }}</td><td>{{ m.referencia }}</td><td>{{ m.concepto }}</td><td>{% if m.sentido == "cargo" %}−{% endif %}{{ m.importe|dinero }}</td></tr>{% endfor %}</tbody>
+<tbody>{% for m in movimientos %}<tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.descripcion }}</td><td>{{ m.referencia }}</td><td>{{ m.concepto }}</td><td>{% if m.sentido == "cargo" %}−{% endif %}{{ m.importe|dinero }}</td></tr>{% endfor %}</tbody>
 </table>
 {% endblock %}

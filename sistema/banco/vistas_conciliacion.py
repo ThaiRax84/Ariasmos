@@ -1,5 +1,5 @@
 import secrets
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django import forms
 from django.contrib import messages
@@ -137,7 +137,10 @@ def previa(request, token):
         messages.success(request, f"Importación lista: {importacion.aplicados} aplicados, {importacion.sugeridos + importacion.sin_pista} por identificar, {importacion.duplicados} ya estaban.")
         return redirect("conciliacion:importacion", pk=importacion.pk)
     resumen = conciliacion.vista_previa(cuenta, datos["movimientos"])
-    return render(request, "banco/previa.html", {"carga": carga, "cuenta": cuenta, "resumen": resumen, "movimientos": datos["movimientos"][:100], "estado": datos.get("resumen")})
+    estado = dict(datos.get("resumen") or {})
+    for clave in ("periodo_inicio", "periodo_fin"):
+        estado[clave] = date.fromisoformat(estado[clave]) if estado.get(clave) else None
+    return render(request, "banco/previa.html", {"carga": carga, "cuenta": cuenta, "resumen": resumen, "movimientos": [{**m, "fecha": date.fromisoformat(m["fecha"])} for m in datos["movimientos"][:100]], "estado": estado or None})
 
 
 @requiere_permiso(CONCILIA)
