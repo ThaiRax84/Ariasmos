@@ -31,6 +31,11 @@ function Instalar {
     if ($proceso.ExitCode -ne 0) { Fallar "El instalador terminó con código $($proceso.ExitCode) ($Nombre)." }
     $texto = Get-Content -LiteralPath $registro -Raw
     if ($texto -match 'TOKEN-ASISTENTE|Token del asistente') { Fallar "El registro del instalador contiene el token del asistente ($Nombre)." }
+    foreach ($fin in [regex]::Matches($texto, '(\S+\.ps1) termin\S* con c\S*digo (-?\d+)')) {
+        if ($fin.Groups[2].Value -ne '0') {
+            Fallar "$($fin.Groups[1].Value) terminó con código $($fin.Groups[2].Value) durante la $Nombre."
+        }
+    }
 }
 
 function Esperar-Servicios {
