@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Artículos</h1>
+<div class="atajos"><a class="boton" href="{% url 'inventario:articulo_nuevo' %}">Artículo nuevo</a></div>
+<p>Los artículos no se borran: se desactivan. La existencia no se edita aquí; resulta de las ventas, devoluciones, entradas, mermas y conteos aprobados.</p>
+<table class="tabla">
+<thead><tr><th>Clave</th><th>Artículo</th><th>Precio</th><th>Mínimo</th><th>Concepto</th><th>Estado</th></tr></thead>
+<tbody>{% for a in articulos %}<tr><td><a href="{% url 'inventario:articulo_editar' a.pk %}">{{ a.clave }}</a></td><td>{{ a.nombre }}</td><td>{{ a.precio|dinero }}</td><td>{{ a.minimo }}</td><td>{{ a.concepto }}</td><td>{% if a.activo %}Activo{% else %}Inactivo{% endif %}</td></tr>{% empty %}<tr><td colspan="6">Sin artículos.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

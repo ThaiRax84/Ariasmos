@@ -25,6 +25,7 @@ DINERO = {
     "diferencia", "efectivo_cobrado_neto", "efectivo_en_custodia", "efectivo_depositado", "efectivo_del_mes", "aplicado_por_banco", "abonos_del_estado_oficial",
     "aplicado_confirmado_por_estado_oficial", "aplicado_sin_confirmar", "importe_por_identificar", "1_30", "31_60", "61_90", "mas_90",
     "total_retirado", "total_regresado", "primer_contado", "efectivo_retirado_neto", "retiros_del_mes",
+    "total_devuelto_articulos", "devoluciones_articulos_efectivo",
 }
 ETIQUETAS = {
     "titular.nombre": "Titular",

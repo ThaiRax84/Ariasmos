@@ -13,6 +13,7 @@ from cuentas import conectar
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
+from inventario import servicios as inventario
 from respaldos import servicios as respaldos
 from solicitudes import motor
 from solicitudes.models import Solicitud
@@ -31,6 +32,7 @@ def inicio(request):
         "delegaciones": Delegacion.objects.vigentes().filter(receptor=usuario).select_related("otorgante"),
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
+    contexto["avisos_inventario"] = inventario.avisos(usuario)
     if usuario.tiene_permiso("aprobar_dispositivos"):
         datos_certificado = conectar.datos()
         if datos_certificado and datos_certificado["por_vencer"]:

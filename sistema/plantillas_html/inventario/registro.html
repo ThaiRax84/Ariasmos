@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>{{ registro.get_tipo_display }} {{ registro.pk }}</h1>
+<dl class="datos">
+  <dt>Artículo</dt><dd>{{ registro.articulo }}</dd>
+  <dt>Cantidad</dt><dd>{{ registro.cantidad }}</dd>
+  <dt>Motivo</dt><dd>{{ registro.motivo }}</dd>
+  {% if registro.nota %}<dt>Nota</dt><dd>{{ registro.nota }}</dd>{% endif %}
+  <dt>Registró</dt><dd>{{ registro.usuario }} · {{ registro.creado|date:"d/m/Y H:i" }}</dd>
+  <dt>Comprobante</dt><dd>{% if archivo %}<a href="{% url 'inventario:registro_descargar' registro.pk %}">Descargar</a> · huella {{ archivo.sha256|slice:":12" }}…{% else %}{{ registro.get_comprobante_display }}{% endif %}</dd>
+  <dt>Revisión</dt><dd>{{ registro.get_revision_display }}{% if registro.revisado_por %} · {{ registro.revisado_por }} el {{ registro.revisado_en|date:"d/m/Y H:i" }}{% endif %}{% if registro.nota_revision %} · {{ registro.nota_revision }}{% endif %}</dd>
+</dl>
+{% if puede_adjuntar %}
+<form method="post" action="{% url 'inventario:registro_comprobante' registro.pk %}" class="formulario angosto" enctype="multipart/form-data" novalidate>{% csrf_token %}{% include "comun/_campos.html" with formulario=formulario_comprobante %}<div class="acciones"><button class="boton" type="submit">Adjuntar comprobante</button></div></form>
+{% endif %}
+{% if puede_revisar %}
+<form method="post" action="{% url 'inventario:registro_revisar' registro.pk %}" class="formulario angosto" novalidate>{% csrf_token %}{% include "comun/_campos.html" with formulario=formulario_revision %}<div class="acciones"><button class="boton" type="submit">Guardar revisión</button></div></form>
+{% endif %}
+{% endblock %}

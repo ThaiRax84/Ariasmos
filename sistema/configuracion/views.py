@@ -192,6 +192,35 @@ def carpeta_banco(request):
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
+CLAVES_INVENTARIO = ("modulo_inventario", "devoluciones_inventario", "dias_devolucion", "dias_conteo_sin_aprobar")
+
+
+def valores_inventario():
+    valores = {clave: int(parametro(clave)) for clave in CLAVES_INVENTARIO}
+    valores["modulo_inventario"] = bool(valores["modulo_inventario"])
+    valores["devoluciones_inventario"] = bool(valores["devoluciones_inventario"])
+    return valores
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def inventario(request):
+    from inventario.formularios import FormularioConfiguracion
+
+    antes = valores_inventario()
+    formulario = FormularioConfiguracion(request.POST if request.method == "POST" else None, initial=antes)
+    if request.method == "POST" and formulario.is_valid():
+        with transaction.atomic():
+            for clave in CLAVES_INVENTARIO:
+                valor = formulario.cleaned_data[clave]
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(int(valor))})
+            cambios = diferencias(antes, valores_inventario())
+            if cambios:
+                registrar("inventario_configurado", usuario=request.user, datos={"cambios": cambios}, request=request)
+        messages.success(request, "Inventario guardado.")
+        return redirect("configuracion:indice")
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Inventario", "boton": "Guardar", "volver": "configuracion:indice"})
+
+
 CATALOGOS = {
     "agrupaciones": (Agrupacion, FormularioAgrupacion, "agrupacion"),
     "motivos": (MotivoBaja, FormularioMotivo, "motivo_baja"),

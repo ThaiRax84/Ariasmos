@@ -267,6 +267,7 @@ class FormularioAsistenteInicio(forms.Form):
     moneda = forms.ChoiceField(label="Moneda", initial=moneda.POR_DEFECTO, required=False)
     plantilla = forms.ChoiceField(label="Plantilla inicial", widget=forms.RadioSelect)
     archivo = forms.FileField(label="Archivo de plantilla (solo si eliges importar; JSON de hasta 256 KB)", required=False)
+    inventario = forms.BooleanField(label="Llevar inventario de artículos (libros, útiles, uniformes u otros que se venden); se puede cambiar después en Configuración", required=False)
 
     def __init__(self, *args, plantillas=None, **kwargs):
         super().__init__(*args, **kwargs)

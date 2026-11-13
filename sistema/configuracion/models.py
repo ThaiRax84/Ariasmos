@@ -63,7 +63,7 @@ PARAMETROS = {
     "modulo_inventario": (0, "1 para usar el inventario; 0 para ocultarlo"),
     "devoluciones_inventario": (0, "1 para aceptar devoluciones de artículos vendidos; 0 para no aceptarlas"),
     "dias_devolucion": (15, "Días después de la venta en que se acepta una devolución de artículos"),
-    "dias_conteo_sin_aprobar": (3, "Días que un conteo de inventario puede esperar aprobación antes de avisar a Dirección"),
+    "dias_conteo_sin_aprobar": (2, "Días que un conteo de inventario puede esperar aprobación antes de avisar a Dirección"),
     "serie_devoluciones": ("D", "Serie de los recibos de saldo a favor por devolución de artículos"),
 }
 

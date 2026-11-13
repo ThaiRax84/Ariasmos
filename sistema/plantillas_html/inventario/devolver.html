@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Devolución de artículos</h1>
+{% if not devoluciones_activas %}<p class="mensaje warning">El negocio no acepta devoluciones de artículos.</p>{% endif %}
+<p>Busca la venta por su número o por el recibo (código de verificación o lector de QR).</p>
+<form method="get" class="formulario angosto" novalidate>
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton" type="submit">Buscar</button></div>
+</form>
+{% endblock %}

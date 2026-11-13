@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Devolver artículos de la venta {{ venta }}</h1>
+<p>Lo que todavía no se ha pagado de esos artículos se cancela. Lo ya pagado regresa como saldo a favor (al momento; Supervisión lo revisa) o en efectivo, que siempre se solicita y lo autoriza otra persona; el efectivo sale de tu turno al aprobarse. {% if venta.titular.interno %}Una venta sin {{ voc.matricula|lower }} solo se devuelve en efectivo.{% endif %}</p>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Registrar devolución</button><a class="boton secundario" href="{% url 'inventario:venta' venta.pk %}">Cancelar</a></div>
+</form>
+{% endblock %}

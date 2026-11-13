@@ -3,6 +3,7 @@
 {% block contenido %}
 <h1>Cobrar a {{ titular.nombre_completo }}</h1>
 <p>{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.familia %} · {{ voc.familia }} <a href="{% url 'titulares:familia' titular.familia.pk %}">{{ titular.familia }}</a>{% endif %}</p>
+{% if venta %}<p class="mensaje">Cobro de la venta {{ venta }} por {{ venta.total|dinero }}: el pago se aplica primero a los artículos de esa venta y lo que sobre, al adeudo normal.</p>{% endif %}
 {% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
 {% if propuesta %}
 <section class="panel alerta">
@@ -18,6 +19,7 @@
     <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
     <input type="hidden" name="importe" value="{{ importe }}">
     <input type="hidden" name="ficha" value="{{ ficha }}">
+    {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
     {% if piezas.listo %}
     {% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}
     <p>Cambio a entregar: <strong>{{ piezas.cambio|dinero }}</strong>{% if piezas.cambio %}. Entrega exactamente estas piezas; si entregas otras, corrígelas aquí antes de confirmar.{% endif %}</p>
@@ -27,7 +29,7 @@
     {% include "comun/_campos.html" with formulario=piezas.formulario %}
     <div class="acciones">
       {% if piezas.listo %}<button class="boton grande" type="submit">Confirmar y emitir recibo</button>{% else %}<button class="boton grande" type="submit">Calcular el cambio</button>{% endif %}
-      <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}">Corregir</a>
+      <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir</a>
     </div>
   </form>
   {% else %}
@@ -36,14 +38,16 @@
     <input type="hidden" name="paso" value="confirmar">
     <input type="hidden" name="importe" value="{{ importe }}">
     <input type="hidden" name="ficha" value="{{ ficha }}">
+    {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
     <button class="boton grande" type="submit">Confirmar y emitir recibo</button>
-    <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}">Corregir</a>
+    <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir</a>
   </form>
   {% endif %}
 </section>
 {% elif turno %}
 <form method="post" class="formulario angosto" novalidate>
   {% csrf_token %}
+  {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
   {% include "comun/_campos.html" %}
   <div class="acciones"><button class="boton grande" type="submit">Ver cómo se aplica</button></div>
 </form>

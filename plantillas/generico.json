@@ -25,7 +25,11 @@
         "solicitar_ajustes",
         "cargo_manual",
         "sugerir_conciliacion",
-        "retirar_efectivo"
+        "retirar_efectivo",
+        "vender_articulos",
+        "registrar_movimientos_inventario",
+        "subir_conteo_inventario",
+        "devolver_articulos"
       ]
     },
     {
@@ -53,7 +57,13 @@
         "aprobar_dispositivos",
         "retirar_efectivo",
         "revisar_retiros",
-        "administrar_motivos_retiro"
+        "administrar_motivos_retiro",
+        "vender_articulos",
+        "registrar_movimientos_inventario",
+        "subir_conteo_inventario",
+        "devolver_articulos",
+        "revisar_inventario",
+        "administrar_articulos"
       ]
     },
     {
@@ -87,7 +97,13 @@
         "administrar_respaldos",
         "retirar_efectivo",
         "revisar_retiros",
-        "administrar_motivos_retiro"
+        "administrar_motivos_retiro",
+        "vender_articulos",
+        "registrar_movimientos_inventario",
+        "subir_conteo_inventario",
+        "devolver_articulos",
+        "revisar_inventario",
+        "administrar_articulos"
       ]
     }
   ],
@@ -222,6 +238,26 @@
       "horas_resaltar": 24,
       "permite_delegacion": true,
       "permite_codigo": true
+    },
+    {
+      "accion": "conteo_inventario",
+      "permiso_directo": "aprobar_solicitudes",
+      "permiso_solicitar": "subir_conteo_inventario",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "devolucion_efectivo",
+      "permiso_directo": "aprobar_solicitudes",
+      "permiso_solicitar": "devolver_articulos",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
     }
   ],
   "motivos_baja": [
@@ -317,6 +353,12 @@
     },
     "control_denominaciones": false,
     "periodo_retiros": "dia"
+  },
+  "inventario": {
+    "modulo_inventario": false,
+    "devoluciones_inventario": true,
+    "dias_devolucion": 15,
+    "dias_conteo_sin_aprobar": 2
   },
   "cortes": [
     {

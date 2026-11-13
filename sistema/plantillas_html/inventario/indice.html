@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Inventario</h1>
+<div class="atajos">
+  {% if "vender_articulos" in permisos %}<a class="boton" href="{% url 'inventario:vender' %}">Vender a un {{ voc.titular|lower }}</a> <a class="boton" href="{% url 'inventario:vender_publico' %}">Vender sin {{ voc.matricula|lower }}</a>{% endif %}
+  {% if "devolver_articulos" in permisos %}<a class="boton secundario" href="{% url 'inventario:devolver' %}">Devolución</a>{% endif %}
+  {% if "registrar_movimientos_inventario" in permisos %}<a class="boton secundario" href="{% url 'inventario:registro_nuevo' %}">Entrada o merma</a>{% endif %}
+  {% if "subir_conteo_inventario" in permisos %}<a class="boton secundario" href="{% url 'inventario:conteo' %}">Conteo mensual</a>{% endif %}
+  {% if "vender_articulos" in permisos or "devolver_articulos" in permisos or "revisar_inventario" in permisos %}<a class="boton secundario" href="{% url 'inventario:ventas' %}">Ventas</a>{% endif %}
+  {% if "revisar_inventario" in permisos %}<a class="boton secundario" href="{% url 'inventario:revision' %}">Revisión</a>{% endif %}
+  {% if "administrar_articulos" in permisos %}<a class="boton secundario" href="{% url 'inventario:articulos' %}">Artículos</a>{% endif %}
+  {% if ve_existencias %}<a class="boton secundario" href="{% url 'inventario:existencias_csv' %}">Descargar existencias (CSV)</a>{% endif %}
+</div>
+{% if en_espera %}<p class="mensaje">Hay un conteo en espera de aprobación desde el {{ en_espera.creado|date:"d/m/Y H:i" }}.</p>{% endif %}
+<table class="tabla">
+<thead><tr><th>Clave</th><th>Artículo</th><th>Precio</th><th>Concepto</th>{% if ve_existencias %}<th>Existencia</th><th>Mínimo</th>{% endif %}</tr></thead>
+<tbody>{% for f in filas %}<tr><td>{{ f.articulo.clave }}</td><td>{{ f.articulo.nombre }}</td><td>{{ f.articulo.precio|dinero }}</td><td>{{ f.articulo.concepto }}</td>{% if ve_existencias %}<td>{% if f.bajo %}<strong>{{ f.existencia }}</strong>{% else %}{{ f.existencia }}{% endif %}</td><td>{{ f.articulo.minimo }}</td>{% endif %}</tr>{% empty %}<tr><td colspan="6">Todavía no hay artículos.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

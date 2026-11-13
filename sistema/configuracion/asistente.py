@@ -107,6 +107,7 @@ def inicio(request):
                 defaults={"nombre": formulario.cleaned_data["nombre"], "zona_horaria": formulario.cleaned_data["zona_horaria"], "moneda": formulario.cleaned_data["moneda"], "plantilla": origen, "configurado": False},
             )
             registrar("asistente_negocio", objeto=guardado, datos={"nombre": guardado.nombre, "plantilla": origen, "moneda": guardado.moneda}, request=request)
+        _guardar_estado(request, inventario=bool(formulario.cleaned_data.get("inventario")))
         if origen == "importada":
             _guardar_estado(request, autorizado=True, pendiente=datos)
             return redirect("asistente:revisar")
@@ -118,6 +119,9 @@ def inicio(request):
 def _aplicar_plantilla(request, datos, origen):
     with transaction.atomic():
         plantillas.cargar_datos(datos, origen, request=request)
+        inventario = bool(_estado(request).get("inventario"))
+        Parametro.objects.update_or_create(clave="modulo_inventario", defaults={"valor": "1" if inventario else "0"})
+        registrar("asistente_inventario", datos={"modulo_inventario": inventario, "origen": "asistente"}, request=request)
     _guardar_estado(request, autorizado=True, pendiente=None, rol_inicial=datos["rol_inicial"], recargos=plantillas.recargos(datos))
 
 

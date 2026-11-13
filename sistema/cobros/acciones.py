@@ -148,6 +148,8 @@ class Condonar(Cancelar):
 
 
 class Revertir(AccionLibro):
+    admite_interno = True
+
     def llave(self, datos):
         return {"datos__pago": datos.get("pago")}
 
@@ -179,7 +181,11 @@ class Revertir(AccionLibro):
                 raise ErrorAccion(f"Para devolver efectivo, {responsable} necesita un turno de caja abierto.")
         piezas = datos.get("piezas") if pago.medio == Pago.EFECTIVO else None
         contexto.resultado = libro.revertir_pago(pago, _motivo(datos), contexto.ejecutor, turno, contexto.autorizador, contexto.solicitud, contexto.request, piezas=piezas)
-        return {"pago": pago.pk, "importe": pago.importe}
+        from inventario import servicios as inventario
+
+        regresan = datos.get("regresan") if isinstance(datos.get("regresan"), list) else []
+        inventario.tras_reversion(pago, regresan, contexto.ejecutor, contexto.autorizador, contexto.solicitud, contexto.request)
+        return {"pago": pago.pk, "importe": pago.importe, "regresan": regresan}
 
 
 class PagoSobreTope(AccionLibro):
@@ -195,13 +201,17 @@ class PagoSobreTope(AccionLibro):
         return importe
 
     def aplicar(self, titular, datos, contexto):
+        from inventario import servicios as inventario
+
         importe = self.validar(titular, datos)
         turno = turno_abierto(contexto.solicitante)
         if turno is None:
             raise ErrorAccion(f"{contexto.solicitante} necesita un turno de caja abierto para registrar el pago.")
+        venta = inventario.venta_por_cobrar(titular, datos.get("venta")) if datos.get("venta") is not None else None
         try:
-            pago = libro.registrar_pago(titular, importe, Pago.EFECTIVO, contexto.solicitante, turno=turno, ficha=datos["ficha"], request=contexto.request, solicitud=contexto.solicitud, piezas=datos.get("piezas"))
+            pago = libro.registrar_pago(titular, importe, Pago.EFECTIVO, contexto.solicitante, turno=turno, ficha=datos["ficha"], request=contexto.request, solicitud=contexto.solicitud, piezas=datos.get("piezas"), primero=inventario.cargos_de(venta) if venta else None)
         except libro.ErrorLibro as error:
             raise ErrorAccion(str(error))
+        inventario.ligar_pago(venta, pago)
         contexto.resultado = pago
         return {"pago": pago.pk, "importe": importe, "tope": parametro("tope_pago_individual")}

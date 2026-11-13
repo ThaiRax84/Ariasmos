@@ -25,6 +25,12 @@ PERMISOS = {
     "retirar_efectivo": "Retirar efectivo de su caja para gastos",
     "revisar_retiros": "Revisar retiros de caja",
     "administrar_motivos_retiro": "Administrar motivos de retiro",
+    "vender_articulos": "Vender artículos del inventario",
+    "registrar_movimientos_inventario": "Registrar entradas y mermas de inventario",
+    "subir_conteo_inventario": "Subir el conteo de inventario",
+    "devolver_articulos": "Registrar devoluciones de artículos",
+    "revisar_inventario": "Revisar movimientos de inventario",
+    "administrar_articulos": "Administrar artículos del inventario",
 }
 
 OPCIONES = list(PERMISOS.items())

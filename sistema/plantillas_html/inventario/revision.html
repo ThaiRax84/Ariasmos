@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Revisión de inventario</h1>
+<p>Nadie revisa lo que registró: los renglones propios aparecen sin botón.</p>
+{% if bajo_minimo %}
+<section class="panel alerta"><h2>Artículos en o bajo su mínimo</h2><ul class="lista">{% for a, e in bajo_minimo %}<li>{{ a }} · existencia {{ e }} · mínimo {{ a.minimo }}</li>{% endfor %}</ul></section>
+{% endif %}
+<h2>Entradas y mermas por revisar</h2>
+<table class="tabla compacta">
+<thead><tr><th>Registro</th><th>Fecha</th><th>Artículo</th><th>Cantidad</th><th>Motivo</th><th>Registró</th><th>Comprobante</th></tr></thead>
+<tbody>{% for r in registros %}<tr><td><a href="{% url 'inventario:registro' r.pk %}">{{ r }}</a></td><td>{{ r.creado|date:"d/m/Y" }}</td><td>{{ r.articulo }}</td><td>{{ r.cantidad }}</td><td>{{ r.motivo }}</td><td>{{ r.usuario }}</td><td>{{ r.get_comprobante_display }}</td></tr>{% empty %}<tr><td colspan="7">Nada por revisar.</td></tr>{% endfor %}</tbody>
+</table>
+<h2>Devoluciones por revisar</h2>
+<table class="tabla compacta">
+<thead><tr><th>Devolución</th><th>Venta</th><th>Fecha</th><th>Cómo regresó</th><th>Cancelado</th><th>A favor</th><th>Registró</th><th></th></tr></thead>
+<tbody>{% for d in devoluciones %}<tr><td>{{ d }}</td><td><a href="{% url 'inventario:venta' d.venta.pk %}">{{ d.venta }}</a></td><td>{{ d.creada|date:"d/m/Y" }}</td><td>{{ d.get_medio_display }}</td><td>{{ d.importe_cancelado|dinero }}</td><td>{{ d.importe_dinero|dinero }}</td><td>{{ d.usuario }}</td><td>{% if d.usuario_id != user.pk %}<form method="post" action="{% url 'inventario:devolucion_revisar' d.pk %}" class="en-linea">{% csrf_token %}{{ formulario_revision.resultado }} {{ formulario_revision.nota }}<button class="boton" type="submit">Guardar</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="8">Nada por revisar.</td></tr>{% endfor %}</tbody>
+</table>
+<h2>Ventas sin existencia</h2>
+<table class="tabla compacta">
+<thead><tr><th>Venta</th><th>Fecha</th><th>Artículo</th><th>Vendidos</th><th>Existencia antes</th><th>Vendió</th><th></th></tr></thead>
+<tbody>{% for r in sin_existencia %}<tr><td><a href="{% url 'inventario:venta' r.venta.pk %}">{{ r.venta }}</a></td><td>{{ r.venta.creada|date:"d/m/Y" }}</td><td>{{ r.articulo }}</td><td>{{ r.cantidad }}</td><td>{{ r.existencia_antes }}</td><td>{{ r.venta.usuario }}</td><td>{% if r.venta.usuario_id != user.pk %}<form method="post" action="{% url 'inventario:renglon_revisar' r.pk %}" class="en-linea">{% csrf_token %}<button class="boton" type="submit">Revisado</button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="7">Nada por revisar.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}
