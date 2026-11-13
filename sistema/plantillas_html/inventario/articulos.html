@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Artículos</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Artículos</h1>
+  </div>
+</div>
 <div class="atajos"><a class="boton" href="{% url 'inventario:articulo_nuevo' %}">Artículo nuevo</a></div>
 <p>Los artículos no se borran: se desactivan. La existencia no se edita aquí; resulta de las ventas, devoluciones, entradas, mermas y conteos aprobados.</p>
 <table class="tabla">

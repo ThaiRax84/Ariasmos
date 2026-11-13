@@ -1,37 +1,87 @@
 {% extends "base.html" %}
-{% load formato %}
+{% load formato static %}
+{% block cabeza %}<script src="{% static 'js/venta.js' %}" defer></script>{% endblock %}
 {% block contenido %}
-{% if publico %}
-<h1>Venta sin {{ voc.matricula|lower }}</h1>
-<p>Para quien no es {{ voc.titular|lower }}: se cobra completa en efectivo en este momento y se registra contra la cuenta interna «Público en general», que nunca queda con adeudo. El precio lo pone cada artículo.</p>
-{% if not turno %}<p class="mensaje warning">Abre tu turno de caja para vender sin {{ voc.matricula|lower }}. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>{% endif %}
-{% else %}
-<h1>Vender a {{ titular.nombre_completo }}</h1>
-<p>{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>. El precio lo pone cada artículo. «Lo paga ahora» crea los cargos y pasa al cobro, que se aplica primero a estos artículos; «Se va a su adeudo» los deja pendientes para cobrarse con lo demás.</p>
-{% endif %}
+<div class="encabezado">
+  <div class="encabezado-texto"><span class="antetitulo">Inventario · Vender</span>
+  {% if publico %}
+    <h1>Público en general</h1>
+    <p class="subtitulo">Venta sin {{ voc.matricula|lower }}: se cobra completa en efectivo en este momento y nunca queda con adeudo.</p>
+  {% else %}
+    <h1>{{ titular.nombre_completo }}</h1>
+    <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %}</p>
+  {% endif %}
+  </div>
+  <div class="encabezado-lado">{% include "inventario/_a_quien.html" %}</div>
+</div>
+{% if publico and not turno %}<p class="mensaje warning">Abre tu turno de caja para vender sin {{ voc.matricula|lower }}. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>{% endif %}
 {% if total %}
-<section class="panel alerta">
-  <h2>Total de la venta: {{ total|dinero }}</h2>
-  <form method="post" class="formulario angosto" novalidate>
-    {% csrf_token %}
-    {% for nombre, valor in ocultos %}<input type="hidden" name="{{ nombre }}" value="{{ valor }}">{% endfor %}
-    <input type="hidden" name="ficha" value="{{ ficha }}">
-    {% if con_piezas %}
-    <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
-    {% if piezas.listo %}{% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}<p>Cambio a entregar: <strong>{{ piezas.cambio|dinero }}</strong>{% if piezas.cambio %}. Entrega exactamente estas piezas; si entregas otras, corrígelas antes de confirmar.{% endif %}</p>{% else %}<p>Escribe las piezas que te entregan; el sistema calcula el cambio.</p>{% endif %}
-    {% include "comun/_campos.html" with formulario=piezas.formulario %}
-    <div class="acciones">{% if piezas.listo %}<button class="boton grande" type="submit">Cobrar y emitir recibo</button>{% else %}<button class="boton grande" type="submit">Calcular el cambio</button>{% endif %}<a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Corregir</a></div>
-    {% else %}
-    <input type="hidden" name="paso" value="confirmar">
-    <div class="acciones"><button class="boton grande" type="submit">Cobrar {{ total|dinero }} y emitir recibo</button><a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Corregir</a></div>
-    {% endif %}
-  </form>
-</section>
+<div class="columnas principal">
+  <section class="panel">
+    <h2>Lo que se lleva</h2>
+    <table class="tabla">
+      <thead><tr><th>Artículo</th><th class="num">Cantidad</th><th class="num">Importe</th></tr></thead>
+      <tbody>{% for e in elegidos %}<tr><td class="fuerte">{{ e.articulo.nombre }}<span class="detalle">{{ e.articulo.clave }}</span></td><td class="num">{{ e.cantidad }}</td><td class="num">{{ e.importe|dinero }}</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="num">{{ total|dinero }}</td></tr></tfoot>
+    </table>
+  </section>
+  <section class="panel alerta">
+    <h2>Total de la venta: {{ total|dinero }}</h2>
+    <form method="post" class="pila junta" novalidate>
+      {% csrf_token %}
+      {% for nombre, valor in ocultos %}<input type="hidden" name="{{ nombre }}" value="{{ valor }}">{% endfor %}
+      <input type="hidden" name="ficha" value="{{ ficha }}">
+      {% if con_piezas %}
+      <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
+      {% if piezas.listo %}{% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}<p>Cambio a entregar: <strong>{{ piezas.cambio|dinero }}</strong>{% if piezas.cambio %}. Entrega exactamente estas piezas; si entregas otras, corrígelas antes de confirmar.{% endif %}</p>{% else %}<p>Escribe las piezas que te entregan; el sistema calcula el cambio.</p>{% endif %}
+      {% include "comun/_campos.html" with formulario=piezas.formulario %}
+      <div class="acciones">{% if piezas.listo %}<button class="boton grande" type="submit">Cobrar y emitir recibo</button>{% else %}<button class="boton grande" type="submit">Calcular el cambio</button>{% endif %}<a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Corregir</a></div>
+      {% else %}
+      <input type="hidden" name="paso" value="confirmar">
+      <div class="acciones"><button class="boton grande" type="submit">Cobrar {{ total|dinero }} y emitir recibo</button><a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Corregir</a></div>
+      {% endif %}
+    </form>
+  </section>
+</div>
 {% else %}
-<form method="post" class="formulario" novalidate>
+<form method="post" class="columnas principal venta" novalidate data-venta data-simbolo="{{ moneda.simbolo }}" data-moneda="{{ moneda.codigo }}">
   {% csrf_token %}
-  {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">{% if publico %}Ver el total{% else %}Registrar la venta{% endif %}</button><a class="boton secundario" href="{% url 'inventario:indice' %}">Cancelar</a></div>
+  <section class="panel">
+    <h2 class="solo-lectores">Artículos</h2>
+    {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    <div class="con-adorno buscar-articulo" data-buscar-articulo hidden><span class="adorno" aria-hidden="true">&#8981;</span><input type="search" aria-label="Buscar artículo" placeholder="Buscar artículo por nombre o clave" maxlength="60" autocomplete="off"></div>
+    <div class="desplazable">
+    <table class="tabla venta-articulos">
+      <thead><tr><th>Artículo</th><th class="num">Precio</th><th class="num">Existencia</th><th class="num">Cantidad</th></tr></thead>
+      <tbody>
+      {% for fila in catalogo %}<tr data-articulo data-precio="{{ fila.articulo.precio }}" data-nombre="{{ fila.articulo.nombre }}" data-buscar="{{ fila.articulo.nombre|lower }} {{ fila.articulo.clave|lower }}"{% if fila.campo.errors %} class="con-error"{% endif %}>
+        <td class="fuerte">{{ fila.articulo.nombre }}<span class="detalle">{{ fila.articulo.clave }}</span></td>
+        <td class="num">{{ fila.articulo.precio|dinero }}</td>
+        <td class="num">{% if fila.existencia %}<span class="estado{% if fila.pocas %} pocas{% endif %}">Quedan {{ fila.existencia }}{% if fila.pocas %} · pocas{% endif %}</span>{% endif %}</td>
+        <td class="num"><div class="contador"><button type="button" class="contador-boton" data-quitar aria-label="Quitar uno de {{ fila.articulo.nombre }}" hidden>&minus;</button><label class="solo-lectores" for="{{ fila.campo.id_for_label }}">{{ fila.campo.label }}</label>{{ fila.campo }}<button type="button" class="contador-boton mas" data-agregar aria-label="Agregar uno de {{ fila.articulo.nombre }}" hidden>+</button></div>{% for e in fila.campo.errors %}<p class="error">{{ e }}</p>{% endfor %}</td>
+      </tr>{% empty %}<tr><td colspan="4">No hay artículos activos.</td></tr>{% endfor %}
+      <tr data-sin-coincidencias hidden><td colspan="4">Ningún artículo coincide con la búsqueda.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+  <section class="panel resumen-venta">
+    <h2>Resumen</h2>
+    <p class="ayuda" data-resumen-sin-js>El total se calcula al continuar.</p>
+    <div class="resumen" data-resumen hidden>
+      <ul class="resumen-renglones" data-resumen-renglones></ul>
+      <p class="ayuda" data-resumen-vacio>Todavía no hay artículos.</p>
+      <div class="resumen-total"><span>Total</span><span class="cifra-importe media" data-resumen-total></span></div>
+    </div>
+    {% if formulario.modo %}
+    <fieldset class="como-se-paga{% if formulario.modo.errors %} con-error{% endif %}">
+      <legend class="etiqueta-campo">¿Cómo se paga?</legend>
+      {% for opcion in formulario.modo %}<label class="opcion" data-boton="{% if opcion.data.value == 'ahora' and puede_cobrar %}Continuar al cobro{% else %}Registrar la venta{% endif %}">{{ opcion.tag }}<span><span class="opcion-titulo">{{ opcion.choice_label }}</span><span class="opcion-detalle">{% if opcion.data.value == 'ahora' %}Sigue al cobro y se da recibo{% else %}Se cobra después, junto con lo demás{% endif %}</span></span></label>{% endfor %}
+      {% for e in formulario.modo.errors %}<p class="error">{{ e }}</p>{% endfor %}
+    </fieldset>
+    {% endif %}
+    <div class="acciones columna"><button class="boton grande ancho" type="submit" data-boton-venta{% if publico %} data-texto="Continuar al cobro"{% endif %}>Continuar</button><a class="boton secundario ancho" href="{% url 'inventario:indice' %}">Cancelar</a></div>
+  </section>
 </form>
 {% endif %}
 {% endblock %}

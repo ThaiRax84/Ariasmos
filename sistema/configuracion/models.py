@@ -65,6 +65,7 @@ PARAMETROS = {
     "dias_devolucion": (15, "Días después de la venta en que se acepta una devolución de artículos"),
     "dias_conteo_sin_aprobar": (2, "Días que un conteo de inventario puede esperar aprobación antes de avisar a Dirección"),
     "serie_devoluciones": ("D", "Serie de los recibos de saldo a favor por devolución de artículos"),
+    "porcentaje_existencia_baja": (20, "Porcentaje de su nivel de referencia (existencia tras su última entrada o conteo aprobado) en o bajo el cual un artículo tiene existencia baja"),
 }
 
 ESPECIALES = (
@@ -82,6 +83,7 @@ ESPECIALES = (
     "devoluciones_inventario",
     "dias_devolucion",
     "dias_conteo_sin_aprobar",
+    "porcentaje_existencia_baja",
 )
 
 
@@ -182,3 +184,32 @@ class Tarea(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+PATRON_COLOR = r"^#[0-9A-Fa-f]{6}\Z"
+
+
+class MarcaNegocio(models.Model):
+    color_principal = models.CharField(max_length=7, blank=True)
+    color_acento = models.CharField(max_length=7, blank=True)
+    logo = models.CharField(max_length=40, blank=True)
+    logo_tipo = models.CharField(max_length=4, blank=True)
+    logo_sha256 = models.CharField(max_length=64, blank=True)
+    version = models.PositiveIntegerField(default=0)
+    actualizada = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(id=1), name="marca_unica"),
+            models.CheckConstraint(condition=Q(color_principal="") | Q(color_principal__regex=PATRON_COLOR), name="marca_color_principal"),
+            models.CheckConstraint(condition=Q(color_acento="") | Q(color_acento__regex=PATRON_COLOR), name="marca_color_acento"),
+            models.CheckConstraint(condition=(Q(color_principal="") & Q(color_acento="")) | (~Q(color_principal="") & ~Q(color_acento="")), name="marca_colores_juntos"),
+            models.CheckConstraint(condition=Q(logo="") | Q(logo__regex=r"^[0-9a-f]{32}\.(jpg|png)\Z"), name="marca_logo_nombre"),
+        ]
+
+    def __str__(self):
+        return "Marca del negocio"
+
+    @property
+    def con_colores(self):
+        return bool(self.color_principal and self.color_acento)

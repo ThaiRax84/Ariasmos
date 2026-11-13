@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>¿Qué es cada columna?</h1>
-<p>{{ carga.nombre_archivo }}. Revisa la propuesta; se recordará para esta cuenta.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Banco</span>
+    <h1>¿Qué es cada columna?</h1>
+    <p class="subtitulo">{{ carga.nombre_archivo }}. Revisa la propuesta; se recordará para esta cuenta.</p>
+  </div>
+</div>
 <table class="tabla compacta"><tbody>{% for fila in muestra %}<tr>{% for celda in fila %}<td>{{ celda }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}

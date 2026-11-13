@@ -1,0 +1,10 @@
+<section class="panel" data-avisos-control>
+  <h2>{{ titulo }}</h2>
+  {% if avisos %}
+  <ul class="lista-estado">
+    {% for a in avisos %}<li data-aviso="{{ a.clave }}"><span class="renglon-texto"><span class="renglon-titulo">{{ a.titulo }}</span><span class="renglon-detalle">{{ a.detalle }}</span>{% if a.enlaces %}<span class="renglon-enlaces">{% for e in a.enlaces %}<a href="{{ e.url }}">{{ e.texto }}</a>{% endfor %}</span>{% endif %}</span><span class="estado {{ a.tono }}">{{ a.pastilla }}</span></li>{% endfor %}
+  </ul>
+  {% else %}
+  <ul class="lista-estado"><li><span class="renglon-texto"><span class="renglon-titulo">Sin avisos</span><span class="renglon-detalle">Nada pendiente por ahora.</span></span><span class="estado bien">Bien</span></li></ul>
+  {% endif %}
+</section>

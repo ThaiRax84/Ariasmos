@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Roles y permisos</h1>
-<p><a class="boton" href="{% url 'rol_nuevo' %}">Nuevo rol</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Roles</span>
+    <h1>Roles y permisos</h1>
+  </div>
+  <div class="encabezado-lado"><a class="boton" href="{% url 'rol_nuevo' %}">Nuevo rol</a></div>
+</div>
 {% for rol, nombres in filas %}
 <section class="panel">
   <h2>{{ rol.nombre }} <small>nivel {{ rol.nivel }} · cierre tras {{ rol.minutos_inactividad }} min · autenticador {% if rol.requiere_totp %}obligatorio{% else %}opcional{% endif %}</small></h2>

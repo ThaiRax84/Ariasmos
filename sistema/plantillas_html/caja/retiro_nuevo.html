@@ -1,14 +1,29 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Retirar efectivo de la caja</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Mi caja{% if turno %} · {{ turno.caja }}{% endif %}</span>
+    <h1>Retiro de caja</h1>
+    <p class="subtitulo">Sale efectivo de tu caja. Queda registrado con su motivo y comprobante, y Supervisión lo revisa después.</p>
+  </div>
+</div>
 {% if not turno %}
 <p class="mensaje warning">Abre tu turno de caja para retirar efectivo. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>
 {% else %}
-<p>El retiro sale del efectivo de tu turno en {{ turno.caja }}. Si pasa de los topes del negocio queda como solicitud para que otra persona lo autorice. Adjunta el ticket o recibo ahora o después; el turno no se puede cerrar con comprobantes pendientes.</p>
-<form method="post" class="formulario angosto" enctype="multipart/form-data" novalidate>
-  {% csrf_token %}
-  {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Registrar retiro</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
-</form>
+<div class="columnas principal">
+  <form method="post" class="panel importe-principal" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% include "comun/_campos.html" %}
+    <div class="acciones"><button class="boton grande" type="submit">Registrar retiro</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
+  </form>
+  <section class="panel">
+    <h2>Antes de retirar</h2>
+    <ul class="vias">
+      <li><div><strong>Sale de tu turno</strong><span>El retiro sale del efectivo de tu turno en {{ turno.caja }}.</span></div></li>
+      <li><div><strong>Topes del negocio</strong><span>Si pasa de los topes queda como solicitud para que otra persona lo autorice.</span></div></li>
+      <li><div><strong>Comprobante</strong><span>Adjunta el ticket o recibo ahora o después; el turno no se puede cerrar con comprobantes pendientes.</span></div></li>
+    </ul>
+  </section>
+</div>
 {% endif %}
 {% endblock %}

@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ titulo }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">{% if antetitulo %}{{ antetitulo }}{% endif %}</span>
+    <h1>{{ titulo }}</h1>
+  </div>
+</div>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

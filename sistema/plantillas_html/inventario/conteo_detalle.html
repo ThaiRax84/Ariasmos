@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Conteo {{ conteo.pk }}{% if conteo.inicial %} (carga inicial){% endif %}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Conteo {{ conteo.pk }}{% if conteo.inicial %} (carga inicial){% endif %}</h1>
+  </div>
+</div>
 <p>Subió {{ conteo.usuario }} el {{ conteo.creado|date:"d/m/Y H:i" }} · {{ conteo.get_origen_display }}{% if conteo.nombre_archivo %} · {{ conteo.nombre_archivo }}{% endif %}.
 {% if conteo.aplicado_en %}Aprobado por {{ conteo.aplicado_por }} el {{ conteo.aplicado_en|date:"d/m/Y H:i" }}.{% elif conteo.solicitud %}Solicitud {{ conteo.solicitud.get_estado_display|lower }}: <a href="{% url 'solicitudes:detalle' conteo.solicitud.pk %}">ver solicitud</a>.{% endif %}</p>
 <p>Lo esperado es la existencia del sistema en el momento del conteo; al aprobarse se ajusta exactamente esa diferencia y no se tocan los movimientos posteriores.</p>

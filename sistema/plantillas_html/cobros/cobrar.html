@@ -1,56 +1,108 @@
 {% extends "base.html" %}
 {% load formato %}
+{% load static %}
+{% block transicion %}{% endblock %}
+{% block cabeza %}<script src="{% static 'js/piezas.js' %}" defer></script>{% endblock %}
 {% block contenido %}
-<h1>Cobrar a {{ titular.nombre_completo }}</h1>
-<p>{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.familia %} · {{ voc.familia }} <a href="{% url 'titulares:familia' titular.familia.pk %}">{{ titular.familia }}</a>{% endif %}</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Cobrar en efectivo</span>
+    <h1>{{ titular.nombre_completo }}</h1>
+    <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %}{% if titular.familia %} · {{ voc.familia }} <a href="{% url 'titulares:familia' titular.familia.pk %}">{{ titular.familia }}</a>{% endif %}</p>
+  </div>
+  <div class="encabezado-lado">
+    <div class="recuadro-cifra"><span class="etiqueta">Adeudo{% if titular.familia %} de la {{ voc.familia|lower }}{% endif %}</span><span class="valor grande cifra-importe" aria-label="{{ estado.adeudo|dinero }}">{{ estado.adeudo|cifra }}</span></div>
+  </div>
+</div>
 {% if venta %}<p class="mensaje">Cobro de la venta {{ venta }} por {{ venta.total|dinero }}: el pago se aplica primero a los artículos de esa venta y lo que sobre, al adeudo normal.</p>{% endif %}
 {% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
-{% if propuesta %}
-<section class="panel alerta">
-  <h2>Confirma el pago de {{ importe|dinero }}</h2>
-  {% if sobre_tope %}<p><strong>Este importe pasa del tope de un pago individual: necesitará autorización.</strong></p>{% endif %}
-  <ul class="lista">
-    {% for cargo, parte in propuesta.partes %}<li>{{ cargo }}{% if cargo.titular_id != titular.pk %} ({{ cargo.titular.nombre_completo }}){% endif %}: {{ parte|dinero }}</li>{% empty %}<li>No hay cargos pendientes.</li>{% endfor %}
-    {% if propuesta.resto %}<li>Queda a favor: <strong>{{ propuesta.resto|dinero }}</strong></li>{% endif %}
-  </ul>
-  {% if con_piezas %}
-  <form method="post" class="formulario angosto" novalidate>
-    {% csrf_token %}
-    <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
-    <input type="hidden" name="importe" value="{{ importe }}">
-    <input type="hidden" name="ficha" value="{{ ficha }}">
-    {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
-    {% if piezas.listo %}
-    {% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}
-    <p>Cambio a entregar: <strong>{{ piezas.cambio|dinero }}</strong>{% if piezas.cambio %}. Entrega exactamente estas piezas; si entregas otras, corrígelas aquí antes de confirmar.{% endif %}</p>
-    {% else %}
-    <p>Escribe las piezas que te entregan; el sistema calcula el cambio.</p>
-    {% endif %}
-    {% include "comun/_campos.html" with formulario=piezas.formulario %}
-    <div class="acciones">
-      {% if piezas.listo %}<button class="boton grande" type="submit">Confirmar y emitir recibo</button>{% else %}<button class="boton grande" type="submit">Calcular el cambio</button>{% endif %}
-      <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir</a>
+<div class="columnas mitades">
+  <section class="panel">
+    <h2>Cargos pendientes</h2>
+    <table class="tabla">
+      <thead><tr><th>Concepto</th><th>Vence</th><th class="importe">Saldo</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for fila in estado.cargos %}{% with c=fila.cargo %}{% if c.saldo > 0 %}
+      <tr><td>{{ c }}{% if c.titular_id != titular.pk %}<span class="detalle">{{ c.titular.nombre_completo }}</span>{% endif %}</td><td>{{ c.vencimiento|date:"j M Y" }}</td><td class="importe saldo">{{ c.saldo|dinero }}</td><td><span class="estado {{ fila.estado }}">{{ fila.estado|capfirst }}</span></td></tr>
+      {% endif %}{% endwith %}{% endfor %}
+      </tbody>
+    </table>
+    {% if not estado.adeudo %}<p class="ayuda">No hay cargos pendientes.</p>{% endif %}
+    {% if propuesta %}
+    <div class="aplica">
+      <span class="etiqueta">Así se va a aplicar</span>
+      {% for cargo, parte in propuesta.partes %}<div class="renglon"><span>{{ cargo }}{% if cargo.titular_id != titular.pk %} ({{ cargo.titular.nombre_completo }}){% endif %}</span><span>{{ parte|dinero }}</span></div>{% empty %}<div class="renglon"><span>No hay cargos pendientes.</span></div>{% endfor %}
+      {% if propuesta.resto %}<div class="renglon total"><span>Queda a favor</span><span>{{ propuesta.resto|dinero }}</span></div>{% endif %}
     </div>
-  </form>
-  {% else %}
-  <form method="post" class="acciones">
-    {% csrf_token %}
-    <input type="hidden" name="paso" value="confirmar">
-    <input type="hidden" name="importe" value="{{ importe }}">
-    <input type="hidden" name="ficha" value="{{ ficha }}">
-    {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
-    <button class="boton grande" type="submit">Confirmar y emitir recibo</button>
-    <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir</a>
-  </form>
-  {% endif %}
-</section>
-{% elif turno %}
-<form method="post" class="formulario angosto" novalidate>
-  {% csrf_token %}
-  {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
-  {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Ver cómo se aplica</button></div>
-</form>
-{% endif %}
+    {% endif %}
+  </section>
+  <section class="panel">
+    {% if propuesta %}
+    <h2>Confirma el pago de {{ importe|dinero }}</h2>
+    {% if sobre_tope %}<p class="mensaje warning">Este importe pasa del tope de un pago individual: necesitará autorización.</p>{% endif %}
+    {% if con_piezas %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
+      <input type="hidden" name="importe" value="{{ importe }}">
+      <input type="hidden" name="ficha" value="{{ ficha }}">
+      {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
+      {% if piezas.formulario.non_field_errors %}<div class="errores" role="alert">{% for e in piezas.formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+      {% for campo in piezas.formulario.hidden_fields %}{{ campo }}{% endfor %}
+      <div class="campo">
+        <span class="etiqueta">{% if piezas.listo %}Piezas que te pagaron{% else %}2 · Con qué te pagaron{% endif %}</span>
+        <span class="ayuda" data-ayuda-sin-js>Escribe cuántas piezas recibiste de cada billete o moneda.</span>
+        <span class="ayuda" data-ayuda-con-js hidden>Toca cada billete o moneda que recibas; con «−» quitas una.</span>
+        {% include "caja/_piezas.html" with campos=piezas.formulario.campos_recibidas prefijo="Recibí: piezas de" mosaicos=True %}
+      </div>
+      {% if not piezas.listo %}<div class="cuadros" data-recibido-cuadro hidden><div class="cuadro"><span class="etiqueta">Recibido</span><span class="valor" data-recibido></span></div><div class="cuadro"><span class="etiqueta">Importe a cobrar</span><span class="valor">{{ importe|dinero }}</span></div></div>{% endif %}
+      {% if piezas.listo %}
+      <div class="cuadros">
+        <div class="cuadro"><span class="etiqueta">Recibido</span><span class="valor">{{ importe|add:piezas.cambio|dinero }}</span></div>
+        <div class="cuadro aviso"><span class="etiqueta">Cambio a entregar</span><span class="valor">{{ piezas.cambio|dinero }}</span></div>
+      </div>
+      {% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}
+      {% if piezas.cambio %}
+      {% if not piezas.aviso %}<div class="piezas-entrega">
+        <div><span class="etiqueta">Entrega exactamente estas piezas</span><span class="cuales">{% for c in piezas.formulario.campos_cambio %}{% if c.value and c.value != "0" and c.value != 0 %}{{ c.value }} × {{ c.label|denominacion_corta }}{% if not forloop.last %} · {% endif %}{% endif %}{% endfor %}</span><span class="ayuda">Así las piezas de tu caja cuadran en el corte. Si entregas otras, corrígelas antes de confirmar.</span></div>
+      </div>{% endif %}
+      <details class="campo"{% if piezas.formulario.errors or piezas.aviso %} open{% endif %}>
+        <summary class="enlace">{% if piezas.aviso %}Piezas que entregas de cambio{% else %}Di el cambio con otras piezas{% endif %}</summary>
+        {% include "caja/_piezas.html" with campos=piezas.formulario.campos_cambio prefijo="Entrego de cambio: piezas de" mosaicos=True %}
+      </details>
+      {% endif %}
+      <div class="acciones columna"><button class="boton grande ancho" type="submit">Confirmar y dar recibo</button></div>
+      {% else %}
+      <div class="acciones columna"><button class="boton grande ancho" type="submit">Calcular el cambio</button></div>
+      {% endif %}
+    </form>
+    {% else %}
+    <form method="post" class="acciones columna">
+      {% csrf_token %}
+      <input type="hidden" name="paso" value="confirmar">
+      <input type="hidden" name="importe" value="{{ importe }}">
+      <input type="hidden" name="ficha" value="{{ ficha }}">
+      {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
+      <button class="boton grande ancho" type="submit">Confirmar y dar recibo</button>
+    </form>
+    {% endif %}
+    <p class="acciones"><a class="enlace" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir el importe</a> · <a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular|lower }}</a></p>
+    {% elif turno %}
+    <h2>1 · Importe a cobrar</h2>
+    <form method="post" class="importe-principal" novalidate>
+      {% csrf_token %}
+      {% if venta %}<input type="hidden" name="venta" value="{{ venta.pk }}">{% endif %}
+      {% include "comun/_campos.html" %}
+      <p class="ayuda">Escribe solo el número; el signo y la moneda ya vienen puestos.</p>
+      <div class="acciones columna"><button class="boton grande ancho" type="submit">Ver cómo se aplica</button></div>
+    </form>
+    <p class="acciones"><a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular|lower }}</a></p>
+    {% else %}
+    <h2>Sin turno abierto</h2>
+    <p>Para cobrar en efectivo abre primero tu turno de caja.</p>
+    <a class="boton" href="{% url 'caja:inicio' %}">Ir a mi caja</a>
+    {% endif %}
+  </section>
+</div>
 {% include "cobros/_estado_cuenta.html" with varios=estado.titulares|length|add:"-1" %}
 {% endblock %}

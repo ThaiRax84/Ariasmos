@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Equipos</h1>
-<p><a class="boton secundario" href="{% url 'conectar' %}">Conectar otra computadora</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Equipos</h1>
+  </div>
+  <div class="encabezado-lado"><a class="boton secundario" href="{% url 'conectar' %}">Conectar otra computadora</a></div>
+</div>
 <h2>Pendientes de aprobación</h2>
 {% if pendientes %}
 <table class="tabla">

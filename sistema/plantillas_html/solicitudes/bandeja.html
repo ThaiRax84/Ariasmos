@@ -1,18 +1,35 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Solicitudes</h1>
-{% if "aprobar_solicitudes" in permisos %}
-<section class="panel">
-  <h2>Por resolver</h2>
-  {% if pendientes %}<ul class="lista">{% for s, resaltada in pendientes %}<li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</small></li>{% endfor %}</ul>
-  {% else %}<p>No hay pendientes.</p>{% endif %}
-</section>
-{% endif %}
-<section class="panel">
-  <h2>Mis solicitudes</h2>
-  <table class="tabla">
-  <thead><tr><th>Acción</th><th>{{ voc.titular }}</th><th>Estado</th><th>Resolvió</th><th>Fecha</th></tr></thead>
-  <tbody>{% for s in propias %}<tr><td><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }}</a></td><td>{{ s.titular|default:"—" }}</td><td>{{ s.get_estado_display }}</td><td>{{ s.resuelta_por|default:"—" }}{% if s.via %} ({{ s.get_via_display }}){% endif %}</td><td>{{ s.creada|date:"d/m/Y H:i" }}</td></tr>{% empty %}<tr><td colspan="5">Sin solicitudes.</td></tr>{% endfor %}</tbody>
-  </table>
-</section>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Solicitudes</h1>
+  </div>
+</div>
+<div class="columnas">
+  <div class="pila">
+    {% if "aprobar_solicitudes" in permisos %}
+    <section class="panel">
+      <h2>Por resolver</h2>
+      {% if pendientes %}<ul class="lista-estado">{% for s, resaltada in pendientes %}<li><span class="renglon-texto"><a class="renglon-titulo" href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a><span class="renglon-detalle">de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</span></span>{% if resaltada %}<span class="estado aviso">Lleva tiempo esperando</span>{% else %}<span class="estado calma">En espera</span>{% endif %}</li>{% endfor %}</ul>
+      {% else %}<p>No hay pendientes.</p>{% endif %}
+    </section>
+    {% endif %}
+    <section class="panel">
+      <h2>Mis solicitudes</h2>
+      <div class="desplazable"><table class="tabla">
+      <thead><tr><th>Solicitud</th><th>{{ voc.titular }}</th><th>Enviada</th><th>Resolvió</th><th>Estado</th></tr></thead>
+      <tbody>{% for s in propias %}<tr><td class="fuerte"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }}</a></td><td>{{ s.titular|default:"—" }}</td><td>{{ s.creada|date:"d/m/Y H:i" }}</td><td>{{ s.resuelta_por|default:"—" }}{% if s.via %} ({{ s.get_via_display }}){% endif %}</td><td><span class="estado {{ s.estado }}">{{ s.get_estado_display }}</span></td></tr>{% empty %}<tr><td colspan="5">Sin solicitudes.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>¿Urge una autorización?</h2>
+    <p class="ayuda">Hay tres caminos; no tienes que esperar a que alguien abra su bandeja.</p>
+    <ol class="vias">
+      <li><div><strong>Bandeja</strong><span>Quien autoriza la ve en su inicio y la resuelve cuando entra.</span></div></li>
+      <li><div><strong>Permiso temporal</strong><span>Si te delegaron ese permiso, la acción se aplica al momento.</span></div></li>
+      <li><div><strong>Código por teléfono</strong><span>Abre la solicitud y escribe el código de 6 dígitos que te dicta quien autoriza desde su autenticador.</span></div></li>
+    </ol>
+  </section>
+</div>
 {% endblock %}

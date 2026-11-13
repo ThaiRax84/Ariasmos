@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Código del autenticador</h1>
-<p>Abre en tu teléfono la aplicación autenticadora que diste de alta (por ejemplo Google Authenticator, Microsoft Authenticator, Authy o 2FAS) y busca la cuenta de este sistema.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Código del autenticador</h1>
+    <p class="subtitulo">Abre en tu teléfono la aplicación autenticadora que diste de alta (por ejemplo Google Authenticator, Microsoft Authenticator, Authy o 2FAS) y busca la cuenta de este sistema.</p>
+  </div>
+</div>
 <p>Escribe el código de 6 dígitos que muestra en este momento. Cambia cada 30 segundos: si está por cambiar, espera el siguiente.</p>
 <p><small>Si perdiste el teléfono o cambiaste de aplicación, pide a quien administra los usuarios que reinicie tu autenticador.</small></p>
 <form method="post" class="formulario angosto">

@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Vender artículos</h1>
-<p><a class="boton secundario" href="{% url 'inventario:vender_publico' %}">Vender sin {{ voc.matricula|lower }} (público en general)</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Vender artículos</h1>
+  </div>
+  <div class="encabezado-lado">{% include "inventario/_a_quien.html" %}</div>
+</div>
 <form method="get" class="busqueda">
   <input type="search" name="q" value="{{ q }}" placeholder="{{ voc.matricula }} o nombre" aria-label="Buscar" maxlength="60" autofocus>
   <button class="boton" type="submit">Buscar</button>

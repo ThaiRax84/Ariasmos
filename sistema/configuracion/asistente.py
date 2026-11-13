@@ -69,10 +69,11 @@ def _token_valido(token):
 
 
 TOTAL_PASOS = 8
+NOMBRES_PASOS = ("Negocio y plantilla", "Vocabulario y conceptos", "Importes", "Datos de pago", "Caja: cortes y retiros", "Entrega y respaldo", "Usuario de Dirección", "Autenticador")
 
 
 def _paso(request, plantilla, formulario, numero, titulo, **extra):
-    return render(request, plantilla, {"formulario": formulario, "paso": numero, "total": TOTAL_PASOS, "titulo": titulo, **extra})
+    return render(request, plantilla, {"formulario": formulario, "paso": numero, "total": TOTAL_PASOS, "titulo": titulo, "nombres_pasos": NOMBRES_PASOS, **extra})
 
 
 def _leer_plantilla(formulario):
@@ -347,6 +348,7 @@ def codigo(request):
         "formulario": formulario,
         "paso": 8,
         "total": TOTAL_PASOS,
+        "nombres_pasos": NOMBRES_PASOS,
         "titulo": "Autenticador del primer usuario",
         **qr.contexto(secreto, nuevo.usuario, negocio.nombre),
     }

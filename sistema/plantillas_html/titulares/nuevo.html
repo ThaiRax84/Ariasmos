@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Alta de {{ voc.titular|lower }}</h1>
-<p>Al guardar se asigna la {{ voc.matricula|lower }} y ya se puede imprimir la ficha de pago.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">{{ voc.titulares }}</span>
+    <h1>Alta de {{ voc.titular|lower }}</h1>
+    <p class="subtitulo">Al guardar se asigna la {{ voc.matricula|lower }} y ya se puede imprimir la ficha de pago.</p>
+  </div>
+</div>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

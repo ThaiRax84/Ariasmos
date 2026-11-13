@@ -1,34 +1,44 @@
-{% load static formato %}<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Recibo {{ recibo }}</title>
-<link rel="stylesheet" href="{% static 'css/sistema.css' %}">
-<script src="{% static 'js/sistema.js' %}" defer></script>
-</head>
-<body class="ficha">
-<div class="no-imprimir acciones">
-  <button class="boton" type="button" id="imprimir">Imprimir</button>
-  <a class="boton secundario" href="{% url 'cobros:recibo_pdf' recibo.pk %}">PDF</a>
-  {% if titular.interno %}{% if inventario_activo %}<a class="boton secundario" href="{% url 'inventario:indice' %}">Volver</a>{% endif %}{% else %}<a class="boton secundario" href="{% url 'titulares:detalle' titular.pk %}">Volver</a>{% endif %}
+{% extends "base.html" %}
+{% load formato %}
+{% block titulo %}Recibo {{ recibo }}{% endblock %}
+{% block transicion %}{% endblock %}
+{% block contenido %}
+<div class="recibo-pantalla">
+  <div class="pila junta no-imprimir">
+    <span class="antetitulo">{% if cancelado %}Recibo cancelado{% else %}Recibo de pago{% endif %}</span>
+    <h1>Recibo {{ recibo }}</h1>
+    <p class="subtitulo">{% if cancelado %}Este pago se revirtió; el recibo queda solo como constancia.{% else %}El pago quedó aplicado. Entrega el recibo impreso o en PDF.{% endif %}</p>
+    <div class="recibo-acciones">
+      <button class="boton grande" type="button" id="imprimir">Imprimir recibo</button>
+      <a class="boton secundario" href="{% url 'cobros:recibo_pdf' recibo.pk %}">Descargar PDF</a>
+      {% if "registrar_pago_efectivo" in permisos and not titular.interno %}<a class="boton secundario" href="{% url 'cobros:buscar' %}">Cobrar a otro {{ voc.titular|lower }}</a>{% endif %}
+    </div>
+    {% if titular.interno %}{% if inventario_activo %}<a class="enlace" href="{% url 'inventario:indice' %}">Volver al inventario</a>{% endif %}{% else %}<a class="enlace" href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a>{% endif %}
+  </div>
+  <article class="hoja">
+    <header class="hoja-encabezado">
+      {% if marca.logo %}<img class="logo-negocio" src="{% url 'marca_logo' %}?v={{ marca.version }}" alt="Logotipo de {{ negocio.nombre }}" width="72" height="72">{% endif %}
+      <div class="hoja-negocio"><strong>{{ negocio.nombre }}</strong><span>Recibo de pago</span></div>
+      <div class="hoja-folio"><span>Recibo</span><strong>{{ recibo }}</strong></div>
+    </header>
+    {% if cancelado %}<p class="sello-cancelado">CANCELADO</p>{% endif %}
+    <dl class="datos">
+      <dt>Fecha</dt><dd>{{ pago.fecha|date:"d/m/Y H:i" }}</dd>
+      <dt>{{ voc.titular }}</dt><dd>{{ titular.nombre_completo }}</dd>
+      {% if not titular.interno %}<dt>{{ voc.matricula }}</dt><dd>{{ titular.matricula_formateada }}</dd>{% endif %}
+      <dt>Forma de pago</dt><dd>{{ pago.get_medio_display|capfirst }}</dd>
+    </dl>
+    <p class="hoja-seccion">Aplicado a</p>
+    <dl class="datos">
+      {% for a in aplicaciones %}<dt>{{ a.cargo }}{% if a.cargo.titular_id != titular.pk %} ({{ a.cargo.titular.nombre_completo }}){% endif %}</dt><dd>{{ a.importe|dinero }}</dd>{% empty %}<dt>Sin cargos pendientes al momento del pago.</dt><dd>—</dd>{% endfor %}
+      {% if a_favor %}<dt>Queda a favor</dt><dd>{{ a_favor|dinero }}</dd>{% endif %}
+    </dl>
+    <div class="hoja-total"><span class="etiqueta">Importe recibido</span><span class="cifra-importe media" aria-label="{{ pago.importe|dinero }}">{{ pago.importe|cifra }}</span></div>
+    <div class="hoja-verificacion">
+      <div class="qr-recibo">{{ qr }}</div>
+      <div><span class="etiqueta">Código de verificación</span><span class="codigo">{{ recibo.codigo }}</span><span class="pie">Recibió: <strong>{{ pago.registrado_por|default:"importación automática del banco" }}</strong></span></div>
+    </div>
+    <footer class="hoja-pie"><span>Comprueba este recibo con el QR o con su código.</span><span class="hecho-con">Hecho con <b>ARIASMOS</b></span></footer>
+  </article>
 </div>
-<article class="hoja">
-  <h1>{{ negocio.nombre }}</h1>
-  <h2>Recibo {{ recibo }}</h2>
-  {% if cancelado %}<p class="sello-cancelado">CANCELADO</p>{% endif %}
-  <dl class="datos">
-    <dt>Fecha</dt><dd>{{ pago.fecha|date:"d/m/Y H:i" }}</dd>
-    <dt>{{ voc.titular }}</dt><dd>{{ titular.nombre_completo }}</dd>
-    {% if not titular.interno %}<dt>{{ voc.matricula }}</dt><dd>{{ titular.matricula_formateada }}</dd>{% endif %}
-    <dt>Importe</dt><dd><strong>{{ pago.importe|dinero }}</strong> ({{ pago.get_medio_display|lower }})</dd>
-  </dl>
-  <h3>Aplicado a</h3>
-  <ul>{% for a in aplicaciones %}<li>{{ a.cargo }}{% if a.cargo.titular_id != titular.pk %} ({{ a.cargo.titular.nombre_completo }}){% endif %}: {{ a.importe|dinero }}</li>{% empty %}<li>Sin cargos pendientes al momento del pago.</li>{% endfor %}
-  {% if a_favor %}<li>Queda a favor: {{ a_favor|dinero }}</li>{% endif %}</ul>
-  <div class="qr-recibo">{{ qr }}</div>
-  <p>Código de verificación: <strong>{{ recibo.codigo }}</strong></p>
-  <p class="pie">Recibió: {{ pago.registrado_por|default:"importación automática del banco" }}</p>
-</article>
-</body>
-</html>
+{% endblock %}

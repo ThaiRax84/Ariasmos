@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ solicitud }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Solicitudes</span>
+    <h1>{{ solicitud }}</h1>
+  </div>
+</div>
 <section class="panel{% if resaltada %} resaltada{% endif %}">
   <dl class="datos">
     {% if solicitud.titular and not solicitud.titular.interno %}<dt>{{ voc.matricula }}</dt><dd><a href="{% url 'titulares:detalle' solicitud.titular.pk %}">{{ solicitud.titular.matricula_formateada }}</a></dd>{% endif %}

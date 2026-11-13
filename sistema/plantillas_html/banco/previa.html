@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Vista previa de la importación</h1>
-<p>{{ carga.nombre_archivo }} · {{ cuenta }}{% if estado %} · periodo {{ estado.periodo_inicio|date:"d/m/Y" }} a {{ estado.periodo_fin|date:"d/m/Y" }} · saldo inicial {{ estado.saldo_inicial|dinero }}, final {{ estado.saldo_final|dinero }}{% endif %}</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Banco</span>
+    <h1>Vista previa de la importación</h1>
+    <p class="subtitulo">{{ carga.nombre_archivo }} · {{ cuenta }}{% if estado %} · periodo {{ estado.periodo_inicio|date:"d/m/Y" }} a {{ estado.periodo_fin|date:"d/m/Y" }} · saldo inicial {{ estado.saldo_inicial|dinero }}, final {{ estado.saldo_final|dinero }}{% endif %}</p>
+  </div>
+</div>
 {% if rechazo %}
 <section class="panel alerta">
   <h2>Este estado de cuenta se rechaza</h2>

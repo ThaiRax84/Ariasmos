@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Bitácora</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Auditoría</span>
+    <h1>Bitácora</h1>
+  </div>
+</div>
 {% if verificacion %}<p class="{% if not verificacion.valida %}mensaje error{% endif %}">Última verificación: {{ verificacion.momento|date:"d/m/Y H:i" }} · {% if verificacion.valida %}íntegra ({{ verificacion.eventos }} eventos){% else %}NO íntegra: {{ motivos|obtener:verificacion.motivo }}{% if verificacion.numero %} (evento {{ verificacion.numero }}){% endif %}{% endif %}</p>{% endif %}
 <div class="atajos">
   <form method="get" class="busqueda">

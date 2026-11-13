@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Retiro {{ retiro }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Mi caja</span>
+    <h1>Retiro {{ retiro }}</h1>
+  </div>
+</div>
 <section class="panel{% if retiro.revision == 'observado' or retiro.comprobante == 'sin_comprobante' %} alerta{% endif %}">
   <dl class="datos">
     <dt>Fecha</dt><dd>{{ retiro.creado|date:"d/m/Y H:i" }}</dd>

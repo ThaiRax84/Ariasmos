@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Destinos de entrega de cortes</h1>
-<p>Cada corte cerrado y cada lista de cobranza se escribe en estas carpetas como PDF, CSV y JSON, con un <code>manifiesto.json</code> firmado.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración · Destinos de cortes</span>
+    <h1>Destinos de entrega de cortes</h1>
+    <p class="subtitulo">Cada corte cerrado y cada lista de cobranza se escribe en estas carpetas como PDF, CSV y JSON, con un <code>manifiesto.json</code> firmado.</p>
+  </div>
+</div>
 <div class="atajos"><a class="boton" href="{% url 'cortes:destino_nuevo' %}">Agregar carpeta</a></div>
 <table class="tabla">
 <thead><tr><th>Nombre</th><th>Carpeta</th><th>Activo</th><th>Qué recibe</th></tr></thead>

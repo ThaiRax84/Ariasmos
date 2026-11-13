@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Respaldos</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Respaldos</h1>
+  </div>
+</div>
 {% for a in alertas %}<p class="mensaje warning">{{ a }}</p>{% endfor %}
 {% if pendiente %}<section class="panel alerta"><h2>Falta guardar la clave de recuperación</h2><p>Sin ella ningún respaldo se puede abrir.</p><a class="boton" href="{% url 'respaldos:clave' %}">Ver la clave de recuperación</a></section>{% endif %}
 <p>Carpeta: {% if carpeta %}<code>{{ carpeta }}</code>{% else %}sin configurar{% endif %} · <a href="{% url 'respaldos:carpeta' %}">cambiar</a></p>

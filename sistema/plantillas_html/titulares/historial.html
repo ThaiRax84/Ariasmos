@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Historial de {{ titular.nombre_completo }}</h1>
-<p>{{ voc.matricula }} {{ titular.matricula_formateada }} · <a href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">{{ voc.titulares }}</span>
+    <h1>Historial de {{ titular.nombre_completo }}</h1>
+    <p class="subtitulo">{{ voc.matricula }} {{ titular.matricula_formateada }} · <a href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a></p>
+  </div>
+</div>
 <ul class="lista historial">
 {% for f in filas %}
   <li>

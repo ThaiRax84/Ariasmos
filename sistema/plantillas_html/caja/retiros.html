@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Retiros de caja</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Mi caja</span>
+    <h1>Retiros de caja</h1>
+  </div>
+</div>
 {% if puede_retirar %}<div class="atajos"><a class="boton" href="{% url 'caja:retiro_nuevo' %}">Retirar efectivo</a></div>{% endif %}
 <table class="tabla">
 <thead><tr><th>Folio</th><th>Fecha</th><th>Caja</th><th>Registró</th><th>Motivo</th><th>Importe</th><th>Comprobante</th><th>Revisión</th></tr></thead>

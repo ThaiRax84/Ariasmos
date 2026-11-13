@@ -1,18 +1,33 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ voc.titulares }}</h1>
-<form method="get" class="busqueda">
-  <input type="search" name="q" value="{{ q }}" placeholder="Nombre o {{ voc.matricula|lower }}" aria-label="Buscar">
-  <select name="estado" aria-label="Estado"><option value="">Todos</option>{% for valor, nombre in estados %}<option value="{{ valor }}"{% if valor == estado %} selected{% endif %}>{{ nombre }}</option>{% endfor %}</select>
-  <button class="boton" type="submit">Buscar</button>
-  {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton secundario" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}
-</form>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Padrón</span>
+    <h1>{{ voc.titulares }}</h1>
+  </div>
+  <div class="encabezado-lado">{% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}</div>
+</div>
+<div class="fila">
+  <form method="get" class="buscador" role="search">
+    <label class="solo-lectores" for="buscar-padron">Buscar</label>
+    <input id="buscar-padron" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre o {{ voc.matricula|lower }}" aria-label="Buscar">
+    {% if estado %}<input type="hidden" name="estado" value="{{ estado }}">{% endif %}
+    <button class="boton chico" type="submit">Buscar</button>
+  </form>
+  <nav class="filtros" aria-label="Filtrar por estado">
+    <a class="filtro{% if not estado %} activo{% endif %}" href="?{% if q %}q={{ q|urlencode }}{% endif %}"{% if not estado %} aria-current="true"{% endif %}>Todos</a>
+    {% for valor, nombre, total in filtros %}<a class="filtro{% if valor == estado %} activo{% endif %}" href="?estado={{ valor }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}"{% if valor == estado %} aria-current="true"{% endif %}>{{ nombre }} · {{ total }}</a>{% endfor %}
+  </nav>
+</div>
+<section class="panel">
 <table class="tabla">
-<thead><tr><th>{{ voc.matricula }}</th><th>Nombre</th><th>{{ voc.agrupacion }}</th><th>Estado</th></tr></thead>
+<thead><tr><th>{{ voc.titular }}</th><th>{{ voc.matricula }}</th><th>{{ voc.agrupacion }}</th><th>{{ voc.familia }}</th><th>Estado</th></tr></thead>
 <tbody>
 {% for t in titulares %}
-<tr><td><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }}</a></td><td><a href="{% url 'titulares:detalle' t.pk %}">{{ t.apellidos }}, {{ t.nombre }}</a></td><td>{{ t.agrupacion|default:"—" }}</td><td><span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span></td></tr>
-{% empty %}<tr><td colspan="4">Sin resultados.</td></tr>
+<tr><td class="fuerte"><a href="{% url 'titulares:detalle' t.pk %}">{{ t.apellidos }}, {{ t.nombre }}</a></td><td><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }}</a></td><td>{{ t.agrupacion|default:"—" }}</td><td>{{ t.familia|default:"—" }}</td><td><span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span></td></tr>
+{% empty %}<tr><td colspan="5">Sin resultados.</td></tr>
 {% endfor %}
 </tbody></table>
+<div class="pie-tabla"><span>Mostrando {{ titulares|length }}{% if titulares|length == 200 %} (los primeros 200; usa la búsqueda){% endif %}</span></div>
+</section>
 {% endblock %}

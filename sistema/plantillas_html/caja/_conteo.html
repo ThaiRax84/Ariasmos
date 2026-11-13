@@ -1,0 +1,13 @@
+{% load formato %}{% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+<table class="tabla" data-conteo data-simbolo="{{ moneda.simbolo }}">
+  <thead><tr><th>Denominación</th><th class="num">Piezas</th><th class="num">Subtotal</th></tr></thead>
+  <tbody>
+  {% for campo in formulario %}{% if campo.name != "nota" %}
+  <tr data-centavos="{{ campo.name|slice:'2:' }}">
+    <td class="fuerte"><label for="{{ campo.id_for_label }}"><span class="solo-lectores">Piezas de </span>{{ campo.label|denominacion_corta }}</label></td>
+    <td class="num conteo-piezas">{{ campo }}{% for e in campo.errors %}<p class="error">{{ e }}</p>{% endfor %}</td>
+    <td class="num" data-subtotal></td>
+  </tr>
+  {% endif %}{% endfor %}
+  </tbody>
+</table>

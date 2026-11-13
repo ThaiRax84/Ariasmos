@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ titulo }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración</span>
+    <h1>{{ titulo }}</h1>
+  </div>
+</div>
 <div class="atajos"><a class="boton" href="{% url 'configuracion:catalogo_nuevo' catalogo %}">Agregar</a><a class="boton secundario" href="{% url 'configuracion:indice' %}">Volver</a></div>
 <table class="tabla">
 <tbody>{% for e in elementos %}<tr><td>{{ e }}</td>

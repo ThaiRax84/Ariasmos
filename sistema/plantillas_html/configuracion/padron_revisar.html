@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Importar padrón: {{ carga.nombre_archivo }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración</span>
+    <h1>Importar padrón: {{ carga.nombre_archivo }}</h1>
+  </div>
+</div>
 <table class="tabla compacta"><tbody>{% for fila in muestra %}<tr>{% for celda in fila %}<td>{{ celda }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}

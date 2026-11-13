@@ -34,6 +34,10 @@
     },
     recibo: function (texto) { return texto.toUpperCase().replace(/[^A-Z0-9|\-]/g, ""); },
     folio: function (texto) { return texto.toUpperCase().replace(/[^A-Z0-9\-]/g, ""); },
+    color: function (texto) {
+      var cifras = texto.toUpperCase().replace(/[^0-9A-F]/g, "").slice(0, 6);
+      return cifras || texto.indexOf("#") !== -1 ? "#" + cifras : "";
+    },
     hora: function (texto) {
       var limpio = texto.replace(/[^0-9:]/g, "");
       var dos = limpio.indexOf(":");
