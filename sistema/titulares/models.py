@@ -27,6 +27,18 @@ class MotivoBaja(models.Model):
         return self.nombre
 
 
+class Familia(models.Model):
+    nombre = models.CharField(max_length=100)
+    activa = models.BooleanField(default=True)
+    creada = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
 class Titular(models.Model):
     PENDIENTE = "pendiente"
     ACTIVO = "activo"
@@ -38,6 +50,8 @@ class Titular(models.Model):
     nombre = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=150)
     agrupacion = models.ForeignKey(Agrupacion, null=True, blank=True, on_delete=models.PROTECT, related_name="titulares")
+    familia = models.ForeignKey(Familia, null=True, blank=True, on_delete=models.PROTECT, related_name="miembros")
+    activo_desde = models.DateField(null=True, blank=True)
     estado = models.CharField(max_length=10, choices=ESTADOS, default=PENDIENTE)
     notas = models.TextField(blank=True)
     constancia_consentimiento = models.BooleanField(default=False)
@@ -109,7 +123,8 @@ class CampoContacto(models.Model):
 
 
 class Contacto(models.Model):
-    titular = models.ForeignKey(Titular, on_delete=models.CASCADE, related_name="contactos")
+    titular = models.ForeignKey(Titular, null=True, blank=True, on_delete=models.CASCADE, related_name="contactos")
+    familia = models.ForeignKey(Familia, null=True, blank=True, on_delete=models.CASCADE, related_name="contactos")
     nombre = models.CharField(max_length=150)
     relacion = models.ForeignKey(RelacionContacto, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     valores = models.JSONField(default=dict, blank=True)
@@ -120,7 +135,9 @@ class Contacto(models.Model):
     class Meta:
         ordering = ["-principal", "nombre"]
         constraints = [
-            models.UniqueConstraint(fields=["titular"], condition=Q(principal=True), name="contacto_un_principal"),
+            models.UniqueConstraint(fields=["titular"], condition=Q(principal=True, titular__isnull=False), name="contacto_un_principal"),
+            models.UniqueConstraint(fields=["familia"], condition=Q(principal=True, familia__isnull=False), name="contacto_familia_un_principal"),
+            models.CheckConstraint(condition=(Q(titular__isnull=False) & Q(familia__isnull=True)) | (Q(titular__isnull=True) & Q(familia__isnull=False)), name="contacto_de_titular_o_familia"),
         ]
 
     def __str__(self):
