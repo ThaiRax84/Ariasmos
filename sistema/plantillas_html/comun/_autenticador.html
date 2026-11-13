@@ -1,0 +1,18 @@
+<section class="panel">
+  <h2>¿Qué es el autenticador?</h2>
+  <p>Es una aplicación gratuita para el teléfono que muestra un código de 6 dígitos que cambia cada 30 segundos. Ese código, además de tu contraseña, comprueba que eres tú.</p>
+  <p>Sirve cualquiera de estas: Google Authenticator, Microsoft Authenticator, Authy o 2FAS. También cualquier otra aplicación compatible con códigos TOTP estándar.</p>
+  <h2>Cómo darlo de alta</h2>
+  <ol class="pasos">
+    <li>Instala la aplicación desde la tienda de tu teléfono (App Store o Google Play).</li>
+    <li>Ábrela y elige «Agregar cuenta» (a veces es un botón «+»).</li>
+    <li>Escanea este código con la aplicación; si no puedes, escribe la clave:
+      <div class="qr-autenticador" role="img" aria-label="Código QR para agregar la cuenta en la aplicación">{{ qr }}</div>
+      <p>Si no puedes escanearlo, elige «Introducir clave manualmente» (o «Introducir una clave de configuración») y escribe:</p>
+      <p>Nombre de la cuenta: <strong>{{ cuenta_sugerida }}</strong></p>
+      <p>Clave: <code class="clave clave-autenticador">{{ secreto_agrupado }}</code></p>
+      <p><small>Los espacios son solo para leerla mejor; puedes escribirla con o sin ellos. Si la aplicación pregunta el tipo, elige «Basada en el tiempo».</small></p>
+    </li>
+    <li>La aplicación mostrará un código de 6 dígitos para esta cuenta. Escríbelo abajo antes de que cambie.</li>
+  </ol>
+</section>

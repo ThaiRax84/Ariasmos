@@ -12,8 +12,8 @@ from cuentas.permisos import INDISPENSABLES
 from solicitudes.models import PoliticaAccion
 from titulares.models import CampoContacto, MotivoBaja, RelacionContacto
 
-from . import esquema
-from .models import VOCABULARIO_BASE, Vocabulario, vocabulario
+from . import esquema, moneda
+from .models import VOCABULARIO_BASE, Negocio, Vocabulario, vocabulario
 
 ErrorPlantilla = esquema.PlantillaInvalida
 
@@ -63,8 +63,10 @@ def cargar_datos(datos, origen, usuario=None, request=None):
             RelacionContacto.objects.get_or_create(nombre=relacion)
         for nombre in datos["cajas"]:
             Caja.objects.get_or_create(nombre=nombre)
-        for valor in datos["denominaciones"]:
-            Denominacion.objects.get_or_create(valor=valor)
+        negocio = Negocio.actual()
+        if datos["moneda"] == (negocio.moneda if negocio else moneda.POR_DEFECTO):
+            for valor in datos["denominaciones"]:
+                Denominacion.objects.get_or_create(valor=valor)
         for orden, medio in enumerate(datos["medios_pago"], start=1):
             MedioPago.objects.get_or_create(nombre=medio, defaults={"orden": orden * 10})
         for campo in datos["campos_contacto"]:
@@ -112,6 +114,7 @@ def exportar():
         )
     datos = {
         "nombre": "Configuración exportada",
+        "moneda": moneda.codigo_actual(),
         "descripcion": "Plantilla generada desde la configuración de una instalación, sin cifras ni datos de personas.",
         "vocabulario": {clave: texto for clave, texto in vocabulario().items() if clave in VOCABULARIO_BASE},
         "roles": definiciones,

@@ -2,11 +2,9 @@
 {% block contenido %}
 <p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
 <h1>{{ titulo }}</h1>
-<ol class="pasos">
-  <li>En la aplicación autenticadora del teléfono, agrega una cuenta con esta clave: <code class="clave">{{ secreto }}</code></li>
-  <li>O pega este enlace si tu aplicación lo admite: <code class="uri">{{ uri }}</code></li>
-  <li>Escribe el código de 6 dígitos. Este equipo quedará aprobado como el primero.</li>
-</ol>
+<p>Quien dirige el negocio entra con su contraseña y con un código de su teléfono. Así, aunque alguien conozca la contraseña, no puede entrar ni autorizar nada sin el teléfono.</p>
+{% include "comun/_autenticador.html" %}
+<p>Al terminar, este equipo quedará aprobado como el primero.</p>
 <form method="post" class="formulario angosto">
   {% csrf_token %}
   {% include "comun/_campos.html" %}

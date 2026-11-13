@@ -1,7 +1,7 @@
 from django import template
 
 from cuentas.permisos import PERMISOS
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 
 register = template.Library()
 

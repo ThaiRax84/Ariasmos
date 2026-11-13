@@ -5,13 +5,15 @@ from django import forms
 
 from banco.models import MedioPago
 from caja.models import Caja, Denominacion
-from cobros.formularios import CampoImporte
+from cobros.formularios import CampoImporte, CampoPorcentaje, valor_de_recargo
 from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
+from proyecto.captura import CampoContrasena, CampoUsuario
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
+from . import moneda
 from .models import PARAMETROS, VOCABULARIO_BASE, Negocio
 
 
@@ -35,6 +37,8 @@ def validar_zona(valor):
 
 
 class FormularioNegocio(forms.ModelForm):
+    nota_ficha = forms.CharField(label="Nota de la ficha mientras no haya cuenta principal", max_length=1000, required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
     class Meta:
         model = Negocio
         fields = ["nombre", "zona_horaria", "nota_ficha"]
@@ -47,6 +51,22 @@ class FormularioNegocio(forms.ModelForm):
 
     def clean_zona_horaria(self):
         return validar_zona(self.cleaned_data["zona_horaria"])
+
+
+class FormularioMoneda(forms.Form):
+    moneda = forms.ChoiceField(label="Moneda del negocio")
+
+    def __init__(self, *args, bloqueada=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["moneda"].choices = moneda.opciones()
+        if bloqueada:
+            self.fields["moneda"].disabled = True
+
+    def clean_moneda(self):
+        try:
+            return moneda.validar(self.cleaned_data["moneda"])
+        except moneda.ErrorMoneda:
+            raise forms.ValidationError("Elige una moneda del catálogo.")
 
 
 class FormularioAjustesAvanzados(forms.ModelForm):
@@ -200,15 +220,23 @@ IMPORTAR = "importar"
 
 
 class FormularioAsistenteInicio(forms.Form):
-    token = forms.CharField(label="Token de instalación (lo mostró el comando inicializar)", max_length=200, widget=forms.PasswordInput)
+    token = CampoContrasena(label="Token de instalación (lo mostró el comando inicializar)", max_length=200, autocompletar="off")
     nombre = forms.CharField(label="Nombre del negocio", max_length=150)
     zona_horaria = forms.CharField(label="Zona horaria", max_length=64, initial="America/Mexico_City")
+    moneda = forms.ChoiceField(label="Moneda", initial=moneda.POR_DEFECTO, required=False)
     plantilla = forms.ChoiceField(label="Plantilla inicial", widget=forms.RadioSelect)
     archivo = forms.FileField(label="Archivo de plantilla (solo si eliges importar; JSON de hasta 256 KB)", required=False)
 
     def __init__(self, *args, plantillas=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["plantilla"].choices = list((plantillas or {}).items()) + [(IMPORTAR, "Importar un archivo de plantilla")]
+        self.fields["moneda"].choices = moneda.opciones()
+
+    def clean_moneda(self):
+        try:
+            return moneda.validar(self.cleaned_data["moneda"] or moneda.POR_DEFECTO)
+        except moneda.ErrorMoneda:
+            raise forms.ValidationError("Elige una moneda del catálogo.")
 
     def clean_zona_horaria(self):
         return validar_zona(self.cleaned_data["zona_horaria"])
@@ -280,11 +308,29 @@ class FormularioAsistenteConceptos(forms.Form):
             if concepto.nombre in (con_recargo or {}):
                 sugerido = (con_recargo or {})[concepto.nombre] or {}
                 self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: tipo de recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"), required=False)
-                self.fields[f"recargo_valor_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: valor del recargo (importe o porcentaje)", required=False)
+                self.fields[f"recargo_importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe fijo del recargo (si el tipo es fijo)", required=False)
+                self.fields[f"recargo_porcentaje_{concepto.pk}"] = CampoPorcentaje(label=f"{concepto.nombre}: porcentaje del recargo (si el tipo es porcentaje)", required=False)
                 self.fields[f"recargo_gracia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: días de gracia", min_value=0, max_value=60, required=False, initial=sugerido.get("dias_gracia", 0))
+
+    def clean(self):
+        datos = super().clean()
+        for concepto in self.conceptos:
+            clave_tipo = f"recargo_tipo_{concepto.pk}"
+            if clave_tipo not in self.fields:
+                continue
+            importe, porcentaje = datos.get(f"recargo_importe_{concepto.pk}"), datos.get(f"recargo_porcentaje_{concepto.pk}")
+            datos[f"recargo_valor_{concepto.pk}"] = None
+            if importe is None and porcentaje is None:
+                continue
+            tipo = datos.get(clave_tipo) or ReglaRecargo.FIJO
+            try:
+                datos[f"recargo_valor_{concepto.pk}"] = valor_de_recargo(tipo, importe, porcentaje)
+            except forms.ValidationError as error:
+                self.add_error(f"recargo_porcentaje_{concepto.pk}" if tipo == ReglaRecargo.PORCENTAJE else f"recargo_importe_{concepto.pk}", error)
+        return datos
 
 
 class FormularioAsistenteUsuario(ContrasenaNueva):
-    usuario = forms.RegexField(label="Usuario", max_length=60, regex=r"^[a-zA-Z0-9_.-]+$")
+    usuario = CampoUsuario(label="Usuario")
     nombre = forms.CharField(label="Nombre completo", max_length=150)
     field_order = ["usuario", "nombre", "contrasena1", "contrasena2"]

@@ -52,4 +52,4 @@ def resumir(datos):
         for permiso in RESERVADOS_A_NIVELES_ALTOS:
             if permiso in rol["permisos"]:
                 advertencias.append(f"El rol de menor nivel «{rol['nombre']}» puede {PERMISOS[permiso].lower()}.")
-    return {"roles": resumen_roles, "politicas": resumen_politicas, "advertencias": advertencias}
+    return {"roles": resumen_roles, "politicas": resumen_politicas, "advertencias": advertencias, "moneda": datos["moneda"], "denominaciones": len(datos["denominaciones"])}

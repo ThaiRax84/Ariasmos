@@ -8,8 +8,8 @@ from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import Preformatted
 
 from banco.ficha import datos_de_pago
+from configuracion import moneda
 from configuracion.models import hoy_negocio, vocabulario
-from nucleo.dinero import formatear
 
 from .estado import estado_cuenta
 from .libro import fecha_local
@@ -24,6 +24,10 @@ ESTILO_TABLA = TableStyle(
         ("ALIGN", (3, 1), (-1, -1), "RIGHT"),
     ]
 )
+
+
+def formatear(centavos):
+    return moneda.formatear(centavos, pdf=True)
 
 
 def _corto(texto, maximo):

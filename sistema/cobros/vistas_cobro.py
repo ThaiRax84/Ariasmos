@@ -14,7 +14,7 @@ from auditoria.servicios import registrar
 from caja.servicios import turno_abierto
 from configuracion.models import hoy_negocio, parametro, vocabulario
 from cuentas.decoradores import requiere_permiso
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 from nucleo.matricula import normalizar
 from solicitudes import motor
 from titulares import contactos
@@ -160,12 +160,12 @@ def recibo_pdf(request, pk):
         (12, f"Recibo {objeto}"),
         (10, f"Fecha: {libro.fecha_local(datos['pago'].fecha).strftime('%d/%m/%Y')}"),
         (10, f"{voc['titular']}: {datos['titular'].nombre_completo} · {voc['matricula']} {datos['titular'].matricula_formateada}"),
-        (12, f"Importe: {formatear(datos['pago'].importe)}"),
+        (12, f"Importe: {formatear(datos['pago'].importe, pdf=True)}"),
     ]
     for aplicacion in datos["aplicaciones"]:
-        lineas.append((10, f"  {aplicacion.cargo} ({aplicacion.cargo.titular.nombre_completo}): {formatear(aplicacion.importe)}"))
+        lineas.append((10, f"  {aplicacion.cargo} ({aplicacion.cargo.titular.nombre_completo}): {formatear(aplicacion.importe, pdf=True)}"))
     if datos["a_favor"]:
-        lineas.append((10, f"  Queda a favor: {formatear(datos['a_favor'])}"))
+        lineas.append((10, f"  Queda a favor: {formatear(datos['a_favor'], pdf=True)}"))
     lineas.append((10, f"Código de verificación: {objeto.codigo}"))
     if datos["cancelado"]:
         lineas.append((16, "CANCELADO"))

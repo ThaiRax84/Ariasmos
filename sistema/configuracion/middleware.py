@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 from django.shortcuts import redirect
 from django.utils import timezone
 
+from . import moneda
 from .models import Negocio
 
 LIBRES = ("/static/", "/asistente/")
@@ -24,7 +25,9 @@ class Instalacion:
                 timezone.deactivate()
         if not configurado and not request.path.startswith(LIBRES):
             return redirect("asistente:inicio")
+        marca = moneda.fijar(negocio.moneda if negocio else moneda.POR_DEFECTO)
         try:
             return self.get_response(request)
         finally:
+            moneda.soltar(marca)
             timezone.deactivate()

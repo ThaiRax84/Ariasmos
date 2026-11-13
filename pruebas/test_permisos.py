@@ -69,6 +69,7 @@ MATRIZ = {
     "configuracion:catalogo_nuevo": ("administrar_configuracion",),
     "configuracion:catalogo_editar": ("administrar_configuracion",),
     "configuracion:avanzado": ("administrar_configuracion",),
+    "configuracion:moneda": ("administrar_configuracion",),
     "configuracion:exportar": ("administrar_configuracion",),
     "banco:lista": ("administrar_configuracion",),
     "banco:nueva": ("administrar_configuracion",),

@@ -1,0 +1,14 @@
+{
+  "monedas": [
+    {"codigo": "MXN", "nombre": "Peso mexicano", "simbolo": "$", "decimales": 2},
+    {"codigo": "USD", "nombre": "Dólar estadounidense", "simbolo": "$", "decimales": 2},
+    {"codigo": "EUR", "nombre": "Euro", "simbolo": "€", "decimales": 2},
+    {"codigo": "COP", "nombre": "Peso colombiano", "simbolo": "$", "decimales": 2},
+    {"codigo": "PEN", "nombre": "Sol peruano", "simbolo": "S/", "decimales": 2},
+    {"codigo": "CLP", "nombre": "Peso chileno", "simbolo": "$", "decimales": 0},
+    {"codigo": "ARS", "nombre": "Peso argentino", "simbolo": "$", "decimales": 2},
+    {"codigo": "GTQ", "nombre": "Quetzal", "simbolo": "Q", "decimales": 2},
+    {"codigo": "CRC", "nombre": "Colón costarricense", "simbolo": "₡", "decimales": 2},
+    {"codigo": "DOP", "nombre": "Peso dominicano", "simbolo": "RD$", "decimales": 2}
+  ]
+}

@@ -4,6 +4,7 @@ from django.core.validators import validate_email
 
 from nucleo import clabe as nucleo_clabe
 from nucleo import telefono
+from proyecto.captura import CampoDigitos
 from titulares.contactos import normalizar_telefono, prefijo
 
 from .models import Banco, CuentaBancaria, MedioPago
@@ -23,7 +24,7 @@ def normalizar_contacto(valor):
 
 
 class FormularioCuenta(forms.Form):
-    clabe = forms.CharField(label="CLABE (18 dígitos)", max_length=30, widget=forms.TextInput(attrs={"inputmode": "numeric", "autocomplete": "off"}))
+    clabe = CampoDigitos(label="CLABE (18 dígitos)", max_length=30, maximo_tecleo=18, widget=forms.TextInput(attrs={"autocomplete": "off"}))
     banco = forms.ModelChoiceField(label="Banco", queryset=Banco.objects.none(), required=False, empty_label="Proponer según la CLABE")
     banco_otro = forms.CharField(label="Otro banco (solo si el prefijo de la CLABE no está en el catálogo)", max_length=80, required=False)
     beneficiario = forms.CharField(label="Beneficiario (como lo pide el banco)", max_length=150)
@@ -39,7 +40,7 @@ class FormularioCuenta(forms.Form):
     def __init__(self, *args, cuenta=None, en_asistente=False, **kwargs):
         if cuenta is not None and "initial" not in kwargs:
             kwargs["initial"] = {
-                "clabe": cuenta.clabe_formateada,
+                "clabe": cuenta.clabe,
                 "banco": cuenta.banco_id,
                 "beneficiario": cuenta.beneficiario,
                 "numero_cuenta": cuenta.numero_cuenta,

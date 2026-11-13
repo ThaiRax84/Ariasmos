@@ -3,6 +3,8 @@ import json
 from cuentas.permisos import INDISPENSABLES, PERMISOS
 from solicitudes.politicas import POR_DEFECTO, definicion
 
+from . import moneda
+
 LIMITE_BYTES = 256 * 1024
 MAXIMO_LISTA = {"roles": 20, "politicas": 20, "motivos_baja": 100, "relaciones_contacto": 50, "campos_contacto": 20, "conceptos": 100, "medios_pago": 30, "cajas": 20, "denominaciones": 30}
 VOCABULARIO = ("titular", "titulares", "matricula", "agrupacion", "agrupaciones", "familia", "familias")
@@ -27,6 +29,7 @@ RAIZ = {
     "medios_pago": False,
     "cajas": False,
     "denominaciones": False,
+    "moneda": False,
 }
 
 
@@ -184,6 +187,10 @@ def _concepto(valor, ruta):
 def validar(datos):
     _objeto(datos, "plantilla", tuple(RAIZ), [c for c, obligatoria in RAIZ.items() if obligatoria])
     limpia = {"nombre": _texto(datos["nombre"], "nombre", 60), "descripcion": _texto(datos.get("descripcion", ""), "descripcion", 300, 0)}
+    codigo = datos.get("moneda", "MXN")
+    if not isinstance(codigo, str) or codigo not in moneda.disponibles():
+        _falla("moneda", "no es una moneda disponible del catálogo")
+    limpia["moneda"] = codigo
     vocabulario = _objeto(datos.get("vocabulario", {}), "vocabulario", VOCABULARIO)
     limpia["vocabulario"] = {clave: _texto(texto, f"vocabulario.{clave}", 60) for clave, texto in vocabulario.items()}
     limpia["roles"] = [_rol(r, f"roles[{i}]") for i, r in enumerate(_lista(datos["roles"], "roles", "roles"))]

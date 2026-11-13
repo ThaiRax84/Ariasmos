@@ -1,6 +1,7 @@
 {
   "nombre": "Escuela",
   "descripcion": "Padrón de alumnos con inscripción, colegiatura mensual y cargos por evento.",
+  "moneda": "MXN",
   "vocabulario": {
     "titular": "Alumno",
     "titulares": "Alumnos",

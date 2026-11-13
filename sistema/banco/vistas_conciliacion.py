@@ -13,7 +13,9 @@ from django.views.decorators.http import require_POST
 
 from caja.models import Traslado
 from cuentas.decoradores import requiere_permiso
+from configuracion.models import Negocio
 from nucleo.matricula import normalizar
+from proyecto.captura import CampoGuiadoTexto
 from titulares.models import Titular
 
 from . import conciliacion, lectura
@@ -49,7 +51,12 @@ class FormularioColumnas(forms.Form):
 
 
 class FormularioMatricula(forms.Form):
-    matricula = forms.CharField(label="Matrícula", max_length=20)
+    matricula = CampoGuiadoTexto(label="Matrícula", max_length=20, acepta="matricula")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        negocio = Negocio.actual()
+        self.fields["matricula"].maximo_tecleo = (negocio.longitud_matricula if negocio else 7) + 2
 
     def clean_matricula(self):
         digitos = normalizar(self.cleaned_data["matricula"])

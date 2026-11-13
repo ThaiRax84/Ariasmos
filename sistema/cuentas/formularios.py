@@ -2,27 +2,28 @@ from django import forms
 from django.contrib.auth import password_validation
 
 from configuracion.models import parametro
+from proyecto.captura import CampoContrasena, CampoDigitos, CampoGuiadoTexto, CampoUsuario
 
 from .models import Rol, Usuario
 from .permisos import DELEGABLES, PERMISOS
 
 
 class FormularioEntrar(forms.Form):
-    usuario = forms.CharField(label="Usuario", max_length=60, widget=forms.TextInput(attrs={"autocomplete": "username", "autofocus": True}))
-    contrasena = forms.CharField(label="Contraseña", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}))
+    usuario = CampoUsuario(label="Usuario", widget=forms.TextInput(attrs={"autocomplete": "username", "autofocus": True}))
+    contrasena = CampoContrasena(label="Contraseña")
 
 
 class FormularioCodigo(forms.Form):
-    codigo = forms.CharField(label="Código de 6 dígitos", max_length=10, widget=forms.TextInput(attrs={"inputmode": "numeric", "autocomplete": "one-time-code", "autofocus": True}))
+    codigo = CampoDigitos(label="Código de 6 dígitos", max_length=10, maximo_tecleo=6, widget=forms.TextInput(attrs={"autocomplete": "one-time-code", "autofocus": True}))
 
 
 class FormularioConfirmar(forms.Form):
-    contrasena = forms.CharField(label="Tu contraseña", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "current-password", "autofocus": True}))
+    contrasena = CampoContrasena(label="Tu contraseña", enfocar=True)
 
 
 class ContrasenaNueva(forms.Form):
-    contrasena1 = forms.CharField(label="Contraseña nueva", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
-    contrasena2 = forms.CharField(label="Repite la contraseña", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}))
+    contrasena1 = CampoContrasena(label="Contraseña nueva", autocompletar="new-password")
+    contrasena2 = CampoContrasena(label="Repite la contraseña", autocompletar="new-password")
 
     def __init__(self, *args, usuario=None, **kwargs):
         self.usuario_objetivo = usuario
@@ -39,7 +40,7 @@ class ContrasenaNueva(forms.Form):
 
 
 class FormularioCambioPropio(ContrasenaNueva):
-    actual = forms.CharField(label="Contraseña actual", strip=False, widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}))
+    actual = CampoContrasena(label="Contraseña actual")
     field_order = ["actual", "contrasena1", "contrasena2"]
 
     def clean_actual(self):
@@ -50,7 +51,7 @@ class FormularioCambioPropio(ContrasenaNueva):
 
 
 class FormularioUsuarioNuevo(forms.Form):
-    usuario = forms.RegexField(label="Usuario", max_length=60, regex=r"^[a-zA-Z0-9_.-]+$", error_messages={"invalid": "Solo letras, números, punto, guion y guion bajo."})
+    usuario = CampoUsuario(label="Usuario")
     nombre = forms.CharField(label="Nombre completo", max_length=150)
     rol = forms.ModelChoiceField(label="Rol", queryset=Rol.objects.all())
 
@@ -71,8 +72,8 @@ class FormularioUsuarioEditar(forms.ModelForm):
         fields = ["nombre", "rol", "activo"]
 
 class FormularioActivacion(ContrasenaNueva):
-    usuario = forms.CharField(label="Usuario", max_length=60, widget=forms.TextInput(attrs={"autocomplete": "username", "autofocus": True}))
-    codigo = forms.CharField(label="Código de activación", max_length=20, widget=forms.TextInput(attrs={"autocomplete": "off", "autocapitalize": "characters"}))
+    usuario = CampoUsuario(label="Usuario", widget=forms.TextInput(attrs={"autocomplete": "username", "autofocus": True}))
+    codigo = CampoGuiadoTexto(label="Código de activación", max_length=20, acepta="codigo_activacion", maximo_tecleo=11, widget=forms.TextInput(attrs={"autocomplete": "off", "autocapitalize": "characters"}))
     field_order = ["usuario", "codigo", "contrasena1", "contrasena2"]
 
 

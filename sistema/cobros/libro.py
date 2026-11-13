@@ -14,7 +14,7 @@ from caja.models import Turno
 from caja.servicios import personas_con_efectivo
 from configuracion.models import Negocio, parametro
 from nucleo import reparto
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 from titulares.models import Titular
 
 from .models import Aplicacion, CancelacionCargo, Cargo, Pago, Recibo, ReversionPago, SerieRecibo

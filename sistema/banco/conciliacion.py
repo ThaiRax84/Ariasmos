@@ -12,7 +12,7 @@ from cobros import libro
 from cobros.models import Pago
 from configuracion.models import Negocio, parametro
 from nucleo import identificacion, reparto
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 from nucleo.lectores import santander_pyme
 from titulares.models import Titular
 
