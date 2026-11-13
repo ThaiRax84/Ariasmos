@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.12 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.13 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -12,7 +12,7 @@ Un sistema local, multiusuario y configurable que:
 2. Genera **cargos** (inscripción, mensualidad, recargos, extras…) según categorías que el negocio define.
 3. Registra **pagos** en efectivo y por banco, y los aplica solos a la cuenta del titular cuando la matrícula viene en la transferencia.
 4. Controla el **efectivo** con caja, arqueo ciego y cadena de custodia.
-5. Emite **cortes** periódicos (menor y mayor) y los entrega a los destinos configurados.
+5. Emite **cortes** periódicos (diario de caja y mayor) y los entrega a los destinos configurados.
 
 No es específico de una escuela: vocabulario, categorías, roles, frecuencias y destinos se definen en un asistente de configuración. El repo incluye una plantilla «escuela» como punto de partida y nunca incluye datos de ningún negocio.
 
@@ -222,7 +222,8 @@ Los permisos son átomos fijos en el código; qué rol tiene cuáles se guarda e
 | Recibir efectivo y revisar arqueos | — | ✓ | ✓ |
 | Importar banco y conciliar | sugiere | ✓ | ✓ |
 | Administrar conceptos de cobro | — | ✓ | ✓ |
-| Ver cortes / cerrar cortes | ver | ✓ | ✓ |
+| Corte diario de su propia caja | ✓ | ✓ | ✓ |
+| Ver todos los cortes / cerrar el corte mayor | — | ✓ | ✓ |
 | Aprobar dispositivos | — | ✓ | ✓ |
 | Cambiar nombre de un titular aprobado | solicita | ✓ | ✓ |
 | Beca, prórroga, cambio de familia | solicita | ✓ | ✓ |
@@ -355,24 +356,47 @@ Riesgo que queda: dos personas de acuerdo, una que importa y otra que revisa, pu
 
 ## 9. Cortes y reportes
 
-Un **corte** es una definición configurable: nombre, frecuencia, alcance, si cierra periodo y a qué destinos va. La plantilla «escuela» trae dos:
+Un **corte** es una definición configurable: nombre, tipo, frecuencia, quién lo cierra, si cierra periodo y a qué destinos va, con qué nivel de detalle. La plantilla «escuela» trae tres.
 
-| Corte | Frecuencia | Cierra periodo | Contenido |
-|---|---|---|---|
-| Menor | Semanal | No | Ingresos por medio y concepto, estado de caja, movimientos por identificar, adeudos vencidos |
-| Mayor | Mensual | Sí | Todo lo anterior, más una fila por titular con el estado de cada concepto (pagado, parcial, adeudo), antigüedad de saldos, altas y bajas, y conciliación banco–efectivo |
+| Corte | Cuándo | Quién | Cierra periodo | Contenido |
+|---|---|---|---|---|
+| Diario de caja | Cada día, antes de la hora límite (18:00 por defecto) | Operación, al cerrar su turno | No | Solo su caja: recibos del día uno por uno, devoluciones, total cobrado, lo contado, la diferencia y los traslados |
+| Mayor | Mensual | Supervisión | Sí | Ingresos por medio y concepto, una fila por titular con el estado de cada concepto, antigüedad de saldos, altas y bajas, caja y banco |
+| Lista de cobranza | Semanal y a demanda | Automático | No | Adeudos vencidos, uno por renglón |
 
-Flujo: el sistema genera el corte solo en la fecha indicada y lo deja como borrador. Supervisión lo revisa y lo cierra con un clic. Si nadie lo cierra en el plazo configurado, se entrega marcado «sin revisar» para no detener a nadie. Al cerrar un corte que cierra periodo, ese periodo queda bloqueado: los ajustes posteriores entran en el periodo siguiente.
+### 9.1 Corte diario de caja
 
-Además existe el corte de tipo **lista de cobranza**: los adeudos vencidos a la fecha, uno por renglón, con lo necesario para que una persona o un agente externo avise a quien debe (titular o familia, concepto, importe, vencimiento, días de atraso y, según el nivel de detalle del destino, matrícula y contacto). El sistema no envía mensajes: entrega la lista.
+- Es el cierre del turno: primero el arqueo ciego, después se genera el corte. Así el corte nunca revela lo esperado antes de contar.
+- Cada persona ve solo el suyo; Supervisión y Dirección ven todos. No incluye ingresos por banco ni lo cobrado por otras personas.
+- Si a la hora límite hay un turno con cobros del día sin cerrar, Supervisión ve una alerta. No se bloquea nada: quien cobra puede cerrarlo después y el corte queda marcado como **tardío**.
+- Un día sin cobros en efectivo no genera corte.
 
-Todo corte incluye, en su archivo JSON, las cifras que un análisis externo necesita sin tener que recalcularlas: esperado y cobrado del periodo por concepto, cartera vencida por antigüedad, altas y bajas. El sistema no trae tablero de indicadores propio.
+### 9.2 Corte mayor
 
-**Estado de cuenta.** Por titular o por familia, en PDF: cargos, pagos, becas, prórrogas y saldo a una fecha, con los datos de pago de §5.4. Lo genera quien puede ver titulares; cada emisión queda en la bitácora.
+- El sistema lo genera solo el día configurado del mes siguiente y lo deja como borrador. Supervisión lo revisa y lo cierra con un clic. Si nadie lo cierra en el plazo configurado, se entrega marcado «sin revisar».
+- Contenido:
+  - ingresos por medio de pago y por concepto;
+  - una fila por titular con el estado de cada concepto (pagado, parcial, adeudo), becas y prórrogas;
+  - cartera vencida por antigüedad; altas y bajas;
+  - **caja:** efectivo cobrado frente a efectivo en custodia y depositado, diferencias de arqueo, depósitos sin conciliar;
+  - **banco:** lo aplicado por banco frente al estado de cuenta oficial del mes; pagos que vinieron de importaciones no verificables y que no aparecen en el estado oficial; importaciones pendientes de revisión; movimientos por identificar;
+  - reversos, cancelaciones y condonaciones del mes, con quién los autorizó.
+- **Cierre de periodo.** Al cerrarlo, el mes queda bloqueado: ningún cargo, pago ni reverso puede fecharse dentro de él. Lo que llegue después (un pago bancario tardío, la corrección de un error) se registra con fecha del periodo abierto y conserva como referencia la fecha original.
 
-**Destinos** (enchufables): `carpeta` (PDF + CSV + JSON con un `manifiesto.json`; la ruta se elige en el asistente y se puede cambiar después), y `correo` más adelante. Cada destino define su nivel de detalle: `completo` (nombre, matrícula y contacto), `solo_nombres` (nombre, sin matrícula ni contacto) o `sin_nombres` (solo matrícula). Un agente externo puede leer la carpeta; el sistema no depende de ningún agente.
+### 9.3 Lista de cobranza
 
-Cada archivo de corte lleva un hash firmado con la clave de la instalación para detectar alteraciones.
+Los adeudos vencidos a la fecha, uno por renglón, con lo necesario para que una persona o un agente externo avise a quien debe: titular o familia, concepto, importe, vencimiento, días de atraso y, según el nivel de detalle del destino, matrícula y contacto. El encabezado lleva los datos de pago del negocio (§5.4). El sistema no envía mensajes: entrega la lista.
+
+### 9.4 Destinos y entrega
+
+- **Destinos** enchufables: `carpeta` y, más adelante, `correo`. Cada combinación de corte y destino define su nivel de detalle: `completo` (nombre, matrícula y contacto), `solo_nombres` (nombre, sin matrícula ni contacto) o `sin_nombres` (solo matrícula).
+- **Carpeta.** La ruta se elige en el asistente y se puede cambiar después; el sistema comprueba que puede escribir en ella. Cada entrega deja PDF, CSV y JSON con nombres fijos por tipo y fecha, escritos de forma atómica, y actualiza un `manifiesto.json` con la lista de archivos, su hash, una firma con la clave de la instalación y el ancla de la bitácora (§10.1). Los nombres de archivo los genera el sistema; nada que escriba un usuario llega a una ruta.
+- **Reintento.** Si la carpeta no está disponible, la entrega queda pendiente y el trabajador la reintenta; no detiene el corte.
+- Todo corte incluye en su JSON las cifras que un análisis externo necesita sin recalcularlas: esperado y cobrado por concepto, cartera vencida por antigüedad, altas y bajas. El sistema no trae tablero de indicadores propio.
+
+### 9.5 Estado de cuenta
+
+Por titular o por familia, en PDF: cargos, pagos, becas, prórrogas y saldo a una fecha, con los datos de pago de §5.4. Lo genera quien puede ver titulares; cada emisión queda en la bitácora.
 
 ## 10. Seguridad
 
@@ -385,7 +409,8 @@ Cada archivo de corte lleva un hash firmado con la clave de la instalación para
 | Archivos | Los archivos subidos se leen, nunca se ejecutan; tamaño y tipo limitados; se guardan fuera de la carpeta pública. Las exportaciones neutralizan celdas que empiezan con `=`, `+`, `-`, `@`. |
 | Integridad | Libro inmutable. Bitácora sellada con clave y anclada fuera de la base (§10.1). Periodos cerrados bloqueados. |
 | Secretos | Carpeta `instancia/` fuera del repo, con permisos restringidos a la cuenta del servicio: clave de Django, clave de matrícula, clave de respaldo. |
-| Respaldo | Copia diaria consistente de la base, cifrada con AES-256-GCM, hacia una carpeta sincronizada fuera del equipo. Retención 30 diarias y 12 mensuales. Prueba de restauración automática mensual. La clave de recuperación se imprime al instalar. |
+| Respaldo | Copia diaria cifrada hacia una carpeta sincronizada fuera del equipo, con prueba de restauración mensual (§10.2). |
+| Secretos en la base | El secreto del autenticador de cada usuario se guarda cifrado con una clave de la instalación; una copia suelta de la base no lo revela. |
 | Privacidad | Datos mínimos; vistas limitadas por rol; toda exportación queda registrada; aviso de privacidad y consentimiento del tutor fuera del sistema, con casilla de constancia en el alta. |
 
 ### 10.1 Bitácora
@@ -401,6 +426,17 @@ Cada archivo de corte lleva un hash firmado con la clave de la instalación para
 - **Sello con clave:** `sello = HMAC-SHA256(clave_auditoria, sello anterior ‖ contenido)`. La clave vive en `instancia/`, fuera de la base; sin ella no se pueden recalcular los sellos tras alterar un evento.
 - **Ancla externa:** tras cada evento confirmado se escribe en `instancia/` el número y el sello del último evento, firmados. Si se borran los eventos finales o se restaura una copia vieja de la base, la verificación lo detecta porque la base queda por detrás del ancla.
 - **Verificación:** a demanda y por tarea diaria; un fallo aparece como alerta en el inicio de Dirección. A partir de la Fase 4 el ancla viaja también en cada corte y en cada respaldo, de modo que existe fuera del equipo.
+
+### 10.2 Respaldo y restauración
+
+- **Qué se respalda.** Una copia consistente de la base (tomada con el mecanismo de respaldo de SQLite, no copiando el archivo en uso) más las claves de la instalación y el ancla de la bitácora, en un solo paquete.
+- **Cifrado.** AES-256-GCM con una **clave de recuperación** aleatoria generada al instalar. Se muestra una sola vez para imprimirla y guardarla fuera del equipo; sin ella un respaldo no se puede abrir. El paquete cifrado se verifica solo: cualquier alteración se detecta al abrirlo.
+- **Destino.** Una carpeta elegida en el asistente, pensada para una carpeta sincronizada con la nube. El sistema comprueba que puede escribir en ella.
+- **Cuándo.** Una vez al día a la hora configurada, y siempre antes de actualizar el programa.
+- **Retención.** 30 diarios y 12 mensuales; lo demás se borra.
+- **Prueba de restauración.** Una vez al mes el sistema abre el último respaldo en una carpeta temporal, verifica la integridad de la base y de la bitácora, compara conteos y borra la copia. Un fallo es una alerta para Dirección.
+- **Alerta.** Si el último respaldo correcto tiene más de 48 horas, Dirección lo ve en su inicio.
+- **Restaurar.** Un comando (y una opción del instalador en un equipo nuevo) toma el archivo de respaldo y la clave de recuperación y deja la instalación como estaba.
 
 Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol, acceso a objetos ajenos, CSRF, fijación de sesión, fuerza bruta, autoaprobación, reutilización de código, delegación vencida, manipulación del libro, archivos maliciosos, inyección en exportaciones y concurrencia en contador de matrícula, folios e importaciones.
 
@@ -420,7 +456,14 @@ Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol
 - **Todo editable después** por quien tenga el permiso: Supervisión administra conceptos de cobro; Dirección lo demás.
 - **Importación inicial.** Para empezar con un padrón existente, Dirección sube un Excel o CSV. El sistema no exige un formato: propone qué columna es cada dato (nombre, apellidos, agrupación, responsable, teléfono, saldo por concepto), deja corregir la correspondencia, muestra una vista previa con los errores renglón por renglón y no escribe nada hasta confirmar. Al confirmar crea titulares activos con su matrícula, sus contactos, sus vínculos de familia (renglones con el mismo responsable y teléfono se proponen como familia; cada titular recibe su propia matrícula) y su saldo inicial. Detecta duplicados si se repite. Entrega la lista de matrículas asignadas y las fichas de pago para repartir. Todo queda en la bitácora.
 - **Repo sin datos:** `instancia/`, bases, respaldos y documentos internos están en `.gitignore`. Descargar el repo da el motor, las plantillas y el asistente, nada más.
-- **Instalación en Windows:** un **instalador `.exe`** que trae todo incluido (no hay que instalar Python). Instala el programa, genera las claves, registra los servicios de Windows (web, trabajador y TLS) con arranque automático y reinicio ante fallas, y abre el asistente. Los datos viven en una carpeta aparte del programa, de modo que actualizar con un instalador nuevo los conserva y hace un respaldo antes de migrar. Las demás computadoras no instalan nada: entran por el navegador. El instalador se compila de forma automática en el repo y se publica en sus versiones.
+- **Instalación en Windows:** un **instalador `.exe`** («Ariasmos») que trae todo incluido (no hay que instalar Python).
+  - Programa en `C:\Program Files\Ariasmos`; datos (base, claves, registros, certificados) en `C:\ProgramData\Ariasmos`, con permisos solo para la cuenta del servicio y los administradores.
+  - Tres servicios de Windows con arranque automático y reinicio ante fallas: web (escucha solo en el propio equipo), trabajador y TLS (proxy que atiende a la red local por HTTPS con una autoridad de certificados interna).
+  - Regla de firewall que abre el puerto HTTPS solo a la red local.
+  - Al terminar genera las claves, muestra el token del asistente y abre el asistente en el navegador.
+  - Actualizar con un instalador nuevo detiene los servicios, hace un respaldo, reemplaza el programa, migra la base y los arranca. Desinstalar conserva los datos salvo que se pida borrarlos.
+  - Las demás computadoras no instalan el programa: entran por el navegador, después de instalar una sola vez el certificado raíz, que el sistema ofrece junto con sus instrucciones.
+  - El instalador se compila de forma automática en el repo, con una prueba de instalación y arranque, y queda como archivo de la compilación junto con su hash; no se publica como versión.
 
 ## 12. Estructura del repo
 
@@ -442,7 +485,8 @@ instancia/         (ignorada) claves, base, configuración local
 | 1b | Datos de pago por campos, catálogo de bancos, plantillas propias |
 | 2 | Familias, cargos automáticos, recargos, becas y prórrogas, pagos en efectivo, recibos, caja y traslados |
 | 3 | Estado de cuenta en PDF, importación inicial desde Excel, importación bancaria, identificación y conciliación |
-| 4 | Cortes (con lista de cobranza), destinos, respaldo, instalador `.exe` y guías |
+| 4a | Cortes (diario, mayor, lista de cobranza), destinos, cierre de periodo, respaldo y cifrado de secretos |
+| 4b | Instalador `.exe`, HTTPS en la red local, compilación automática y guías |
 | 5 | Diseño de la interfaz, con el motor ya terminado |
 
 ## 14. Pendientes de decisión
