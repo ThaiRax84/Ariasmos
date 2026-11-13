@@ -39,6 +39,14 @@ class Familia(models.Model):
         return self.nombre
 
 
+class TitularesVisibles(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(interno=False)
+
+
+MATRICULA_INTERNA = "PUBLICO"
+
+
 class Titular(models.Model):
     PENDIENTE = "pendiente"
     ACTIVO = "activo"
@@ -61,11 +69,18 @@ class Titular(models.Model):
     creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
+    interno = models.BooleanField(default=False, editable=False)
+
+    objects = TitularesVisibles()
+    todos = models.Manager()
 
     class Meta:
         ordering = ["apellidos", "nombre"]
+        default_manager_name = "objects"
         constraints = [
             models.CheckConstraint(condition=Q(estado__in=["pendiente", "activo", "baja", "rechazado"]), name="titular_estado_valido"),
+            models.UniqueConstraint(fields=["interno"], condition=Q(interno=True), name="titular_una_cuenta_interna"),
+            models.CheckConstraint(condition=Q(interno=False) | (Q(estado="activo") & Q(familia__isnull=True)), name="titular_interno_activo_sin_familia"),
         ]
 
     def __str__(self):
@@ -77,7 +92,7 @@ class Titular(models.Model):
 
     @property
     def matricula_formateada(self):
-        return formatear(self.matricula)
+        return "" if self.interno else formatear(self.matricula)
 
     @property
     def referencia_bancaria(self):

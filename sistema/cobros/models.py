@@ -251,7 +251,9 @@ class Pago(Asiento):
     EFECTIVO = "efectivo"
     BANCO = "banco"
     SALDO_INICIAL = "saldo_inicial"
-    MEDIOS = [(EFECTIVO, "Efectivo"), (BANCO, "Banco"), (SALDO_INICIAL, "Saldo inicial")]
+    DEVOLUCION = "devolucion"
+    MEDIOS = [(EFECTIVO, "Efectivo"), (BANCO, "Banco"), (SALDO_INICIAL, "Saldo inicial"), (DEVOLUCION, "Saldo a favor por devolución de artículos")]
+    INGRESOS = (EFECTIVO, BANCO, SALDO_INICIAL)
 
     titular = models.ForeignKey("titulares.Titular", on_delete=models.PROTECT, related_name="pagos")
     importe = models.PositiveBigIntegerField()
