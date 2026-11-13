@@ -173,9 +173,11 @@ def rechazar_entrega(traslado, usuario, nota, request=None):
 def personas_con_efectivo():
     ids = set(Pago.objects.filter(medio=Pago.EFECTIVO).values_list("turno__usuario", flat=True))
     ids |= set(Traslado.objects.values_list("destino", flat=True))
+    ids |= set(Traslado.objects.filter(tipo=Traslado.DEPOSITO).values_list("origen", flat=True))
     filas = []
     for usuario in Usuario.objects.filter(pk__in=[i for i in ids if i]):
-        filas.append({"usuario": usuario, "custodia": custodia(usuario), "disponible": disponible(usuario), "desde": efectivo_desde(usuario)})
+        depositos = Traslado.objects.filter(origen=usuario, tipo=Traslado.DEPOSITO, estado=Traslado.POR_CONCILIAR).select_related("cuenta_bancaria").order_by("creado")
+        filas.append({"usuario": usuario, "custodia": custodia(usuario), "disponible": disponible(usuario), "desde": efectivo_desde(usuario), "depositos": list(depositos)})
     return filas
 
 
@@ -195,6 +197,9 @@ def alertas():
     limite = ahora - timedelta(days=parametro("dias_maximos_efectivo_sin_trasladar"))
     sin_trasladar = [f for f in personas_con_efectivo() if f["custodia"] > 0 and f["desde"] is not None and f["desde"] < limite]
     return {
+        "depositos_sin_conciliar": Traslado.objects.filter(
+            tipo=Traslado.DEPOSITO, estado=Traslado.POR_CONCILIAR, creado__lt=ahora - timedelta(days=parametro("dias_maximos_deposito_sin_conciliar"))
+        ).select_related("origen", "cuenta_bancaria").order_by("creado"),
         "sin_trasladar": sin_trasladar,
         "entregas_pendientes": Traslado.objects.filter(tipo=Traslado.ENTREGA, estado=Traslado.PENDIENTE).select_related("origen", "destino"),
         "diferencias": Arqueo.objects.filter(supera_umbral=True, creado__gte=ahora - timedelta(days=parametro("dias_alerta_recibos_cancelados"))).select_related("turno__usuario", "turno__caja"),

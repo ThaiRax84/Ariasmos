@@ -30,6 +30,7 @@ PARAMETROS = {
     "tope_pago_individual": (5000000, "Importe máximo en centavos de un pago individual sin autorización"),
     "umbral_diferencia_arqueo": (1000, "Diferencia en centavos a partir de la cual el arqueo pide nota y avisa a Supervisión"),
     "dias_maximos_efectivo_sin_trasladar": (2, "Días que el efectivo puede quedarse con una persona sin entregarse ni depositarse"),
+    "dias_maximos_deposito_sin_conciliar": (5, "Días que un depósito registrado puede quedar sin aparecer en el banco antes de alertar"),
     "dias_alerta_recibos_cancelados": (7, "Días que un recibo cancelado aparece en las alertas"),
     "segundos_ciclo_trabajador": (300, "Segundos entre ciclos del trabajador"),
     "horas_validez_codigo_activacion": (72, "Horas que vale un código de activación de cuenta"),
