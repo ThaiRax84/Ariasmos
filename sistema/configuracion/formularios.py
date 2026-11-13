@@ -9,12 +9,12 @@ from cobros.formularios import CampoImporte, CampoPorcentaje, valor_de_recargo
 from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
-from proyecto.captura import CampoContrasena, CampoUsuario
+from proyecto.captura import CampoContrasena, CampoGuiadoTexto, CampoUsuario
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
 from . import moneda
-from .models import PARAMETROS, VOCABULARIO_BASE, Negocio
+from .models import ESPECIALES, PARAMETROS, VOCABULARIO_BASE, Negocio
 
 
 ETIQUETAS_VOCABULARIO = {
@@ -105,6 +105,8 @@ class FormularioParametros(forms.Form):
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
         for clave, (defecto, descripcion) in PARAMETROS.items():
+            if clave in ESPECIALES:
+                continue
             inicial = (valores or {}).get(clave, defecto)
             if isinstance(defecto, str):
                 self.fields[clave] = forms.CharField(label=descripcion, max_length=200, initial=inicial)
@@ -140,6 +142,36 @@ class FormularioParametros(forms.Form):
         if valor < 1:
             raise forms.ValidationError("Debe ser al menos 1.")
         return valor
+
+    def _hora(self, clave):
+        texto = self.cleaned_data[clave].strip()
+        if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", texto):
+            raise forms.ValidationError("Escribe la hora como HH:MM, por ejemplo 18:00.")
+        return texto
+
+    def clean_serie_retiros(self):
+        return self._serie("serie_retiros")
+
+    def clean_intentos_verificar_recibo_por_hora(self):
+        valor = self.cleaned_data["intentos_verificar_recibo_por_hora"]
+        if valor < 1:
+            raise forms.ValidationError("Debe ser al menos 1.")
+        return valor
+
+    def clean_hora_respaldo(self):
+        return self._hora("hora_respaldo")
+
+    def clean_dia_corte_mayor(self):
+        dia = self.cleaned_data["dia_corte_mayor"]
+        if not 1 <= dia <= 28:
+            raise forms.ValidationError("El día va de 1 a 28.")
+        return dia
+
+    def clean_dia_semana_cobranza(self):
+        dia = self.cleaned_data["dia_semana_cobranza"]
+        if dia > 7:
+            raise forms.ValidationError("Usa 1 (lunes) a 7 (domingo), o 0 para no generarla.")
+        return dia
 
     def clean_dia_generacion_cargos(self):
         dia = self.cleaned_data["dia_generacion_cargos"]
@@ -328,6 +360,137 @@ class FormularioAsistenteConceptos(forms.Form):
             except forms.ValidationError as error:
                 self.add_error(f"recargo_porcentaje_{concepto.pk}" if tipo == ReglaRecargo.PORCENTAJE else f"recargo_importe_{concepto.pk}", error)
         return datos
+
+
+class CampoHora(CampoGuiadoTexto):
+    acepta = "hora"
+    maximo_tecleo = 5
+
+    def clean(self, valor):
+        valor = super().clean(valor)
+        if valor in ("", None):
+            return ""
+        texto = valor.strip()
+        if not re.fullmatch(r"([01][0-9]|2[0-3]):[0-5][0-9]", texto):
+            raise forms.ValidationError("Escribe la hora como HH:MM, por ejemplo 18:00.")
+        return texto
+
+
+class FormularioCajaCortes(forms.Form):
+    control_denominaciones = forms.BooleanField(label="Capturar piezas por denominación en apertura, cobros, retiros y devoluciones", required=False)
+    periodo_retiros = forms.ChoiceField(label="Los topes de retiros se cuentan por", choices=[("dia", "Día"), ("semana", "Semana (lunes a domingo)")])
+    tope_retiro_individual = CampoImporte(label="Importe máximo de un retiro sin autorización")
+    tope_retiros_periodo = CampoImporte(label="Importe máximo de retiros por caja en el periodo sin autorización")
+    maximo_retiros_periodo = forms.IntegerField(label="Número máximo de retiros por caja en el periodo sin autorización", min_value=0, max_value=10000)
+    maximo_efectivo_caja = CampoImporte(label="Efectivo máximo en una caja antes de avisar que se entregue (0 sin aviso)")
+    dias_retiro_sin_revisar = forms.IntegerField(label="Días que un retiro puede quedar sin revisar antes de avisar", min_value=1, max_value=365)
+
+    def __init__(self, *args, valores=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from cortes import calendario
+
+        valores = valores or {}
+        dias = {}
+        horario = valores.get("calendario_corte", calendario.PROPUESTO)
+        for numero, nombre in enumerate(calendario.DIAS):
+            dias[f"corte_{numero}"] = CampoHora(label=f"{nombre}: hora límite del corte (vacío si ese día no hay corte)", max_length=5, required=False, initial=horario.get(str(numero), ""))
+        dias.update(self.fields)
+        self.fields = dias
+        for clave in ("control_denominaciones", "periodo_retiros", "tope_retiro_individual", "tope_retiros_periodo", "maximo_retiros_periodo", "maximo_efectivo_caja", "dias_retiro_sin_revisar"):
+            if clave in valores:
+                self.fields[clave].initial = valores[clave]
+
+    def clean(self):
+        datos = super().clean()
+        calendario = {str(numero): datos[f"corte_{numero}"] for numero in range(7) if datos.get(f"corte_{numero}")}
+        if not calendario and Caja.objects.filter(activa=True).exists():
+            raise forms.ValidationError("Elige al menos un día con corte de caja: el negocio tiene cajas activas.")
+        datos["calendario_corte"] = calendario
+        return datos
+
+    def valores(self):
+        datos = self.cleaned_data
+        return {
+            "calendario_corte": datos["calendario_corte"],
+            "control_denominaciones": 1 if datos.get("control_denominaciones") else 0,
+            "periodo_retiros": datos["periodo_retiros"],
+            "tope_retiro_individual": datos.get("tope_retiro_individual") or 0,
+            "tope_retiros_periodo": datos.get("tope_retiros_periodo") or 0,
+            "maximo_retiros_periodo": datos.get("maximo_retiros_periodo") or 0,
+            "maximo_efectivo_caja": datos.get("maximo_efectivo_caja") or 0,
+            "dias_retiro_sin_revisar": datos.get("dias_retiro_sin_revisar") or 3,
+        }
+
+
+def valores_caja():
+    from cortes import calendario
+
+    from .models import parametro
+
+    valores = {"calendario_corte": calendario.actual()}
+    for clave in ("control_denominaciones", "periodo_retiros", "tope_retiro_individual", "tope_retiros_periodo", "maximo_retiros_periodo", "maximo_efectivo_caja", "dias_retiro_sin_revisar"):
+        valores[clave] = parametro(clave)
+    valores["control_denominaciones"] = bool(valores["control_denominaciones"])
+    return valores
+
+
+def guardar_caja(valores):
+    from cortes import calendario
+
+    from .models import Parametro
+
+    for clave, valor in valores.items():
+        texto = calendario.a_texto(valor) if clave == "calendario_corte" else str(valor)
+        Parametro.objects.update_or_create(clave=clave, defaults={"valor": texto})
+
+
+class FormularioCarpetaBanco(forms.Form):
+    carpeta_banco = forms.CharField(label="Carpeta vigilada del banco (opcional; ruta absoluta donde se deja el archivo descargado del banco)", max_length=400, required=False)
+
+    def clean_carpeta_banco(self):
+        from banco.carpeta import ErrorCarpeta, validar_carpeta
+
+        valor = self.cleaned_data.get("carpeta_banco", "").strip()
+        if not valor:
+            return ""
+        try:
+            return validar_carpeta(valor)
+        except ErrorCarpeta as error:
+            raise forms.ValidationError(str(error))
+
+
+class FormularioAsistenteCortes(FormularioCarpetaBanco):
+    carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
+    carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)
+    field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco"]
+
+    def __init__(self, *args, niveles=None, carpeta="", carpeta_banco="", pide_clave=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        from cortes.models import NIVELES, TIPOS
+
+        for tipo, nombre in TIPOS:
+            self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=NIVELES, initial=(niveles or {}).get(tipo, "solo_nombres"))
+        self.initial.setdefault("carpeta_respaldo", carpeta)
+        self.initial.setdefault("carpeta_banco", carpeta_banco)
+        if pide_clave:
+            self.fields["guardada"] = forms.BooleanField(label="Ya imprimí la clave de recuperación y la guardé fuera de este equipo", required=True)
+
+    def _ruta(self, clave):
+        from cortes.entrega import ErrorEntrega, validar_ruta
+
+        valor = self.cleaned_data.get(clave, "").strip()
+        if not valor:
+            return ""
+        try:
+            return validar_ruta(valor)
+        except ErrorEntrega as error:
+            raise forms.ValidationError(str(error))
+
+    def clean_carpeta_entrega(self):
+        return self._ruta("carpeta_entrega")
+
+    def clean_carpeta_respaldo(self):
+        return self._ruta("carpeta_respaldo")
 
 
 class FormularioAsistenteUsuario(ContrasenaNueva):

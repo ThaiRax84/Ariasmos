@@ -42,7 +42,33 @@ PARAMETROS = {
     "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
     "digitos_telefono_nacional": (10, "Dígitos de un teléfono nacional sin prefijo de país"),
+    "calendario_corte": ('{"0":"18:00","1":"18:00","2":"18:00","3":"18:00","4":"18:00","5":"18:00","6":"18:00"}', "Días con corte de caja y hora límite de cada uno"),
+    "dia_corte_mayor": (1, "Día del mes en que se genera el corte mayor del mes anterior (1 a 28)"),
+    "dias_plazo_corte_mayor": (5, "Días para cerrar el corte mayor antes de que se cierre solo marcado sin revisar"),
+    "dia_semana_cobranza": (1, "Día de la semana de la lista de cobranza automática (1 lunes a 7 domingo; 0 para no generarla)"),
+    "hora_respaldo": ("02:00", "Hora del respaldo diario (HH:MM, hora del negocio)"),
+    "control_denominaciones": (0, "1 para capturar piezas por denominación en apertura, cobros, retiros y devoluciones; 0 para no hacerlo"),
+    "periodo_retiros": ("dia", "Periodo en que se cuentan los topes de retiros (dia o semana)"),
+    "tope_retiro_individual": (0, "Importe máximo en centavos de un retiro de caja sin autorización"),
+    "tope_retiros_periodo": (0, "Importe máximo en centavos de los retiros de una caja en el periodo sin autorización"),
+    "maximo_retiros_periodo": (0, "Número máximo de retiros de una caja en el periodo sin autorización"),
+    "maximo_efectivo_caja": (0, "Efectivo máximo en centavos en una caja antes de avisar que se entregue (0 sin aviso)"),
+    "dias_retiro_sin_revisar": (3, "Días que un retiro puede quedar sin revisar antes de avisar a Supervisión"),
+    "serie_retiros": ("R", "Serie de los folios de retiros de caja"),
+    "intentos_verificar_recibo_por_hora": (20, "Verificaciones de recibo fallidas por hora, por persona y por equipo, antes de bloquear la verificación"),
+    "propuestas_cambio_sin_cobro": (10, "Propuestas de cambio sin cobro registrado que se permiten por turno"),
 }
+
+ESPECIALES = (
+    "calendario_corte",
+    "control_denominaciones",
+    "periodo_retiros",
+    "tope_retiro_individual",
+    "tope_retiros_periodo",
+    "maximo_retiros_periodo",
+    "maximo_efectivo_caja",
+    "dias_retiro_sin_revisar",
+)
 
 
 class Negocio(models.Model):
@@ -55,6 +81,10 @@ class Negocio(models.Model):
     longitud_matricula = models.PositiveSmallIntegerField(default=7)
     contador_matricula = models.BigIntegerField(default=0)
     cobro_desde = models.DateField(null=True, blank=True)
+    periodo_cerrado_hasta = models.DateField(null=True, blank=True)
+    carpeta_respaldo = models.CharField(max_length=400, blank=True)
+    carpeta_banco = models.CharField(max_length=400, blank=True)
+    clave_recuperacion_pendiente = models.BooleanField(default=True)
     plantilla = models.CharField(max_length=40, blank=True)
     configurado = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)

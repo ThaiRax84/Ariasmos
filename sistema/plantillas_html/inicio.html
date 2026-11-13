@@ -10,11 +10,36 @@
 </section>
 {% endif %}
 {% if alertas %}{% include "caja/_alertas.html" %}{% endif %}
+{% if avisos_retiros.cerca_del_tope or avisos_retiros.sin_comprobante or avisos_retiros.por_revisar_viejos or avisos_retiros.sobre_maximo %}
+<section class="panel alerta">
+  <h2>Retiros de caja</h2>
+  <ul class="lista">
+    {% for a in avisos_retiros.cerca_del_tope %}<li>{{ a.caja }} ya usó {% if a.tope == "importe" %}{{ a.usado|dinero }} de {{ a.limite|dinero }}{% else %}{{ a.usado }} de {{ a.limite }} retiros{% endif %} del periodo.</li>{% endfor %}
+    {% for r in avisos_retiros.sin_comprobante %}<li><a href="{% url 'caja:retiro' r.pk %}">Retiro {{ r }}</a> de {{ r.registrado_por }} ({{ r.importe|dinero }}, {{ r.motivo }}) declarado sin comprobante: {{ r.motivo_sin_comprobante }}</li>{% endfor %}
+    {% for r in avisos_retiros.por_revisar_viejos %}<li><a href="{% url 'caja:retiro' r.pk %}">Retiro {{ r }}</a> de {{ r.registrado_por }} sin revisar desde {{ r.creado|date:"d/m/Y" }}.</li>{% endfor %}
+    {% for t in avisos_retiros.sobre_maximo %}<li>{{ t.caja }} ({{ t.usuario }}) pasa del efectivo máximo: conviene entregar o depositar.</li>{% endfor %}
+  </ul>
+  <a class="boton" href="{% url 'caja:retiros' %}">Ver retiros</a>
+</section>
+{% endif %}
+{% if retenidas %}
+<section class="panel alerta">
+  <h2>Importaciones automáticas retenidas</h2>
+  <p>Llegaron por la carpeta vigilada y no continúan un estado anterior: sus pagos no se aplican hasta que alguien con permiso de conciliación las revise.</p>
+  <ul class="lista">{% for i in retenidas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if automaticas %}
+<section class="panel">
+  <h2>Últimas importaciones de la carpeta vigilada</h2>
+  <ul class="lista">{% for i in automaticas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.aplicados }} aplicado{{ i.aplicados|pluralize }}{% if i.retenida and not i.liberada_en %} · retenida{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
 {% if importaciones_por_revisar %}
 <section class="panel alerta">
   <h2>Importaciones bancarias por revisar</h2>
   <p>Aplicaron pagos y no se pudieron comprobar contra un estado anterior. Revísalas contra el banco; quien importó no puede marcarlas.</p>
-  <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.creada_por }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+  <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.importo }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if muestra_banco %}
@@ -25,6 +50,24 @@
 </section>
 {% endif %}
 {% if por_recibir %}<section class="panel alerta"><h2>Tienes {{ por_recibir }} entrega{{ por_recibir|pluralize }} de efectivo por confirmar</h2><a class="boton" href="{% url 'caja:traslados' %}">Revisar</a></section>{% endif %}
+{% if diarios_pendientes %}
+<section class="panel alerta">
+  <h2>Corte diario pendiente</h2>
+  <ul class="lista">{% for p in diarios_pendientes %}<li>{{ p.persona }} · {{ p.caja }} · turno abierto desde {{ p.desde|date:"d/m/Y H:i" }}{% if p.dia_anterior %} (de un día anterior){% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if clave_pendiente %}
+<section class="panel alerta"><h2>Guarda la clave de recuperación</h2><p>Sin ella ningún respaldo se puede abrir. Se muestra una sola vez.</p><a class="boton" href="{% url 'respaldos:clave' %}">Ver la clave</a></section>
+{% endif %}
+{% if alertas_respaldo %}
+<section class="panel alerta"><h2>Respaldos</h2><ul class="lista">{% for a in alertas_respaldo %}<li>{{ a }}</li>{% endfor %}</ul><a class="boton" href="{% url 'respaldos:panel' %}">Ir a respaldos</a></section>
+{% endif %}
+{% if entregas_con_problema %}
+<section class="panel alerta"><h2>Hay {{ entregas_con_problema }} entrega{{ entregas_con_problema|pluralize }} de cortes con problemas</h2><a class="boton" href="{% url 'cortes:destinos' %}">Revisar</a></section>
+{% endif %}
+{% if mayores_borrador %}
+<section class="panel"><h2>Cortes mayores por cerrar</h2><ul class="lista">{% for c in mayores_borrador %}<li><a href="{% url 'cortes:detalle' c.pk %}">{{ c.fecha|date:"m/Y" }}</a></li>{% endfor %}</ul></section>
+{% endif %}
 {% if faltan_denominaciones %}
 <section class="panel alerta">
   <h2>Faltan las denominaciones de caja</h2>
@@ -47,6 +90,13 @@
   <a class="boton" href="{% url 'autorizaciones' %}">Revisar</a>
 </section>
 {% endif %}
+{% if certificado_por_vencer %}
+<section class="panel alerta">
+  <h2>El certificado del servidor vence pronto</h2>
+  <p>Vence el {{ certificado_por_vencer.vence|date:"d/m/Y" }} (faltan {{ certificado_por_vencer.dias }} días). Actualiza el programa en esta computadora para generar uno nuevo y después vuelve a instalarlo en las demás computadoras.</p>
+  <a class="boton" href="{% url 'conectar' %}">Conectar otra computadora</a>
+</section>
+{% endif %}
 <div class="atajos">
   {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}
   {% if "registrar_pago_efectivo" in permisos %}<a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
@@ -59,7 +109,7 @@
   {% if pendientes %}
   <ul class="lista">
     {% for s, resaltada in pendientes %}
-    <li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }} · {{ s.titular }} · {{ s.titular.matricula_formateada }}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}{% if resaltada %} · lleva tiempo esperando{% endif %}</small></li>
+    <li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}{% if resaltada %} · lleva tiempo esperando{% endif %}</small></li>
     {% endfor %}
   </ul>
   {% else %}<p>No hay solicitudes pendientes.</p>{% endif %}
@@ -68,7 +118,7 @@
 {% if propias %}
 <section class="panel">
   <h2>Mis solicitudes en espera</h2>
-  <ul class="lista">{% for s in propias %}<li><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }} · {{ s.titular }}</a></li>{% endfor %}</ul>
+  <ul class="lista">{% for s in propias %}<li><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}</a></li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if delegaciones %}

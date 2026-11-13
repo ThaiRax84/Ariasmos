@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from auditoria.models import Evento
+from cuentas import secretos
 from cuentas.models import CodigoUsado, Delegacion
 from solicitudes import motor
 from solicitudes.models import Solicitud
@@ -211,7 +212,7 @@ def test_autoaprobacion_rechazada(personas):
 
 
 def test_autorizacion_por_codigo_propio_rechazada(personas, roles):
-    personas["op"].totp_secreto = personas["sup"].totp_secreto
+    secretos.guardar(personas["op"], secretos.leer(personas["sup"]))
     personas["op"].totp_confirmado = True
     personas["op"].save()
     titular = alta_por_vista(cliente(personas["op"]), "PropioCodigo")

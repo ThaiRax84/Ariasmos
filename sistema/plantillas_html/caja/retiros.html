@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<h1>Retiros de caja</h1>
+{% if puede_retirar %}<div class="atajos"><a class="boton" href="{% url 'caja:retiro_nuevo' %}">Retirar efectivo</a></div>{% endif %}
+<table class="tabla">
+<thead><tr><th>Folio</th><th>Fecha</th><th>Caja</th><th>Registró</th><th>Motivo</th><th>Importe</th><th>Comprobante</th><th>Revisión</th></tr></thead>
+<tbody>{% for r in retiros %}<tr><td><a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a></td><td>{{ r.creado|date:"d/m/Y H:i" }}</td><td>{{ r.caja }}</td><td>{{ r.registrado_por }}</td><td>{{ r.motivo }}</td><td>{{ r.importe|dinero }}</td><td>{{ r.get_comprobante_display }}</td><td>{{ r.get_revision_display }}</td></tr>{% empty %}<tr><td colspan="8">Sin retiros.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

@@ -5,15 +5,18 @@ from django.db import transaction
 
 from auditoria.servicios import registrar
 from banco.models import MedioPago
-from caja.models import Caja, Denominacion
+from caja.models import Caja, Denominacion, MotivoRetiro
 from cobros.models import ConceptoCobro
+from cortes.models import DefinicionCorte
 from cuentas.models import PermisoRol, Rol
 from cuentas.permisos import INDISPENSABLES
 from solicitudes.models import PoliticaAccion
 from titulares.models import CampoContacto, MotivoBaja, RelacionContacto
 
+from cortes import calendario
+
 from . import esquema, moneda
-from .models import VOCABULARIO_BASE, Negocio, Vocabulario, vocabulario
+from .models import VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, parametro, vocabulario
 
 ErrorPlantilla = esquema.PlantillaInvalida
 
@@ -63,10 +66,16 @@ def cargar_datos(datos, origen, usuario=None, request=None):
             RelacionContacto.objects.get_or_create(nombre=relacion)
         for nombre in datos["cajas"]:
             Caja.objects.get_or_create(nombre=nombre)
+        for nombre in datos["motivos_retiro"]:
+            MotivoRetiro.objects.get_or_create(nombre=nombre)
+        for clave, valor in datos["caja"].items():
+            Parametro.objects.update_or_create(clave=clave, defaults={"valor": _texto_parametro(clave, valor)})
         negocio = Negocio.actual()
         if datos["moneda"] == (negocio.moneda if negocio else moneda.POR_DEFECTO):
             for valor in datos["denominaciones"]:
                 Denominacion.objects.get_or_create(valor=valor)
+        for definicion in datos["cortes"]:
+            DefinicionCorte.objects.update_or_create(tipo=definicion["tipo"], defaults={"nombre": definicion["nombre"], "nivel": definicion["nivel"], "activa": definicion["activa"]})
         for orden, medio in enumerate(datos["medios_pago"], start=1):
             MedioPago.objects.get_or_create(nombre=medio, defaults={"orden": orden * 10})
         for campo in datos["campos_contacto"]:
@@ -80,6 +89,21 @@ def cargar_datos(datos, origen, usuario=None, request=None):
             )
         registrar("plantilla_cargada", usuario=usuario, datos={"plantilla": origen, "nombre": datos["nombre"]}, request=request)
     return datos
+
+
+def _texto_parametro(clave, valor):
+    if clave == "calendario_corte":
+        return calendario.a_texto(valor)
+    if isinstance(valor, bool):
+        return "1" if valor else "0"
+    return str(valor)
+
+
+def _caja_exportada():
+    caja = {"calendario_corte": calendario.actual(), "control_denominaciones": bool(parametro("control_denominaciones")), "periodo_retiros": "semana" if parametro("periodo_retiros") == "semana" else "dia"}
+    for clave, maximo in esquema.TOPES_CAJA.items():
+        caja[clave] = max(0, min(int(parametro(clave)), maximo))
+    return caja
 
 
 def rol_inicial(datos):
@@ -141,7 +165,10 @@ def exportar():
         "conceptos": conceptos,
         "medios_pago": list(MedioPago.objects.filter(activo=True).values_list("nombre", flat=True)),
         "cajas": list(Caja.objects.filter(activa=True).values_list("nombre", flat=True)),
+        "motivos_retiro": list(MotivoRetiro.objects.filter(activo=True).values_list("nombre", flat=True)),
+        "caja": _caja_exportada(),
         "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
+        "cortes": [{"tipo": d.tipo, "nombre": d.nombre, "nivel": d.nivel, "activa": d.activa} for d in DefinicionCorte.objects.all()],
     }
     esquema.validar(datos)
     return datos

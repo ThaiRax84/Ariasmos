@@ -31,6 +31,16 @@
     usuario: function (texto) { return texto.replace(/[^A-Za-z0-9._\-]/g, ""); },
     codigo_activacion: function (texto) {
       return texto.toUpperCase().split("").filter(function (c) { return ALFABETO_CODIGO.indexOf(c) !== -1; }).join("");
+    },
+    recibo: function (texto) { return texto.toUpperCase().replace(/[^A-Z0-9|\-]/g, ""); },
+    folio: function (texto) { return texto.toUpperCase().replace(/[^A-Z0-9\-]/g, ""); },
+    hora: function (texto) {
+      var limpio = texto.replace(/[^0-9:]/g, "");
+      var dos = limpio.indexOf(":");
+      if (dos === -1) {
+        return limpio.slice(0, 2);
+      }
+      return limpio.slice(0, Math.min(dos, 2)) + ":" + limpio.slice(dos + 1).replace(/:/g, "").slice(0, 2);
     }
   };
 

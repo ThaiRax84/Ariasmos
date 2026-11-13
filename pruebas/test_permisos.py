@@ -3,10 +3,12 @@ from django.urls import URLPattern, URLResolver, get_resolver, reverse
 from django.utils import timezone
 
 from banco.models import Banco, CargaTemporal, CuentaBancaria, Importacion, MovimientoBancario
-from caja.models import Caja, Traslado
+from caja import retiros
+from caja.models import Caja, MotivoRetiro, Traslado
 from caja.servicios import abrir_turno
 from cobros import libro
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
+from cortes.models import Corte, Destino, Entrega
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
 from titulares.models import Agrupacion, Contacto, Familia, LotePadron, Titular
@@ -16,7 +18,7 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
 
 SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
@@ -46,6 +48,9 @@ MATRIZ = {
     "rol_nuevo": ("administrar_roles",),
     "rol_editar": ("administrar_roles",),
     "dispositivos": ("aprobar_dispositivos",),
+    "conectar": ("aprobar_dispositivos",),
+    "conectar_certificado": ("aprobar_dispositivos",),
+    "conectar_instalador": ("aprobar_dispositivos",),
     "dispositivos_descartar": ("aprobar_dispositivos",),
     "dispositivo_aprobar": ("aprobar_dispositivos",),
     "dispositivo_revocar": ("aprobar_dispositivos",),
@@ -99,6 +104,21 @@ MATRIZ = {
     "caja:confirmar": ("recibir_efectivo",),
     "caja:rechazar": ("recibir_efectivo",),
     "caja:custodia": ("recibir_efectivo",),
+    "caja:reconteo": ("turno_caja",),
+    "caja:retiros": ("retirar_efectivo", "revisar_retiros"),
+    "caja:retiro_nuevo": ("retirar_efectivo",),
+    "caja:retiro": ("retirar_efectivo", "revisar_retiros"),
+    "caja:retiro_comprobante": ("retirar_efectivo",),
+    "caja:retiro_sin_comprobante": ("retirar_efectivo",),
+    "caja:retiro_descargar": ("retirar_efectivo", "revisar_retiros"),
+    "caja:retiro_revisar": ("revisar_retiros",),
+    "caja:retiro_revertir": ("retirar_efectivo", "revisar_retiros"),
+    "caja:motivos": ("administrar_motivos_retiro",),
+    "caja:motivo_nuevo": ("administrar_motivos_retiro",),
+    "caja:motivo_editar": ("administrar_motivos_retiro",),
+    "configuracion:caja": ("administrar_configuracion",),
+    "configuracion:carpeta_banco": ("administrar_configuracion",),
+    "conciliacion:liberar": ("conciliar_banco",),
     "auditoria:lista": ("ver_auditoria",),
     "auditoria:verificar": ("ver_auditoria",),
     "titulares:estado_pdf": ("ver_titulares",),
@@ -115,6 +135,21 @@ MATRIZ = {
     "conciliacion:confirmar": ("conciliar_banco",),
     "conciliacion:no_cobro": ("conciliar_banco",),
     "conciliacion:emparejar": ("conciliar_banco",),
+    "cortes:lista": ("turno_caja", "ver_cortes"),
+    "cortes:detalle": ("turno_caja", "ver_cortes"),
+    "cortes:descargar": ("turno_caja", "ver_cortes"),
+    "cortes:cerrar": ("cerrar_cortes",),
+    "cortes:cobranza": ("ver_cortes",),
+    "cortes:destinos": ("administrar_configuracion",),
+    "cortes:destino_nuevo": ("administrar_configuracion",),
+    "cortes:destino_editar": ("administrar_configuracion",),
+    "cortes:reintentar": ("administrar_configuracion",),
+    "respaldos:panel": ("administrar_respaldos",),
+    "respaldos:carpeta": ("administrar_respaldos",),
+    "respaldos:respaldar": ("administrar_respaldos",),
+    "respaldos:probar": ("administrar_respaldos",),
+    "respaldos:clave": ("administrar_respaldos",),
+    "respaldos:clave_nueva": ("administrar_respaldos",),
     "configuracion:padron_subir": ("administrar_configuracion",),
     "configuracion:padron_revisar": ("administrar_configuracion",),
     "configuracion:padron_lote": ("administrar_configuracion",),
@@ -122,9 +157,9 @@ MATRIZ = {
     "configuracion:padron_fichas": ("administrar_configuracion",),
 }
 
-CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
+CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar", "conectar_certificado", "conectar_instalador"}
 
-OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}}
+OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
 
 def nombres_de_rutas(patrones=None, prefijo=""):
@@ -166,6 +201,8 @@ def escenario(db):
     turno = abrir_turno(usuarios["Operación"], Caja.objects.get_or_create(nombre="Caja 1")[0], 0)
     pago = libro.registrar_pago(titular, 50000, "efectivo", usuarios["Operación"], turno=turno)
     entrega = Traslado.objects.create(tipo="entrega", origen=usuarios["Operación"], destino=usuarios["Supervisión"], importe=100, estado="pendiente")
+    motivo_retiro = MotivoRetiro.objects.create(nombre="Insumos de prueba")
+    retiro = retiros.crear(turno, usuarios["Operación"], 1000, motivo_retiro, "", {})
     cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
     importacion = Importacion.objects.create(cuenta=cuenta, nombre_archivo="estado.pdf", sha256="0" * 64, adaptador=Importacion.ESTADO_PDF, creada_por=usuarios["Dirección"])
     movimiento = MovimientoBancario.objects.create(cuenta=cuenta, importacion=importacion, fecha=timezone.now().date(), importe=1000, sentido="abono", clase="spei", huella="h-matriz", estado="por_identificar")
@@ -173,7 +210,15 @@ def escenario(db):
     carga_banco = CargaTemporal.objects.create(token="b" * 43, tipo=CargaTemporal.BANCO_PDF, usuario=ajeno, nombre_archivo="x.pdf", sha256="0" * 64, datos={})
     carga_padron = CargaTemporal.objects.create(token="p" * 43, tipo=CargaTemporal.PADRON, usuario=ajeno, nombre_archivo="x.csv", sha256="0" * 64, datos={})
     lote = LotePadron.objects.create(nombre_archivo="x.csv", sha256="0" * 64, creado_por=ajeno, resultado={"titulares": [titular.pk]})
+    mayor = Corte.objects.create(tipo="mayor", fecha=timezone.now().date().replace(day=1), periodo_inicio=timezone.now().date().replace(day=1), periodo_fin=timezone.now().date().replace(day=1), cifras={})
+    destino = Destino.objects.create(nombre="D", ruta="/tmp")
+    entrega_corte = Entrega.objects.create(corte=mayor, destino=destino, nivel="completo")
     argumentos = {
+        "cortes:detalle": {"pk": mayor.pk},
+        "cortes:descargar": {"pk": mayor.pk, "formato": "json"},
+        "cortes:cerrar": {"pk": mayor.pk},
+        "cortes:destino_editar": {"pk": destino.pk},
+        "cortes:reintentar": {"pk": entrega_corte.pk},
         "titulares:estado_pdf": {"pk": titular.pk},
         "titulares:familia_estado_pdf": {"pk": familia.pk},
         "conciliacion:columnas": {"token": carga_banco.token},
@@ -230,6 +275,15 @@ def escenario(db):
         "caja:turno": {"pk": turno.pk},
         "caja:cerrar": {"pk": turno.pk},
         "caja:confirmar": {"pk": entrega.pk},
+        "caja:reconteo": {"pk": turno.pk},
+        "caja:retiro": {"pk": retiro.pk},
+        "caja:retiro_comprobante": {"pk": retiro.pk},
+        "caja:retiro_sin_comprobante": {"pk": retiro.pk},
+        "caja:retiro_descargar": {"pk": retiro.pk},
+        "caja:retiro_revisar": {"pk": retiro.pk},
+        "caja:retiro_revertir": {"pk": retiro.pk},
+        "caja:motivo_editar": {"pk": motivo_retiro.pk},
+        "conciliacion:liberar": {"pk": importacion.pk},
         "caja:rechazar": {"pk": entrega.pk},
     }
     return usuarios, argumentos

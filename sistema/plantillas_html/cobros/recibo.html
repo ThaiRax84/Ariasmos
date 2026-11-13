@@ -26,8 +26,9 @@
   <h3>Aplicado a</h3>
   <ul>{% for a in aplicaciones %}<li>{{ a.cargo }}{% if a.cargo.titular_id != titular.pk %} ({{ a.cargo.titular.nombre_completo }}){% endif %}: {{ a.importe|dinero }}</li>{% empty %}<li>Sin cargos pendientes al momento del pago.</li>{% endfor %}
   {% if a_favor %}<li>Queda a favor: {{ a_favor|dinero }}</li>{% endif %}</ul>
+  <div class="qr-recibo">{{ qr }}</div>
   <p>Código de verificación: <strong>{{ recibo.codigo }}</strong></p>
-  <p class="pie">Recibió: {{ pago.registrado_por }}</p>
+  <p class="pie">Recibió: {{ pago.registrado_por|default:"importación automática del banco" }}</p>
 </article>
 </body>
 </html>

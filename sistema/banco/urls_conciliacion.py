@@ -11,6 +11,7 @@ urlpatterns = [
     path("importaciones/", vistas.importaciones, name="importaciones"),
     path("importaciones/<int:pk>/", vistas.importacion, name="importacion"),
     path("importaciones/<int:pk>/revisada/", vistas.revisada, name="revisada"),
+    path("importaciones/<int:pk>/liberar/", vistas.liberar, name="liberar"),
     path("cola/", vistas.cola, name="cola"),
     path("movimientos/<int:pk>/", vistas.movimiento, name="movimiento"),
     path("movimientos/<int:pk>/proponer/", vistas.proponer, name="proponer"),

@@ -4,10 +4,16 @@ from auditoria.servicios import MOTIVOS, ultima_verificacion
 from banco import conciliacion
 from banco.models import CuentaBancaria, Importacion, MovimientoBancario
 from caja.models import Denominacion, Traslado
+from caja import retiros
 from caja.servicios import alertas as alertas_caja
+from configuracion.models import Negocio
+from cortes import servicios as cortes
+from cortes.models import MAYOR, Corte
+from cuentas import conectar
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
+from respaldos import servicios as respaldos
 from solicitudes import motor
 from solicitudes.models import Solicitud
 from solicitudes.views import pendientes_para
@@ -25,10 +31,19 @@ def inicio(request):
         "delegaciones": Delegacion.objects.vigentes().filter(receptor=usuario).select_related("otorgante"),
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
+    if usuario.tiene_permiso("aprobar_dispositivos"):
+        datos_certificado = conectar.datos()
+        if datos_certificado and datos_certificado["por_vencer"]:
+            contexto["certificado_por_vencer"] = datos_certificado
     if usuario.tiene_permiso("recibir_efectivo"):
-        contexto["alertas"] = alertas_caja()
+        contexto["diarios_pendientes"] = cortes.diarios_pendientes()
+        contexto["alertas"] = alertas_caja(usuario)
         contexto["por_recibir"] = Traslado.objects.filter(destino=usuario, estado=Traslado.PENDIENTE).count()
+    if usuario.tiene_permiso("revisar_retiros"):
+        contexto["avisos_retiros"] = retiros.avisos(usuario)
     if usuario.tiene_permiso("conciliar_banco"):
+        contexto["retenidas"] = list(Importacion.objects.filter(retenida=True, liberada_en__isnull=True).select_related("cuenta__banco"))
+        contexto["automaticas"] = list(Importacion.objects.filter(origen=Importacion.CARPETA).select_related("cuenta__banco")[:5])
         contexto["banco_pendientes"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).count()
         contexto["banco_propuestos"] = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR, propuesta__isnull=False).count()
         contexto["ultima_importacion"] = Importacion.objects.order_by("-creada").first()
@@ -36,6 +51,12 @@ def inicio(request):
     if usuario.tiene_permiso("administrar_configuracion"):
         contexto["falta_cuenta"] = CuentaBancaria.principal_activa() is None
         contexto["faltan_denominaciones"] = not Denominacion.objects.filter(activa=True).exists()
+        contexto["entregas_con_problema"] = cortes.entregas_con_problema().count()
+    if usuario.tiene_permiso("administrar_respaldos"):
+        contexto["alertas_respaldo"] = respaldos.alertas()
+        contexto["clave_pendiente"] = Negocio.objects.filter(pk=1, clave_recuperacion_pendiente=True).exists()
+    if usuario.tiene_permiso("cerrar_cortes"):
+        contexto["mayores_borrador"] = Corte.objects.filter(tipo=MAYOR, estado=Corte.BORRADOR).order_by("fecha")
     if usuario.tiene_permiso("ver_auditoria"):
         contexto["importaciones_por_revisar"] = list(conciliacion.pendientes_de_revision()[:50])
         verificacion = ultima_verificacion()

@@ -9,7 +9,8 @@ from django.urls import reverse
 from banco.models import CuentaBancaria
 from cobros.models import ConceptoCobro
 from cuentas.qr import agrupar
-from configuracion.models import Negocio, vocabulario
+from configuracion.models import Negocio, parametro, vocabulario
+from cortes import calendario
 from cuentas.models import Dispositivo, Usuario
 from nucleo import totp
 
@@ -55,7 +56,17 @@ def test_asistente_completo_deja_instalacion_usable():
     colegiatura.refresh_from_db()
     assert colegiatura.importe_centavos == 150050 and colegiatura.dia_vencimiento == 10 and colegiatura.regla_recargo.valor == 1000
     respuesta = c.post(reverse("asistente:pago"), {"clabe": "002 010 07777777777 1", "beneficiario": "Mi negocio SA", "medios": [], "referencia_en": "ambos", "contacto_dudas": "55 1234 5678"})
-    assert respuesta.url == reverse("asistente:usuario")
+    assert respuesta.url == reverse("asistente:caja")
+    pagina_caja = c.get(reverse("asistente:caja")).content.decode()
+    assert "paso 5 de 8" in pagina_caja and 'name="corte_0" value="18:00"' in pagina_caja and 'name="corte_6"' in pagina_caja and 'name="corte_6" value=' not in pagina_caja
+    caja = {f"corte_{dia}": "18:00" for dia in range(6)}
+    caja.update({"corte_5": "14:00", "periodo_retiros": "semana", "tope_retiro_individual": "500", "tope_retiros_periodo": "2,000", "maximo_retiros_periodo": "5", "maximo_efectivo_caja": "0", "dias_retiro_sin_revisar": "3", "control_denominaciones": "on"})
+    assert c.post(reverse("asistente:caja"), caja).url == reverse("asistente:cortes")
+    assert calendario.actual() == {"0": "18:00", "1": "18:00", "2": "18:00", "3": "18:00", "4": "18:00", "5": "14:00"}
+    assert (parametro("tope_retiro_individual"), parametro("tope_retiros_periodo"), parametro("maximo_retiros_periodo"), parametro("control_denominaciones"), parametro("periodo_retiros")) == (50000, 200000, 5, 1, "semana")
+    assert "paso 6 de 8" in c.get(reverse("asistente:cortes")).content.decode()
+    assert "Clave de recuperación" in c.get(reverse("asistente:cortes")).content.decode()
+    assert c.post(reverse("asistente:cortes"), {"omitir": "1"}).url == reverse("asistente:usuario")
     cuenta = CuentaBancaria.objects.get()
     assert cuenta.principal and cuenta.clabe == CLABE_PRUEBA and cuenta.banco.clave == "002"
     assert terminar(c).url == reverse("inicio")

@@ -10,14 +10,15 @@ from django.utils import timezone
 
 from auditoria.servicios import registrar
 from banco.models import MovimientoBancario
-from caja.models import Turno
-from caja.servicios import personas_con_efectivo
+from caja import piezas as control_piezas
+from caja.models import MovimientoPiezas, Turno
+from caja.servicios import neto_de, personas_con_efectivo, recibe_movimientos
 from configuracion.models import Negocio, parametro
 from nucleo import reparto
 from configuracion.moneda import formatear
 from titulares.models import Titular
 
-from .models import Aplicacion, CancelacionCargo, Cargo, Pago, Recibo, ReversionPago, SerieRecibo
+from .models import Aplicacion, CancelacionCargo, Cargo, Pago, Recibo, ReversionPago, SerieRecibo, cerrado_hasta, dia_contable
 
 ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
@@ -193,6 +194,16 @@ def fecha_local(momento):
     return timezone.localtime(momento, zona).date()
 
 
+def fecha_contable(momento):
+    ahora = timezone.now()
+    if momento is None:
+        return ahora, None
+    limite = cerrado_hasta()
+    if limite is not None and dia_contable(momento) <= limite:
+        return ahora, dia_contable(momento)
+    return momento, None
+
+
 def emitir_recibo(pago, serie):
     SerieRecibo.objects.get_or_create(nombre=serie)
     SerieRecibo.objects.filter(nombre=serie).update(siguiente=F("siguiente") + 1)
@@ -219,9 +230,21 @@ def proponer_reparto(titular, importe):
     return reparto.repartir(importe, pendientes_de(miembros), titular.pk, miembros, orden_reparto())
 
 
-def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, request=None, solicitud=None, serie=None, fecha=None, movimiento=None):
+def _piezas_de_cobro(importe, medio, piezas):
+    if not piezas:
+        return None
+    if medio != Pago.EFECTIVO:
+        raise ErrorLibro("Solo un pago en efectivo lleva piezas.")
+    try:
+        return control_piezas.validar_cobro(importe, piezas.get("recibidas"), piezas.get("cambio"))
+    except control_piezas.ErrorPiezas as error:
+        raise ErrorLibro(str(error))
+
+
+def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, request=None, solicitud=None, serie=None, fecha=None, movimiento=None, piezas=None):
     if not isinstance(importe, int) or isinstance(importe, bool) or importe <= 0:
         raise ErrorLibro("El importe debe ser mayor que cero.")
+    piezas = _piezas_de_cobro(importe, medio, piezas)
     with transaction.atomic():
         if ficha:
             existente = Pago.objects.filter(ficha=ficha).first()
@@ -230,15 +253,21 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
         if medio == Pago.EFECTIVO:
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Se necesita un turno de caja abierto.")
+            if not recibe_movimientos(turno):
+                raise ErrorLibro("El turno ya está en arqueo: no recibe cobros nuevos.")
+        fecha, fecha_banco = fecha_contable(fecha)
         partes, resto = proponer_reparto(titular, importe)
         pago = Pago.objects.create(
             titular=titular, importe=importe, medio=medio, turno=turno, ficha=ficha or None, registrado_por=usuario,
-            solicitud=solicitud, fecha=fecha or timezone.now(), movimiento=movimiento,
+            solicitud=solicitud, fecha=fecha, fecha_banco=fecha_banco, movimiento=movimiento,
         )
         cargos = {c.pk: c for c in Cargo.objects.filter(pk__in=[p.cargo for p in partes])}
         for parte in partes:
             _aplicar(pago, cargos[parte.cargo], parte.importe)
         recibo = emitir_recibo(pago, serie or (turno.caja.serie_recibos if turno is not None else "A"))
+        if piezas:
+            control_piezas.registrar(turno, usuario, MovimientoPiezas.RECIBIDO, piezas["recibidas"], 1, pago=pago)
+            control_piezas.registrar(turno, usuario, MovimientoPiezas.CAMBIO, piezas["cambio"], -1, pago=pago)
         registrar(
             "pago_registrado",
             usuario=usuario,
@@ -253,6 +282,7 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
                 "movimiento": movimiento.pk if movimiento is not None else None,
                 "aplicaciones": [{"cargo": p.cargo, "titular": p.titular, "importe": p.importe} for p in partes],
                 "saldo_a_favor": resto,
+                "piezas": piezas or {},
             },
             request=request,
         )
@@ -280,23 +310,31 @@ def cancelar_cargo(cargo, importe, tipo, motivo, ejecutor, autorizador=None, sol
     return asiento
 
 
-def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitud=None, request=None):
+def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitud=None, request=None, piezas=None):
+    if piezas:
+        try:
+            piezas = control_piezas.exigir_total(piezas, pago.importe, "Las piezas devueltas deben sumar exactamente el importe del pago.")
+        except control_piezas.ErrorPiezas as error:
+            raise ErrorLibro(str(error))
     with transaction.atomic():
         if ReversionPago.objects.filter(pago=pago).exists():
             raise ErrorLibro("El pago ya fue revertido.")
         if pago.medio == Pago.EFECTIVO:
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Para devolver efectivo se necesita un turno de caja abierto de quien lo devuelve.")
-            en_turno = efectivo_devolvible(turno)
-            if en_turno < pago.importe:
+            if not recibe_movimientos(turno):
+                raise ErrorLibro("El turno de quien devuelve ya está en arqueo: no admite devoluciones.")
+            if efectivo_devolvible(turno) < pago.importe:
                 raise ErrorLibro(
-                    f"El turno de {turno.usuario} solo tiene {formatear(max(en_turno, 0))} cobrado y no devuelto; no alcanza para devolver {formatear(pago.importe)}. "
+                    f"El turno de {turno.usuario} no tiene suficiente efectivo cobrado para devolver {formatear(pago.importe)}. "
                     f"{quien_tiene_efectivo(pago)}"
                 )
         aplicaciones = list(pago.aplicaciones.values("cargo", "importe"))
         if pago.movimiento_id:
             MovimientoBancario.objects.filter(pk=pago.movimiento_id, pago=pago).update(estado=MovimientoBancario.POR_IDENTIFICAR, pago=None, resuelto_por=None, resuelto_en=None)
         reversion = ReversionPago.objects.create(pago=pago, motivo=motivo[:300], turno=turno if pago.medio == Pago.EFECTIVO else None, ejecutada_por=ejecutor, autorizada_por=autorizador, solicitud=solicitud)
+        if piezas and pago.medio == Pago.EFECTIVO:
+            control_piezas.registrar(turno, turno.usuario, MovimientoPiezas.DEVOLUCION, piezas, -1, reversion=reversion)
         recibo = getattr(pago, "recibo", None)
         registrar(
             "pago_revertido",
@@ -310,13 +348,11 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
 
 
 def efectivo_devolvible(turno):
-    cobrado = Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO).aggregate(t=Sum("importe"))["t"] or 0
-    devuelto = ReversionPago.objects.filter(turno=turno).aggregate(t=Sum("pago__importe"))["t"] or 0
-    return cobrado - devuelto
+    return neto_de(turno)
 
 
 def quien_tiene_efectivo(pago):
-    tenedores = [f"{f['usuario']} ({formatear(f['custodia'])})" for f in personas_con_efectivo() if f["custodia"] > 0]
+    tenedores = [str(f["usuario"]) if f["turno_abierto"] else f"{f['usuario']} ({formatear(f['custodia'])})" for f in personas_con_efectivo() if f["turno_abierto"] or f["custodia"] > 0]
     cobro = f"Lo cobró {pago.registrado_por} en {pago.turno.caja}." if pago.turno_id else ""
     hoy = f" Hoy tienen efectivo: {', '.join(tenedores)}." if tenedores else " Hoy nadie tiene efectivo en custodia."
     return (cobro + hoy + " Quien lo tenga debe abrir su turno para devolverlo.").strip()

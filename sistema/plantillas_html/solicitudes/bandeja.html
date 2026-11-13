@@ -4,7 +4,7 @@
 {% if "aprobar_solicitudes" in permisos %}
 <section class="panel">
   <h2>Por resolver</h2>
-  {% if pendientes %}<ul class="lista">{% for s, resaltada in pendientes %}<li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }} · {{ s.titular }} · {{ s.titular.matricula_formateada }}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</small></li>{% endfor %}</ul>
+  {% if pendientes %}<ul class="lista">{% for s, resaltada in pendientes %}<li class="{% if resaltada %}resaltada{% endif %}"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a> <small>de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</small></li>{% endfor %}</ul>
   {% else %}<p>No hay pendientes.</p>{% endif %}
 </section>
 {% endif %}
@@ -12,7 +12,7 @@
   <h2>Mis solicitudes</h2>
   <table class="tabla">
   <thead><tr><th>Acción</th><th>{{ voc.titular }}</th><th>Estado</th><th>Resolvió</th><th>Fecha</th></tr></thead>
-  <tbody>{% for s in propias %}<tr><td><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }}</a></td><td>{{ s.titular }}</td><td>{{ s.get_estado_display }}</td><td>{{ s.resuelta_por|default:"—" }}{% if s.via %} ({{ s.get_via_display }}){% endif %}</td><td>{{ s.creada|date:"d/m/Y H:i" }}</td></tr>{% empty %}<tr><td colspan="5">Sin solicitudes.</td></tr>{% endfor %}</tbody>
+  <tbody>{% for s in propias %}<tr><td><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }}</a></td><td>{{ s.titular|default:"—" }}</td><td>{{ s.get_estado_display }}</td><td>{{ s.resuelta_por|default:"—" }}{% if s.via %} ({{ s.get_via_display }}){% endif %}</td><td>{{ s.creada|date:"d/m/Y H:i" }}</td></tr>{% empty %}<tr><td colspan="5">Sin solicitudes.</td></tr>{% endfor %}</tbody>
   </table>
 </section>
 {% endblock %}

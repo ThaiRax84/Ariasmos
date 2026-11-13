@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
@@ -111,6 +113,28 @@ class AsientoInmutable(Exception):
     pass
 
 
+class PeriodoCerrado(AsientoInmutable):
+    pass
+
+
+def cerrado_hasta():
+    from configuracion.models import Negocio
+
+    return Negocio.objects.filter(pk=1).values_list("periodo_cerrado_hasta", flat=True).first()
+
+
+def dia_contable(momento):
+    from configuracion.models import Negocio
+
+    if not hasattr(momento, "hour"):
+        return momento
+    zona = Negocio.objects.filter(pk=1).values_list("zona_horaria", flat=True).first()
+    try:
+        return timezone.localtime(momento, ZoneInfo(zona)).date() if zona else timezone.localtime(momento).date()
+    except Exception:
+        return timezone.localtime(momento).date()
+
+
 class ConsultaInmutable(models.QuerySet):
     def update(self, **kwargs):
         raise AsientoInmutable("los asientos del libro no se modifican")
@@ -120,14 +144,22 @@ class ConsultaInmutable(models.QuerySet):
 
 
 class Asiento(models.Model):
+    CAMPO_FECHA = None
     objects = ConsultaInmutable.as_manager()
 
     class Meta:
         abstract = True
 
+    def fecha_contable(self):
+        valor = getattr(self, self.CAMPO_FECHA, None) if self.CAMPO_FECHA else None
+        return dia_contable(valor or timezone.now())
+
     def save(self, *args, **kwargs):
         if not self._state.adding:
             raise AsientoInmutable("los asientos del libro no se modifican")
+        limite = cerrado_hasta()
+        if limite is not None and self.fecha_contable() <= limite:
+            raise PeriodoCerrado(f"El periodo está cerrado hasta el {limite:%d/%m/%Y}: no se puede registrar un asiento con fecha dentro de él.")
         kwargs["force_insert"] = True
         super().save(*args, **kwargs)
 
@@ -161,6 +193,7 @@ class Beca(Asiento):
 
 
 class Cargo(Asiento):
+    CAMPO_FECHA = "creado"
     AUTOMATICO = "automatico"
     MANUAL = "manual"
     RECARGO = "recargo"
@@ -214,6 +247,7 @@ class SerieRecibo(models.Model):
 
 
 class Pago(Asiento):
+    CAMPO_FECHA = "fecha"
     EFECTIVO = "efectivo"
     BANCO = "banco"
     SALDO_INICIAL = "saldo_inicial"
@@ -223,10 +257,11 @@ class Pago(Asiento):
     importe = models.PositiveBigIntegerField()
     medio = models.CharField(max_length=15, choices=MEDIOS)
     fecha = models.DateTimeField(default=timezone.now)
+    fecha_banco = models.DateField(null=True, blank=True)
     turno = models.ForeignKey("caja.Turno", null=True, blank=True, on_delete=models.PROTECT, related_name="pagos")
     movimiento = models.ForeignKey("banco.MovimientoBancario", null=True, blank=True, on_delete=models.PROTECT, related_name="pagos")
     ficha = models.CharField(max_length=64, null=True, blank=True, unique=True)
-    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     solicitud = models.ForeignKey("solicitudes.Solicitud", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
 
     class Meta:
@@ -234,6 +269,7 @@ class Pago(Asiento):
         constraints = [
             models.CheckConstraint(condition=Q(importe__gt=0), name="pago_importe_positivo"),
             models.CheckConstraint(condition=~Q(medio="efectivo") | Q(turno__isnull=False), name="pago_efectivo_con_turno"),
+            models.CheckConstraint(condition=Q(registrado_por__isnull=False) | Q(medio="banco", movimiento__isnull=False), name="pago_con_responsable"),
         ]
 
     def __str__(self):

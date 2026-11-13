@@ -17,6 +17,8 @@ from .formularios import (
     FormularioAgrupacion,
     FormularioAjustesAvanzados,
     FormularioCaja,
+    FormularioCajaCortes,
+    FormularioCarpetaBanco,
     FormularioCampoContacto,
     FormularioDenominacion,
     FormularioMedioPago,
@@ -26,6 +28,8 @@ from .formularios import (
     FormularioParametros,
     FormularioRelacion,
     FormularioVocabulario,
+    guardar_caja,
+    valores_caja,
 )
 from .models import PARAMETROS, VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, parametro, vocabulario
 
@@ -146,6 +150,41 @@ def parametros(request):
         messages.success(request, "Parámetros guardados.")
         return redirect("configuracion:indice")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Parámetros", "boton": "Guardar", "volver": "configuracion:indice"})
+
+
+def registrar_caja(request, antes, despues, origen):
+    cambios = diferencias(antes, despues)
+    if "calendario_corte" in cambios:
+        registrar("calendario_corte_cambiado", usuario=request.user, datos={"cambios": {"calendario_corte": cambios["calendario_corte"]}, "origen": origen}, request=request)
+    if cambios:
+        registrar("caja_configurada", usuario=request.user, datos={"cambios": cambios, "origen": origen}, request=request)
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def caja(request):
+    antes = valores_caja()
+    formulario = FormularioCajaCortes(request.POST if request.method == "POST" else None, valores=antes)
+    if request.method == "POST" and formulario.is_valid():
+        with transaction.atomic():
+            guardar_caja(formulario.valores())
+            registrar_caja(request, antes, valores_caja(), "configuracion")
+        messages.success(request, "Caja: cortes y retiros guardados.")
+        return redirect("configuracion:indice")
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Caja: cortes y retiros", "boton": "Guardar", "volver": "configuracion:indice"})
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def carpeta_banco(request):
+    actual = Negocio.objects.get(pk=1)
+    formulario = FormularioCarpetaBanco(request.POST if request.method == "POST" else None, initial={"carpeta_banco": actual.carpeta_banco})
+    if request.method == "POST" and formulario.is_valid():
+        nueva = formulario.cleaned_data["carpeta_banco"]
+        with transaction.atomic():
+            Negocio.objects.filter(pk=1).update(carpeta_banco=nueva)
+            registrar("carpeta_banco_cambiada", usuario=request.user, objeto=actual, datos={"cambios": {"carpeta_banco": [actual.carpeta_banco, nueva]}}, request=request)
+        messages.success(request, "Carpeta vigilada guardada." if nueva else "Carpeta vigilada desactivada.")
+        return redirect("configuracion:indice")
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 CATALOGOS = {

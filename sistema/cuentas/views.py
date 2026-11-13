@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth import password_validation
@@ -7,6 +8,7 @@ from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -15,7 +17,8 @@ from django.views.decorators.http import require_POST
 from auditoria.servicios import diferencias, registrar
 from nucleo import totp
 
-from . import qr, servicios
+from . import conectar as conectar_mod
+from . import qr, secretos, servicios
 from .decoradores import requiere_permiso, requiere_sesion
 from .formularios import (
     FormularioActivacion,
@@ -212,9 +215,9 @@ def alta_totp(request):
     if request.method == "POST" and formulario.is_valid():
         usado, _ = servicios.consumir_codigo(usuario, formulario.cleaned_data["codigo"], CodigoUsado.ALTA, secreto=secreto)
         if usado is not None:
-            usuario.totp_secreto = secreto
+            secretos.guardar(usuario, secreto)
             usuario.totp_confirmado = True
-            usuario.save(update_fields=["totp_secreto", "totp_confirmado"])
+            usuario.save(update_fields=["totp_cifrado", "totp_confirmado"])
             request.session.pop("totp_propuesto", None)
             registrar("totp_alta", usuario=usuario, objeto=usuario, request=request)
             messages.success(request, "Autenticador activado.")
@@ -330,7 +333,7 @@ def usuario_editar(request, pk):
                 cambiado.intentos_fallidos = 0
                 cambiado.bloqueado_hasta = None
             if datos.get("reiniciar_totp"):
-                cambiado.totp_secreto = ""
+                cambiado.totp_cifrado = ""
                 cambiado.totp_confirmado = False
             cambiado.save()
             if not servicios.quedan_administradores():
@@ -502,3 +505,34 @@ def delegacion_revocar(request, pk):
     registrar("delegacion_revocada", usuario=request.user, objeto=delegacion, request=request)
     messages.success(request, "Delegación revocada.")
     return redirect("delegaciones")
+
+
+@requiere_permiso("aprobar_dispositivos")
+def conectar(request):
+    nombres = [h for h in settings.ALLOWED_HOSTS if h not in ("localhost", "127.0.0.1", "[::1]", "testserver")]
+    return render(request, "cuentas/conectar.html", {"certificado": conectar_mod.datos(), "nombres": nombres})
+
+
+def _descarga(contenido, tipo, nombre):
+    respuesta = HttpResponse(contenido, content_type=tipo)
+    respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    return respuesta
+
+
+@requiere_permiso("aprobar_dispositivos")
+def conectar_certificado(request):
+    pem = conectar_mod.certificado()
+    if pem is None:
+        raise Http404
+    registrar("certificado_descargado", request=request)
+    return _descarga(pem.encode("ascii"), "application/x-x509-ca-cert", conectar_mod.NOMBRE)
+
+
+@requiere_permiso("aprobar_dispositivos")
+def conectar_instalador(request):
+    pem = conectar_mod.certificado()
+    if pem is None:
+        raise Http404
+    registrar("instalador_certificado_descargado", request=request)
+    return _descarga(conectar_mod.instalador(pem).encode("ascii"), "application/octet-stream", "instalar-certificado.cmd")

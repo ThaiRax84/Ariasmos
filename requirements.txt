@@ -1,5 +1,8 @@
 Django==5.2.19
+asgiref==3.13.0
+sqlparse==0.6.1
 argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
 waitress==3.0.2
 tzdata==2026.6
 reportlab==5.1.0
@@ -7,5 +10,8 @@ pillow==12.3.0
 charset-normalizer==3.5.1
 pypdf==7.0.1
 segno==1.6.6
+cryptography==50.0.1
+cffi==2.1.1
+pycparser==3.0
 openpyxl==3.1.5
 et-xmlfile==2.0.0

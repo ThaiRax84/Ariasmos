@@ -1,0 +1,19 @@
+{
+  "python": {
+    "version": "3.12.10",
+    "url": "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip",
+    "sha256": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3",
+    "md5_oficial": "fe8ef205f2e9c3ba44d0cf9954e1abd3",
+    "nota": "SHA-256 calculado en la primera compilación (ejecución 43359577743), cuyo MD5 fe8ef205f2e9c3ba44d0cf9954e1abd3 coincide con el oficial de python.org"
+  },
+  "winsw": {
+    "version": "2.12.0",
+    "url": "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW.NET461.exe",
+    "sha256": "b5066b7bbdfba1293e5d15cda3caaea88fbeab35bd5b38c41c913d492aadfc4f"
+  },
+  "caddy": {
+    "version": "2.11.4",
+    "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_windows_amd64.zip",
+    "sha256": "1708333f79e274c7697285afe6d592ab39314e0b131e9ec6bea08ad27df62ebf"
+  }
+}
