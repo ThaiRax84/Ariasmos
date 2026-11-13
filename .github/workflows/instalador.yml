@@ -1,0 +1,102 @@
+name: Instalador de Windows
+
+on:
+  pull_request:
+    paths:
+      - "instalacion/**"
+      - "sistema/**"
+      - "nucleo/**"
+      - "datos/**"
+      - "plantillas/**"
+      - "pruebas/**"
+      - "requirements*.txt"
+      - "VERSION"
+      - ".github/workflows/instalador.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instalador-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependencias
+        run: python -m pip install --disable-pip-version-check -r requirements-pruebas.txt
+      - name: Pruebas
+        run: python -m pytest -q
+
+  instalador-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+      - name: Dependencias de prueba
+        run: python -m pip install --disable-pip-version-check -r requirements-pruebas.txt
+      - name: Pruebas en Windows
+        run: python -m pytest -q
+      - name: Construir el paquete
+        run: |
+          ./instalacion/construir.ps1 -Python (Get-Command python).Source
+          if ($LASTEXITCODE -ne 0) { throw "construir.ps1 falló" }
+      - name: Inno Setup
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          $vale = $false
+          if (Test-Path -LiteralPath $iscc) {
+            $version = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
+            Write-Host "Inno Setup encontrado: $version"
+            $vale = [version]($version -replace '[^0-9.].*$', '') -ge [version]'6.3.0'
+          }
+          if (-not $vale) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar Inno Setup" }
+          }
+          if (-not (Test-Path -LiteralPath $iscc)) { throw "No se encontró ISCC.exe" }
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Compilar el instalador
+        run: |
+          & $env:ISCC /Qp (Join-Path $PWD 'instalacion\ariasmos.iss')
+          if ($LASTEXITCODE -ne 0) { throw "ISCC falló" }
+          $instalador = Get-ChildItem -Path build\salida -Filter 'Ariasmos-*-instalador.exe' | Select-Object -First 1
+          if ($null -eq $instalador) { throw "No se generó el instalador" }
+          $hash = (Get-FileHash -LiteralPath $instalador.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($instalador.Name)" | Out-File -FilePath build\salida\SHA256SUMS.txt -Encoding ascii
+          Get-Content build\salida\SHA256SUMS.txt
+          "INSTALADOR=$($instalador.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Prueba de humo
+        run: |
+          ./instalacion/prueba-humo.ps1 -Instalador $env:INSTALADOR -Registros (Join-Path $PWD 'build\registros')
+          if ($LASTEXITCODE -ne 0) { throw "La prueba de humo falló" }
+      - name: Artefactos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ariasmos-instalador
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            build/salida/*.exe
+            build/salida/SHA256SUMS.txt
+            build/construir.log
+            build/registros/**
