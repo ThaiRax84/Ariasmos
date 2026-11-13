@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from auditoria.servicios import registrar
 from caja.models import Turno
+from caja.servicios import personas_con_efectivo
 from configuracion.models import Negocio, parametro
 from nucleo import reparto
 from nucleo.dinero import formatear
@@ -281,6 +282,12 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
         if pago.medio == Pago.EFECTIVO:
             if turno is None or not Turno.objects.filter(pk=turno.pk, estado=Turno.ABIERTO).exists():
                 raise ErrorLibro("Para devolver efectivo se necesita un turno de caja abierto de quien lo devuelve.")
+            en_turno = efectivo_devolvible(turno)
+            if en_turno < pago.importe:
+                raise ErrorLibro(
+                    f"El turno de {turno.usuario} solo tiene {formatear(max(en_turno, 0))} cobrado y no devuelto; no alcanza para devolver {formatear(pago.importe)}. "
+                    f"{quien_tiene_efectivo(pago)}"
+                )
         aplicaciones = list(pago.aplicaciones.values("cargo", "importe"))
         reversion = ReversionPago.objects.create(pago=pago, motivo=motivo[:300], turno=turno if pago.medio == Pago.EFECTIVO else None, ejecutada_por=ejecutor, autorizada_por=autorizador, solicitud=solicitud)
         recibo = getattr(pago, "recibo", None)
@@ -293,6 +300,19 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
             request=request,
         )
     return reversion
+
+
+def efectivo_devolvible(turno):
+    cobrado = Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO).aggregate(t=Sum("importe"))["t"] or 0
+    devuelto = ReversionPago.objects.filter(turno=turno).aggregate(t=Sum("pago__importe"))["t"] or 0
+    return cobrado - devuelto
+
+
+def quien_tiene_efectivo(pago):
+    tenedores = [f"{f['usuario']} ({formatear(f['custodia'])})" for f in personas_con_efectivo() if f["custodia"] > 0]
+    cobro = f"Lo cobró {pago.registrado_por} en {pago.turno.caja}." if pago.turno_id else ""
+    hoy = f" Hoy tienen efectivo: {', '.join(tenedores)}." if tenedores else " Hoy nadie tiene efectivo en custodia."
+    return (cobro + hoy + " Quien lo tenga debe abrir su turno para devolverlo.").strip()
 
 
 def validar_importe_pago(importe):
