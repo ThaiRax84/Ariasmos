@@ -42,7 +42,7 @@
 {% if planes %}
 <section class="panel">
   <h2>Planes de cobro</h2>
-  <ul class="lista">{% for p in planes %}<li>{{ p.concepto }}{% if p.importe_texto %} · {{ p.importe_texto }}{% endif %}{% if p.descuento_texto %} · descuento {{ p.descuento_texto }}{% endif %} · desde {{ p.vigente_desde|date:"d/m/Y" }}{% if not p.activo %} · inactivo{% endif %}</li>{% endfor %}</ul>
+  <ul class="lista">{% for p in planes %}<li>{{ p.concepto }}{% if p.importe_texto %} · {{ p.importe_texto }}{% endif %} · desde {{ p.vigente_desde|date:"d/m/Y" }}{% if not p.activo %} · inactivo{% endif %}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if "administrar_conceptos" in permisos and titular.estado != "rechazado" %}<p><a href="{% url 'cobros:plan_nuevo' %}?titular={{ titular.pk }}">Agregar plan de cobro</a></p>{% endif %}

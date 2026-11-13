@@ -164,11 +164,10 @@ class FormularioConcepto(forms.ModelForm):
 
 class FormularioPlan(forms.ModelForm):
     importe_centavos = CampoImporte(label="Importe propio (opcional)", required=False)
-    descuento_centesimas = CampoImporte(label="Descuento en porcentaje (opcional)", required=False, maximo=10000)
 
     class Meta:
         model = PlanCobro
-        fields = ["titular", "concepto", "importe_centavos", "descuento_centesimas", "vigente_desde", "vigente_hasta", "activo", "nota"]
+        fields = ["titular", "concepto", "importe_centavos", "vigente_desde", "vigente_hasta", "activo", "nota"]
         widgets = {"vigente_desde": forms.DateInput(attrs={"type": "date"}), "vigente_hasta": forms.DateInput(attrs={"type": "date"})}
 
     def __init__(self, *args, **kwargs):
@@ -178,8 +177,6 @@ class FormularioPlan(forms.ModelForm):
 
     def clean(self):
         datos = super().clean()
-        if datos.get("importe_centavos") is not None and datos.get("descuento_centesimas") is not None:
-            raise forms.ValidationError("Usa importe propio o descuento, no ambos.")
         desde, hasta = datos.get("vigente_desde"), datos.get("vigente_hasta")
         if desde and hasta and hasta < desde:
             raise forms.ValidationError("La vigencia termina antes de empezar.")

@@ -85,7 +85,6 @@ class PlanCobro(models.Model):
     titular = models.ForeignKey("titulares.Titular", on_delete=models.PROTECT, related_name="planes")
     concepto = models.ForeignKey(ConceptoCobro, on_delete=models.PROTECT, related_name="planes")
     importe_centavos = models.PositiveIntegerField(null=True, blank=True)
-    descuento_centesimas = models.PositiveIntegerField(null=True, blank=True)
     vigente_desde = models.DateField()
     vigente_hasta = models.DateField(null=True, blank=True)
     activo = models.BooleanField(default=True)
@@ -95,7 +94,6 @@ class PlanCobro(models.Model):
         ordering = ["-vigente_desde"]
         constraints = [
             models.CheckConstraint(condition=Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=models.F("vigente_desde")), name="plan_vigencia_valida"),
-            models.CheckConstraint(condition=Q(descuento_centesimas__isnull=True) | Q(descuento_centesimas__lte=10000), name="plan_descuento_valido"),
         ]
 
     def __str__(self):
@@ -106,13 +104,6 @@ class PlanCobro(models.Model):
         if self.importe_centavos is None:
             return ""
         return formatear(self.importe_centavos)
-
-    @property
-    def descuento_texto(self):
-        if self.descuento_centesimas is None:
-            return ""
-        enteros, resto = divmod(self.descuento_centesimas, 100)
-        return f"{enteros}.{resto:02d} %"
 
 
 class AsientoInmutable(Exception):
