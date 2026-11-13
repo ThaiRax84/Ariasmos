@@ -1,3 +1,5 @@
+import datetime
+import io
 import json
 import os
 import re
@@ -8,11 +10,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 from django.core.management import CommandError, call_command
 from django.urls import reverse
+from django.utils import timezone
 
 from cuentas import conectar
-from proyecto import equipo, instancia
+from proyecto import certificado, equipo, instancia
 from proyecto.version import actual
 
 from .conftest import cliente
@@ -20,14 +27,6 @@ from .conftest import cliente
 RAIZ = Path(__file__).resolve().parents[1]
 INSTALACION = RAIZ / "instalacion"
 DOMINIOS = {"www.python.org", "github.com"}
-PEM = (
-    "-----BEGIN CERTIFICATE-----\n"
-    "MIIBozCCAUmgAwIBAgIQZmFsc29mYWxzb2ZhbHNvMAoGCCqGSM49BAMCMDAxLjAs\n"
-    "BgNVBAMTJUNhZGR5IExvY2FsIEF1dGhvcml0eSAtIDIwMjYgRUNDIFJvb3QwHhcN\n"
-    "-----END CERTIFICATE-----\n"
-)
-
-
 def manage(*argumentos, entorno=None):
     variables = {**os.environ, **(entorno or {})}
     variables.pop("DJANGO_SETTINGS_MODULE", None)
@@ -45,7 +44,7 @@ def test_version_en_archivo_pie_y_comando(personas):
 def test_inicializar_con_nombres_de_equipo(tmp_path):
     carpeta = tmp_path / "instancia"
     entorno = {"COBRO_INSTANCIA": str(carpeta)}
-    resultado = manage("inicializar", "--host", "Equipo-Caja_01", "--host", "x;calc&", "--certificado-raiz", str(tmp_path / "raiz.crt"), entorno=entorno)
+    resultado = manage("inicializar", "--host", "Equipo-Caja_01", "--host", "x;calc&", "--certificado-servidor", str(tmp_path / "servidor.crt"), entorno=entorno)
     assert resultado.returncode == 0, resultado.stderr
     assert re.search(r"^Token del asistente: \S+$", resultado.stdout, re.M)
     datos = json.loads((carpeta / "configuracion.json").read_text(encoding="utf-8"))
@@ -53,7 +52,7 @@ def test_inicializar_con_nombres_de_equipo(tmp_path):
     assert "equipo-caja01" in datos["hosts"] and "xcalc" in datos["hosts"]
     assert {"https://equipo-caja01", "https://xcalc", "https://localhost"} <= set(datos["origenes_confiables"])
     assert not any(c in "".join(datos["hosts"]) for c in ";&_ ")
-    assert datos["certificado_raiz"] == str(tmp_path / "raiz.crt") and len(bytes.fromhex(datos["clave_respaldo"])) == 32 and datos["clave_secretos"]
+    assert datos["certificado_servidor"] == str(tmp_path / "servidor.crt") and len(bytes.fromhex(datos["clave_respaldo"])) == 32 and datos["clave_secretos"]
     antes = dict(datos)
     otra = manage("inicializar", "--host", "Equipo-Caja_01", entorno=entorno)
     assert "no se cambió nada" in otra.stdout and json.loads((carpeta / "configuracion.json").read_text(encoding="utf-8")) == antes
@@ -61,7 +60,7 @@ def test_inicializar_con_nombres_de_equipo(tmp_path):
     despues = json.loads((carpeta / "configuracion.json").read_text(encoding="utf-8"))
     assert "Token" not in nueva.stdout and "segundo" in despues["hosts"] and all(despues[k] == v for k, v in antes.items() if k not in ("hosts", "origenes_confiables"))
     assert manage("inicializar", "--host", ";;;", entorno=entorno).returncode != 0
-    assert manage("inicializar", "--certificado-raiz", "relativo.crt", entorno={"COBRO_INSTANCIA": str(tmp_path / "otra")}).returncode != 0
+    assert manage("inicializar", "--certificado-servidor", "relativo.crt", entorno={"COBRO_INSTANCIA": str(tmp_path / "otra")}).returncode != 0
 
 
 def test_instancia_existente_recibe_claves_nuevas(tmp_path):
@@ -95,27 +94,118 @@ def test_saneado_del_nombre_del_equipo(crudo, esperado):
     assert re.fullmatch(r"[a-z0-9-]*", equipo.sanear(crudo))
 
 
-def test_caddyfile_generado():
-    texto = equipo.caddyfile("EQUIPO;01 {\n respond hola }", redirigir_http=True)
-    assert "admin off" in texto and "skip_install_trust" in texto and "auto_https disable_redirects" not in texto
-    sitios = [l for l in texto.splitlines() if l.endswith("{") and not l.startswith("{")]
-    assert sitios == ["https://equipo01respondhola, https://localhost {"]
-    assert "reverse_proxy 127.0.0.1:8000" in texto and "tls internal" in texto and "respond" not in texto.split("{", 2)[2].replace("respondhola", "")
-    assert texto.count("{") == texto.count("}") == 2
-    sin = equipo.caddyfile("caja", redirigir_http=False)
-    assert "auto_https disable_redirects" in sin
-    solo_local = equipo.caddyfile(";;;")
-    assert [l for l in solo_local.splitlines() if l.endswith("{") and not l.startswith("{")] == ["https://localhost {"]
-    assert "https://localhost, https://localhost" not in equipo.caddyfile("localhost")
+def test_configuracion_de_caddy_sin_autoridad_local():
+    configuracion = equipo.configuracion_caddy("EQUIPO;01 {\n respond hola }", "C:\\Datos\\caddy\\servidor.crt", "C:\\Datos\\caddy\\servidor.key")
+    texto = json.dumps(configuracion)
+    assert configuracion["admin"]["disabled"] is True
+    assert "tls internal" not in texto and "internal" not in texto and "pki" not in texto and "authorities" not in texto and "automation" not in texto
+    https = configuracion["apps"]["http"]["servers"]["ariasmos"]
+    assert https["listen"] == [":443"] and https["automatic_https"] == {"disable": True}
+    assert https["routes"][0]["match"] == [{"host": ["equipo01respondhola", "localhost"]}]
+    assert https["routes"][0]["handle"][0] == {"handler": "reverse_proxy", "upstreams": [{"dial": "127.0.0.1:8000"}]}
+    archivos = configuracion["apps"]["tls"]["certificates"]["load_files"]
+    assert archivos == [{"certificate": "C:/Datos/caddy/servidor.crt", "key": "C:/Datos/caddy/servidor.key", "tags": ["ariasmos"]}]
+    assert https["tls_connection_policies"] == [{"certificate_selection": {"any_tag": ["ariasmos"]}}]
+    redireccion = configuracion["apps"]["http"]["servers"]["redireccion"]
+    assert redireccion["listen"] == [":80"] and redireccion["routes"][0]["handle"][0]["status_code"] == 308
+    sin = equipo.configuracion_caddy("caja", "/c/s.crt", "/c/s.key", redirigir_http=False)
+    assert set(sin["apps"]["http"]["servers"]) == {"ariasmos"}
+    assert equipo.configuracion_caddy(";;;", "/c/s.crt", "/c/s.key")["apps"]["http"]["servers"]["ariasmos"]["routes"][0]["match"] == [{"host": ["localhost"]}]
+    assert equipo.configuracion_caddy("localhost", "/c/s.crt", "/c/s.key")["apps"]["http"]["servers"]["ariasmos"]["routes"][0]["match"] == [{"host": ["localhost"]}]
+    with pytest.raises(ValueError):
+        equipo.configuracion_caddy("caja", "/c/s.crt\n", "/c/s.key")
 
 
-def test_comando_generar_caddyfile(tmp_path, settings):
-    salida = tmp_path / "caddy" / "Caddyfile"
-    call_command("generar_caddyfile", "--nombre", "Caja$1", "--salida", str(salida), "--sin-redireccion")
-    texto = salida.read_text(encoding="utf-8")
-    assert "https://caja1, https://localhost {" in texto and "disable_redirects" in texto
+def test_comando_generar_config_caddy(tmp_path):
+    salida = tmp_path / "caddy" / "caddy.json"
+    call_command("generar_config_caddy", "--nombre", "Caja$1", "--cert", str(tmp_path / "s.crt"), "--clave", str(tmp_path / "s.key"), "--salida", str(salida), "--sin-redireccion")
+    datos = json.loads(salida.read_text(encoding="utf-8"))
+    assert datos["apps"]["http"]["servers"]["ariasmos"]["routes"][0]["match"] == [{"host": ["caja1", "localhost"]}] and "redireccion" not in datos["apps"]["http"]["servers"]
     with pytest.raises(CommandError):
-        call_command("generar_caddyfile", "--nombre", "x", "--salida", "relativo/Caddyfile")
+        call_command("generar_config_caddy", "--nombre", "x", "--cert", str(tmp_path / "s.crt"), "--clave", str(tmp_path / "s.key"), "--salida", "relativo/caddy.json")
+    with pytest.raises(CommandError):
+        call_command("generar_config_caddy", "--nombre", "x", "--cert", "s.crt", "--clave", str(tmp_path / "s.key"), "--salida", str(salida))
+
+
+def test_certificado_del_servidor_tiene_exactamente_las_propiedades(tmp_path):
+    cert, clave = tmp_path / "caddy" / "servidor.crt", tmp_path / "caddy" / "servidor.key"
+    call_command("generar_certificado", "--nombre", "Equipo_Caja;01", "--cert", str(cert), "--clave", str(clave))
+    c = x509.load_pem_x509_certificate(cert.read_bytes())
+    assert b"PRIVATE KEY" not in cert.read_bytes() and cert.read_bytes().count(b"BEGIN CERTIFICATE") == 1
+    privada = serialization.load_pem_private_key(clave.read_bytes(), password=None)
+    assert isinstance(privada, ec.EllipticCurvePrivateKey) and privada.curve.name == "secp256r1"
+    assert c.public_key().public_numbers() == privada.public_key().public_numbers()
+    assert c.subject.rfc4514_string() == c.issuer.rfc4514_string() == "CN=Ariasmos equipocaja01"
+    assert (c.not_valid_after_utc - c.not_valid_before_utc) == datetime.timedelta(days=3650, minutes=5)
+    assert abs((c.not_valid_before_utc - datetime.datetime.now(datetime.timezone.utc)).total_seconds() + 300) < 120
+    assert c.serial_number > 2**64 and c.version == x509.Version.v3
+    extensiones = {e.oid: e for e in c.extensions}
+    san = extensiones[ExtensionOID.SUBJECT_ALTERNATIVE_NAME].value
+    assert san.get_values_for_type(x509.DNSName) == ["equipocaja01", "localhost"] and [str(i) for i in san.get_values_for_type(x509.IPAddress)] == ["127.0.0.1"]
+    restricciones = extensiones[ExtensionOID.BASIC_CONSTRAINTS]
+    assert restricciones.critical and restricciones.value.ca is False and restricciones.value.path_length is None
+    uso = extensiones[ExtensionOID.KEY_USAGE].value
+    assert uso.digital_signature and not (uso.key_cert_sign or uso.crl_sign or uso.key_encipherment or uso.content_commitment or uso.data_encipherment or uso.key_agreement)
+    assert list(extensiones[ExtensionOID.EXTENDED_KEY_USAGE].value) == [ExtendedKeyUsageOID.SERVER_AUTH]
+    assert ExtensionOID.NAME_CONSTRAINTS not in extensiones and ExtensionOID.AUTHORITY_INFORMATION_ACCESS not in extensiones
+    otro = certificado.construir("Equipo_Caja;01")[0]
+    assert otro.serial_number != c.serial_number
+    if os.name == "posix":
+        assert clave.stat().st_mode & 0o777 == 0o600
+    assert not list((tmp_path / "caddy").glob(".*tmp"))
+    with pytest.raises(CommandError):
+        call_command("generar_certificado", "--nombre", ";;;", "--cert", str(cert), "--clave", str(clave))
+    with pytest.raises(CommandError):
+        call_command("generar_certificado", "--nombre", "caja", "--cert", "relativo.crt", "--clave", str(clave))
+    solo_local = certificado.construir("localhost")[0]
+    assert solo_local.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName) == ["localhost"]
+
+
+def test_el_certificado_solo_se_regenera_cuando_hace_falta(tmp_path):
+    cert, clave = tmp_path / "servidor.crt", tmp_path / "servidor.key"
+    argumentos = ["generar_certificado", "--nombre", "caja", "--cert", str(cert), "--clave", str(clave), "--si-hace-falta"]
+    salida = io.StringIO()
+    call_command(*argumentos, stdout=salida)
+    assert salida.getvalue().startswith("CERTIFICADO: nuevo ") and "(no existe)" in salida.getvalue()
+    original = cert.read_bytes()
+    salida = io.StringIO()
+    call_command(*argumentos, stdout=salida)
+    assert salida.getvalue().startswith("CERTIFICADO: conservado ") and cert.read_bytes() == original
+    huella = certificado.huella(x509.load_pem_x509_certificate(original))
+    assert huella in salida.getvalue() and re.fullmatch(r"[0-9A-F]{64}", huella)
+    assert certificado.motivo_para_regenerar(cert, "CAJA") == ""
+    assert certificado.motivo_para_regenerar(cert, "otra") == "no incluye otra"
+    ahora = datetime.datetime.now(datetime.timezone.utc)
+    assert certificado.motivo_para_regenerar(cert, "caja", ahora + datetime.timedelta(days=3650 - 61)) == ""
+    assert "vence" in certificado.motivo_para_regenerar(cert, "caja", ahora + datetime.timedelta(days=3650 - 59))
+    salida = io.StringIO()
+    call_command("generar_certificado", "--nombre", "otra", "--cert", str(cert), "--clave", str(clave), "--si-hace-falta", stdout=salida)
+    assert "nuevo" in salida.getvalue() and "no incluye otra" in salida.getvalue() and cert.read_bytes() != original
+    clave.unlink()
+    salida = io.StringIO()
+    call_command("generar_certificado", "--nombre", "otra", "--cert", str(cert), "--clave", str(clave), "--si-hace-falta", stdout=salida)
+    assert "nuevo" in salida.getvalue() and clave.is_file()
+    cert.write_bytes(pem_de(autoridad()))
+    assert certificado.motivo_para_regenerar(cert, "otra") == "es de autoridad"
+    cert.write_text("basura", encoding="ascii")
+    assert certificado.motivo_para_regenerar(cert, "otra") == "no se puede leer"
+
+
+def pem_de(objeto):
+    return objeto.public_bytes(serialization.Encoding.PEM)
+
+
+def autoridad():
+    clave = ec.generate_private_key(ec.SECP256R1())
+    nombre = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Autoridad cualquiera")])
+    ahora = datetime.datetime.now(datetime.timezone.utc)
+    return (
+        x509.CertificateBuilder().subject_name(nombre).issuer_name(nombre).public_key(clave.public_key()).serial_number(x509.random_serial_number())
+        .not_valid_before(ahora).not_valid_after(ahora + datetime.timedelta(days=30))
+        .add_extension(x509.SubjectAlternativeName([x509.DNSName("localhost")]), critical=False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(clave, hashes.SHA256())
+    )
 
 
 def test_servir_se_niega_a_escuchar_en_la_red_con_https(settings):
@@ -130,33 +220,82 @@ def test_conectar_otra_computadora_y_certificado(personas, tmp_path, settings):
     assert cliente(personas["op"]).get(url).status_code == 403
     assert cliente(personas["op"]).get(reverse("conectar_certificado")).status_code == 403
     c = cliente(personas["sup"])
-    settings.CERTIFICADO_RAIZ = ""
-    assert "todavía no tiene un certificado" in c.get(url).content.decode()
+    settings.CERTIFICADO_SERVIDOR = ""
+    assert "todavía no tiene publicado el certificado" in c.get(url).content.decode()
     assert c.get(reverse("conectar_certificado")).status_code == 404 and c.get(reverse("conectar_instalador")).status_code == 404
-    carpeta = tmp_path / "caddy" / "pki" / "authorities" / "local"
-    carpeta.mkdir(parents=True)
-    (carpeta / "root.key").write_text("-----BEGIN EC PRIVATE KEY-----\nSECRETO\n-----END EC PRIVATE KEY-----\n", encoding="ascii")
-    raiz = tmp_path / "ariasmos-raiz.crt"
-    raiz.write_text(PEM, encoding="ascii")
-    settings.CERTIFICADO_RAIZ = str(raiz)
-    assert "instalar-certificado.cmd" in c.get(url).content.decode()
+    carpeta = tmp_path / "caddy"
+    publico = tmp_path / "certificado" / "ariasmos-servidor.crt"
+    objeto = certificado.generar("Caja-01", carpeta / "servidor.crt", carpeta / "servidor.key")
+    publico.parent.mkdir()
+    publico.write_bytes((carpeta / "servidor.crt").read_bytes())
+    PEM = publico.read_text(encoding="ascii")
+    settings.CERTIFICADO_SERVIDOR = str(publico)
+    pagina = c.get(url).content.decode()
+    assert "instalar-certificado.cmd" in pagina and "ariasmos-servidor.crt" in pagina and "vence en 10 años" in pagina
+    assert certificado.huella_legible(objeto) in pagina and re.search(r"[0-9A-F]{2}(:[0-9A-F]{2}){31}", pagina)
+    assert timezone.localtime(certificado.vence(objeto)).strftime("%d/%m/%Y") in pagina and "caja-01" in pagina and "vence pronto" not in pagina
     respuesta = c.get(reverse("conectar_certificado"))
-    assert respuesta.status_code == 200 and respuesta.content.decode() == PEM and "ariasmos-raiz.crt" in respuesta["Content-Disposition"]
-    for manipulada in ("?ruta=../caddy/pki/authorities/local/root.key", "?archivo=root.key"):
+    assert respuesta.status_code == 200 and respuesta.content.decode() == PEM and "ariasmos-servidor.crt" in respuesta["Content-Disposition"]
+    for manipulada in ("?ruta=../caddy/servidor.key", "?archivo=servidor.key"):
         assert c.get(reverse("conectar_certificado") + manipulada).content.decode() == PEM
-    assert c.get("/cuentas/conectar/root.key").status_code == 404
-    assert c.get("/cuentas/conectar/..%2Fcaddy%2Fpki%2Fauthorities%2Flocal%2Froot.key").status_code == 404
+    assert c.get("/cuentas/conectar/servidor.key").status_code == 404
+    assert c.get("/cuentas/conectar/..%2Fcaddy%2Fservidor.key").status_code == 404
     instalador = c.get(reverse("conectar_instalador")).content.decode("ascii")
-    assert "certutil -addstore -f Root" in instalador and "\r\n" in instalador and "SECRETO" not in instalador
-    assert all(l.split(" echo ", 1)[1] in PEM for l in instalador.splitlines() if " echo -" in l or (" echo " in l and '"%CERT%"' in l))
+    secreto = (carpeta / "servidor.key").read_text(encoding="ascii").splitlines()[1]
+    assert "certutil -addstore -f Root" in instalador and "\r\n" in instalador and secreto not in instalador and "PRIVATE" not in instalador
+    assert all(l.split(" echo ", 1)[1] in PEM for l in instalador.splitlines() if " echo " in l and '"%CERT%"' in l)
     assert personas["sup"].usuario not in instalador and "Negocio de prueba" not in instalador
-    for falso in ("-----BEGIN EC PRIVATE KEY-----\nX\n-----END EC PRIVATE KEY-----\n", PEM + PEM, "no soy un certificado", PEM.replace("MIIB", "MI&B")):
-        raiz.write_text(falso, encoding="ascii")
-        assert c.get(reverse("conectar_certificado")).status_code == 404
-    settings.CERTIFICADO_RAIZ = str(carpeta / "root.key")
+    clave_privada = (carpeta / "servidor.key").read_text(encoding="ascii")
+    falsos = {
+        "clave": clave_privada,
+        "certificado-y-clave": PEM + clave_privada,
+        "dos": PEM + PEM,
+        "texto": "no soy un certificado",
+        "base64-roto": PEM.replace(PEM.splitlines()[1][:4], "MI&B", 1),
+        "autoridad": pem_de(autoridad()).decode("ascii"),
+        "truncado": "\n".join(PEM.splitlines()[:3] + PEM.splitlines()[-1:]) + "\n",
+    }
+    for nombre, falso in falsos.items():
+        publico.write_text(falso, encoding="ascii")
+        assert c.get(reverse("conectar_certificado")).status_code == 404, nombre
+        assert conectar.datos() is None and "todavía no tiene publicado" in c.get(url).content.decode(), nombre
+    settings.CERTIFICADO_SERVIDOR = str(carpeta / "servidor.key")
     assert c.get(reverse("conectar_certificado")).status_code == 404
-    settings.CERTIFICADO_RAIZ = "relativo.crt"
+    settings.CERTIFICADO_SERVIDOR = "relativo.crt"
     assert conectar.certificado() is None
+
+
+def test_aviso_en_inicio_cuando_el_certificado_esta_por_vencer(personas, tmp_path, settings):
+    publico = tmp_path / "ariasmos-servidor.crt"
+    settings.CERTIFICADO_SERVIDOR = str(publico)
+    ahora = datetime.datetime.now(datetime.timezone.utc)
+    viejo = certificado.construir("caja", ahora - datetime.timedelta(days=3650 - 30))[0]
+    publico.write_bytes(pem_de(viejo))
+    pagina = cliente(personas["sup"]).get(reverse("inicio")).content.decode()
+    assert "El certificado del servidor vence pronto" in pagina and timezone.localtime(certificado.vence(viejo)).strftime("%d/%m/%Y") in pagina
+    assert "El certificado del servidor vence pronto" not in cliente(personas["op"]).get(reverse("inicio")).content.decode()
+    assert "vence pronto" in cliente(personas["sup"]).get(reverse("conectar")).content.decode()
+    limite = certificado.construir("caja", ahora - datetime.timedelta(days=3650 - 60, hours=-1))[0]
+    publico.write_bytes(pem_de(limite))
+    assert "El certificado del servidor vence pronto" in cliente(personas["sup"]).get(reverse("inicio")).content.decode()
+    publico.write_bytes(pem_de(certificado.construir("caja", ahora - datetime.timedelta(days=3650 - 62))[0]))
+    assert "El certificado del servidor vence pronto" not in cliente(personas["sup"]).get(reverse("inicio")).content.decode()
+    settings.CERTIFICADO_SERVIDOR = ""
+    assert "El certificado del servidor vence pronto" not in cliente(personas["sup"]).get(reverse("inicio")).content.decode()
+
+
+def test_nada_menciona_el_certificado_raiz_anterior():
+    viejos = ("ariasmos-raiz.crt", "generar_caddyfile", "certificado_raiz", "certificado-raiz", "CERTIFICADO_RAIZ", "tls internal", "RaizCaddy", "Caddy Local Authority - ")
+    excluidos = {RAIZ / "pruebas" / "test_instalacion.py"}
+    carpetas = [RAIZ / "sistema", RAIZ / "instalacion", RAIZ / "docs", RAIZ / "pruebas", RAIZ / ".github"]
+    archivos = [RAIZ / "README.md"] + [p for carpeta in carpetas for p in carpeta.rglob("*") if p.is_file() and p.suffix in (".py", ".html", ".ps1", ".iss", ".cmd", ".xml", ".json", ".md", ".yml", ".txt", ".js", ".css")]
+    for archivo in archivos:
+        if archivo in excluidos or "ARQUITECTURA" in archivo.name:
+            continue
+        texto = archivo.read_text(encoding="utf-8-sig", errors="replace")
+        for viejo in viejos:
+            assert viejo not in texto, (archivo, viejo)
+    assert not (RAIZ / "sistema" / "configuracion" / "management" / "commands" / "generar_caddyfile.py").exists()
 
 
 def test_destino_sin_permiso_menciona_la_utilidad(personas, tmp_path, monkeypatch):
@@ -223,7 +362,7 @@ def test_xml_de_servicios_winsw():
     assert "servir --host 127.0.0.1 --puerto 8000" in web.findtext("arguments")
     assert {e.get("name"): e.get("value") for e in web.findall("env")}["COBRO_INSTANCIA"] == "%ProgramData%\\Ariasmos\\instancia"
     tls = ET.parse(INSTALACION / "servicios" / "AriasmosTLS.xml").getroot()
-    assert "caddy.exe" in tls.findtext("executable") and "run --config" in tls.findtext("arguments") and "--adapter caddyfile" in tls.findtext("arguments")
+    assert "caddy.exe" in tls.findtext("executable") and tls.findtext("arguments") == 'run --config "%ProgramData%\\Ariasmos\\caddy\\caddy.json"' and "adapter" not in tls.findtext("arguments")
     assert {e.get("name") for e in tls.findall("env")} == {"XDG_DATA_HOME", "XDG_CONFIG_HOME"}
 
 
