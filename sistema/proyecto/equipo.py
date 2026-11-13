@@ -20,13 +20,47 @@ def nombres_validos(nombres):
     return vistos
 
 
-def caddyfile(nombre, redirigir_http=True, puerto_aplicacion=8000):
+def ruta_caddy(ruta):
+    texto = str(ruta).replace("\\", "/")
+    if not texto or any(ord(c) < 32 for c in texto):
+        raise ValueError("ruta no válida para la configuración de Caddy")
+    return texto
+
+
+def configuracion_caddy(nombre, certificado, clave, redirigir_http=True, puerto_aplicacion=8000):
     limpio = sanear(nombre)
-    sitios = ["https://localhost"]
+    sitios = ["localhost"]
     if limpio and limpio not in RESERVADOS:
-        sitios.insert(0, f"https://{limpio}")
-    globales = ["\tadmin off", "\tskip_install_trust", "\tpersist_config off"]
-    if not redirigir_http:
-        globales.append("\tauto_https disable_redirects")
-    lineas = ["{", *globales, "}", "", ", ".join(sitios) + " {", "\ttls internal", f"\treverse_proxy 127.0.0.1:{int(puerto_aplicacion)}", "}", ""]
-    return "\n".join(lineas)
+        sitios.insert(0, limpio)
+    servidores = {
+        "ariasmos": {
+            "listen": [":443"],
+            "routes": [
+                {
+                    "match": [{"host": sitios}],
+                    "handle": [{"handler": "reverse_proxy", "upstreams": [{"dial": f"127.0.0.1:{int(puerto_aplicacion)}"}]}],
+                    "terminal": True,
+                }
+            ],
+            "tls_connection_policies": [{"certificate_selection": {"any_tag": ["ariasmos"]}}],
+            "automatic_https": {"disable": True},
+        }
+    }
+    if redirigir_http:
+        servidores["redireccion"] = {
+            "listen": [":80"],
+            "routes": [
+                {
+                    "match": [{"host": sitios}],
+                    "handle": [{"handler": "static_response", "status_code": 308, "headers": {"Location": ["https://{http.request.host}{http.request.uri}"]}}],
+                }
+            ],
+            "automatic_https": {"disable": True},
+        }
+    return {
+        "admin": {"disabled": True, "config": {"persist": False}},
+        "apps": {
+            "http": {"servers": servidores},
+            "tls": {"certificates": {"load_files": [{"certificate": ruta_caddy(certificado), "key": ruta_caddy(clave), "tags": ["ariasmos"]}]}},
+        },
+    }
