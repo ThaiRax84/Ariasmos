@@ -85,7 +85,7 @@ def test_personalizar_vocabulario_y_conceptos():
     c = Client()
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
     quitar = ConceptoCobro.objects.get(nombre="Otro cargo")
-    datos = {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", f"quitar_{quitar.pk}": "on", "nuevo_nombre": "Cuota anual", "nuevo_tipo": "recurrente", "nuevo_periodicidad": "anual", "nuevo_aplica_a": "todos", "nuevo_recargo": "on", "seguir": "continuar"}
+    datos = {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas", f"quitar_{quitar.pk}": "on", "nuevo_nombre": "Cuota anual", "nuevo_tipo": "recurrente", "nuevo_periodicidad": "anual", "nuevo_aplica_a": "todos", "nuevo_recargo": "on", "seguir": "continuar"}
     assert c.post(reverse("asistente:personalizar"), datos).url == reverse("asistente:conceptos")
     assert vocabulario()["titular"] == "Socio"
     assert not ConceptoCobro.objects.filter(nombre="Otro cargo").exists()
