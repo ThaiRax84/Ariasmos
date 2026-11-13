@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from auditoria.servicios import diferencias, registrar
 from nucleo import totp
 
-from . import qr, servicios
+from . import qr, secretos, servicios
 from .decoradores import requiere_permiso, requiere_sesion
 from .formularios import (
     FormularioActivacion,
@@ -212,9 +212,9 @@ def alta_totp(request):
     if request.method == "POST" and formulario.is_valid():
         usado, _ = servicios.consumir_codigo(usuario, formulario.cleaned_data["codigo"], CodigoUsado.ALTA, secreto=secreto)
         if usado is not None:
-            usuario.totp_secreto = secreto
+            secretos.guardar(usuario, secreto)
             usuario.totp_confirmado = True
-            usuario.save(update_fields=["totp_secreto", "totp_confirmado"])
+            usuario.save(update_fields=["totp_cifrado", "totp_confirmado"])
             request.session.pop("totp_propuesto", None)
             registrar("totp_alta", usuario=usuario, objeto=usuario, request=request)
             messages.success(request, "Autenticador activado.")
@@ -330,7 +330,7 @@ def usuario_editar(request, pk):
                 cambiado.intentos_fallidos = 0
                 cambiado.bloqueado_hasta = None
             if datos.get("reiniciar_totp"):
-                cambiado.totp_secreto = ""
+                cambiado.totp_cifrado = ""
                 cambiado.totp_confirmado = False
             cambiado.save()
             if not servicios.quedan_administradores():

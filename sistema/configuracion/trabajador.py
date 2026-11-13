@@ -5,6 +5,7 @@ from django.utils import timezone
 from auditoria.servicios import registrar, verificar_cadena
 from banco.models import depurar_cargas
 from cobros import generacion
+from cuentas import secretos
 from cuentas.servicios import depurar_pendientes
 from solicitudes import motor
 
@@ -32,6 +33,13 @@ def _cargas(hoy):
     return f"{depurar_cargas()} archivos en revisión vencidos depurados"
 
 
+def _secretos(hoy):
+    cambiados = secretos.cifrar_pendientes()
+    if secretos.en_claro():
+        raise RuntimeError("quedan secretos del autenticador en claro")
+    return f"{cambiados} secretos del autenticador cifrados"
+
+
 def _bitacora(hoy):
     resultado = verificar_cadena(guardar=True)
     if not resultado.valida:
@@ -45,6 +53,7 @@ TAREAS = (
     ("caducar_solicitudes", _solicitudes, False),
     ("depurar_equipos", _equipos, False),
     ("depurar_cargas", _cargas, False),
+    ("cifrar_secretos", _secretos, False),
     ("verificar_bitacora", _bitacora, True),
 )
 

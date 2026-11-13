@@ -7,5 +7,8 @@ pillow==12.3.0
 charset-normalizer==3.5.1
 pypdf==7.0.1
 segno==1.6.6
+cryptography==50.0.1
+cffi==2.1.1
+pycparser==3.0
 openpyxl==3.1.5
 et-xmlfile==2.0.0

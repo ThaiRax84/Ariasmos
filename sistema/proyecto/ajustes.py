@@ -16,6 +16,8 @@ if _datos is None:
     SECRET_KEY = "sin-instancia"
     CLAVE_MATRICULA = b""
     CLAVE_AUDITORIA = b""
+    CLAVE_SECRETOS = b""
+    RUTA_INSTANCIA = ""
     RUTA_ANCLA_AUDITORIA = ""
     DATABASES = base_de_datos(":memory:")
     ALLOWED_HOSTS = []
@@ -25,6 +27,10 @@ else:
     if "clave_auditoria" not in _datos and "inicializar" not in sys.argv:
         raise ImproperlyConfigured("Falta clave_auditoria en la instancia. Ejecuta: python manage.py inicializar")
     CLAVE_AUDITORIA = bytes.fromhex(_datos.get("clave_auditoria", ""))
+    if "clave_secretos" not in _datos and "inicializar" not in sys.argv:
+        raise ImproperlyConfigured("Faltan claves nuevas en la instancia. Ejecuta: python manage.py inicializar")
+    CLAVE_SECRETOS = bytes.fromhex(_datos.get("clave_secretos", ""))
+    RUTA_INSTANCIA = str(instancia.carpeta())
     RUTA_ANCLA_AUDITORIA = str(instancia.carpeta() / instancia.ANCLA)
     DATABASES = base_de_datos(_datos["base_datos"])
     ALLOWED_HOSTS = list(_datos.get("hosts", []))

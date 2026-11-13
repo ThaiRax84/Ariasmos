@@ -16,6 +16,7 @@ from configuracion.models import parametro
 from nucleo import totp
 from proyecto.red import ip_cliente
 
+from . import secretos
 from .models import CodigoActivacion, CodigoUsado, Delegacion, Dispositivo, Usuario
 from .permisos import INDISPENSABLES
 
@@ -85,9 +86,10 @@ def revocar_dispositivo(dispositivo, usuario, request=None):
 
 
 def verificar_codigo(usuario, codigo):
-    if not usuario.totp_confirmado or not usuario.totp_secreto:
+    secreto = secretos.leer(usuario) if usuario.totp_confirmado else ""
+    if not secreto:
         return None
-    return totp.verificar(usuario.totp_secreto, codigo, ventana=parametro("ventana_codigo_pasos"))
+    return totp.verificar(secreto, codigo, ventana=parametro("ventana_codigo_pasos"))
 
 
 def consumir_codigo(autorizador, codigo, proposito, usado_por=None, solicitud=None, secreto=None):

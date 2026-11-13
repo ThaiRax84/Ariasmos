@@ -13,6 +13,7 @@ from cobros import generacion
 from cobros.models import ConceptoCobro, ReglaRecargo
 from configuracion import plantillas
 from configuracion.models import Negocio, hoy_negocio
+from cuentas import secretos
 from cuentas.models import Rol, Usuario
 from nucleo import totp
 from nucleo.recargos import sumar_meses
@@ -93,7 +94,7 @@ class Command(BaseCommand):
                 secreto = totp.generar_secreto()
                 creado = Usuario.objects.create_user(usuario, contrasena, nombre=nombre, rol=roles[nivel])
                 if roles[nivel].requiere_totp:
-                    creado.totp_secreto = secreto
+                    secretos.guardar(creado, secreto)
                     creado.totp_confirmado = True
                     creado.save()
                     self.stdout.write(f"{usuario}: secreto del autenticador {secreto}")

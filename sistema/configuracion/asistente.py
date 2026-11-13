@@ -15,7 +15,7 @@ from banco.models import CuentaBancaria
 from banco.servicios import guardar_cuenta
 from banco.views import avisar as avisar_banco
 from cobros.models import ConceptoCobro, ReglaRecargo
-from cuentas import qr
+from cuentas import qr, secretos
 from cuentas import servicios as cuentas_servicios
 from cuentas.formularios import FormularioCodigo
 from cuentas.models import CodigoUsado, Usuario
@@ -250,9 +250,9 @@ def codigo(request):
         with transaction.atomic():
             usado, _ = cuentas_servicios.consumir_codigo(nuevo, formulario.cleaned_data["codigo"], CodigoUsado.ALTA, secreto=secreto)
             if usado is not None:
-                nuevo.totp_secreto = secreto
+                secretos.guardar(nuevo, secreto)
                 nuevo.totp_confirmado = True
-                nuevo.save(update_fields=["totp_secreto", "totp_confirmado"])
+                nuevo.save(update_fields=["totp_cifrado", "totp_confirmado"])
                 dispositivo = request.dispositivo
                 cuentas_servicios.aprobar_dispositivo(dispositivo, nuevo, "Servidor (asistente)", request)
                 Negocio.objects.filter(pk=1).update(configurado=True)
