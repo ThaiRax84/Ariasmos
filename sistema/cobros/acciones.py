@@ -4,7 +4,7 @@ from django.db.models import Max, Q
 
 from caja.servicios import turno_abierto
 from configuracion.models import parametro
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 
 from . import libro
 from .models import Beca, CancelacionCargo, Cargo, ConceptoCobro, Pago, Prorroga, ReversionPago

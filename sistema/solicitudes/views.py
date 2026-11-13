@@ -7,7 +7,7 @@ from auditoria.servicios import diferencias, registrar
 from cobros import libro
 from cobros.models import Cargo, ConceptoCobro, Pago
 from cuentas.decoradores import requiere_permiso
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 from titulares.models import Familia
 
 from . import motor

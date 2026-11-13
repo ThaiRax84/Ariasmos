@@ -8,7 +8,7 @@ from auditoria.servicios import registrar
 from cobros.models import Pago, Recibo, ReversionPago
 from configuracion.models import parametro
 from cuentas.models import Usuario
-from nucleo.dinero import formatear
+from configuracion.moneda import formatear
 
 from .models import Arqueo, Denominacion, Traslado, Turno
 
