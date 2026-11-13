@@ -162,7 +162,7 @@ try {
     Copiar-Codigo -Origen (Join-Path $PSScriptRoot 'herramientas') -Destino $herramientas
 
     Paso 'Precompilando el código de Python'
-    Ejecutar -Archivo $pythonEmbebido -Argumentos @('-m', 'compileall', '-q', '-j', '0', '--invalidation-mode', 'unchecked-hash', $app, $sitio) | Out-Null
+    Ejecutar -Archivo $pythonEmbebido -Argumentos @('-m', 'compileall', '-q', '--invalidation-mode', 'unchecked-hash', $app, $sitio) | Out-Null
 
     Paso 'Comprobando el paquete con el Python embebido'
     $importaciones = "import django, argon2, waitress, reportlab, PIL, pypdf, segno, cryptography, openpyxl, charset_normalizer, tzdata, sqlite3, zoneinfo; zoneinfo.ZoneInfo('America/Mexico_City'); print('ok')"
