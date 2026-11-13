@@ -21,7 +21,7 @@ from cobros import libro
 from cobros.models import Beca, Cargo, ConceptoCobro, Pago, PeriodoCerrado
 from configuracion.models import Negocio, Parametro, hoy_negocio
 from configuracion.trabajador import ejecutar_ciclo
-from cortes import entrega, salida
+from cortes import calendario, entrega, salida
 from cortes import servicios as cortes
 from cortes.models import COBRANZA, DIARIO, MAYOR, Corte, CorteCerrado, Destino, Entrega, ReglaDestino
 from titulares.models import CampoContacto, Contacto, Familia, Titular
@@ -92,13 +92,13 @@ def test_corte_diario_tardio_y_alerta(personas):
     preparar_conceptos()
     ana = titular_activo(personas["op"], personas["sup"], "Ana")
     cobrar(personas["op"], ana, 10000)
-    Parametro.objects.update_or_create(clave="hora_limite_corte_diario", defaults={"valor": "00:00"})
+    Parametro.objects.update_or_create(clave="calendario_corte", defaults={"valor": calendario.a_texto(calendario.todos_los_dias("00:00"))})
     pendientes = cortes.diarios_pendientes()
     assert [p["persona"] for p in pendientes] == [personas["op"]]
     inicio = cliente(personas["sup"]).get(reverse("inicio")).content.decode()
     assert "Corte diario pendiente" in inicio and "Persona operacion" in inicio
     assert "Corte diario pendiente" not in cliente(personas["op2"]).get(reverse("inicio")).content.decode()
-    Parametro.objects.update_or_create(clave="hora_limite_corte_diario", defaults={"valor": "23:59"})
+    Parametro.objects.update_or_create(clave="calendario_corte", defaults={"valor": calendario.a_texto(calendario.todos_los_dias("23:59"))})
     turno = caja.turno_abierto(personas["op"])
     Turno.objects.filter(pk=turno.pk).update(abierto_en=timezone.now() - timedelta(days=1))
     assert cortes.diarios_pendientes()[0]["dia_anterior"]
@@ -470,9 +470,9 @@ def test_paso_del_asistente_de_cortes_y_respaldo(tmp_path, settings):
     pagina = c.get(reverse("asistente:cortes"))
     texto = sobre.clave_a_texto(bytes(settings.CLAVE_RESPALDO))
     assert texto in pagina.content.decode() and pagina["Cache-Control"] == "no-store"
-    datos = {"carpeta_entrega": "relativa", "hora_limite_corte_diario": "19:30", "carpeta_respaldo": "", "nivel_diario": "solo_nombres", "nivel_mayor": "sin_nombres", "nivel_cobranza": "completo"}
+    datos = {"carpeta_entrega": "relativa", "carpeta_respaldo": "", "carpeta_banco": "", "nivel_diario": "solo_nombres", "nivel_mayor": "sin_nombres", "nivel_cobranza": "completo"}
     assert c.post(reverse("asistente:cortes"), datos).status_code == 200
-    datos.update({"carpeta_entrega": str(tmp_path / "cortes"), "carpeta_respaldo": str(tmp_path / "respaldos")})
+    datos.update({"carpeta_entrega": str(tmp_path / "cortes"), "carpeta_respaldo": str(tmp_path / "respaldos"), "carpeta_banco": str(tmp_path / "banco")})
     assert c.post(reverse("asistente:cortes"), datos).status_code == 200
     datos["guardada"] = "on"
     assert c.post(reverse("asistente:cortes"), datos).url == reverse("asistente:usuario")
@@ -480,5 +480,5 @@ def test_paso_del_asistente_de_cortes_y_respaldo(tmp_path, settings):
     assert negocio.carpeta_respaldo == str((tmp_path / "respaldos").resolve()) and not negocio.clave_recuperacion_pendiente
     destino_creado = Destino.objects.get()
     assert dict(destino_creado.reglas.values_list("tipo", "nivel")) == {"diario": "solo_nombres", "mayor": "sin_nombres", "cobranza": "completo"}
-    assert Parametro.objects.get(clave="hora_limite_corte_diario").valor == "19:30"
+    assert negocio.carpeta_banco == str((tmp_path / "banco").resolve()) and (tmp_path / "banco" / "procesados").is_dir()
     assert texto not in c.get(reverse("asistente:cortes")).content.decode()
