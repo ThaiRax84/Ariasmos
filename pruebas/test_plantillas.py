@@ -125,3 +125,36 @@ def test_exportar_sin_importes_clabe_usuarios_ni_titulares(personas):
 def test_exportacion_se_puede_volver_a_importar(personas):
     contenido = cliente(personas["dir"]).get(reverse("configuracion:exportar")).content
     assert esquema.desde_bytes(contenido)["nombre"] == "Configuración exportada"
+
+
+@pytest.mark.parametrize("nombre", ["generico", "escuela"])
+def test_plantillas_traen_caja_motivos_y_permisos_de_retiros(nombre):
+    with open(settings.PLANTILLAS_NEGOCIO / f"{nombre}.json", "rb") as archivo:
+        datos = esquema.desde_bytes(archivo.read())
+    assert datos["caja"]["calendario_corte"] == {str(d): "18:00" for d in range(6)} and datos["caja"]["control_denominaciones"] is False
+    assert datos["motivos_retiro"] and {"retiro_caja", "revertir_retiro"} <= {p["accion"] for p in datos["politicas"]}
+    permisos = {r["nombre"]: set(r["permisos"]) for r in datos["roles"]}
+    assert "retirar_efectivo" in permisos["Operación"] and not {"revisar_retiros", "administrar_motivos_retiro"} & permisos["Operación"]
+    for rol in ("Supervisión", "Dirección"):
+        assert {"retirar_efectivo", "revisar_retiros", "administrar_motivos_retiro"} <= permisos[rol]
+
+
+@pytest.mark.parametrize(
+    "caja",
+    [{"calendario_corte": {"7": "18:00"}}, {"calendario_corte": {"0": "25:00"}}, {"periodo_retiros": "mes"}, {"control_denominaciones": "si"}, {"tope_retiro_individual": 100}, {"maximo_retiros_periodo": -1}, []],
+    ids=["dia", "hora", "periodo", "control", "importe", "negativo", "lista"],
+)
+def test_esquema_de_caja_rechaza_valores_invalidos(caja):
+    datos = base()
+    datos["caja"] = caja
+    with pytest.raises(esquema.PlantillaInvalida):
+        esquema.validar(datos)
+
+
+def test_exportar_lleva_caja_sin_importes(personas):
+    from configuracion import plantillas
+    from cortes import calendario
+
+    datos = plantillas.exportar()
+    assert datos["caja"]["calendario_corte"] == calendario.actual() and "Compra de insumos" in datos["motivos_retiro"]
+    assert not {"tope_retiro_individual", "tope_retiros_periodo", "maximo_efectivo_caja"} & set(datos["caja"])

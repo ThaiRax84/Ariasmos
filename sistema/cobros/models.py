@@ -261,7 +261,7 @@ class Pago(Asiento):
     turno = models.ForeignKey("caja.Turno", null=True, blank=True, on_delete=models.PROTECT, related_name="pagos")
     movimiento = models.ForeignKey("banco.MovimientoBancario", null=True, blank=True, on_delete=models.PROTECT, related_name="pagos")
     ficha = models.CharField(max_length=64, null=True, blank=True, unique=True)
-    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     solicitud = models.ForeignKey("solicitudes.Solicitud", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
 
     class Meta:
@@ -269,6 +269,7 @@ class Pago(Asiento):
         constraints = [
             models.CheckConstraint(condition=Q(importe__gt=0), name="pago_importe_positivo"),
             models.CheckConstraint(condition=~Q(medio="efectivo") | Q(turno__isnull=False), name="pago_efectivo_con_turno"),
+            models.CheckConstraint(condition=Q(registrado_por__isnull=False) | Q(medio="banco", movimiento__isnull=False), name="pago_con_responsable"),
         ]
 
     def __str__(self):

@@ -113,13 +113,25 @@ class Importacion(models.Model):
     depositos_emparejados = models.PositiveIntegerField(default=0)
     otra_via = models.PositiveIntegerField(default=0)
     continuidad = models.CharField(max_length=16, choices=CONTINUIDADES, default=CON_HUECO)
-    creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    MANUAL = "manual"
+    CARPETA = "carpeta"
+    ORIGENES = [(MANUAL, "Subida por una persona"), (CARPETA, "Carpeta vigilada")]
+    origen = models.CharField(max_length=10, choices=ORIGENES, default=MANUAL)
+    retenida = models.BooleanField(default=False)
+    liberada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    liberada_en = models.DateTimeField(null=True, blank=True)
+    creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     creada = models.DateTimeField(auto_now_add=True)
     revisada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     revisada_en = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-creada", "-id"]
+        constraints = [models.CheckConstraint(condition=Q(origen="carpeta") | Q(creada_por__isnull=False), name="importacion_con_responsable")]
+
+    @property
+    def importo(self):
+        return self.creada_por if self.creada_por_id else "Carpeta vigilada"
 
     @property
     def requiere_revision(self):
@@ -269,3 +281,13 @@ HORAS_CARGA = 2
 
 def depurar_cargas():
     return CargaTemporal.objects.filter(creada__lt=timezone.now() - timedelta(hours=HORAS_CARGA)).delete()[0]
+
+
+class ArchivoVigilado(models.Model):
+    nombre = models.CharField(max_length=255, unique=True)
+    tamano = models.BigIntegerField()
+    modificado = models.BigIntegerField()
+    visto_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nombre"]
