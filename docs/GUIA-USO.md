@@ -2,6 +2,13 @@
 
 El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada persona entra con su usuario, su contraseña y, si su rol lo pide, el código de 6 dígitos de su autenticador. Lo que cada quien ve depende de su rol; esta guía sigue los tres roles de las plantillas: **Operación**, **Supervisión** y **Dirección**. Los nombres de los menús («titulares», «matrícula», «familias») pueden cambiar según cómo se configuró el vocabulario.
 
+## La pantalla
+
+- Al abrir el programa aparece una vez la presentación de Ariasmos con su versión («ver. 0.7.0»); se quita sola en un par de segundos o con un clic o cualquier tecla, y no vuelve a salir hasta que cierres el navegador. Si tu equipo tiene activado «reducir movimiento», no aparece.
+- Arriba está la marca de Ariasmos y, a su lado, el logo y el nombre del negocio. Las entradas más usadas del menú se ven siempre (Inicio, Cobrar, el padrón, Inventario, Mi caja, Banco, Efectivo, Solicitudes y Cortes, según tu rol); las demás (familias, conceptos, usuarios, roles, configuración, respaldos, bitácora y otras) están en **Más**. **Más** se abre con un clic o con Enter y se recorre con las flechas; Esc lo cierra.
+- A la derecha ves tu nombre, tu rol y, si tienes turno abierto, la caja y la hora en que lo abriste.
+- Las acciones que mueven dinero o no se deshacen piden confirmación en un recuadro propio del programa; los avisos de que algo salió bien aparecen abajo unos segundos.
+
 ## Operación
 
 ### Dar de alta a un titular
@@ -16,8 +23,8 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 1. Abre tu turno en **Mi caja** (el fondo inicial es opcional). Si el negocio captura piezas por denominación, escribe cuántos billetes y monedas de cada valor hay en el fondo.
 2. Menú **Cobrar** → busca al titular por nombre o matrícula.
-3. Escribe el importe recibido. El sistema muestra cómo se reparte entre los cargos pendientes (y los de su familia).
-4. Si se capturan piezas: escribe los billetes y monedas que te entregan y elige **Calcular el cambio**. El sistema propone las piezas del cambio con las que debería haber en tu caja; entrega exactamente esas o corrígelas en pantalla antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
+3. A la izquierda ves los cargos pendientes y arriba a la derecha el adeudo. Escribe el importe (solo el número: el signo y la moneda ya vienen puestos). El sistema muestra en **Así se va a aplicar** cómo se reparte entre los cargos pendientes (y los de su familia).
+4. Si se capturan piezas: escribe cuántos billetes y monedas de cada valor te entregan y elige **Calcular el cambio**. El recuadro **Entrega exactamente estas piezas** dice qué piezas dar de cambio para que tu caja cuadre en el corte; si entregas otras, ábrelas con **Di el cambio con otras piezas** y corrígelas antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
 5. Confirma. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
 
 ### Retirar efectivo para un gasto
@@ -32,7 +39,7 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 ### Corte diario
 
 1. Al terminar el día, en **Mi caja** elige **Cerrar turno**.
-2. Cuenta el efectivo por billete y moneda y guarda el conteo. No verás lo esperado hasta que el turno quede cerrado, y el conteo guardado ya no se puede cambiar.
+2. Cuenta el efectivo por billete y moneda; mientras escribes, el recuadro **Contado** suma lo que capturaste (solo lo tuyo, nunca lo esperado). Guarda el conteo. No verás lo esperado hasta que el turno quede cerrado, y el conteo guardado ya no se puede cambiar.
 3. Si coincide con lo que debe haber, el turno se cierra. Si no coincide, el sistema solo dice que **no coincide** (sin decir cuánto ni si sobra o falta) y te deja **recontar una sola vez** o cerrar con el primer conteo; en los dos casos escribe una nota.
 4. Al cerrar ves lo esperado, lo contado y la diferencia, en total y, si se capturan piezas, por denominación. Se genera tu **corte diario**: recibos, devoluciones, retiros, lo contado y la diferencia. Lo ves en **Cortes**.
 5. Cada negocio decide qué días hay corte y a qué hora. Un turno abierto en un día con corte debe cerrarse antes de la hora de ese día; si se abrió en un día sin corte, antes de la hora del siguiente día que sí tenga. Si cierras después, el corte queda marcado como **tardío**; no pasa nada más.
@@ -45,7 +52,8 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 1. **Inventario** → **Vender a un titular** (o **Vender artículos** desde su ficha): elige artículos y cantidades. El precio lo pone cada artículo.
 2. Elige cómo se paga: **Lo paga ahora** pasa al cobro, que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás.
 3. **Vender sin matrícula** es para quien no es titular: se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
-4. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
+4. Junto a cada artículo ves cuántas piezas quedan; si no queda ninguna no se muestra número. Cuando quedan pocas (20 % o menos de lo que había tras la última entrada o conteo, o en su mínimo) aparece **pocas**.
+5. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
 
 ### Devoluciones, entradas, mermas y conteo
 
@@ -113,8 +121,17 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope de pagos sin respaldo y el tope por pago), **Inventario** (encenderlo, devoluciones y plazos) e importación inicial del padrón.
+- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope de pagos sin respaldo y el tope por pago), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
+
+### Marca del negocio
+
+**Más → Configuración → Marca del negocio** (pide tu contraseña otra vez):
+
+1. **Colores**: escribe el color principal y el de acento como `#` y seis dígitos hexadecimales (por ejemplo `#1F1A4E` y `#F58634`) y guarda. El principal pinta los botones y el menú activo; el acento, la franja de arriba, los subrayados y los fondos suaves. Si el principal es demasiado claro para leer texto blanco encima, los botones usan un tono oscuro y la pantalla te lo indica en **Lectura**. **Usar los colores de Ariasmos** quita los del negocio.
+2. **Logo**: sube una imagen JPEG o PNG de hasta 1 MB. El programa revisa el contenido real del archivo y lo vuelve a dibujar solo con sus píxeles; cualquier otra cosa se rechaza. **Quitar logo** deja solo el nombre del negocio.
+3. El logo y el nombre aparecen en la barra y en el recibo (en pantalla, impreso y en PDF); Ariasmos queda solo en la línea del pie del recibo. Cada cambio queda en la bitácora.
+4. Sin colores se usan los de Ariasmos; sin logo, solo el nombre. El asistente de instalación siempre usa los colores de Ariasmos.
 
 ### Respaldos
 

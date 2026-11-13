@@ -10,6 +10,7 @@ El inventario es opcional y está pensado para inventarios pequeños (libros, ú
 | Registrar devoluciones | ✓ | ✓ | ✓ |
 | Registrar entradas y mermas | ✓ | ✓ | ✓ |
 | Subir el conteo | ✓ | ✓ | ✓ |
+| Ver cuántas piezas quedan al vender | ✓ | ✓ | ✓ |
 | Ver existencias y revisar movimientos | — | ✓ | ✓ |
 | Administrar artículos | — | ✓ | ✓ |
 | Aprobar conteos y devoluciones en efectivo | — | ✓ | ✓ |
@@ -34,7 +35,8 @@ La primera vez se hace un conteo (ver abajo). Cuando otra persona lo aprueba, ca
    - **Lo paga ahora**: se crean los cargos y pasas al cobro. El pago se aplica primero a los artículos de esta venta y lo que sobre, al adeudo normal.
    - **Se va a su adeudo**: los cargos quedan pendientes y se cobran después junto con lo demás.
 3. **Vender sin matrícula** es para quien no es titular. Necesita tu turno de caja abierto; se cobra completa en efectivo en ese momento y se registra contra la cuenta interna «Público en general», que nunca queda con adeudo. Si se capturan piezas por denominación, el cambio se calcula igual que en un cobro.
-4. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
+4. Al vender ves cuántas piezas quedan de cada artículo; cuando no queda ninguna no se muestra número. Si la existencia está en 20 % o menos de su nivel de referencia (lo que había justo después de su última entrada o de su último conteo aprobado), o en su mínimo si se le fijó uno, el artículo se marca **pocas** y Supervisión ve el aviso de **existencia baja** en su inicio. El porcentaje se cambia en **Configuración → Inventario**.
+5. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
 
 ## Devolver
 
