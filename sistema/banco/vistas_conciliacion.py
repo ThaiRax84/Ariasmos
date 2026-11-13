@@ -3,7 +3,9 @@ from datetime import date, timedelta
 
 from django import forms
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Count, Q, Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -19,6 +21,7 @@ from .models import HORAS_CARGA, CargaTemporal, CuentaBancaria, Importacion, Mov
 
 CONCILIA = "conciliar_banco"
 VEN_COLA = ("sugerir_conciliacion", "conciliar_banco")
+REVISA = "ver_auditoria"
 
 
 class FormularioSubida(forms.Form):
@@ -137,21 +140,49 @@ def previa(request, token):
         messages.success(request, f"Importación lista: {importacion.aplicados} aplicados, {importacion.sugeridos + importacion.sin_pista} por identificar, {importacion.duplicados} ya estaban.")
         return redirect("conciliacion:importacion", pk=importacion.pk)
     resumen = conciliacion.vista_previa(cuenta, datos["movimientos"])
+    try:
+        clasificacion, rechazo = conciliacion.continuidad(cuenta, datos["adaptador"], datos.get("resumen")), ""
+    except conciliacion.ErrorConciliacion as error:
+        clasificacion, rechazo = "", str(error)
     estado = dict(datos.get("resumen") or {})
     for clave in ("periodo_inicio", "periodo_fin"):
         estado[clave] = date.fromisoformat(estado[clave]) if estado.get(clave) else None
-    return render(request, "banco/previa.html", {"carga": carga, "cuenta": cuenta, "resumen": resumen, "movimientos": [{**m, "fecha": date.fromisoformat(m["fecha"])} for m in datos["movimientos"][:100]], "estado": estado or None})
+    return render(request, "banco/previa.html", {"carga": carga, "cuenta": cuenta, "resumen": resumen, "movimientos": [{**m, "fecha": date.fromisoformat(m["fecha"])} for m in datos["movimientos"][:100]], "estado": estado or None, "clasificacion": dict(Importacion.CONTINUIDADES).get(clasificacion, ""), "rechazo": rechazo})
 
 
 @requiere_permiso(CONCILIA)
 def importaciones(request):
-    return render(request, "banco/importaciones.html", {"importaciones": Importacion.objects.select_related("cuenta__banco", "creada_por")[:100]})
+    consulta = Importacion.objects.select_related("cuenta__banco", "creada_por", "revisada_por").annotate(aplicados_vigentes=Count("lista", filter=Q(lista__estado=MovimientoBancario.APLICADO)))
+    return render(request, "banco/importaciones.html", {"importaciones": consulta[:100]})
 
 
-@requiere_permiso(CONCILIA)
+@requiere_permiso(CONCILIA, REVISA)
 def importacion(request, pk):
-    objeto = get_object_or_404(Importacion.objects.select_related("cuenta__banco"), pk=pk)
-    return render(request, "banco/importacion.html", {"importacion": objeto, "movimientos": objeto.lista.select_related("pago__titular", "pago__recibo")})
+    objeto = get_object_or_404(Importacion.objects.select_related("cuenta__banco", "creada_por", "revisada_por"), pk=pk)
+    aplicados = objeto.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(n=Count("id"), t=Sum("importe"))
+    contexto = {
+        "importacion": objeto,
+        "movimientos": objeto.lista.select_related("pago__titular", "pago__recibo"),
+        "aplicados": aplicados["n"],
+        "monto": aplicados["t"] or 0,
+        "puede_revisar": objeto.requiere_revision and objeto.revisada_por_id is None and request.user.tiene_permiso(REVISA) and objeto.creada_por_id != request.user.pk,
+    }
+    return render(request, "banco/importacion.html", contexto)
+
+
+@requiere_permiso(REVISA)
+@require_POST
+def revisada(request, pk):
+    objeto = get_object_or_404(Importacion, pk=pk)
+    try:
+        conciliacion.marcar_revisada(objeto, request.user, request)
+    except conciliacion.RevisionPropia:
+        raise PermissionDenied
+    except conciliacion.ErrorConciliacion as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(request, "Importación marcada como revisada.")
+    return redirect("conciliacion:importacion", pk=pk)
 
 
 @requiere_permiso(*VEN_COLA)

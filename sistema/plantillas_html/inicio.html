@@ -10,6 +10,13 @@
 </section>
 {% endif %}
 {% if alertas %}{% include "caja/_alertas.html" %}{% endif %}
+{% if importaciones_por_revisar %}
+<section class="panel alerta">
+  <h2>Importaciones bancarias por revisar</h2>
+  <p>Aplicaron pagos y no se pudieron comprobar contra un estado anterior. Revísalas contra el banco; quien importó no puede marcarlas.</p>
+  <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.creada_por }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
 {% if muestra_banco %}
 <section class="panel{% if banco_pendientes %} alerta{% endif %}">
   <h2>Banco: {{ banco_pendientes }} movimiento{{ banco_pendientes|pluralize }} por identificar{% if banco_propuestos %} ({{ banco_propuestos }} con propuesta){% endif %}</h2>
