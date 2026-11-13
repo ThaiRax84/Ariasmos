@@ -1,6 +1,5 @@
 import json
 import os
-import sqlite3
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -42,7 +41,7 @@ def con_datos(personas, tmp_path, django_capture_on_commit_callbacks):
 
 
 def saldos(ruta):
-    with sqlite3.connect(ruta) as base:
+    with servicios.conexion(ruta) as base:
         cargos = base.execute("SELECT titular_id, SUM(importe_final) FROM cobros_cargo GROUP BY titular_id ORDER BY titular_id").fetchall()
         aplicado = base.execute(
             "SELECT c.titular_id, SUM(a.importe) FROM cobros_aplicacion a JOIN cobros_cargo c ON c.id = a.cargo_id GROUP BY c.titular_id ORDER BY c.titular_id"
@@ -69,9 +68,10 @@ def test_respaldo_prueba_y_restauracion_en_instancia_vacia(con_datos, tmp_path, 
     texto = sobre.clave_a_texto(bytes(settings.CLAVE_RESPALDO))
     nueva = tmp_path / "equipo-nuevo" / "instancia"
     resultado = restaurar(archivos[0], texto.lower(), destino=nueva)
-    configuracion = json.loads((nueva / "configuracion.json").read_text())
+    configuracion = json.loads((nueva / "configuracion.json").read_text(encoding="utf-8"))
     assert configuracion["clave_respaldo"] == bytes(settings.CLAVE_RESPALDO).hex() and configuracion["base_datos"] == str(nueva / "cobro.sqlite3")
-    assert oct(os.stat(nueva / "configuracion.json").st_mode)[-3:] == "600"
+    if os.name == "posix":
+        assert oct(os.stat(nueva / "configuracion.json").st_mode)[-3:] == "600"
     origen = Path(settings.DATABASES["default"]["NAME"]) if Path(settings.DATABASES["default"]["NAME"]).exists() else Path(settings.DATABASES["default"]["TEST"]["NAME"])
     assert saldos(nueva / "cobro.sqlite3") == saldos(origen)
     valida, eventos = servicios._cadena_valida(str(nueva / "cobro.sqlite3"), bytes(settings.CLAVE_AUDITORIA))
@@ -80,7 +80,7 @@ def test_respaldo_prueba_y_restauracion_en_instancia_vacia(con_datos, tmp_path, 
     for evento in Evento.objects.all():
         contenido = json.dumps(evento.datos)
         assert texto not in contenido and bytes(settings.CLAVE_RESPALDO).hex() not in contenido
-    with sqlite3.connect(origen) as base:
+    with servicios.conexion(origen) as base:
         volcado = "\n".join(base.iterdump())
     assert texto not in volcado and bytes(settings.CLAVE_RESPALDO).hex() not in volcado
 
@@ -92,7 +92,7 @@ def test_restaurar_rechaza_clave_equivocada_y_archivos_alterados_sin_tocar_nada(
     texto = sobre.clave_a_texto(bytes(settings.CLAVE_RESPALDO))
     destino = tmp_path / "instancia"
     destino.mkdir()
-    (destino / "configuracion.json").write_text('{"intacta": true}')
+    (destino / "configuracion.json").write_text('{"intacta": true}', encoding="utf-8")
     otra = sobre.clave_a_texto(sobre.nueva_clave())
     crudo = archivo.read_bytes()
     alterado = tmp_path / "alterado.respaldo"
@@ -105,13 +105,13 @@ def test_restaurar_rechaza_clave_equivocada_y_archivos_alterados_sin_tocar_nada(
     for ruta, clave in casos:
         with pytest.raises((sobre.ErrorSobre, servicios.ErrorRespaldo)):
             restaurar(ruta, clave, reemplazar=True, destino=destino)
-        assert (destino / "configuracion.json").read_text() == '{"intacta": true}' and sorted(p.name for p in destino.iterdir()) == ["configuracion.json"]
+        assert (destino / "configuracion.json").read_text(encoding="utf-8") == '{"intacta": true}' and sorted(p.name for p in destino.iterdir()) == ["configuracion.json"]
     assert not list(tmp_path.glob("instancia-anterior-*"))
     with pytest.raises(servicios.ErrorRespaldo, match="Ya hay una instalación"):
         restaurar(archivo, texto, destino=destino)
     resultado = restaurar(archivo, texto, reemplazar=True, destino=destino)
-    assert Path(resultado["copia_anterior"]).is_dir() and (Path(resultado["copia_anterior"]) / "configuracion.json").read_text() == '{"intacta": true}'
-    assert json.loads((destino / "configuracion.json").read_text())["clave_respaldo"] == bytes(settings.CLAVE_RESPALDO).hex()
+    assert Path(resultado["copia_anterior"]).is_dir() and (Path(resultado["copia_anterior"]) / "configuracion.json").read_text(encoding="utf-8") == '{"intacta": true}'
+    assert json.loads((destino / "configuracion.json").read_text(encoding="utf-8"))["clave_respaldo"] == bytes(settings.CLAVE_RESPALDO).hex()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -158,7 +158,7 @@ def test_retencion_30_diarios_y_12_mensuales(tmp_path):
         nombre = servicios.nombre_archivo(momento)
         (tmp_path / nombre).write_bytes(b"x")
         nombres.append((momento, nombre))
-    (tmp_path / "otro-archivo.txt").write_text("no se toca")
+    (tmp_path / "otro-archivo.txt").write_text("no se toca", encoding="utf-8")
     servicios.retener(tmp_path)
     quedan = sorted(p.name for p in tmp_path.iterdir() if p.name.endswith(".respaldo"))
     diarios = {servicios.nombre_archivo(inicio - timedelta(days=d)) for d in range(30)}
@@ -228,7 +228,7 @@ def test_la_prueba_detecta_una_bitacora_alterada_en_la_copia(con_datos, tmp_path
     registro = servicios.respaldar()
     extraidos = servicios.abrir(carpeta / registro.archivo, bytes(settings.CLAVE_RESPALDO), str(tmp_path))
     assert servicios.verificar_paquete(extraidos)["eventos"] == registro.conteos["eventos"]
-    with servicios.abrir_sqlite(extraidos[servicios.BASE]) as base:
+    with servicios.conexion(extraidos[servicios.BASE]) as base:
         base.execute("UPDATE auditoria_evento SET accion = 'otra' WHERE numero = 2")
     with pytest.raises(servicios.ErrorRespaldo, match="bitácora"):
         servicios.verificar_paquete(extraidos)

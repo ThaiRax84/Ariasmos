@@ -163,7 +163,7 @@ def test_flujo_completo_de_un_mes(personas, tmp_path, django_capture_on_commit_c
         assert cortes.ejecutar_entregas() == (1, 0)
     assert entrega.verificar(carpeta.ruta) == []
     call_command("verificar_entrega", carpeta.ruta)
-    manifiesto = json.loads((Path(carpeta.ruta) / "manifiesto.json").read_text())
+    manifiesto = json.loads((Path(carpeta.ruta) / "manifiesto.json").read_text(encoding="utf-8"))
     nombres = {a["nombre"] for a in manifiesto["archivos"]}
     assert f"corte-mensual-{inicio:%Y-%m}.pdf" in nombres and manifiesto["ancla"]["numero"] > 0
     tardio = estado([spei(20, 40000, referencia=beto.matricula, rastreo="TARDE1")], mes=inicio.month, anio=inicio.year)
@@ -183,7 +183,7 @@ def test_flujo_completo_de_un_mes(personas, tmp_path, django_capture_on_commit_c
     cliente(personas["sup"]).get(reverse("cortes:detalle", args=[mayor.pk]))
     mayor.refresh_from_db()
     assert mayor.cifras == foto
-    (Path(carpeta.ruta) / f"corte-mensual-{inicio:%Y-%m}.csv").write_text("alterado")
+    (Path(carpeta.ruta) / f"corte-mensual-{inicio:%Y-%m}.csv").write_text("alterado", encoding="utf-8")
     assert any("no coincide" in p for p in entrega.verificar(carpeta.ruta))
     with pytest.raises(CommandError):
         call_command("verificar_entrega", carpeta.ruta)
@@ -315,7 +315,7 @@ def test_rutas_de_destino_invalidas(personas, tmp_path, settings):
         respuesta = c.post(reverse("cortes:destino_nuevo"), {"nombre": "x", "ruta": ruta, "activo": "on"})
         assert respuesta.status_code == 200, ruta
     archivo = tmp_path / "soy-archivo"
-    archivo.write_text("x")
+    archivo.write_text("x", encoding="utf-8")
     assert c.post(reverse("cortes:destino_nuevo"), {"nombre": "x", "ruta": str(archivo), "activo": "on"}).status_code == 200
     assert not Destino.objects.exists()
     nueva = tmp_path / "nueva" / "carpeta"
@@ -331,7 +331,7 @@ def test_entrega_fallida_se_reintenta_y_alerta(personas, tmp_path, django_captur
     preparar_cobranza(personas)
     objeto = destino(tmp_path)
     Path(objeto.ruta).rmdir()
-    Path(objeto.ruta).write_text("ya no es carpeta")
+    Path(objeto.ruta).write_text("ya no es carpeta", encoding="utf-8")
     with django_capture_on_commit_callbacks(execute=True):
         corte = cortes.generar_cobranza(usuario=personas["sup"])
         assert cortes.ejecutar_entregas() == (0, 1)
@@ -404,7 +404,7 @@ def test_cierres_simultaneos_trabajadores_y_entregas_dobles(tmp_path):
     for h in hilos:
         h.join()
     assert all(e.estado == Entrega.ENTREGADA and e.intentos == 1 for e in Entrega.objects.all())
-    manifiesto = json.loads((Path(objeto.ruta) / "manifiesto.json").read_text())
+    manifiesto = json.loads((Path(objeto.ruta) / "manifiesto.json").read_text(encoding="utf-8"))
     nombres = [a["nombre"] for a in manifiesto["archivos"]]
     assert len(nombres) == len(set(nombres)) == 3 * Entrega.objects.count()
     assert entrega.verificar(objeto.ruta) == []

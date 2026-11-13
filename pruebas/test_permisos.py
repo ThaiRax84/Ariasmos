@@ -47,6 +47,9 @@ MATRIZ = {
     "rol_nuevo": ("administrar_roles",),
     "rol_editar": ("administrar_roles",),
     "dispositivos": ("aprobar_dispositivos",),
+    "conectar": ("aprobar_dispositivos",),
+    "conectar_certificado": ("aprobar_dispositivos",),
+    "conectar_instalador": ("aprobar_dispositivos",),
     "dispositivos_descartar": ("aprobar_dispositivos",),
     "dispositivo_aprobar": ("aprobar_dispositivos",),
     "dispositivo_revocar": ("aprobar_dispositivos",),
@@ -138,7 +141,7 @@ MATRIZ = {
     "configuracion:padron_fichas": ("administrar_configuracion",),
 }
 
-CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
+CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar", "conectar_certificado", "conectar_instalador"}
 
 OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
