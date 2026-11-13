@@ -1,5 +1,8 @@
+from zoneinfo import ZoneInfo
+
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 VOCABULARIO_BASE = {
     "titular": "Titular",
@@ -7,6 +10,8 @@ VOCABULARIO_BASE = {
     "matricula": "Matrícula",
     "agrupacion": "Agrupación",
     "agrupaciones": "Agrupaciones",
+    "familia": "Familia",
+    "familias": "Familias",
 }
 
 PARAMETROS = {
@@ -20,6 +25,13 @@ PARAMETROS = {
     "intentos_codigo_por_solicitud": (5, "Códigos erróneos permitidos por solicitud antes de exigir la bandeja"),
     "intentos_codigo_por_hora": (5, "Códigos por teléfono erróneos por hora, por capturista y por autorizador, antes de bloquear esa vía"),
     "maximo_equipos_pendientes": (50, "Equipos pendientes de aprobación como máximo; los de más de 24 horas se depuran solos"),
+    "dia_generacion_cargos": (1, "Día del mes en que se generan los cargos recurrentes"),
+    "orden_reparto": ("recargos,vencimiento,prioridad", "Orden en que un pago cubre los cargos (recargos, vencimiento, prioridad, separados por comas)"),
+    "tope_pago_individual": (5000000, "Importe máximo en centavos de un pago individual sin autorización"),
+    "umbral_diferencia_arqueo": (1000, "Diferencia en centavos a partir de la cual el arqueo pide nota y avisa a Supervisión"),
+    "dias_maximos_efectivo_sin_trasladar": (2, "Días que el efectivo puede quedarse con una persona sin entregarse ni depositarse"),
+    "dias_alerta_recibos_cancelados": (7, "Días que un recibo cancelado aparece en las alertas"),
+    "segundos_ciclo_trabajador": (300, "Segundos entre ciclos del trabajador"),
     "horas_validez_codigo_activacion": (72, "Horas que vale un código de activación de cuenta"),
     "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
@@ -35,6 +47,7 @@ class Negocio(models.Model):
     ranuras = models.PositiveSmallIntegerField(default=10)
     longitud_matricula = models.PositiveSmallIntegerField(default=7)
     contador_matricula = models.BigIntegerField(default=0)
+    cobro_desde = models.DateField(null=True, blank=True)
     plantilla = models.CharField(max_length=40, blank=True)
     configurado = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)
@@ -87,7 +100,15 @@ def parametro(clave):
     valor = Parametro.objects.filter(clave=clave).values_list("valor", flat=True).first()
     if valor is None:
         return base
+    if isinstance(base, str):
+        return valor
     try:
         return int(valor)
     except ValueError:
         return base
+
+
+def hoy_negocio():
+    negocio = Negocio.actual()
+    zona = ZoneInfo(negocio.zona_horaria) if negocio else timezone.get_default_timezone()
+    return timezone.localtime(timezone.now(), zona).date()

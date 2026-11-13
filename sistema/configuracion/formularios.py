@@ -12,6 +12,17 @@ from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionCont
 from .models import PARAMETROS, VOCABULARIO_BASE, Negocio
 
 
+ETIQUETAS_VOCABULARIO = {
+    "titular": "Cómo se llama a cada titular (singular)",
+    "titulares": "Plural",
+    "matricula": "Cómo se llama la matrícula",
+    "agrupacion": "Cómo se llama una agrupación (singular)",
+    "agrupaciones": "Plural",
+    "familia": "Cómo se llama a quienes paga la misma persona (singular)",
+    "familias": "Plural",
+}
+
+
 def validar_zona(valor):
     try:
         ZoneInfo(valor)
@@ -62,13 +73,7 @@ class FormularioAjustesAvanzados(forms.ModelForm):
 class FormularioVocabulario(forms.Form):
     def __init__(self, *args, textos=None, **kwargs):
         super().__init__(*args, **kwargs)
-        etiquetas = {
-            "titular": "Cómo se llama a cada titular (singular)",
-            "titulares": "Plural",
-            "matricula": "Cómo se llama la matrícula",
-            "agrupacion": "Cómo se llama una agrupación (singular)",
-            "agrupaciones": "Plural",
-        }
+        etiquetas = ETIQUETAS_VOCABULARIO
         for clave in VOCABULARIO_BASE:
             self.fields[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave])
 
@@ -153,13 +158,7 @@ class FormularioPersonalizar(forms.Form):
     def __init__(self, *args, textos=None, conceptos=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.conceptos = list(conceptos)
-        etiquetas = {
-            "titular": "Cómo se llama a cada titular (singular)",
-            "titulares": "Plural",
-            "matricula": "Cómo se llama la matrícula",
-            "agrupacion": "Cómo se llama una agrupación (singular)",
-            "agrupaciones": "Plural",
-        }
+        etiquetas = ETIQUETAS_VOCABULARIO
         campos = {}
         for clave in VOCABULARIO_BASE:
             campos[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave])
