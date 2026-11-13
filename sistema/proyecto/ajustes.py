@@ -23,6 +23,7 @@ if _datos is None:
     CERTIFICADO_SERVIDOR = ""
     RUTA_ANCLA_AUDITORIA = ""
     RUTA_COMPROBANTES = ""
+    RUTA_ACTUALIZACIONES = ""
     DATABASES = base_de_datos(":memory:")
     ALLOWED_HOSTS = []
 else:
@@ -38,6 +39,7 @@ else:
     RUTA_INSTANCIA = str(instancia.carpeta())
     RUTA_ANCLA_AUDITORIA = str(instancia.carpeta() / instancia.ANCLA)
     RUTA_COMPROBANTES = str(instancia.carpeta() / instancia.COMPROBANTES)
+    RUTA_ACTUALIZACIONES = str(instancia.carpeta() / instancia.ACTUALIZACIONES)
     DATABASES = base_de_datos(_datos["base_datos"])
     ALLOWED_HOSTS = list(_datos.get("hosts", []))
     CSRF_TRUSTED_ORIGINS = list(_datos.get("origenes_confiables", []))

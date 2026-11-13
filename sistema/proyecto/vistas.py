@@ -16,6 +16,7 @@ from cuentas import conectar
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
+from proyecto.avisos import contexto_inicio
 from inventario import servicios as inventario
 from respaldos import servicios as respaldos
 from solicitudes import motor
@@ -80,6 +81,7 @@ def inicio(request):
         if verificacion is not None and not verificacion.valida:
             contexto["bitacora_fallida"] = verificacion
             contexto["bitacora_motivo"] = MOTIVOS.get(verificacion.motivo, verificacion.motivo)
+    contexto.update(contexto_inicio(usuario))
     return render(request, "inicio.html", contexto)
 
 

@@ -1,0 +1,30 @@
+{% if aviso_actualizacion %}{% with a=aviso_actualizacion %}
+{% if a.version %}
+<section class="panel {% if a.lista %}bien{% else %}calma{% endif %}" aria-labelledby="aviso-version">
+  {% if a.lista %}
+  <h2 id="aviso-version">Lista para instalar: versión {{ a.version.version }}</h2>
+  <p>La versión nueva ya se descargó y se comprobó su firma. Para instalarla, en la computadora del servidor abre el menú Inicio, entra a Ariasmos y elige «Instalar actualización»: vuelve a comprobar la firma y la huella antes de ejecutar el instalador.</p>
+  <p>Antes de instalar haz un respaldo y avisa a quien esté usando el sistema: los servicios se detienen unos minutos.{% if a.turnos_abiertos %} <strong>Hay {{ a.turnos_abiertos }} turno{{ a.turnos_abiertos|pluralize }} de caja abierto{{ a.turnos_abiertos|pluralize }}:</strong> conviene cerrarlos antes.{% endif %}</p>
+  {% else %}
+  <h2 id="aviso-version">Hay una versión nueva: {{ a.version.version }}</h2>
+  {% if a.paso_previo %}<p>Para llegar a esta versión hay que instalar antes la versión {{ a.minimo }}. Pide ese instalador al dueño del programa.</p>{% endif %}
+  {% endif %}
+  {% if a.cambios %}<ul class="lista">{% for linea in a.cambios %}<li>{{ linea }}</li>{% endfor %}</ul>{% endif %}
+  {% if not a.lista and not a.paso_previo %}
+  {% if a.en_curso %}<p><span class="estado">Descargando</span> El servicio está bajando el instalador.</p>
+  {% elif a.puede_descargar %}<form method="post" action="{% url 'actualizaciones:descargar' %}" class="acciones">{% csrf_token %}{% if a.fallida %}<p>El intento anterior no se completó.</p>{% endif %}<button class="boton" type="submit">Descargar</button></form>
+  {% elif a.agotado %}<p>Ya se intentó descargar tres veces en la última hora. Se puede volver a intentar más tarde.</p>{% endif %}
+  {% endif %}
+</section>
+{% endif %}
+{% if a.eventos or a.fallidas %}
+<section class="panel alerta" aria-labelledby="aviso-actualizaciones-direccion">
+  <h2 id="aviso-actualizaciones-direccion">Actualizaciones del programa</h2>
+  <ul class="lista">
+    {% for e in a.eventos %}<li>{{ e.momento|date:"d/m/Y H:i" }} · {% if e.accion == "llave_de_uso_cambiada" %}Se cambió la llave de uso de las actualizaciones (huella {{ e.datos.huella_llave }}). Si no lo hizo el dueño del programa, apaga las actualizaciones y avísale.{% else %}Se descargó la versión {{ e.datos.version }}{% if e.datos.pedida_por %}, pedida por {{ e.datos.pedida_por }}{% endif %}.{% endif %}</li>{% endfor %}
+    {% for d in a.fallidas %}<li>{{ d.terminada_en|date:"d/m/Y H:i" }} · La descarga de la versión {{ d.version.version }}{% if d.pedida_por %} pedida por {{ d.pedida_por }}{% endif %} no se completó: {{ d.motivo }}</li>{% endfor %}
+  </ul>
+  <a class="boton secundario" href="{% url 'actualizaciones:configurar' %}">Ver actualizaciones</a>
+</section>
+{% endif %}
+{% endwith %}{% endif %}

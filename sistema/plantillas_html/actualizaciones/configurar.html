@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración</span>
+    <h1>Actualizaciones del programa</h1>
+  </div>
+  <div class="encabezado-lado">
+    <div class="recuadro-cifra"><span class="etiqueta">Versión instalada</span><span class="valor">{{ instalada }}</span></div>
+  </div>
+</div>
+{% if not disponibles %}
+<section class="panel alerta">
+  <h2>Esta copia no trae llaves de actualización</h2>
+  <p>El programa solo acepta versiones firmadas con la llave del dueño. Esta copia viene sin las llaves públicas, así que no puede buscar actualizaciones. Se actualiza a mano con un instalador nuevo.</p>
+</section>
+{% endif %}
+<p class="ayuda">Cuando está activado, el servicio busca una versión nueva al arrancar y una vez al día en {{ canal|lower }}. Solo acepta avisos firmados con la llave del dueño; no envía ningún dato del negocio. La descarga la puede pedir cualquier persona desde su inicio; la instalación se hace a mano en esta computadora con el acceso directo «Instalar actualización».</p>
+<form method="post" class="formulario" novalidate autocomplete="off">
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <p class="ayuda">Clave guardada: {% if config.tiene_clave %}sí{% else %}no{% endif %}.</p>
+  <div class="acciones">
+    <button class="boton" type="submit">Guardar</button>
+    <a class="boton secundario" href="{% url 'configuracion:indice' %}">Volver</a>
+  </div>
+</form>
+<section class="panel">
+  <h2>Estado</h2>
+  <ul class="lista">
+    <li>Última búsqueda: {% if config.ultima_busqueda %}{{ config.ultima_busqueda|date:"d/m/Y H:i" }}{% else %}todavía no{% endif %}{% if config.ultimo_resultado %} · {{ config.ultimo_resultado }}{% endif %}</li>
+    <li>Próxima búsqueda: {% if config.activa and config.proxima_busqueda %}{{ config.proxima_busqueda|date:"d/m/Y H:i" }}{% elif config.activa %}al siguiente ciclo del servicio{% else %}apagadas{% endif %}{% if config.busqueda_pedida %} · búsqueda pedida{% endif %}</li>
+    <li>Versión disponible: {% if vigente %}{{ vigente.version }} (publicada el {{ vigente.datos.fecha }}){% else %}ninguna más nueva que la instalada{% endif %}</li>
+  </ul>
+  {% if config.activa %}
+  <form method="post" action="{% url 'actualizaciones:buscar' %}" class="acciones">{% csrf_token %}<button class="boton secundario" type="submit">Buscar ahora</button></form>
+  {% endif %}
+</section>
+{% if descargas %}
+<section class="panel">
+  <h2>Descargas</h2>
+  <table class="tabla">
+    <thead><tr><th>Pedida</th><th>Versión</th><th>Quién</th><th>Estado</th><th>Detalle</th></tr></thead>
+    <tbody>{% for d in descargas %}<tr><td>{{ d.pedida_en|date:"d/m/Y H:i" }}</td><td>{{ d.version.version }}</td><td>{{ d.pedida_por|default:"—" }}</td><td><span class="estado{% if d.estado == 'fallida' %} aviso{% elif d.estado == 'lista' %} bien{% endif %}">{{ d.get_estado_display }}</span></td><td>{{ d.motivo }}</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

@@ -8,6 +8,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ARCHIVO = "configuracion.json"
 ANCLA = "ancla_auditoria.json"
 COMPROBANTES = "comprobantes"
+ACTUALIZACIONES = "actualizaciones"
 
 
 def carpeta():

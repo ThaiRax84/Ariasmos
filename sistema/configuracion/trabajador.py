@@ -2,6 +2,7 @@ import traceback
 
 from django.utils import timezone
 
+from actualizaciones import servicios as actualizaciones
 from auditoria.servicios import registrar, verificar_cadena
 from banco import carpeta as carpeta_banco
 from banco.models import depurar_cargas
@@ -102,6 +103,10 @@ def _bitacora(hoy):
     return f"bitácora íntegra ({resultado.total} eventos)"
 
 
+def _actualizaciones(hoy):
+    return actualizaciones.ciclo()
+
+
 TAREAS = (
     ("generar_cargos", _cargos, False),
     ("generar_recargos", _recargos, False),
@@ -117,6 +122,7 @@ TAREAS = (
     ("respaldo", _respaldo, False),
     ("prueba_respaldo", _prueba, False),
     ("verificar_bitacora", _bitacora, True),
+    ("actualizaciones", _actualizaciones, False),
 )
 
 

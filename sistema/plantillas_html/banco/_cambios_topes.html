@@ -1,0 +1,8 @@
+{% load formato %}{% if cambios_topes %}
+<section class="panel alerta" aria-labelledby="aviso-topes">
+  <h2 id="aviso-topes">Cambios en los topes del banco</h2>
+  <p>Cambios de los últimos 7 días hechos por otra persona. Quien concilia también libera pagos: revisa que los topes sean los acordados.</p>
+  <ul class="lista">{% for c in cambios_topes %}<li>{{ c.momento|date:"d/m/Y H:i" }} · {{ c.quien }}{% for r in c.cambios %} · {{ r.nombre }}: {{ r.antes|dinero }} → {{ r.despues|dinero }}{% endfor %}</li>{% endfor %}</ul>
+  {% if "configurar_topes_banco" in permisos %}<a class="boton secundario" href="{% url 'conciliacion:topes' %}">Ver topes</a>{% endif %}
+</section>
+{% endif %}

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
+{% include "actualizaciones/_aviso.html" %}
+{% include "banco/_cambios_topes.html" %}
 <div class="encabezado">
   <div class="encabezado-texto">
     {% now "l j \d\e F \d\e Y" as hoy %}<span class="antetitulo">{{ hoy|lower|capfirst }}</span>

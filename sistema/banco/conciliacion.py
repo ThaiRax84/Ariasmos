@@ -17,7 +17,7 @@ from nucleo.lectores import santander_pyme
 from titulares.models import Titular
 
 from . import lectura
-from .models import CuentaBancaria, Importacion, MapeoColumnas, MovimientoBancario, ReglaPagador
+from .models import CuentaBancaria, Importacion, MapeoColumnas, MovimientoBancario, ReglaPagador, TopeDiarioBanco
 
 CLASES_PDF = {
     santander_pyme.SPEI: MovimientoBancario.SPEI,
@@ -403,6 +403,88 @@ def expuesto():
     return _aplicados_editables().aggregate(t=Sum("importe"))["t"] or 0
 
 
+DIAS_SEMANA = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
+ACUMULADO = "acumulado"
+CLAVES_TOPES = DIAS_SEMANA + (ACUMULADO,)
+NOMBRES_TOPES = dict(zip(CLAVES_TOPES, ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo", "Tope acumulado")))
+
+
+def topes_diarios():
+    guardados = dict(TopeDiarioBanco.objects.values_list("dia", "importe"))
+    return [int(guardados.get(dia, 0) or 0) for dia in range(7)]
+
+
+def tope_del_dia(dia):
+    return topes_diarios()[dia.weekday()]
+
+
+def topes_actuales():
+    valores = dict(zip(DIAS_SEMANA, topes_diarios()))
+    valores[ACUMULADO] = int(parametro("tope_aplicado_sin_respaldo"))
+    return valores
+
+
+def guardar_topes(nuevos, usuario=None, request=None, origen=""):
+    from configuracion.models import Parametro
+
+    limpios = {}
+    for clave in CLAVES_TOPES:
+        valor = int(nuevos.get(clave) or 0)
+        if valor < 0:
+            raise ErrorConciliacion("Los topes no pueden ser negativos.")
+        limpios[clave] = valor
+    with transaction.atomic():
+        antes = topes_actuales()
+        for dia, clave in enumerate(DIAS_SEMANA):
+            TopeDiarioBanco.objects.update_or_create(dia=dia, defaults={"importe": limpios[clave]})
+        Parametro.objects.update_or_create(clave="tope_aplicado_sin_respaldo", defaults={"valor": str(limpios[ACUMULADO])})
+        despues = topes_actuales()
+        if antes == despues:
+            return False
+        datos = {"antes": antes, "despues": despues, "cambios": {c: [antes[c], despues[c]] for c in CLAVES_TOPES if antes[c] != despues[c]}}
+        if origen:
+            datos["origen"] = origen
+        registrar("topes_banco_cambiados", usuario=usuario, datos=datos, request=request)
+    return True
+
+
+def aplicado_solo_en(dia):
+    return MovimientoBancario.objects.filter(dia_aplicado_solo=dia).aggregate(t=Sum("importe"))["t"] or 0
+
+
+def cabe_en_tope_del_dia(importe, usado, tope):
+    return importe > 0 and usado + importe <= tope
+
+
+def uso_de_topes(hoy=None):
+    hoy = hoy or hoy_negocio()
+    return {
+        "dia": hoy,
+        "nombre_dia": DIAS_SEMANA[hoy.weekday()],
+        "aplicado_hoy": aplicado_solo_en(hoy),
+        "tope_hoy": tope_del_dia(hoy),
+        "acumulado": expuesto(),
+        "tope_acumulado": int(parametro("tope_aplicado_sin_respaldo")),
+    }
+
+
+def cambios_de_topes_ajenos(usuario, dias=7):
+    from auditoria.models import Evento
+
+    desde = timezone.now() - timedelta(days=dias)
+    eventos = Evento.objects.filter(accion="topes_banco_cambiados", momento__gte=desde).exclude(usuario=usuario).select_related("usuario").order_by("-numero")[:50]
+    lista = []
+    for evento in eventos:
+        cambios = (evento.datos or {}).get("cambios") or {}
+        renglones = []
+        for clave in CLAVES_TOPES:
+            par = cambios.get(clave)
+            if isinstance(par, list) and len(par) == 2 and all(isinstance(v, int) and not isinstance(v, bool) for v in par):
+                renglones.append({"clave": clave, "nombre": NOMBRES_TOPES[clave], "antes": par[0], "despues": par[1]})
+        lista.append({"momento": evento.momento, "quien": str(evento.usuario) if evento.usuario else "Asistente de instalación", "cambios": renglones})
+    return lista
+
+
 def antiguos_sin_respaldo(hoy=None):
     hoy = hoy or hoy_negocio()
     limite = hoy - timedelta(days=max(int(parametro("dias_sin_respaldo_alerta")), 1))
@@ -681,6 +763,8 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
             Importacion.objects.filter(pk=importacion.pk).update(retenida=True)
         hoy = hoy_negocio()
         vistas = Counter()
+        tope_hoy = tope_del_dia(hoy) if vigilado else 0
+        usado_hoy = aplicado_solo_en(hoy) if vigilado else 0
         for movimiento, resultado, extra in candidatos:
             if del_archivo:
                 _retener(movimiento, del_archivo, resultado, extra)
@@ -698,7 +782,15 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
                     _retener(movimiento, motivos, resultado, extra)
                     cuentas["retenidos"] += 1
                     continue
+                if not cabe_en_tope_del_dia(movimiento.importe, usado_hoy, tope_hoy):
+                    _retener(movimiento, ["tope_dia"], resultado, extra)
+                    cuentas["retenidos"] += 1
+                    cuentas["tope_dia"] += 1
+                    continue
             aplicar(movimiento, titular, usuario, request)
+            if vigilado:
+                MovimientoBancario.objects.filter(pk=movimiento.pk, dia_aplicado_solo__isnull=True).update(dia_aplicado_solo=hoy)
+                usado_hoy += movimiento.importe
             cuentas["aplicados"] += 1
         Importacion.objects.filter(pk=importacion.pk).update(
             nuevos=cuentas["nuevos"], duplicados=cuentas["duplicados"], aplicados=cuentas["aplicados"], otra_via=cuentas["otra_via"],

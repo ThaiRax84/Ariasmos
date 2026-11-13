@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Banco</span>
+    <h1>Topes para aplicar pagos solos</h1>
+  </div>
+</div>
+<div class="cifras">
+  <div class="cifra{% if uso.aplicado_hoy >= uso.tope_hoy %} aviso{% endif %}"><span class="etiqueta">Aplicado solo hoy ({{ nombre_hoy|lower }})</span><span class="numero">{{ uso.aplicado_hoy|dinero }}</span><span class="detalle">de un tope del día de {{ uso.tope_hoy|dinero }}</span></div>
+  <div class="cifra{% if uso.acumulado >= uso.tope_acumulado %} aviso{% endif %}"><span class="etiqueta">Acumulado sin respaldo de un estado</span><span class="numero">{{ uso.acumulado|dinero }}</span><span class="detalle">de un tope acumulado de {{ uso.tope_acumulado|dinero }}</span></div>
+</div>
+<p class="ayuda">Un Excel o CSV que llega por la carpeta vigilada aplica sus pagos solo mientras no rebase ninguno de los dos topes. El del día se cuenta pago por pago, en el orden del archivo, sobre lo que se aplica solo ese día; el que no cabe queda retenido y se sigue con el siguiente. El acumulado cuenta lo aplicado desde archivos editables que todavía no respalda un estado en PDF; si un archivo lo rebasaría, se retiene completo. Lo que liberas a mano no gasta el tope del día. Con un tope en 0 se retiene todo.</p>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  <h2>Tope del día</h2>
+  {% for r in renglones %}
+  <div class="campo{% if r.campo.errors %} con-error{% endif %}">
+    <label for="{{ r.campo.id_for_label }}">{{ r.nombre }}</label> {{ r.campo }}
+    {% for e in r.campo.errors %}<p class="error">{{ e }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  <h2>Tope acumulado</h2>
+  <div class="campo{% if acumulado.errors %} con-error{% endif %}">
+    {{ acumulado.label_tag }} {{ acumulado }}
+    {% for e in acumulado.errors %}<p class="error">{{ e }}</p>{% endfor %}
+  </div>
+  <div class="acciones">
+    <button class="boton" type="submit">Guardar topes</button>
+    <a class="boton secundario" href="{% url 'conciliacion:cola' %}">Volver al banco</a>
+  </div>
+</form>
+{% endblock %}

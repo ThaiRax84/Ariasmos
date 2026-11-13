@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "inventario",
     "cortes",
     "respaldos",
+    "actualizaciones",
 ]
 
 MIDDLEWARE = [
