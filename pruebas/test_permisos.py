@@ -7,6 +7,7 @@ from caja.models import Caja, Traslado
 from caja.servicios import abrir_turno
 from cobros import libro
 from cobros.models import ConceptoCobro, PlanCobro, ReglaRecargo
+from cortes.models import Corte, Destino, Entrega
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
 from titulares.models import Agrupacion, Contacto, Familia, LotePadron, Titular
@@ -16,7 +17,7 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
 
 SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
@@ -115,6 +116,21 @@ MATRIZ = {
     "conciliacion:confirmar": ("conciliar_banco",),
     "conciliacion:no_cobro": ("conciliar_banco",),
     "conciliacion:emparejar": ("conciliar_banco",),
+    "cortes:lista": ("turno_caja", "ver_cortes"),
+    "cortes:detalle": ("turno_caja", "ver_cortes"),
+    "cortes:descargar": ("turno_caja", "ver_cortes"),
+    "cortes:cerrar": ("cerrar_cortes",),
+    "cortes:cobranza": ("ver_cortes",),
+    "cortes:destinos": ("administrar_configuracion",),
+    "cortes:destino_nuevo": ("administrar_configuracion",),
+    "cortes:destino_editar": ("administrar_configuracion",),
+    "cortes:reintentar": ("administrar_configuracion",),
+    "respaldos:panel": ("administrar_respaldos",),
+    "respaldos:carpeta": ("administrar_respaldos",),
+    "respaldos:respaldar": ("administrar_respaldos",),
+    "respaldos:probar": ("administrar_respaldos",),
+    "respaldos:clave": ("administrar_respaldos",),
+    "respaldos:clave_nueva": ("administrar_respaldos",),
     "configuracion:padron_subir": ("administrar_configuracion",),
     "configuracion:padron_revisar": ("administrar_configuracion",),
     "configuracion:padron_lote": ("administrar_configuracion",),
@@ -124,7 +140,7 @@ MATRIZ = {
 
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
 
-OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}}
+OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
 
 def nombres_de_rutas(patrones=None, prefijo=""):
@@ -173,7 +189,15 @@ def escenario(db):
     carga_banco = CargaTemporal.objects.create(token="b" * 43, tipo=CargaTemporal.BANCO_PDF, usuario=ajeno, nombre_archivo="x.pdf", sha256="0" * 64, datos={})
     carga_padron = CargaTemporal.objects.create(token="p" * 43, tipo=CargaTemporal.PADRON, usuario=ajeno, nombre_archivo="x.csv", sha256="0" * 64, datos={})
     lote = LotePadron.objects.create(nombre_archivo="x.csv", sha256="0" * 64, creado_por=ajeno, resultado={"titulares": [titular.pk]})
+    mayor = Corte.objects.create(tipo="mayor", fecha=timezone.now().date().replace(day=1), periodo_inicio=timezone.now().date().replace(day=1), periodo_fin=timezone.now().date().replace(day=1), cifras={})
+    destino = Destino.objects.create(nombre="D", ruta="/tmp")
+    entrega_corte = Entrega.objects.create(corte=mayor, destino=destino, nivel="completo")
     argumentos = {
+        "cortes:detalle": {"pk": mayor.pk},
+        "cortes:descargar": {"pk": mayor.pk, "formato": "json"},
+        "cortes:cerrar": {"pk": mayor.pk},
+        "cortes:destino_editar": {"pk": destino.pk},
+        "cortes:reintentar": {"pk": entrega_corte.pk},
         "titulares:estado_pdf": {"pk": titular.pk},
         "titulares:familia_estado_pdf": {"pk": familia.pk},
         "conciliacion:columnas": {"token": carga_banco.token},
