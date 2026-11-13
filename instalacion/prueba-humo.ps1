@@ -93,26 +93,25 @@ function Comprobar-Puerto8000 {
     }
 }
 
+function Reglas {
+    param([string]$Ruta)
+    return @((Get-Acl -LiteralPath $Ruta).GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+}
+
 function Comprobar-Permisos {
     $permitidos = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-19')
     foreach ($ruta in @($Datos, $Instancia, (Join-Path $Instancia 'configuracion.json'))) {
-        foreach ($regla in (Get-Acl -LiteralPath $ruta).Access) {
-            $sid = $regla.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value
-            if ($regla.AccessControlType -eq 'Allow' -and $permitidos -notcontains $sid) { Fallar "$ruta da acceso a $($regla.IdentityReference) ($sid)." }
+        foreach ($regla in (Reglas $ruta)) {
+            $sid = $regla.IdentityReference.Value
+            if ($regla.AccessControlType -eq 'Allow' -and $permitidos -notcontains $sid) { Fallar "$ruta da acceso a $sid." }
         }
     }
-    $leible = $true
-    try {
-        $usuarios = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-545')
-        $reglas = (Get-Acl -LiteralPath $Instancia).Access | Where-Object { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]) -eq $usuarios }
-        $leible = @($reglas).Count -gt 0
-    }
-    catch { $leible = $true }
-    if ($leible) { Fallar 'El grupo Usuarios tiene acceso a la instancia.' }
-    $escritura = (Get-Acl -LiteralPath $Programa).Access | Where-Object {
-        $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-19' -and ($_.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write)
+    if (@(Reglas $Instancia | Where-Object { $_.IdentityReference.Value -eq 'S-1-5-32-545' }).Count -gt 0) { Fallar 'El grupo Usuarios tiene acceso a la instancia.' }
+    $escritura = Reglas $Programa | Where-Object {
+        $_.IdentityReference.Value -eq 'S-1-5-19' -and $_.AccessControlType -eq 'Allow' -and ($_.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write)
     }
     if (@($escritura).Count -gt 0) { Fallar 'La cuenta del servicio puede escribir en la carpeta del programa.' }
+    if (@(Reglas $Programa | Where-Object { $_.IdentityReference.Value -eq 'S-1-5-19' -and $_.AccessControlType -eq 'Allow' }).Count -eq 0) { Fallar 'La cuenta del servicio no puede leer la carpeta del programa.' }
     Paso 'Permisos de la instancia y del programa correctos'
 }
 
@@ -189,7 +188,7 @@ function Certificado-Servido {
             $tls.AuthenticateAsClient($Nombre, $null, [System.Security.Authentication.SslProtocols]::Tls12, $false)
         }
         catch {
-            Fallar "La conexión TLS a $Nombre no se validó contra el almacén del equipo: $($_.Exception.InnerException.Message) $($_.Exception.Message)"
+            Fallar "La conexión TLS a $Nombre no se validó contra el almacén del equipo: $($_.Exception.ToString())"
         }
         $certificado = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tls.RemoteCertificate)
         $tls.Dispose()
@@ -250,9 +249,9 @@ function Comprobar-Certificado {
     Paso "Certificado del servidor: SHA-256 $sha256, SHA-1 $($certificado.Thumbprint), $($a.sujeto), DNS $(@($a.dns) -join ', '), IP $(@($a.ips) -join ', '), CA:FALSE crítica, serverAuth, $($a.curva), $($a.dias) días, vence $($a.vence)"
     $clave = Join-Path $Datos 'caddy\servidor.key'
     $permitidos = @('S-1-5-32-544', 'S-1-5-18', 'S-1-5-19')
-    foreach ($regla in (Get-Acl -LiteralPath $clave).Access) {
-        $sid = $regla.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value
-        if ($regla.AccessControlType -eq 'Allow' -and $permitidos -notcontains $sid) { Fallar "La clave privada da acceso a $($regla.IdentityReference)." }
+    foreach ($regla in (Reglas $clave)) {
+        $sid = $regla.IdentityReference.Value
+        if ($regla.AccessControlType -eq 'Allow' -and $permitidos -notcontains $sid) { Fallar "La clave privada da acceso a $sid." }
         if ($sid -eq 'S-1-5-19' -and ($regla.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write)) { Fallar 'La cuenta del servicio puede escribir la clave privada.' }
     }
     foreach ($archivo in @(Get-ChildItem -LiteralPath $Datos -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -ne $clave -and $_.Length -lt 10MB })) {
