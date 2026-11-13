@@ -455,3 +455,30 @@ def test_corte_mayor_del_mes_en_curso_lista_reversos_con_quien_los_hizo(personas
 
     reversos = next(s for s in calculo.cifras_mayor(hoy.replace(day=1), hoy)["secciones"] if s["clave"] == "reversos")["filas"]
     assert reversos[0]["importe"] == 30000 and reversos[0]["ejecuto"] == personas["sup2"].nombre and reversos[0]["autorizo"] == personas["dir"].nombre
+
+
+@pytest.mark.django_db
+def test_paso_del_asistente_de_cortes_y_respaldo(tmp_path, settings):
+    from django.test import Client
+
+    from nucleo import sobre
+
+    from .test_asistente import paso_inicio
+
+    c = Client()
+    c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE))
+    pagina = c.get(reverse("asistente:cortes"))
+    texto = sobre.clave_a_texto(bytes(settings.CLAVE_RESPALDO))
+    assert texto in pagina.content.decode() and pagina["Cache-Control"] == "no-store"
+    datos = {"carpeta_entrega": "relativa", "hora_limite_corte_diario": "19:30", "carpeta_respaldo": "", "nivel_diario": "solo_nombres", "nivel_mayor": "sin_nombres", "nivel_cobranza": "completo"}
+    assert c.post(reverse("asistente:cortes"), datos).status_code == 200
+    datos.update({"carpeta_entrega": str(tmp_path / "cortes"), "carpeta_respaldo": str(tmp_path / "respaldos")})
+    assert c.post(reverse("asistente:cortes"), datos).status_code == 200
+    datos["guardada"] = "on"
+    assert c.post(reverse("asistente:cortes"), datos).url == reverse("asistente:usuario")
+    negocio = Negocio.objects.get()
+    assert negocio.carpeta_respaldo == str((tmp_path / "respaldos").resolve()) and not negocio.clave_recuperacion_pendiente
+    destino_creado = Destino.objects.get()
+    assert dict(destino_creado.reglas.values_list("tipo", "nivel")) == {"diario": "solo_nombres", "mayor": "sin_nombres", "cobranza": "completo"}
+    assert Parametro.objects.get(clave="hora_limite_corte_diario").valor == "19:30"
+    assert texto not in c.get(reverse("asistente:cortes")).content.decode()

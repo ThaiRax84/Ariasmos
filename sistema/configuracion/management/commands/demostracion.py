@@ -1,4 +1,5 @@
 import secrets
+import tempfile
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
@@ -8,11 +9,14 @@ from auditoria.servicios import registrar
 from banco import conciliacion
 from banco.models import Banco, CuentaBancaria, Importacion
 from caja.models import Caja
-from caja.servicios import abrir_turno
-from cobros import generacion
-from cobros.models import ConceptoCobro, ReglaRecargo
+from caja.servicios import abrir_turno, cerrar_turno
+from cobros import generacion, libro
+from cobros.models import ConceptoCobro, Pago, ReglaRecargo
 from configuracion import plantillas
-from configuracion.models import Negocio, hoy_negocio
+from configuracion.models import Negocio, Parametro, hoy_negocio
+from cortes import servicios as cortes
+from cortes.models import TIPOS as TIPOS_CORTE
+from cortes.models import DefinicionCorte, Destino, ReglaDestino
 from cuentas import secretos
 from cuentas.models import Rol, Usuario
 from nucleo import totp
@@ -55,6 +59,7 @@ class Command(BaseCommand):
         caja = Caja.objects.filter(activa=True).first() or Caja.objects.create(nombre="Caja 1")
         abrir_turno(Usuario.objects.get(usuario="operacion"), caja, 50000)
         self._banco(Usuario.objects.get(usuario="supervision"))
+        self._cortes()
         self.stdout.write("Datos de cobro: 4 titulares (2 en una familia), cargos de los últimos 3 meses con recargos y un turno abierto para operacion.")
 
     def _banco(self, importador):
@@ -77,6 +82,23 @@ class Command(BaseCommand):
             )
         importacion = conciliacion.importar(cuenta, movimientos, Importacion.ARCHIVO, "demostracion.csv", "0" * 64, importador)
         self.stdout.write(f"Banco: cuenta ficticia {cuenta.clabe}; {importacion.aplicados} abono aplicado solo y {importacion.sugeridos + importacion.sin_pista} en la cola por identificar; la importación queda pendiente de revisión para direccion.")
+
+    def _cortes(self):
+        carpeta = tempfile.mkdtemp(prefix="ariasmos-demo-cortes-")
+        destino = Destino.objects.create(nombre="Carpeta de demostración", ruta=carpeta)
+        for tipo, _ in TIPOS_CORTE:
+            definicion = DefinicionCorte.objects.filter(tipo=tipo).first()
+            ReglaDestino.objects.create(destino=destino, tipo=tipo, nivel=definicion.nivel if definicion else "solo_nombres")
+        supervision = Usuario.objects.get(usuario="supervision")
+        caja = Caja.objects.filter(activa=True).exclude(turnos__estado="abierto").first() or Caja.objects.create(nombre="Caja 2")
+        turno = abrir_turno(supervision, caja, 0)
+        titular = Titular.objects.order_by("pk").last()
+        libro.registrar_pago(titular, 50000, Pago.EFECTIVO, supervision, turno=turno)
+        cerrar_turno(turno, supervision, {"50000": 1})
+        Parametro.objects.update_or_create(clave="dias_plazo_corte_mayor", defaults={"valor": "31"})
+        mayores = cortes.generar_mayores()
+        hechas, _ = cortes.ejecutar_entregas()
+        self.stdout.write(f"Cortes: un corte diario de supervision, {len(mayores)} corte(s) mayor(es) en borrador (plazo de cierre de 31 días para la demostración) y {hechas} entrega(s) en la carpeta temporal {carpeta}.")
 
     def handle(self, *args, **opciones):
         negocio = Negocio.actual()
