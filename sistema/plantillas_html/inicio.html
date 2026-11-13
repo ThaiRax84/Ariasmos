@@ -8,167 +8,64 @@
   </div>
   <div class="encabezado-lado">
     {% if turno_sesion %}<div class="recuadro-cifra"><span class="etiqueta">Turno abierto en {{ turno_sesion.caja }}</span><span class="valor">{{ cobros_turno }} cobro{{ cobros_turno|pluralize }} · desde {{ turno_sesion.abierto_en|time:"H:i" }}</span></div>{% endif %}
+    {% if perfil == "coordinacion" %}
+    {% if "otorgar_delegaciones" in permisos %}<a class="boton secundario" href="{% url 'delegacion_nueva' %}">Dar permiso temporal</a>{% endif %}
+    {% if "recibir_efectivo" in permisos %}<a class="boton secundario" href="{% url 'caja:custodia' %}">Ver efectivo en custodia</a>{% endif %}
+    {% else %}
     {% if "ver_auditoria" in permisos %}<a class="boton secundario" href="{% url 'auditoria:lista' %}">Ver bitácora</a>{% endif %}
     {% if "aprobar_dispositivos" in permisos %}<a class="boton secundario" href="{% url 'conectar' %}">Conectar otra computadora</a>{% endif %}
+    {% endif %}
   </div>
 </div>
-{% if "ver_titulares" in permisos %}
+{% if cifras %}
+<div class="cifras tablero">
+  {% for c in cifras %}{% if c.enlace and not c.oculta %}<a href="{{ c.enlace }}"{% else %}<div{% endif %} class="cifra{% if c.aviso and not c.oculta %} aviso{% endif %}{% if c.oculta %} oculta{% endif %}" data-cifra="{{ c.clave }}">
+    <span class="etiqueta">{{ c.etiqueta }}</span>
+    {% if c.oculta %}<span class="numero calma">—</span>{% elif c.importe is not None %}<span class="numero">{{ c.importe|dinero }}</span>{% else %}<span class="numero">{{ c.texto }}</span>{% endif %}
+    <span class="detalle">{{ c.detalle }}</span>
+  {% if c.enlace and not c.oculta %}</a>{% else %}</div>{% endif %}{% endfor %}
+</div>
+{% endif %}
+{% if perfil == "recepcion" and "ver_titulares" in permisos %}
 <form method="get" action="{% url 'titulares:lista' %}" class="buscador" role="search">
   <label class="solo-lectores" for="buscar-inicio">Buscar {{ voc.titular|lower }}</label>
   <input id="buscar-inicio" type="search" name="q" placeholder="Buscar {{ voc.titular|lower }} por nombre o {{ voc.matricula|lower }}" maxlength="60">
   <button class="boton chico" type="submit">Buscar</button>
 </form>
 {% endif %}
-{% if bitacora_fallida %}
-<section class="panel alerta">
-  <h2>La bitácora no está íntegra</h2>
-  <p>Verificación del {{ bitacora_fallida.momento|date:"d/m/Y H:i" }}: {{ bitacora_motivo }}{% if bitacora_fallida.numero %} (evento {{ bitacora_fallida.numero }}){% endif %}.</p>
-  <a class="boton" href="{% url 'auditoria:lista' %}">Ver bitácora</a>
+{% if corte_propio %}
+<section class="aviso-pantalla" aria-label="Aviso">
+  <div class="aviso-texto"><div class="aviso-titulo">{% if corte_propio.vencido %}Tu corte diario ya pasó de su hora{% else %}Corte diario pendiente{% endif %}</div><div>{{ corte_propio.texto }}</div></div>
+  <a class="boton" href="{% url 'caja:inicio' %}">Ir a mi caja</a>
 </section>
 {% endif %}
-{% if alertas %}{% include "caja/_alertas.html" %}{% endif %}
-{% if avisos_retiros.cerca_del_tope or avisos_retiros.sin_comprobante or avisos_retiros.por_revisar_viejos or avisos_retiros.sobre_maximo %}
-<section class="panel alerta">
-  <h2>Retiros de caja</h2>
-  <ul class="lista">
-    {% for a in avisos_retiros.cerca_del_tope %}<li>{{ a.caja }} ya usó {% if a.tope == "importe" %}{{ a.usado|dinero }} de {{ a.limite|dinero }}{% else %}{{ a.usado }} de {{ a.limite }} retiros{% endif %} del periodo.</li>{% endfor %}
-    {% for r in avisos_retiros.sin_comprobante %}<li><a href="{% url 'caja:retiro' r.pk %}">Retiro {{ r }}</a> de {{ r.registrado_por }} ({{ r.importe|dinero }}, {{ r.motivo }}) declarado sin comprobante: {{ r.motivo_sin_comprobante }}</li>{% endfor %}
-    {% for r in avisos_retiros.por_revisar_viejos %}<li><a href="{% url 'caja:retiro' r.pk %}">Retiro {{ r }}</a> de {{ r.registrado_por }} sin revisar desde {{ r.creado|date:"d/m/Y" }}.</li>{% endfor %}
-    {% for t in avisos_retiros.sobre_maximo %}<li>{{ t.caja }} ({{ t.usuario }}) pasa del efectivo máximo: conviene entregar o depositar.</li>{% endfor %}
-  </ul>
-  <a class="boton" href="{% url 'caja:retiros' %}">Ver retiros</a>
-</section>
-{% endif %}
-{% if retenidas %}
-<section class="panel alerta">
-  <h2>Importaciones automáticas retenidas</h2>
-  <p>Llegaron por la carpeta vigilada con movimientos que tienen una señal de sospecha: esos pagos no se aplican hasta que alguien con permiso de conciliación los compare con el banco y los libere.</p>
-  <ul class="lista">{% for i in retenidas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.retenidos }} movimiento{{ i.retenidos|pluralize }} retenido{{ i.retenidos|pluralize }} por {{ i.monto_retenido|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% if sin_respaldo %}
-<section class="panel alerta">
-  <h2>Pagos sin respaldo en el estado</h2>
-  <p>Se aplicaron desde un archivo editable y no aparecen en el estado de cuenta en PDF de su periodo. No se revierten solos: compáralos con el banco y, si no existieron, solicita su reversión.</p>
-  <ul class="lista">{% for m in sin_respaldo %}<li>{{ m.fecha|date:"d/m/Y" }} · {{ m.importe|dinero }} · {{ m.pago.titular.nombre_completo }} · recibo {{ m.pago.recibo }}{% if "solicitar_ajustes" in permisos or "aplicar_ajustes" in permisos %} · <a href="{% url 'cobros:revertir' m.pago.pk %}">Solicitar su reversión</a>{% endif %}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% if antiguos_sin_respaldo %}
-<section class="panel alerta">
-  <h2>Pagos sin un estado que los respalde</h2>
-  <p>Se aplicaron desde archivos editables hace más de {{ dias_sin_respaldo }} días y todavía no se importa el estado de cuenta en PDF que los cubra.</p>
-  <ul class="lista">{% for m in antiguos_sin_respaldo %}<li>{{ m.fecha|date:"d/m/Y" }} · {{ m.importe|dinero }} · {{ m.pago.titular.nombre_completo }} · recibo {{ m.pago.recibo }}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% if automaticas %}
-<section class="panel">
-  <h2>Últimas importaciones de la carpeta vigilada</h2>
-  <ul class="lista">{% for i in automaticas %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · {{ i.creada|date:"d/m/Y H:i" }} · {{ i.aplicados }} aplicado{{ i.aplicados|pluralize }}{% if i.retenida and not i.liberada_en %} · con retenidos{% endif %}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% if importaciones_por_revisar %}
-<section class="panel alerta">
-  <h2>Importaciones bancarias por revisar</h2>
-  <p>Aplicaron pagos y no se pudieron comprobar contra un estado anterior. Revísalas contra el banco; quien importó no puede marcarlas.</p>
-  <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.importo }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% if avisos_inventario.bajo_minimo or avisos_inventario.existencia_baja or avisos_inventario.por_revisar or avisos_inventario.conteo_viejo %}
-<section class="panel alerta">
-  <h2>Inventario</h2>
-  <ul class="lista">
-    {% for a, e in avisos_inventario.bajo_minimo %}<li>{{ a }}: existencia {{ e }}, mínimo {{ a.minimo }}.</li>{% endfor %}
-    {% for a, e, referencia in avisos_inventario.existencia_baja %}<li>{{ a }}: existencia baja, quedan {{ e }} de {{ referencia }} tras su última entrada o conteo.</li>{% endfor %}
-    {% if avisos_inventario.por_revisar %}<li>{{ avisos_inventario.por_revisar }} movimiento{{ avisos_inventario.por_revisar|pluralize }} de inventario por revisar. <a href="{% url 'inventario:revision' %}">Revisar</a></li>{% endif %}
-    {% if avisos_inventario.conteo_viejo %}<li>El <a href="{% url 'inventario:conteo_detalle' avisos_inventario.conteo_viejo.pk %}">conteo {{ avisos_inventario.conteo_viejo.pk }}</a> espera aprobación desde el {{ avisos_inventario.conteo_viejo.creado|date:"d/m/Y" }}.</li>{% endif %}
-  </ul>
-</section>
-{% endif %}
-{% if muestra_banco %}
-<section class="panel{% if banco_pendientes %} alerta{% endif %}">
-  <h2>Banco: {{ banco_pendientes }} movimiento{{ banco_pendientes|pluralize }} por identificar{% if banco_propuestos %} ({{ banco_propuestos }} con propuesta){% endif %}</h2>
-  <p>{% if ultima_importacion %}Última importación: {{ ultima_importacion.creada|date:"d/m/Y H:i" }} ({{ ultima_importacion.nombre_archivo }}).{% else %}Todavía no se ha importado ningún estado de cuenta.{% endif %}</p>
-  <a class="boton" href="{% url 'conciliacion:cola' %}">Ver cola</a> <a class="boton secundario" href="{% url 'conciliacion:importar' %}">Importar estado de cuenta</a>
-</section>
-{% endif %}
-{% if por_recibir %}<section class="panel alerta"><h2>Tienes {{ por_recibir }} entrega{{ por_recibir|pluralize }} de efectivo por confirmar</h2><a class="boton" href="{% url 'caja:traslados' %}">Revisar</a></section>{% endif %}
-{% if diarios_pendientes %}
-<section class="panel alerta">
-  <h2>Corte diario pendiente</h2>
-  <ul class="lista">{% for p in diarios_pendientes %}<li>{{ p.persona }} · {{ p.caja }} · turno abierto desde {{ p.desde|date:"d/m/Y H:i" }}{% if p.dia_anterior %} (de un día anterior){% endif %}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% if clave_pendiente %}
-<section class="panel alerta"><h2>Guarda la clave de recuperación</h2><p>Sin ella ningún respaldo se puede abrir. Se muestra una sola vez.</p><a class="boton" href="{% url 'respaldos:clave' %}">Ver la clave</a></section>
-{% endif %}
-{% if alertas_respaldo %}
-<section class="panel alerta"><h2>Respaldos</h2><ul class="lista">{% for a in alertas_respaldo %}<li>{{ a }}</li>{% endfor %}</ul><a class="boton" href="{% url 'respaldos:panel' %}">Ir a respaldos</a></section>
-{% endif %}
-{% if entregas_con_problema %}
-<section class="panel alerta"><h2>Hay {{ entregas_con_problema }} entrega{{ entregas_con_problema|pluralize }} de cortes con problemas</h2><a class="boton" href="{% url 'cortes:destinos' %}">Revisar</a></section>
-{% endif %}
-{% if mayores_borrador %}
-<section class="panel"><h2>Cortes mayores por cerrar</h2><ul class="lista">{% for c in mayores_borrador %}<li><a href="{% url 'cortes:detalle' c.pk %}">{{ c.fecha|date:"m/Y" }}</a></li>{% endfor %}</ul></section>
-{% endif %}
-{% if faltan_denominaciones %}
-<section class="panel alerta">
-  <h2>Faltan las denominaciones de caja</h2>
-  <p>No hay billetes ni monedas capturados para la moneda del negocio: el arqueo de caja no podrá contar el efectivo.</p>
-  <a class="boton" href="{% url 'configuracion:catalogo' 'denominaciones' %}">Capturar denominaciones</a>
-</section>
-{% endif %}
-{% if falta_cuenta %}
-<section class="panel alerta">
-  <h2>Faltan los datos de pago</h2>
-  <p>No hay una cuenta bancaria principal: la ficha de pago no muestra a dónde pagar.</p>
-  <a class="boton" href="{% url 'banco:nueva' %}">Agregar cuenta</a>
-</section>
-{% endif %}
-{% if por_revisar or bloqueos %}
-<section class="panel alerta">
-  <h2>Avisos sobre tu código de autorización</h2>
-  {% if por_revisar %}<p>Se usaron códigos de tu autenticador para autorizar solicitudes. Confírmalas o repórtalas.</p>{% endif %}
-  {% if bloqueos %}<p>Alguien tecleó códigos erróneos a tu nombre y la vía de código quedó bloqueada.</p>{% endif %}
-  <a class="boton" href="{% url 'autorizaciones' %}">Revisar</a>
-</section>
-{% endif %}
-{% if certificado_por_vencer %}
-<section class="panel alerta">
-  <h2>El certificado del servidor vence pronto</h2>
-  <p>Vence el {{ certificado_por_vencer.vence|date:"d/m/Y" }} (faltan {{ certificado_por_vencer.dias }} días). Actualiza el programa en esta computadora para generar uno nuevo y después vuelve a instalarlo en las demás computadoras.</p>
-  <a class="boton" href="{% url 'conectar' %}">Conectar otra computadora</a>
-</section>
-{% endif %}
+{% if perfil == "recepcion" %}
 <nav class="accesos" aria-label="Accesos rápidos">
   {% if "registrar_pago_efectivo" in permisos %}<a class="acceso principal" href="{% url 'cobros:buscar' %}"><span class="acceso-titulo">Cobrar</span><span class="acceso-detalle">Registrar un pago en efectivo</span></a>{% endif %}
   {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="acceso" href="{% url 'titulares:nuevo' %}"><span class="acceso-titulo">Nueva alta</span><span class="acceso-detalle">Dar de alta a {{ voc.titular|lower }}</span></a>{% endif %}
   {% if "ver_titulares" in permisos %}<a class="acceso" href="{% url 'titulares:lista' %}"><span class="acceso-titulo">Buscar {{ voc.titular|lower }}</span><span class="acceso-detalle">Ver datos, adeudo e historial</span></a><a class="acceso" href="{% url 'cobros:verificar' %}"><span class="acceso-titulo">Verificar recibo</span><span class="acceso-detalle">Comprobar un recibo con su código</span></a>{% endif %}
-  {% if dispositivos_pendientes %}<a class="acceso" href="{% url 'dispositivos' %}"><span class="acceso-titulo">Equipos por aprobar ({{ dispositivos_pendientes }})</span><span class="acceso-detalle">Navegadores que piden acceso</span></a>{% endif %}
 </nav>
-{% if bitacora_verificacion or salud_respaldos or certificado_por_vencer or dispositivos_pendientes %}
-<section class="panel">
-  <h2>Salud del sistema</h2>
-  <ul class="lista-estado">
-    {% if bitacora_verificacion %}<li><span class="renglon-texto"><span class="renglon-titulo">Bitácora</span><span class="renglon-detalle">Verificada {{ bitacora_verificacion.momento|date:"d/m/Y H:i" }}{% if bitacora_verificacion.valida %} · íntegra{% endif %}</span></span>{% if bitacora_verificacion.valida %}<span class="estado bien">Bien</span>{% else %}<span class="estado aviso">Revisar</span>{% endif %}</li>{% endif %}
-    {% if salud_respaldos %}<li><span class="renglon-texto"><span class="renglon-titulo">Respaldo</span><span class="renglon-detalle">{% if alertas_respaldo %}{{ alertas_respaldo|first }}{% else %}Al día{% endif %}</span></span>{% if alertas_respaldo %}<span class="estado aviso">Revisar</span>{% else %}<span class="estado bien">Bien</span>{% endif %}</li>{% endif %}
-    {% if certificado_por_vencer %}<li><span class="renglon-texto"><span class="renglon-titulo">Certificado del servidor</span><span class="renglon-detalle">Vence el {{ certificado_por_vencer.vence|date:"d/m/Y" }}</span></span><span class="estado aviso">Revisar</span></li>{% endif %}
-    {% if dispositivos_pendientes %}<li><span class="renglon-texto"><span class="renglon-titulo">Equipos por aprobar</span><span class="renglon-detalle">{{ dispositivos_pendientes }} equipo{{ dispositivos_pendientes|pluralize }} pidiendo acceso</span></span><span class="estado aviso">Revisar</span></li>{% endif %}
-  </ul>
-</section>
 {% endif %}
+{% if perfil == "coordinacion" %}
 <div class="columnas mitades">
-{% if "aprobar_solicitudes" in permisos %}
-<section class="panel">
-  <h2>Bandeja de pendientes</h2>
-  {% if pendientes %}
-  <ul class="lista-estado">
-    {% for s, resaltada in pendientes %}
-    <li><span class="renglon-texto"><a class="renglon-titulo" href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a><span class="renglon-detalle">de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</span></span>{% if resaltada %}<span class="estado aviso">Lleva tiempo esperando</span>{% else %}<span class="estado calma">En espera</span>{% endif %}</li>
-    {% endfor %}
-  </ul>
-  {% else %}<p>No hay solicitudes pendientes.</p>{% endif %}
-</section>
+  {% if "aprobar_solicitudes" in permisos %}{% include "_inicio_bandeja.html" with titulo="Por autorizar" %}{% endif %}
+  {% include "_inicio_avisos.html" with titulo="Por revisar" %}
+</div>
+{% if salud %}<div class="columnas mitades">{% include "_inicio_salud.html" %}</div>{% endif %}
+{% elif perfil == "direccion" %}
+<div class="columnas mitades">
+  {% if salud %}{% include "_inicio_salud.html" %}{% endif %}
+  {% include "_inicio_avisos.html" with titulo="Avisos de control" %}
+</div>
+{% if pendientes %}<div class="columnas mitades">{% include "_inicio_bandeja.html" with titulo="Por autorizar" %}</div>{% endif %}
+{% elif avisos or salud %}
+<div class="columnas mitades">
+  {% if avisos %}{% include "_inicio_avisos.html" with titulo="Avisos" %}{% endif %}
+  {% if salud %}{% include "_inicio_salud.html" %}{% endif %}
+</div>
 {% endif %}
+{% if propias or delegaciones %}
+<div class="columnas mitades">
 {% if propias %}
 <section class="panel">
   <h2>Mis solicitudes en espera</h2>
@@ -182,4 +79,5 @@
 </section>
 {% endif %}
 </div>
+{% endif %}
 {% endblock %}

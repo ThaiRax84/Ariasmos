@@ -1,0 +1,6 @@
+<section class="panel">
+  <h2>Salud del sistema</h2>
+  <ul class="lista-estado">
+    {% for a in salud %}<li data-salud="{{ a.clave }}"><span class="renglon-texto"><span class="renglon-titulo">{{ a.titulo }}</span><span class="renglon-detalle">{{ a.detalle }}</span>{% if a.enlaces %}<span class="renglon-enlaces">{% for e in a.enlaces %}<a href="{{ e.url }}">{{ e.texto }}</a>{% endfor %}</span>{% endif %}</span><span class="estado {{ a.tono }}">{{ a.pastilla }}</span></li>{% endfor %}
+  </ul>
+</section>
