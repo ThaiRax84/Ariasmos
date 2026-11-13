@@ -57,9 +57,10 @@ jobs:
           proceso=$!
           for vuelta in $(seq 1 84); do
             if ! kill -0 $proceso 2>/dev/null; then
-              wait $proceso
-              codigo=$?
-              tail -n 25 pruebas.log
+              codigo=0
+              wait $proceso || codigo=$?
+              if [ $codigo -ne 0 ]; then grep -n -E "FAILED|ERROR|Fatal Python|Timeout" pruebas.log | head -n 60 || true; fi
+              tail -n 120 pruebas.log
               exit $codigo
             fi
             sleep 10
