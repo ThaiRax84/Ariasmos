@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.11 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.12 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -407,6 +407,9 @@ Pruebas de seguridad previstas antes de cada entrega: matriz completa URL × rol
 ## 11. Configuración e instalación
 
 - **Asistente de primer uso:** nombre del negocio, vocabulario (cómo se llama al titular, a la matrícula, a las agrupaciones), plantilla, conceptos e importes, roles, políticas de aprobación, cajas, datos de pago, cortes y destinos, respaldo. Crea al primer usuario de Dirección y aprueba el primer dispositivo.
+- **Moneda.** El asistente pregunta la moneda del negocio (por defecto MXN) de un catálogo incluido con código, símbolo y decimales. Todo importe se captura y se muestra con su símbolo y su código. La moneda no se puede cambiar una vez que existe el primer cargo o pago. Las denominaciones de caja incluidas son las de MXN; para otra moneda se capturan en el catálogo.
+- **Captura guiada.** Cada campo solo deja teclear lo que acepta y hasta el largo que acepta: dígitos en CLABE, teléfono, matrícula y códigos; importes con el símbolo de la moneda ya puesto; porcentajes con el signo `%` ya puesto. Es una ayuda de pantalla: el servidor valida igual todo lo que recibe.
+- **Autenticador.** Las pantallas que lo piden explican qué es y nombran aplicaciones gratuitas que sirven (Google Authenticator, Microsoft Authenticator, Authy, 2FAS, entre otras): cualquier aplicación de códigos de 6 dígitos estándar funciona.
 - **Plantillas.** Una plantilla es la configuración completa sin datos: vocabulario, conceptos, recargos, roles y permisos, políticas, campos de contacto, cortes. El asistente ofrece:
   - `generico`: pensada para servir tal cual a la mayoría de los negocios que cobran a clientes recurrentes;
   - `escuela`;
