@@ -87,6 +87,12 @@ class Importacion(models.Model):
     ESTADO_PDF = "estado_pdf"
     ARCHIVO = "archivo"
     ADAPTADORES = [(ESTADO_PDF, "Estado de cuenta en PDF"), (ARCHIVO, "Archivo de movimientos")]
+    VERIFICADA = "verificada"
+    PRIMERA = "primera"
+    CON_HUECO = "con_hueco"
+    NO_VERIFICABLE = "no_verificable"
+    CONTINUIDADES = [(VERIFICADA, "Verificada: continúa el estado anterior"), (PRIMERA, "Primera de la cuenta"), (CON_HUECO, "Con hueco: hay días sin importar"), (NO_VERIFICABLE, "No verificable: archivo editable")]
+    A_REVISAR = (CON_HUECO, NO_VERIFICABLE)
 
     cuenta = models.ForeignKey(CuentaBancaria, on_delete=models.PROTECT, related_name="importaciones")
     nombre_archivo = models.CharField(max_length=120)
@@ -105,11 +111,18 @@ class Importacion(models.Model):
     sugeridos = models.PositiveIntegerField(default=0)
     sin_pista = models.PositiveIntegerField(default=0)
     depositos_emparejados = models.PositiveIntegerField(default=0)
+    continuidad = models.CharField(max_length=16, choices=CONTINUIDADES, default=CON_HUECO)
     creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     creada = models.DateTimeField(auto_now_add=True)
+    revisada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    revisada_en = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-creada", "-id"]
+
+    @property
+    def requiere_revision(self):
+        return self.continuidad in self.A_REVISAR
 
     def __str__(self):
         return f"{self.nombre_archivo} ({self.creada:%d/%m/%Y})"

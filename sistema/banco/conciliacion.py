@@ -1,8 +1,9 @@
 from collections import Counter
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from auditoria.servicios import registrar
@@ -241,6 +242,78 @@ def decidir(movimiento):
     )
 
 
+def _dia(valor):
+    if valor is None or isinstance(valor, date):
+        return valor
+    return date.fromisoformat(valor)
+
+
+def continuidad(cuenta, adaptador, resumen):
+    if adaptador != Importacion.ESTADO_PDF:
+        return Importacion.NO_VERIFICABLE
+    resumen = resumen or {}
+    inicio, fin = _dia(resumen.get("periodo_inicio")), _dia(resumen.get("periodo_fin"))
+    if inicio is None or fin is None:
+        return Importacion.CON_HUECO
+    previas = Importacion.objects.filter(cuenta=cuenta, adaptador=Importacion.ESTADO_PDF, periodo_inicio__isnull=False, periodo_fin__isnull=False)
+    if not previas.exists():
+        return Importacion.PRIMERA
+    mismo = previas.filter(periodo_inicio=inicio, periodo_fin=fin).order_by("creada", "id").first()
+    if mismo is not None:
+        if mismo.saldo_inicial != resumen.get("saldo_inicial") or mismo.saldo_final != resumen.get("saldo_final"):
+            raise ErrorConciliacion(
+                f"Ya se importó un estado del mismo periodo con otros saldos: aquel abrió en {formatear(mismo.saldo_inicial or 0)} y cerró en {formatear(mismo.saldo_final or 0)}; "
+                f"este abre en {formatear(resumen.get('saldo_inicial') or 0)} y cierra en {formatear(resumen.get('saldo_final') or 0)}."
+            )
+        return mismo.continuidad
+    if previas.filter(periodo_inicio__lte=fin, periodo_fin__gte=inicio).exists():
+        return Importacion.CON_HUECO
+    anterior = previas.filter(periodo_fin=inicio - timedelta(days=1)).order_by("-creada", "-id").first()
+    if anterior is not None:
+        if anterior.saldo_final != resumen.get("saldo_inicial"):
+            raise ErrorConciliacion(
+                f"No continúa el estado anterior: cerró el {anterior.periodo_fin:%d/%m/%Y} en {formatear(anterior.saldo_final or 0)} "
+                f"y este abre en {formatear(resumen.get('saldo_inicial') or 0)}. No se importó nada."
+            )
+        return Importacion.VERIFICADA
+    return Importacion.CON_HUECO
+
+
+def pendientes_de_revision():
+    aplicados = Q(lista__estado=MovimientoBancario.APLICADO)
+    return (
+        Importacion.objects.filter(continuidad__in=Importacion.A_REVISAR, revisada_por__isnull=True)
+        .annotate(pagos=Count("lista", filter=aplicados), monto=Sum("lista__importe", filter=aplicados))
+        .filter(pagos__gt=0)
+        .select_related("cuenta__banco", "creada_por")
+        .order_by("creada", "id")
+    )
+
+
+class RevisionPropia(ErrorConciliacion):
+    pass
+
+
+def marcar_revisada(importacion, usuario, request=None):
+    if importacion.creada_por_id == usuario.pk:
+        registrar("revision_propia_denegada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo}, request=request)
+        raise RevisionPropia("Quien importó no puede revisar su propia importación.")
+    if not importacion.requiere_revision:
+        raise ErrorConciliacion("Esta importación no necesita revisión.")
+    with transaction.atomic():
+        hechos = Importacion.objects.filter(pk=importacion.pk, revisada_por__isnull=True).update(revisada_por=usuario, revisada_en=timezone.now())
+        if hechos != 1:
+            raise ErrorConciliacion("Esta importación ya estaba revisada.")
+        aplicados = importacion.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(n=Count("id"), t=Sum("importe"))
+        registrar(
+            "importacion_revisada",
+            usuario=usuario,
+            objeto=importacion,
+            datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "importo": str(importacion.creada_por), "pagos": aplicados["n"], "monto": aplicados["t"] or 0},
+            request=request,
+        )
+
+
 def candidatos_deposito(cuenta, importe, dia):
     tolerancia = timedelta(days=parametro("dias_tolerancia_deposito"))
     return Traslado.objects.filter(
@@ -347,7 +420,9 @@ def conciliar_deposito(movimiento, traslado, usuario, request=None):
 def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=None, request=None):
     resumen = resumen or {}
     with transaction.atomic():
+        clasificacion = continuidad(cuenta, adaptador, resumen)
         importacion = Importacion.objects.create(
+            continuidad=clasificacion,
             cuenta=cuenta, nombre_archivo=lectura.nombre_saneado(nombre), sha256=sha256, adaptador=adaptador,
             periodo_inicio=resumen.get("periodo_inicio") or min(m["fecha"] for m in movimientos),
             periodo_fin=resumen.get("periodo_fin") or max(m["fecha"] for m in movimientos),
@@ -389,7 +464,12 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
             "importacion_bancaria",
             usuario=usuario,
             objeto=importacion,
-            datos={"archivo": importacion.nombre_archivo, "sha256": sha256, "cuenta": str(cuenta), "movimientos": len(movimientos), **dict(cuentas)},
+            datos={
+                "archivo": importacion.nombre_archivo, "sha256": sha256, "cuenta": str(cuenta), "adaptador": adaptador, "continuidad": clasificacion,
+                "periodo": [str(importacion.periodo_inicio), str(importacion.periodo_fin)], "saldo_inicial": importacion.saldo_inicial, "saldo_final": importacion.saldo_final,
+                "total_abonos": importacion.depositos, "total_cargos": importacion.retiros, "movimientos": len(movimientos),
+                "aplicados_monto": importacion.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(t=Sum("importe"))["t"] or 0, **dict(cuentas),
+            },
             request=request,
         )
     return importacion
