@@ -9,6 +9,16 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 - A la derecha ves tu nombre, tu rol y, si tienes turno abierto, la caja y la hora en que lo abriste.
 - Las acciones que mueven dinero o no se deshacen piden confirmación en un recuadro propio del programa; los avisos de que algo salió bien aparecen abajo unos segundos.
 
+## El Inicio
+
+Cada rol ve un Inicio distinto:
+
+- **Operación**: tu turno abierto con el **número** de cobros (nunca importes ni el efectivo esperado), el buscador del padrón, el aviso de la hora límite de tu corte, los accesos rápidos y tus solicitudes en espera.
+- **Supervisión**: cuatro cuadros (cobrado hoy, efectivo sin entregar, banco por identificar y corte diario pendiente), la lista **Por autorizar** y la lista **Por revisar** con los avisos de control.
+- **Dirección**: cuatro cuadros (cobrado en el mes con su reparto entre efectivo y banco, por cobrar vencido, efectivo en custodia y retiros de la semana), **Salud del sistema** (bitácora, respaldo, prueba de restauración, certificado y equipos por aprobar) y **Avisos de control**.
+- Cada cuadro aparece solo si tu rol tiene el permiso correspondiente. Si tienes un turno de caja abierto, los cuadros de cobrado y de efectivo dicen «Se muestra al cerrar tu turno»: el arqueo sigue siendo ciego.
+- Cada aviso lleva una etiqueta (**Revisar**, **Por hacer**, **Por revisar**, **Bien**…) y un enlace a donde se atiende.
+
 ## Operación
 
 ### Dar de alta a un titular
@@ -24,8 +34,8 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 1. Abre tu turno en **Mi caja** (el fondo inicial es opcional). Si el negocio captura piezas por denominación, escribe cuántos billetes y monedas de cada valor hay en el fondo.
 2. Menú **Cobrar** → busca al titular por nombre o matrícula.
 3. A la izquierda ves los cargos pendientes y arriba a la derecha el adeudo. Escribe el importe (solo el número: el signo y la moneda ya vienen puestos). El sistema muestra en **Así se va a aplicar** cómo se reparte entre los cargos pendientes (y los de su familia).
-4. Si se capturan piezas: escribe cuántos billetes y monedas de cada valor te entregan y elige **Calcular el cambio**. El recuadro **Entrega exactamente estas piezas** dice qué piezas dar de cambio para que tu caja cuadre en el corte; si entregas otras, ábrelas con **Di el cambio con otras piezas** y corrígelas antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
-5. Confirma. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
+4. Si se capturan piezas: toca cada billete o moneda que te entregan (con **−** quitas una; también puedes escribir el número) y elige **Calcular el cambio**. Mientras tocas, **Recibido** suma lo que capturaste. El recuadro **Entrega exactamente estas piezas** dice qué piezas dar de cambio para que tu caja cuadre en el corte; si entregas otras, ábrelas con **Di el cambio con otras piezas** y corrígelas antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
+5. Elige **Confirmar y dar recibo**. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
 
 ### Retirar efectivo para un gasto
 
@@ -49,9 +59,9 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [guía de inventario](GUIA-INVENTARIO.md).
 
-1. **Inventario** → **Vender a un titular** (o **Vender artículos** desde su ficha): elige artículos y cantidades. El precio lo pone cada artículo.
-2. Elige cómo se paga: **Lo paga ahora** pasa al cobro, que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás.
-3. **Vender sin matrícula** es para quien no es titular: se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
+1. **Inventario** → **Vender** (o **Vender artículos** desde su ficha) y elige al titular. Verás todos los artículos activos; filtra escribiendo parte del nombre o la clave y usa **+** y **−** en cada uno (o escribe la cantidad). El precio lo pone cada artículo; el **Resumen** de la derecha suma lo elegido, y el sistema lo vuelve a calcular al continuar.
+2. Elige cómo se paga: **Lo paga ahora** pasa al cobro (**Continuar al cobro**), que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás (**Registrar la venta**).
+3. **Sin matrícula** (arriba a la derecha) es para quien no es titular: mismo catálogo; se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
 4. Junto a cada artículo ves cuántas piezas quedan; si no queda ninguna no se muestra número. Cuando quedan pocas (20 % o menos de lo que había tras la última entrada o conteo, o en su mínimo) aparece **pocas**.
 5. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
 
