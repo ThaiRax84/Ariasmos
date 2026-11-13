@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.7 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.8 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -138,11 +138,11 @@ Nada se edita ni se borra: una cancelación crea el asiento inverso y deja ambos
 - *Reversos.* Cancelar un cargo, condonar un recargo o revertir un pago crea un asiento de reverso ligado al original, con motivo y autorización. El saldo de un cargo es `importe − cancelado − aplicado por pagos vigentes`.
 - *Cargo manual.* Operación lo crea con el importe del concepto; cambiar el importe exige el permiso de ajustes o una solicitud.
 
-**Becas.** Una beca es un descuento (porcentaje o importe fijo) sobre un concepto recurrente de un titular, con vigencia y motivo. Se aplica sola al generar cada cargo y queda visible en él. Sustituye al descuento suelto del plan.
+**Becas.** Una beca es un descuento **en porcentaje** (de 1 a 100, con hasta dos decimales) sobre un concepto recurrente de un titular, con vigencia y motivo. No hay becas de importe fijo. Se aplica sola al generar cada cargo y queda visible en él. Sustituye al descuento suelto del plan.
 
 **Prórrogas.** Una prórroga mueve la fecha a partir de la cual un cargo genera recargo. No cambia el importe ni borra recargos ya generados.
 
-Becas y prórrogas son acciones del motor de aprobaciones (`beca`, `prorroga`): Operación las solicita y las autoriza un nivel superior por cualquiera de las tres vías. Cada política decide qué permiso aprueba, así que un negocio puede reservar las becas a Dirección.
+Becas y prórrogas son acciones del motor de aprobaciones (`beca`, `prorroga`), con el mismo flujo que el alta: Operación las solicita y Supervisión las otorga directamente o aprueba la solicitud por cualquiera de las tres vías. Cada política decide qué permiso aprueba, así que un negocio puede reservar las becas a Dirección.
 
 **Saldo inicial.** Al migrar desde otro control, lo que cada titular debía o tenía a favor entra como un cargo o un pago de tipo `saldo_inicial`, fechado al día de la migración.
 
