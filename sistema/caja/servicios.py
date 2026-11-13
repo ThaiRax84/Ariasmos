@@ -192,8 +192,6 @@ def cerrar_turno(turno, usuario, conteo, nota="", request=None):
             raise ErrorCaja("Hay retiros con comprobante pendiente: adjúntalos o declara cada uno sin comprobante antes de cerrar el turno.")
         if ConteoArqueo.objects.filter(turno=turno).exists():
             raise ErrorCaja("El primer conteo ya se guardó y no se puede cambiar.")
-        if abs(contado - esperado_de(turno)) > parametro("umbral_diferencia_arqueo") and not nota.strip():
-            raise NotaRequerida("La diferencia con lo esperado supera el umbral: escribe una nota para cerrar.")
         primero = ConteoArqueo.objects.create(turno=turno, numero=1, conteo=limpio, contado=contado, nota=nota.strip()[:500])
         return _cerrar(turno, usuario, primero, nota, primero, request)
 

@@ -51,15 +51,20 @@ def periodo(momento=None, tipo=None):
     return desde, desde + timedelta(days=7 if tipo == "semana" else 1)
 
 
-def uso(caja, momento=None, tipo=None):
+def uso(caja, momento=None, tipo=None, persona=None):
     desde, hasta = periodo(momento, tipo)
-    datos = RetiroCaja.objects.filter(caja=caja, creado__gte=desde, creado__lt=hasta).aggregate(importe=Sum("importe"), cantidad=Count("id"))
-    return {"importe": datos["importe"] or 0, "cantidad": datos["cantidad"] or 0}
+    del_periodo = RetiroCaja.objects.filter(creado__gte=desde, creado__lt=hasta)
+    datos = del_periodo.filter(caja=caja).aggregate(importe=Sum("importe"), cantidad=Count("id"))
+    resultado = {"importe": datos["importe"] or 0, "cantidad": datos["cantidad"] or 0}
+    if persona is not None:
+        propios = del_periodo.filter(registrado_por=persona).aggregate(importe=Sum("importe"), cantidad=Count("id"))
+        resultado = {"importe": max(resultado["importe"], propios["importe"] or 0), "cantidad": max(resultado["cantidad"], propios["cantidad"] or 0)}
+    return resultado
 
 
 def excede(turno, importe):
     limites = topes()
-    usado = uso(turno.caja)
+    usado = uso(turno.caja, persona=turno.usuario)
     motivos = []
     if importe > limites["importe_individual"]:
         motivos.append("importe_individual")
@@ -148,12 +153,16 @@ def registrar_retiro(usuario, importe, motivo, nota="", piezas=None, archivo=Non
 def adjuntar_preparado(retiro, usuario, preparado, request=None):
     tipo, contenido = preparado
     nombre, huella = comprobantes.guardar(tipo, contenido)
-    with transaction.atomic():
-        hechos = RetiroCaja.objects.filter(pk=retiro.pk, comprobante=RetiroCaja.PENDIENTE).update(comprobante=RetiroCaja.ADJUNTO)
-        if hechos != 1:
-            raise ErrorCaja("El retiro ya tiene comprobante o se declaró sin él.")
-        objeto = ComprobanteRetiro.objects.create(retiro=retiro, archivo=nombre, tipo=tipo, tamano=len(contenido), sha256=huella, subido_por=usuario)
-        registrar("comprobante_adjuntado", usuario=usuario, objeto=retiro, datos={"folio": str(retiro), "tipo": tipo, "tamano": len(contenido), "sha256": huella}, request=request)
+    try:
+        with transaction.atomic():
+            hechos = RetiroCaja.objects.filter(pk=retiro.pk, comprobante=RetiroCaja.PENDIENTE).update(comprobante=RetiroCaja.ADJUNTO)
+            if hechos != 1:
+                raise ErrorCaja("El retiro ya tiene comprobante o se declaró sin él.")
+            objeto = ComprobanteRetiro.objects.create(retiro=retiro, archivo=nombre, tipo=tipo, tamano=len(contenido), sha256=huella, subido_por=usuario)
+            registrar("comprobante_adjuntado", usuario=usuario, objeto=retiro, datos={"folio": str(retiro), "tipo": tipo, "tamano": len(contenido), "sha256": huella}, request=request)
+    except Exception:
+        comprobantes.descartar(nombre)
+        raise
     return objeto
 
 

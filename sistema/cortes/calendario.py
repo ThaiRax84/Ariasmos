@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta
 from configuracion.models import PARAMETROS, parametro
 
 DIAS = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
-HORA = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+HORA = re.compile(r"\A([01][0-9]|2[0-3]):[0-5][0-9]\Z")
 PROPUESTO = {str(dia): "18:00" for dia in range(6)}
 
 

@@ -72,10 +72,10 @@ def _imagen(contenido, tipo):
                 girada = ImageOps.exif_transpose(imagen)
                 salida = BytesIO()
                 if tipo == ComprobanteRetiro.JPEG:
-                    girada.convert("RGB").save(salida, format="JPEG", quality=85)
+                    _solo_pixeles(girada, "RGB").save(salida, format="JPEG", quality=85)
                 else:
                     modo = "RGBA" if girada.mode in ("RGBA", "LA", "P") else "RGB"
-                    girada.convert(modo).save(salida, format="PNG")
+                    _solo_pixeles(girada, modo).save(salida, format="PNG")
     except ComprobanteInvalido:
         raise
     except (Image.DecompressionBombError, Image.DecompressionBombWarning):
@@ -83,6 +83,11 @@ def _imagen(contenido, tipo):
     except Exception:
         raise ComprobanteInvalido("La imagen está dañada o no se puede leer.")
     return salida.getvalue()
+
+
+def _solo_pixeles(imagen, modo):
+    convertida = imagen.convert(modo)
+    return Image.frombytes(modo, convertida.size, convertida.tobytes())
 
 
 def _nombres_crudos(contenido):
@@ -164,6 +169,13 @@ def guardar(tipo, contenido):
         salida.flush()
         os.fsync(salida.fileno())
     return nombre, hashlib.sha256(contenido).hexdigest()
+
+
+def descartar(nombre):
+    try:
+        os.unlink(ruta_de(nombre))
+    except OSError:
+        pass
 
 
 def leer(comprobante):

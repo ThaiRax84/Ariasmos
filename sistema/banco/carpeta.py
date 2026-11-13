@@ -28,12 +28,32 @@ def validar_carpeta(texto):
         ruta = validar_ruta(texto)
     except ErrorEntrega as error:
         raise ErrorCarpeta(str(error))
+    from cortes.entrega import _dentro
+    from cortes.models import Destino
+
     negocio = Negocio.actual()
-    for otra in (negocio.carpeta_respaldo if negocio else "",):
-        if otra and Path(otra).resolve() == Path(ruta):
-            raise ErrorCarpeta("La carpeta vigilada no puede ser la misma que la de respaldo.")
+    otras = [negocio.carpeta_respaldo if negocio else ""] + list(Destino.objects.values_list("ruta", flat=True))
+    propia = Path(ruta)
+    for otra in otras:
+        if not otra:
+            continue
+        ajena = Path(otra).resolve()
+        if ajena == propia or _dentro(ajena, propia) or _dentro(propia, ajena):
+            raise ErrorCarpeta("La carpeta vigilada no puede ser la de respaldo ni una carpeta de entrega de cortes, ni estar dentro de ellas o contenerlas.")
     for sub in (PROCESADOS, RECHAZADOS):
-        (Path(ruta) / sub).mkdir(exist_ok=True)
+        _subcarpeta(propia, sub)
+    return ruta
+
+
+def _subcarpeta(base, nombre):
+    ruta = Path(base) / nombre
+    try:
+        info = os.lstat(ruta)
+    except FileNotFoundError:
+        os.mkdir(ruta)
+        info = os.lstat(ruta)
+    if not stat.S_ISDIR(info.st_mode) or (getattr(info, "st_file_attributes", 0) & PUNTO_DE_REANALISIS):
+        raise ErrorCarpeta(f"«{nombre}» dentro de la carpeta vigilada no es una carpeta normal (es un enlace u otro tipo de entrada). Quítala para que el sistema la vuelva a crear.")
     return ruta
 
 
@@ -58,6 +78,7 @@ def _destino(base, subcarpeta, nombre):
 
 
 def _mover(base, origen, subcarpeta, motivo=""):
+    _subcarpeta(base, subcarpeta)
     destino = _destino(base, subcarpeta, origen.name)
     os.replace(origen, destino)
     if motivo:
@@ -113,68 +134,91 @@ def _rechazar(base, ruta, motivo, sha256=""):
     return destino
 
 
+def _revisar_entrada(base, entrada, presentes, informe):
+    nombre = entrada.name
+    if nombre.startswith(".") or nombre in (PROCESADOS, RECHAZADOS):
+        return
+    ruta_archivo = base / nombre
+    try:
+        info = os.lstat(ruta_archivo)
+    except FileNotFoundError:
+        return
+    if stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode):
+        return
+    presentes.add(nombre)
+    if not _es_regular(info):
+        _rechazar(base, ruta_archivo, "No es un archivo normal (es un enlace u otro tipo de entrada); no se sigue.")
+        informe["rechazados"] += 1
+        return
+    extension = Path(nombre).suffix.lower()
+    limite = LIMITES.get(extension)
+    if limite is None:
+        _rechazar(base, ruta_archivo, f"Extensión no admitida ({extension or 'sin extensión'}). Se aceptan: {', '.join(sorted(LIMITES))}.")
+        informe["rechazados"] += 1
+        return
+    if info.st_size > limite:
+        _rechazar(base, ruta_archivo, f"El archivo pasa del tamaño máximo de importación ({limite // (1024 * 1024)} MB).")
+        informe["rechazados"] += 1
+        return
+    anterior = ArchivoVigilado.objects.filter(nombre=nombre[:255]).first()
+    if anterior is None or anterior.tamano != info.st_size or anterior.modificado != info.st_mtime_ns:
+        ArchivoVigilado.objects.update_or_create(nombre=nombre[:255], defaults={"tamano": info.st_size, "modificado": info.st_mtime_ns})
+        informe["esperando"] += 1
+        return
+    try:
+        contenido = _leer(ruta_archivo, info, limite)
+    except (OSError, ErrorCarpeta):
+        ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
+        informe["esperando"] += 1
+        return
+    huella = lectura.huella_archivo(contenido)
+    if Importacion.objects.filter(sha256=huella).exists():
+        _rechazar(base, ruta_archivo, "Este archivo ya se importó antes (mismo SHA-256).", huella)
+        ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
+        informe["rechazados"] += 1
+        return
+    try:
+        importacion = importar_contenido(nombre, contenido, huella)
+    except (lectura.ErrorLectura, conciliacion.ErrorConciliacion) as error:
+        _rechazar(base, ruta_archivo, str(error), huella)
+        ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
+        informe["rechazados"] += 1
+        return
+    destino = _mover(base, ruta_archivo, PROCESADOS)
+    ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
+    registrar("carpeta_banco_importado", objeto=importacion, datos={"archivo": importacion.nombre_archivo, "sha256": huella, "movido_a": destino.name, "retenida": importacion.retenida})
+    informe["importados"] += 1
+
+
+def _avisar_bloqueo(motivo):
+    from datetime import timedelta
+
+    from auditoria.models import Evento
+
+    if Evento.objects.filter(accion="carpeta_banco_bloqueada", momento__gte=timezone.now() - timedelta(hours=6)).exists():
+        return
+    registrar("carpeta_banco_bloqueada", datos={"motivo": motivo[:300]})
+
+
 def revisar():
     ruta = carpeta()
     if not ruta:
         return {"sin_carpeta": True}
-    base = Path(validar_carpeta(ruta))
+    try:
+        base = Path(validar_carpeta(ruta))
+    except ErrorCarpeta as error:
+        _avisar_bloqueo(str(error))
+        return {"importados": 0, "rechazados": 0, "esperando": 0, "bloqueada": str(error)}
     informe = {"importados": 0, "rechazados": 0, "esperando": 0}
     presentes = set()
     with os.scandir(base) as entradas:
         lista = sorted(entradas, key=lambda e: e.name)
     for entrada in lista:
-        nombre = entrada.name
-        if nombre.startswith(".") or nombre in (PROCESADOS, RECHAZADOS):
-            continue
-        ruta_archivo = base / nombre
         try:
-            info = os.lstat(ruta_archivo)
-        except FileNotFoundError:
-            continue
-        if stat.S_ISDIR(info.st_mode) and not stat.S_ISLNK(info.st_mode):
-            continue
-        presentes.add(nombre)
-        if not _es_regular(info):
-            _rechazar(base, ruta_archivo, "No es un archivo normal (es un enlace u otro tipo de entrada); no se sigue.")
-            informe["rechazados"] += 1
-            continue
-        extension = Path(nombre).suffix.lower()
-        limite = LIMITES.get(extension)
-        if limite is None:
-            _rechazar(base, ruta_archivo, f"Extensión no admitida ({extension or 'sin extensión'}). Se aceptan: {', '.join(sorted(LIMITES))}.")
-            informe["rechazados"] += 1
-            continue
-        if info.st_size > limite:
-            _rechazar(base, ruta_archivo, f"El archivo pasa del tamaño máximo de importación ({limite // (1024 * 1024)} MB).")
-            informe["rechazados"] += 1
-            continue
-        anterior = ArchivoVigilado.objects.filter(nombre=nombre[:255]).first()
-        if anterior is None or anterior.tamano != info.st_size or anterior.modificado != info.st_mtime_ns:
-            ArchivoVigilado.objects.update_or_create(nombre=nombre[:255], defaults={"tamano": info.st_size, "modificado": info.st_mtime_ns})
-            informe["esperando"] += 1
-            continue
-        try:
-            contenido = _leer(ruta_archivo, info, limite)
-        except (OSError, ErrorCarpeta):
-            ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
-            informe["esperando"] += 1
-            continue
-        huella = lectura.huella_archivo(contenido)
-        if Importacion.objects.filter(sha256=huella).exists():
-            _rechazar(base, ruta_archivo, "Este archivo ya se importó antes (mismo SHA-256).", huella)
-            ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
-            informe["rechazados"] += 1
-            continue
-        try:
-            importacion = importar_contenido(nombre, contenido, huella)
-        except (lectura.ErrorLectura, conciliacion.ErrorConciliacion) as error:
-            _rechazar(base, ruta_archivo, str(error), huella)
-            ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
-            informe["rechazados"] += 1
-            continue
-        destino = _mover(base, ruta_archivo, PROCESADOS)
-        ArchivoVigilado.objects.filter(nombre=nombre[:255]).delete()
-        registrar("carpeta_banco_importado", objeto=importacion, datos={"archivo": importacion.nombre_archivo, "sha256": huella, "movido_a": destino.name, "retenida": importacion.retenida})
-        informe["importados"] += 1
+            _revisar_entrada(base, entrada, presentes, informe)
+        except (OSError, ErrorCarpeta) as error:
+            _avisar_bloqueo(str(error))
+            informe["bloqueada"] = str(error)
+            break
     ArchivoVigilado.objects.exclude(nombre__in=presentes).delete()
     return informe

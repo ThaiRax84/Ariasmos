@@ -47,6 +47,8 @@ def _carpeta_banco(hoy):
     informe = carpeta_banco.revisar()
     if informe.get("sin_carpeta"):
         return "sin carpeta vigilada del banco"
+    if informe.get("bloqueada"):
+        raise RuntimeError(f"carpeta vigilada del banco detenida: {informe['bloqueada']}")
     return f"{informe['importados']} importados, {informe['rechazados']} rechazados y {informe['esperando']} en espera en la carpeta del banco"
 
 
