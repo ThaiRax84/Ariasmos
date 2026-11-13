@@ -23,7 +23,7 @@ ROLES = ("Operación", "Supervisión", "Dirección")
 
 PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
 
-SOLO_SESION = {"inicio", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
+SOLO_SESION = {"inicio", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -71,6 +71,7 @@ MATRIZ = {
     "cobros:plan_editar": ("administrar_conceptos",),
     "configuracion:indice": ("administrar_configuracion",),
     "configuracion:negocio": ("administrar_configuracion",),
+    "configuracion:marca": ("administrar_configuracion",),
     "configuracion:vocabulario": ("administrar_configuracion",),
     "configuracion:parametros": ("administrar_configuracion",),
     "configuracion:catalogo": ("administrar_configuracion",),
@@ -365,7 +366,7 @@ def test_rutas_de_sesion_piden_sesion(escenario, nombre):
     usuarios, _ = escenario
     respuesta = cliente().get(reverse(nombre))
     assert respuesta.status_code == 302 and reverse("entrar") in respuesta.url
-    assert cliente(usuarios["Operación"]).get(reverse(nombre)).status_code in (200, 302)
+    assert cliente(usuarios["Operación"]).get(reverse(nombre)).status_code in ((200, 302, 404) if nombre == "marca_logo" else (200, 302))
 
 
 def test_revision_de_codigo_ajeno_no_permitida(escenario):

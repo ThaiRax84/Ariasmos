@@ -188,5 +188,8 @@ def leer(comprobante):
 def todos():
     from inventario.models import ComprobanteInventario
 
+    from configuracion.models import MarcaNegocio
+
     retiros = [(c.archivo, c.sha256) for c in ComprobanteRetiro.objects.order_by("id")]
-    return retiros + [(c.archivo, c.sha256) for c in ComprobanteInventario.objects.order_by("id")]
+    logos = [(m.logo, m.logo_sha256) for m in MarcaNegocio.objects.exclude(logo="")]
+    return retiros + [(c.archivo, c.sha256) for c in ComprobanteInventario.objects.order_by("id")] + logos

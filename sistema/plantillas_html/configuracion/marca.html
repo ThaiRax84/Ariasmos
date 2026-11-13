@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo"><a href="{% url 'configuracion:indice' %}">Configuración</a> · Marca del negocio</span>
+    <h1>Marca del negocio</h1>
+    <p class="subtitulo">El logo y los dos colores aparecen en la barra, los botones y el recibo. Sin colores se usan los de Ariasmos; sin logo, solo el nombre del negocio.</p>
+  </div>
+</div>
+<div class="columnas mitades">
+  <section class="panel">
+    <h2>Colores</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="colores">
+      {% include "comun/_campos.html" with formulario=colores %}
+      <div class="acciones"><button class="boton" type="submit">Guardar colores</button></div>
+    </form>
+    {% if actual.con_colores %}
+    <form method="post" class="acciones">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="sin_colores">
+      <button class="boton secundario" type="submit" data-confirmar="Se dejarán de usar los colores del negocio y volverán los de Ariasmos.">Usar los colores de Ariasmos</button>
+    </form>
+    {% endif %}
+  </section>
+  <div class="pila">
+    <section class="panel">
+      <h2>Logo</h2>
+      {% if actual.logo %}
+      <p class="fila"><img class="logo-negocio" src="{% url 'marca_logo' %}?v={{ actual.version }}" alt="Logotipo actual de {{ negocio.nombre }}" width="56" height="56"> Logo actual</p>
+      {% else %}<p class="ayuda">Todavía no hay logo: la barra y el recibo muestran solo el nombre del negocio.</p>{% endif %}
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="logo">
+        {% include "comun/_campos.html" with formulario=logo %}
+        <p class="ayuda">Se revisa el contenido real del archivo y se vuelve a dibujar solo con sus píxeles; cualquier otra cosa se descarta.</p>
+        <div class="acciones"><button class="boton" type="submit">Subir logo</button></div>
+      </form>
+      {% if actual.logo %}
+      <form method="post" class="acciones">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="quitar_logo">
+        <button class="boton secundario" type="submit" data-confirmar="Se quitará el logo; se mostrará solo el nombre del negocio.">Quitar logo</button>
+      </form>
+      {% endif %}
+    </section>
+    {% if contrastes %}
+    <section class="panel">
+      <h2>Lectura</h2>
+      <ul class="lista-estado">
+        <li><span class="renglon-texto"><span class="renglon-titulo">Texto blanco sobre el color principal</span><span class="renglon-detalle">Contraste {{ contrastes.blanco_sobre_principal }}:1; se pide 4.5:1 o más.</span></span>{% if contrastes.botones_con_tinta %}<span class="estado aviso">Botones con la tinta</span>{% else %}<span class="estado bien">Bien</span>{% endif %}</li>
+        <li><span class="renglon-texto"><span class="renglon-titulo">Color del texto</span><span class="renglon-detalle">{% if contrastes.tinta_es_principal %}El principal es lo bastante oscuro (7:1 o más) y se usa para el texto.{% else %}El principal no es lo bastante oscuro para el texto: se usa la tinta de Ariasmos.{% endif %}</span></span><span class="estado calma">Automático</span></li>
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

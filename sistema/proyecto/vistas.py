@@ -1,4 +1,6 @@
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
+from django.utils.http import quote_etag
 
 from auditoria.servicios import MOTIVOS, ultima_verificacion
 from banco import conciliacion
@@ -6,6 +8,7 @@ from banco.models import CuentaBancaria, Importacion, MovimientoBancario
 from caja.models import Denominacion, Traslado
 from caja import retiros
 from caja.servicios import alertas as alertas_caja
+from configuracion import marca as marca_negocio
 from configuracion.models import Negocio, parametro
 from cortes import servicios as cortes
 from cortes.models import MAYOR, Corte
@@ -70,3 +73,50 @@ def inicio(request):
             contexto["bitacora_fallida"] = verificacion
             contexto["bitacora_motivo"] = MOTIVOS.get(verificacion.motivo, verificacion.motivo)
     return render(request, "inicio.html", contexto)
+
+
+def _guardable(respuesta, version, etiqueta):
+    respuesta["Cache-Control"] = "private, max-age=31536000, immutable"
+    respuesta["ETag"] = quote_etag(f"{etiqueta}-{version}")
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    return respuesta
+
+
+@requiere_sesion
+def marca_css(request):
+    actual = marca_negocio.actual()
+    version = actual.version if actual else 0
+    respuesta = HttpResponse(marca_negocio.hoja(actual), content_type="text/css; charset=utf-8")
+    if request.GET.get("v") != str(version):
+        respuesta["Cache-Control"] = "no-store"
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        return respuesta
+    return _guardable(respuesta, version, "marca")
+
+
+@requiere_sesion
+def marca_logo(request):
+    from caja import comprobantes
+
+    actual = marca_negocio.actual()
+    if actual is None or not actual.logo:
+        raise Http404
+    try:
+        contenido = marca_negocio.leer_logo(actual)
+    except (OSError, comprobantes.ComprobanteInvalido, marca_negocio.MarcaInvalida):
+        registrar_alterado(request, actual)
+        raise Http404
+    respuesta = HttpResponse(contenido, content_type=comprobantes.TIPOS_MIME[actual.logo_tipo])
+    respuesta["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    respuesta["Content-Disposition"] = "inline"
+    if request.GET.get("v") != str(actual.version):
+        respuesta["Cache-Control"] = "no-store"
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        return respuesta
+    return _guardable(respuesta, actual.version, "logo")
+
+
+def registrar_alterado(request, actual):
+    from auditoria.servicios import registrar
+
+    registrar("logo_alterado", request=request, objeto=actual, datos={"archivo": actual.logo})

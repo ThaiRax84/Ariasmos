@@ -7,6 +7,7 @@ app_name = "configuracion"
 urlpatterns = [
     path("", views.indice, name="indice"),
     path("negocio/", views.negocio, name="negocio"),
+    path("marca/", views.marca, name="marca"),
     path("vocabulario/", views.textos, name="vocabulario"),
     path("parametros/", views.parametros, name="parametros"),
     path("avanzado/", views.avanzado, name="avanzado"),
