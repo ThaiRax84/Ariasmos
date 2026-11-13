@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.18 · 13/11/2026 · Estado: fases 1 a 6a construidas; fase 5b (interfaz, `docs/DISENO.md`) en construcción; fase 6b (facturación, §17) diseñada.
+Versión 0.19 · 13/11/2026 · Estado: fases 1 a 6a y 5b construidas; fase 7a (topes del banco §19 y actualizaciones §20) en construcción; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -20,7 +20,7 @@ No es específico de una escuela: vocabulario, categorías, roles, frecuencias y
 
 | Principio | Consecuencia |
 |---|---|
-| Local primero | Todo funciona sin internet. Internet solo se usa para respaldo y, si se configura, correo. |
+| Local primero | Todo funciona sin internet. Internet solo se usa para respaldo y, si se configura, correo, facturación (§17) y búsqueda de actualizaciones (§20). |
 | Nada se borra | Los movimientos de dinero son inmutables; se corrige con un contra-asiento. Las bajas son un estado, no un borrado. |
 | Dos personas para lo delicado, cero esperas para lo normal | Solo las excepciones piden aprobación, y hay tres vías para darla (§6). |
 | Configurable, no programado | Ningún nombre, monto, categoría, rol, frecuencia ni ruta vive en el código. |
@@ -495,6 +495,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 5b | Interfaz nueva según `docs/DISENO.md`: marca Ariasmos y marca del negocio configurable, todas las pantallas con el nuevo sistema de diseño, splash y transiciones |
 | 6a | Carpeta del banco que aplica de inmediato salvo sospecha (§15.5); inventario opcional, venta a titular o sin matrícula, devoluciones y conteo mensual (§16) |
 | 6b | Facturación electrónica opcional con proveedor intercambiable (§17) |
+| 7a | Topes del banco por día y acumulado, configurables por quien concilia y por Dirección (§19); actualizaciones del programa: buscar, avisar y descargar con firma (§20) |
 
 ## 14. Pendientes de decisión
 
@@ -582,11 +583,11 @@ Sacar efectivo de la caja para un gasto del negocio. Operación los hace sin esp
 - **Señales del archivo** (retienen todos sus movimientos):
   1. Trae columna de saldo y los saldos no cuadran renglón a renglón con los importes.
   2. Trae columna de saldo y no continúa el último saldo conocido de esa cuenta.
-  3. **Tope de exposición:** la suma de pagos aplicados desde archivos editables que todavía no respalda un estado, más los de este archivo, pasa de `tope_aplicado_sin_respaldo`. En 0 (valor inicial) **todo archivo editable queda retenido**: aplicar de inmediato es una decisión que el negocio toma al fijar ese tope en el asistente o en Configuración.
+  3. **Tope acumulado** (§19): con los pagos de este archivo se rebasaría `tope_aplicado_sin_respaldo`. En 0 (valor inicial) todo archivo editable queda retenido.
 - **Liberar.** Quien concilia libera un movimiento, varios o todos los retenidos de una importación; queda en bitácora con su nombre. Quien libera no puede marcar la importación como revisada.
 - **Comprobación contra el estado.** Al importar un estado en PDF, cada pago aplicado desde un archivo editable con fecha dentro de ese periodo debe corresponder a un movimiento del estado. El que no aparezca queda marcado **«sin respaldo en el estado»**: alerta en el inicio de Supervisión y Dirección, evento en bitácora y acceso directo a solicitar su reversión. No se revierte solo.
 - **Alerta de antigüedad:** pagos aplicados desde archivos editables que llevan más de `dias_sin_respaldo_alerta` (45) sin un estado que los cubra.
-- El asistente (paso 6) y Configuración piden `tope_aplicado_sin_respaldo` y `tope_pago_carpeta` junto a la carpeta. Las plantillas no llevan importes.
+- El asistente (paso 6) y Configuración piden `tope_pago_carpeta` junto a la carpeta; los topes diario y acumulado se rigen por §19. Las plantillas no llevan importes.
 
 ### 15.6 Asistente
 
@@ -661,3 +662,77 @@ Primer módulo que necesita internet; el resto del sistema funciona sin él. Nad
 
 Un negocio sin matrícula puede querer que las transferencias de sus clientes se reflejen solas. La matrícula del motor serviría como «referencia de pago» de cada cliente con otro nombre (el vocabulario ya lo permite). Faltaría una opción que la mantenga fuera de las pantallas diarias y la muestre solo en la ficha de pago.
 
+## 19. Versión 0.19: topes del banco configurables (fase 7a)
+
+Sustituye la regla del «tope de exposición» de §15.5 y la última línea de esa sección. Lo demás de §15.5 sigue igual.
+
+### 19.1 Dos topes
+
+Un archivo editable aplica solo sus pagos mientras no rebase **ninguno** de los dos topes. Al llegar a un tope nada se rechaza: el pago queda **retenido** con su motivo y quien concilia lo libera, como cualquier otro retenido.
+
+- **Tope diario por día de la semana** (`TopeDiarioBanco`, siete renglones, importe en centavos). Cuenta la suma de pagos **aplicados solos** desde archivos editables en ese día calendario local (el día en que se aplican, no la fecha del movimiento). Un día en 0 retiene todo lo de ese día. Se evalúa movimiento por movimiento, en el orden del archivo: el que no cabe queda retenido («tope del día») y se sigue con el siguiente, que sí puede caber.
+- **Tope acumulado** (`tope_aplicado_sin_respaldo`, ya existente): máximo de pagos aplicados desde archivos editables que todavía no respalda un estado. Baja solo cuando un estado en PDF confirma esos pagos. Sigue siendo señal del archivo: si con los pagos del archivo se rebasa, quedan retenidos todos.
+- Los pagos **liberados a mano** no consumen el tope diario (son una decisión de una persona), pero sí cuentan en el acumulado mientras no los respalde un estado. Liberar nunca se bloquea por un tope.
+- Valores iniciales: todo en 0. Aplicar solo es una decisión que el negocio toma al fijar los topes. Las plantillas no llevan importes.
+- `tope_pago_carpeta` (importe máximo por pago) no cambia.
+
+### 19.2 Quién los cambia y qué queda registrado
+
+- Permiso nuevo `configurar_topes_banco`, que la plantilla da a Supervisión y a Dirección. Pantalla «Topes» en la sección de Banco, con reingreso de contraseña. El asistente (paso 6) pide los mismos valores.
+- Cada cambio guarda en bitácora el evento `topes_banco_cambiados` con los valores de antes y de después.
+- El inicio de quien tiene `ver_auditoria` lista los cambios de topes de los últimos 7 días hechos por otra persona, con quién, cuándo y de cuánto a cuánto. Motivo: quien concilia también libera pagos, así que Dirección debe enterarse sin tener que buscarlo.
+- La pantalla muestra cuánto se ha aplicado hoy contra el tope del día y cuánto hay acumulado sin respaldo contra el tope acumulado.
+- El asistente y Configuración → Carpetas dejan de pedir `tope_aplicado_sin_respaldo`; vive solo en «Topes» y en el asistente.
+
+## 20. Versión 0.19: actualizaciones del programa (fase 7a)
+
+Primera entrega: **buscar, avisar y descargar**. La instalación de un clic queda para después. Es opcional y viene apagada: es la primera conexión saliente del sistema fuera de respaldo.
+
+### 20.1 Canal de versiones
+
+- El código vive en un repositorio privado. Las versiones se publican en un **canal** aparte que solo contiene, por versión: el instalador, el aviso de versión (`version.json`), su firma (`version.json.firma`) y, si hace falta, un cambio de llave (`cambio-de-llave.json` y su firma). Nunca código.
+- El canal se alcanza con un **adaptador** (`actualizaciones/canales/`). El primero es `github`: las publicaciones de un repositorio privado, leídas con una **clave de solo lectura** propia de cada instalación. Otro adaptador (servidor propio con licencias) se podrá añadir sin tocar lo demás.
+- Configuración (Dirección, con reingreso; también en el asistente): activar o apagar, repositorio del canal (`propietario/nombre`, validado por patrón) y la clave. La clave se guarda cifrada como los demás secretos y no se vuelve a mostrar. Evento `actualizaciones_configuradas`, sin la clave.
+- Publicar es manual y lo hace el dueño: la integración continua compila el instalador y **no publica ni firma nada**. Guía en `docs/GUIA-PUBLICAR-VERSION.md`.
+
+### 20.2 Conexión
+
+- Solo HTTPS con verificación de certificado, sin tomar proxies del entorno, con límite de tiempo. Servidores permitidos fijos por adaptador (`api.github.com`; para la descarga se sigue **una** redirección a `*.githubusercontent.com`, sin reenviar la clave).
+- Límites de tamaño: aviso y firmas hasta 64 KB; instalador hasta lo que declara el aviso y nunca más de 500 MB.
+- No se envía ningún dato del negocio. Sin internet no pasa nada ni se muestra error a quien usa el sistema.
+
+### 20.3 Aviso de versión y firma
+
+- `version.json`: `producto` («ariasmos»), `version` (X.Y.Z), `contador` (entero que solo sube), `fecha`, `instalador` (`nombre`, `tamano`, `sha256`), `minimo` (versión desde la que se puede actualizar) y `cambios` (hasta 20 líneas de 200 caracteres, texto plano).
+- Firma Ed25519 **sobre los bytes exactos** del archivo. La firma se comprueba antes de interpretar el contenido.
+- Se acepta solo si: la firma es válida con la llave de uso vigente, `producto` coincide, `version` es mayor que la instalada, `contador` es mayor que el último aceptado y el formato es exacto (campos de más o de menos lo invalidan). Si `minimo` es mayor que la instalada se avisa que hay que pasar antes por esa versión y no se ofrece la descarga.
+- Lo rechazado deja el evento `actualizacion_rechazada` con su motivo, como máximo uno cada 6 horas por motivo.
+
+### 20.4 Llaves
+
+- Dos pares Ed25519 que genera el dueño en su computadora con `herramientas/firma/`. Las privadas van cifradas con contraseña y **nunca** entran al repositorio, a la integración continua ni a la computadora del negocio.
+- El programa trae las dos llaves **públicas** en `sistema/actualizaciones/llaves.json` (`uso` y `recuperacion`). Si el archivo viene vacío, las actualizaciones no se pueden activar.
+- **Llave de uso:** firma cada versión. **Llave de recuperación:** solo firma un cambio de llave.
+- `cambio-de-llave.json`: `producto`, `contador` (propio, solo sube) y `llave_uso` (la nueva pública). Se acepta solo con firma válida de la llave de recuperación que trae el programa y contador mayor al último aceptado. Queda guardado (`LlaveDeUso`) y desde ese momento la llave anterior deja de valer. Evento `llave_de_uso_cambiada`, visible en el inicio de Dirección.
+- **Los contadores son por llave.** El de versiones cuenta dentro de la llave de uso vigente y el de cambios de llave dentro de la llave de recuperación que trae el programa. Así una llave de uso robada no puede dejar al programa sin actualizaciones publicando un contador enorme, y un programa instalado a mano con llaves nuevas empieza a contar de cero.
+- Al cambiar la llave de uso, las versiones firmadas con la anterior dejan de ofrecerse, sus descargas se retiran y sus archivos se borran (`actualizacion_rechazada`, motivo `llave_de_uso_distinta`).
+- Si se pierden las dos llaves, el programa deja de actualizarse solo; se instala a mano una versión con llaves nuevas.
+
+### 20.5 Buscar, avisar y descargar
+
+- El trabajador busca al arrancar y una vez al día a un minuto variable. Dirección tiene «Buscar ahora», con límite de frecuencia.
+- Si hay versión aceptada, **todos los papeles** ven en su inicio «Hay una versión nueva: X.Y.Z» con la lista de cambios (texto escapado).
+- **Descargar** lo puede pedir cualquier persona con sesión (POST). Una descarga a la vez y a lo más tres intentos por hora. La hace el trabajador: baja el instalador a `actualizaciones/` dentro de los datos de la instalación (no se sirve por la web, permisos solo para el servicio), calculando la huella mientras baja; si el tamaño o la huella no coinciden con el aviso firmado, lo borra, registra `actualizacion_rechazada` y avisa a Dirección.
+- La descarga corre aparte de las demás tareas del trabajador, para que una conexión lenta no detenga la carpeta del banco, los cortes ni los respaldos. La firma del aviso se vuelve a comprobar con la llave vigente antes de dejar el archivo listo.
+- Descarga correcta: evento `actualizacion_descargada` con quién la pidió; Dirección lo ve en su inicio. El aviso cambia a «Lista para instalar» con las instrucciones.
+- **Instalar (esta entrega): a mano**, en la computadora del servidor, con el acceso directo «Instalar actualización» (`herramientas/instalar-actualizacion`), que **vuelve a comprobar** firma y huella justo antes de ejecutar el instalador y se niega si no coinciden. El aviso advierte si hay turnos de caja abiertos y recuerda hacer respaldo antes.
+- La pantalla de inicio de sesión y el splash siguen mostrando la versión instalada.
+
+### 20.6 Herramientas del dueño (`herramientas/firma/`)
+
+Se ejecutan en la computadora del dueño, no en la del negocio.
+
+- `generar-llaves`: crea las dos llaves privadas cifradas con contraseña en la carpeta que se indique y escribe el contenido para `llaves.json`.
+- `firmar-version`: recibe el instalador, la versión, el contador y el archivo de cambios; escribe `version.json` y `version.json.firma`.
+- `cambiar-llave`: con la llave de recuperación, escribe `cambio-de-llave.json` y su firma para una llave de uso nueva.
+- `.gitignore` excluye los archivos de llaves privadas por extensión.

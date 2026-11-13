@@ -12,6 +12,7 @@ from solicitudes.models import Solicitud
 from solicitudes.views import pendientes_para
 
 from . import tablero
+from proyecto.avisos import contexto_inicio
 
 
 @requiere_sesion
@@ -35,6 +36,7 @@ def inicio(request):
     if turno is not None:
         contexto["cobros_turno"] = turno.pagos.count()
         contexto["corte_propio"] = tablero.corte_propio(turno)
+    contexto.update(contexto_inicio(usuario))
     return render(request, "inicio.html", contexto)
 
 

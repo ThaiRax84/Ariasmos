@@ -22,4 +22,5 @@ urlpatterns = [
     path("auditoria/", include("auditoria.urls")),
     path("cortes/", include("cortes.urls")),
     path("respaldos/", include("respaldos.urls")),
+    path("actualizaciones/", include("actualizaciones.urls")),
 ]

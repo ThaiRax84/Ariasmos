@@ -8,7 +8,8 @@ Sistema local y multiusuario de cobro y control de titulares: padrón con matrí
 - [Guía de uso](docs/GUIA-USO.md): el trabajo de cada rol.
 - [Guía de inventario](docs/GUIA-INVENTARIO.md): artículos, ventas, devoluciones, entradas, mermas y conteo mensual (opcional).
 - [Restaurar en un equipo nuevo](docs/RESTAURAR.md).
-- [Referencia técnica](docs/REFERENCIA.md): cobro, caja, banco, inventario, cortes, respaldos, comandos y demostración.
+- [Publicar una versión](docs/GUIA-PUBLICAR-VERSION.md): llaves de firma, canal de versiones y claves de solo lectura (para el dueño del programa).
+- [Referencia técnica](docs/REFERENCIA.md): cobro, caja, banco, inventario, actualizaciones, cortes, respaldos, comandos y demostración.
 - [Arquitectura](docs/ARQUITECTURA.md).
 
 ## Desarrollo

@@ -17,6 +17,8 @@
     {% endif %}
   </div>
 </div>
+{% include "actualizaciones/_aviso.html" %}
+{% include "banco/_cambios_topes.html" %}
 {% if cifras %}
 <div class="cifras tablero">
   {% for c in cifras %}{% if c.enlace and not c.oculta %}<a href="{{ c.enlace }}"{% else %}<div{% endif %} class="cifra{% if c.aviso and not c.oculta %} aviso{% endif %}{% if c.oculta %} oculta{% endif %}" data-cifra="{{ c.clave }}">
