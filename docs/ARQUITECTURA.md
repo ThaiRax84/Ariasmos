@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.9 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.10 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -284,6 +284,12 @@ Objetivo: que Operación cobre sin esperar a nadie y que cada billete tenga due�
 
 Cadena de custodia: `caja → resguardo → banco`. En todo momento el sistema sabe cuánto efectivo debería tener cada persona.
 
+Reglas fijas del efectivo, para cualquier rol:
+
+- **Nadie revierte solo un pago que él mismo cobró.** Aunque tenga permiso de ajustes, su reversión queda como solicitud y la resuelve otra persona.
+- **Solo se devuelve efectivo que se tiene.** La devolución de un pago revertido sale del turno abierto de quien la ejecuta, y solo si ese turno tiene cobrado al menos ese importe. La custodia de una persona nunca queda negativa.
+- **Un depósito registrado no desaparece de la vista.** Queda «por conciliar» a nombre de quien lo registró, visible en la pantalla de custodia, hasta que aparece en el banco. Si pasa del plazo configurado sin aparecer, es una alerta.
+
 ## 8. Banco y conciliación
 
 ### 8.1 Entrada de movimientos
@@ -318,15 +324,26 @@ Cada movimiento lleva una **huella** (cuenta, fecha, importe, referencia, descri
 
 Para cada abono:
 
+Las reglas viven en `nucleo/identificacion.py`, Python puro con sus pruebas.
+
 1. **Extraer.** Se buscan en referencia y concepto todas las secuencias de `L` dígitos (también partidas por espacios o guiones) que pasen el dígito verificador.
 2. **Decidir.**
-   - Una sola matrícula válida y existente → **aplicación automática**.
+   - Una sola matrícula válida y existente, escrita **aislada** (no pegada a otros dígitos) → **aplicación automática**. Si viene incrustada en un número más largo, solo se sugiere.
+   - Si esa matrícula contradice a un pagador ya conocido y confiable, tampoco se aplica sola.
    - Ninguna válida → se buscan matrículas existentes a un error de distancia (dígito cambiado, faltante, sobrante o intercambiado) y se ordenan por coincidencia de importe con lo que debe el titular y por historial del pagador. Va a la cola «por identificar» como sugerencia.
    - Varias válidas o ninguna pista → cola «por identificar» sin sugerencia.
 3. **Aprender.** Cuando una persona confirma a quién pertenece un abono, se guarda una `ReglaPagador` (CLABE del pagador → titular o familia). Tras el número de confirmaciones configurado, los siguientes abonos de ese pagador se sugieren en primer lugar; solo se aplican solos si la política lo permite.
 4. **Aplicar.** El pago se reparte según §5.1.
 
-Operación puede sugerir la identificación; Supervisión la confirma. Los depósitos de efectivo de §7 se emparejan contra los traslados registrados, no contra titulares.
+Operación puede sugerir la identificación; Supervisión la confirma. Los depósitos de efectivo de §7 se emparejan contra los traslados registrados (mismo importe y fecha cercana), no contra titulares; el que no empareja va a la cola.
+
+Otras reglas de la importación:
+
+- El archivo debe ser de una cuenta bancaria registrada del negocio (misma CLABE); si no, se rechaza.
+- Un movimiento nunca produce dos pagos: la huella es única y la aplicación va dentro de la misma transacción.
+- De quien paga se guarda lo necesario para identificarlo (banco, CLABE, nombre, clave de rastreo, referencia y concepto). El RFC no se guarda.
+- Operación ve fecha, importe, referencia, concepto y nombre del pagador; la CLABE completa solo la ve quien concilia.
+- Deshacer una aplicación bancaria es una reversión de pago por el motor de aprobaciones; el movimiento vuelve a la cola.
 
 ## 9. Cortes y reportes
 
