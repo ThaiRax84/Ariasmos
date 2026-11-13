@@ -516,6 +516,7 @@ def xlsx(filas):
         ("c.csv", b"%PDF-1.4 no es una hoja", "Excel"),
         ("c.xlsx", b"PK\x03\x04 no es un excel", "Excel"),
     ],
+    ids=["clave_desconocida", "clave_repetida", "cantidad_negativa", "cantidad_decimal", "formula_en_cantidad", "formula_en_clave", "sin_columnas", "demasiados_renglones", "mas_de_un_mega", "pdf_disfrazado", "zip_roto"],
 )
 def test_conteo_subido_es_dato_no_confiable(base, nombre, contenido, mensaje):
     personas, ana, libro_a, cuaderno = base
