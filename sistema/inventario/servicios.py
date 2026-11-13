@@ -605,12 +605,63 @@ def bajo_minimo():
     return [(a, actuales.get(a.pk, 0)) for a in Articulo.objects.filter(activo=True).order_by("clave") if actuales.get(a.pk, 0) <= a.minimo]
 
 
+def niveles_referencia(articulos):
+    niveles = {}
+    for articulo in articulos:
+        candidatos = []
+        entrada = MovimientoInventario.objects.filter(articulo=articulo, tipo=MovimientoInventario.ENTRADA).order_by("-id").first()
+        if entrada is not None:
+            despues = MovimientoInventario.objects.filter(articulo=articulo, id__lte=entrada.pk).aggregate(total=Sum("cantidad"))["total"] or 0
+            candidatos.append((entrada.creado, despues))
+        renglon = RenglonConteo.objects.filter(articulo=articulo, conteo__aplicado_en__isnull=False).select_related("conteo").order_by("-conteo__aplicado_en", "-id").first()
+        if renglon is not None:
+            candidatos.append((renglon.conteo.aplicado_en, renglon.contado))
+        niveles[articulo.pk] = max(candidatos, key=lambda c: c[0])[1] if candidatos else 0
+    return niveles
+
+
+def es_baja(existencia, referencia, minimo, porcentaje):
+    if minimo and existencia <= minimo:
+        return True
+    return referencia > 0 and existencia * 100 <= referencia * porcentaje
+
+
+def porcentaje_baja():
+    return min(max(int(parametro("porcentaje_existencia_baja")), 1), 99)
+
+
+def para_vender():
+    articulos = list(Articulo.objects.filter(activo=True).order_by("nombre", "clave"))
+    actuales = existencias([a.pk for a in articulos])
+    niveles = niveles_referencia(articulos)
+    porcentaje = porcentaje_baja()
+    catalogo = []
+    for articulo in articulos:
+        existencia = actuales.get(articulo.pk, 0)
+        catalogo.append({"articulo": articulo, "existencia": existencia if existencia > 0 else None, "pocas": existencia > 0 and es_baja(existencia, niveles[articulo.pk], articulo.minimo, porcentaje)})
+    return catalogo
+
+
+def existencia_baja():
+    articulos = list(Articulo.objects.filter(activo=True).order_by("clave"))
+    actuales = existencias([a.pk for a in articulos])
+    niveles = niveles_referencia(articulos)
+    porcentaje = porcentaje_baja()
+    resultado = []
+    for articulo in articulos:
+        existencia = actuales.get(articulo.pk, 0)
+        if existencia > articulo.minimo and es_baja(existencia, niveles[articulo.pk], articulo.minimo, porcentaje):
+            resultado.append((articulo, existencia, niveles[articulo.pk]))
+    return resultado
+
+
 def avisos(usuario):
     if not activo():
         return {}
     resultado = {}
     if usuario.tiene_permiso("revisar_inventario") or usuario.tiene_permiso("administrar_articulos"):
         resultado["bajo_minimo"] = bajo_minimo()
+        resultado["existencia_baja"] = existencia_baja()
     if usuario.tiene_permiso("revisar_inventario"):
         resultado["por_revisar"] = (
             RegistroInventario.objects.filter(revision=POR_REVISAR).exclude(usuario=usuario).count()

@@ -73,11 +73,12 @@
   <ul class="lista">{% for i in importaciones_por_revisar %}<li><a href="{% url 'conciliacion:importacion' i.pk %}">{{ i.nombre_archivo }}</a> · importó {{ i.importo }} el {{ i.creada|date:"d/m/Y H:i" }} · {{ i.pagos }} pago{{ i.pagos|pluralize }} por {{ i.monto|dinero }} · {{ i.get_continuidad_display }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
-{% if avisos_inventario.bajo_minimo or avisos_inventario.por_revisar or avisos_inventario.conteo_viejo %}
+{% if avisos_inventario.bajo_minimo or avisos_inventario.existencia_baja or avisos_inventario.por_revisar or avisos_inventario.conteo_viejo %}
 <section class="panel alerta">
   <h2>Inventario</h2>
   <ul class="lista">
     {% for a, e in avisos_inventario.bajo_minimo %}<li>{{ a }}: existencia {{ e }}, mínimo {{ a.minimo }}.</li>{% endfor %}
+    {% for a, e, referencia in avisos_inventario.existencia_baja %}<li>{{ a }}: existencia baja, quedan {{ e }} de {{ referencia }} tras su última entrada o conteo.</li>{% endfor %}
     {% if avisos_inventario.por_revisar %}<li>{{ avisos_inventario.por_revisar }} movimiento{{ avisos_inventario.por_revisar|pluralize }} de inventario por revisar. <a href="{% url 'inventario:revision' %}">Revisar</a></li>{% endif %}
     {% if avisos_inventario.conteo_viejo %}<li>El <a href="{% url 'inventario:conteo_detalle' avisos_inventario.conteo_viejo.pk %}">conteo {{ avisos_inventario.conteo_viejo.pk }}</a> espera aprobación desde el {{ avisos_inventario.conteo_viejo.creado|date:"d/m/Y" }}.</li>{% endif %}
   </ul>

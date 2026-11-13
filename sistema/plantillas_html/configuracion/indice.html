@@ -1,24 +1,29 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Configuración</h1>
-<div class="rejilla">
-  <a class="boton grande secundario" href="{% url 'configuracion:negocio' %}">Datos del negocio</a>
-  <a class="boton grande secundario" href="{% url 'banco:lista' %}">Datos de pago</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'medios' %}">Medios de pago</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'cajas' %}">Cajas</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'denominaciones' %}">Denominaciones</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:caja' %}">Caja: cortes y retiros</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:carpeta_banco' %}">Carpeta vigilada del banco</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:inventario' %}">Inventario</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:vocabulario' %}">Vocabulario</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:parametros' %}">Parámetros</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'agrupaciones' %}">{{ voc.agrupaciones }}</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'motivos' %}">Motivos de baja</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'campos' %}">Campos de contacto</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:catalogo' 'relaciones' %}">Relaciones de contacto</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:avanzado' %}">Ajustes avanzados</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:padron_subir' %}">Importar padrón inicial</a>
-  <a class="boton grande secundario" href="{% url 'cortes:destinos' %}">Destinos de cortes</a>
-  <a class="boton grande secundario" href="{% url 'configuracion:exportar' %}">Guardar configuración como plantilla</a>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Configuración</h1>
+  </div>
 </div>
+<nav class="accesos" aria-label="Secciones de configuración">
+  <a class="acceso" href="{% url 'configuracion:negocio' %}"><span class="acceso-titulo">Datos del negocio</span></a>
+  <a class="acceso" href="{% url 'configuracion:marca' %}"><span class="acceso-titulo">Marca del negocio</span><span class="acceso-detalle">Logo y colores</span></a>
+  <a class="acceso" href="{% url 'banco:lista' %}"><span class="acceso-titulo">Datos de pago</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'medios' %}"><span class="acceso-titulo">Medios de pago</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'cajas' %}"><span class="acceso-titulo">Cajas</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'denominaciones' %}"><span class="acceso-titulo">Denominaciones</span></a>
+  <a class="acceso" href="{% url 'configuracion:caja' %}"><span class="acceso-titulo">Caja: cortes y retiros</span></a>
+  <a class="acceso" href="{% url 'configuracion:carpeta_banco' %}"><span class="acceso-titulo">Carpeta vigilada del banco</span></a>
+  <a class="acceso" href="{% url 'configuracion:inventario' %}"><span class="acceso-titulo">Inventario</span></a>
+  <a class="acceso" href="{% url 'configuracion:vocabulario' %}"><span class="acceso-titulo">Vocabulario</span></a>
+  <a class="acceso" href="{% url 'configuracion:parametros' %}"><span class="acceso-titulo">Parámetros</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'agrupaciones' %}"><span class="acceso-titulo">{{ voc.agrupaciones }}</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'motivos' %}"><span class="acceso-titulo">Motivos de baja</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'campos' %}"><span class="acceso-titulo">Campos de contacto</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'relaciones' %}"><span class="acceso-titulo">Relaciones de contacto</span></a>
+  <a class="acceso" href="{% url 'configuracion:avanzado' %}"><span class="acceso-titulo">Ajustes avanzados</span></a>
+  <a class="acceso" href="{% url 'configuracion:padron_subir' %}"><span class="acceso-titulo">Importar padrón inicial</span></a>
+  <a class="acceso" href="{% url 'cortes:destinos' %}"><span class="acceso-titulo">Destinos de cortes</span></a>
+  <a class="acceso" href="{% url 'configuracion:exportar' %}"><span class="acceso-titulo">Guardar configuración como plantilla</span></a>
+</nav>
 {% endblock %}

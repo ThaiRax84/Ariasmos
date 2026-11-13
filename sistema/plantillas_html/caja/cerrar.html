@@ -1,6 +1,13 @@
 {% extends "base.html" %}
+{% load formato %}
 {% block contenido %}
-<h1>Cerrar turno en {{ turno.caja }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Mi caja · {{ turno.caja }} · Corte diario</span>
+    <h1>Cerrar turno</h1>
+    <p class="subtitulo">Turno abierto desde {{ turno.abierto_en|date:"d/m/Y H:i" }}</p>
+  </div>
+</div>
 {% if pendientes %}
 <section class="panel alerta">
   <h2>Hay retiros con comprobante pendiente</h2>
@@ -8,11 +15,21 @@
   <ul class="lista">{% for r in pendientes %}<li><a href="{% url 'caja:retiro' r.pk %}">Retiro {{ r }}</a></li>{% endfor %}</ul>
 </section>
 {% else %}
-<p>Cuenta el efectivo de la caja, incluido el fondo, y escribe cuántas piezas hay de cada denominación. Este primer conteo queda guardado y ya no se puede cambiar. Si coincide, el turno se cierra; si no, podrás recontar una sola vez.</p>
-<form method="post" class="formulario angosto" novalidate>
+<form method="post" class="columnas principal" novalidate>
   {% csrf_token %}
-  {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Guardar este conteo? Ya no se podrá cambiar.">Guardar conteo</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
+  <section class="panel">
+    <h2>Cuenta el efectivo de la caja</h2>
+    <p class="ayuda">Cuenta el efectivo de la caja, incluido el fondo, y escribe cuántas piezas hay de cada denominación. Este primer conteo queda guardado y ya no se puede cambiar.</p>
+    {% include "caja/_conteo.html" %}
+  </section>
+  <section class="panel">
+    <span class="etiqueta-campo">Contado</span>
+    <p class="cifra-importe grande" data-contado aria-live="polite"></p>
+    <p class="ayuda">Si coincide, el turno se cierra; si no, podrás recontar una sola vez. Lo esperado se muestra hasta que el turno queda cerrado.</p>
+    <div class="campo{% if formulario.nota.errors %} con-error{% endif %}">{{ formulario.nota.label_tag }} {{ formulario.nota }}{% for e in formulario.nota.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+    <div class="acciones columna"><button class="boton grande ancho" type="submit" data-confirmar="¿Guardar este conteo? Ya no se podrá cambiar." data-confirmar-boton="Guardar conteo">Guardar conteo y cerrar</button><a class="boton secundario ancho" href="{% url 'caja:inicio' %}">Cancelar</a></div>
+    <p class="nota-pie">Al cerrar, el corte del día se guarda y se entrega en la carpeta de cortes.</p>
+  </section>
 </form>
 {% endif %}
 {% endblock %}

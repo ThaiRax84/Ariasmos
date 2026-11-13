@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Reglas de recargo</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Conceptos · Recargos</span>
+    <h1>Reglas de recargo</h1>
+  </div>
+</div>
 <div class="atajos"><a class="boton" href="{% url 'cobros:regla_nueva' %}">Nueva regla</a><a class="boton secundario" href="{% url 'cobros:conceptos' %}">Conceptos</a></div>
 <table class="tabla">
 <thead><tr><th>Regla</th><th>Valor</th><th>Gracia</th><th>Se repite</th><th>Tope</th><th>Activa</th><th></th></tr></thead>

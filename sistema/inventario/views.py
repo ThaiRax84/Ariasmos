@@ -134,7 +134,7 @@ def vender_titular(request, pk):
                 return redirect(reverse("cobros:cobrar", args=[titular.pk]) + f"?venta={venta.pk}")
             messages.success(request, f"Venta {venta} registrada{' y cargada a su adeudo' if venta.modo == Venta.ADEUDO else ''}.")
             return redirect("inventario:venta", pk=venta.pk)
-    return render(request, "inventario/venta_nueva.html", {"formulario": formulario, "titular": titular})
+    return render(request, "inventario/venta_nueva.html", {"formulario": formulario, "titular": titular, "catalogo": servicios.para_vender()})
 
 
 def _avisar_sin_existencia(request, venta):
@@ -148,7 +148,7 @@ def _renglones_ocultos(formulario):
 
 
 def _pantalla_publico(request, formulario, turno, **extra):
-    contexto = {"formulario": formulario, "turno": turno, "publico": True, "con_piezas": control_piezas.activo(), **extra}
+    contexto = {"formulario": formulario, "turno": turno, "publico": True, "con_piezas": control_piezas.activo(), "catalogo": servicios.para_vender(), **extra}
     if formulario.is_bound and formulario.is_valid():
         contexto["ocultos"] = _renglones_ocultos(formulario)
     return render(request, "inventario/venta_nueva.html", contexto)

@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Ajustes avanzados de la {{ voc.matricula|lower }}</h1>
-<p>La {{ voc.matricula|lower }} tiene 7 dígitos porque es lo que admite la referencia numérica de una transferencia SPEI. La sede y las ranuras solo importan si varias instalaciones emiten {{ voc.matricula|lower }}s sin conectarse entre sí: cada una usa una sede distinta.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración</span>
+    <h1>Ajustes avanzados de la {{ voc.matricula|lower }}</h1>
+    <p class="subtitulo">La {{ voc.matricula|lower }} tiene 7 dígitos porque es lo que admite la referencia numérica de una transferencia SPEI. La sede y las ranuras solo importan si varias instalaciones emiten {{ voc.matricula|lower }}s sin conectarse entre sí: cada una usa una sede distinta.</p>
+  </div>
+</div>
 {% if bloqueado %}<p class="mensaje warning">Ya se emitieron {{ voc.matricula|lower }}s: estos ajustes quedaron fijos y no se pueden cambiar.</p>{% endif %}
 <form method="post" class="formulario angosto" novalidate>
   {% csrf_token %}

@@ -73,6 +73,7 @@ def _turno(usuario, permisos):
 
 def general(request):
     from .marca import actual as marca_actual
+    from .moneda import actual as moneda_actual
 
     usuario = getattr(request, "user", None)
     autenticado = usuario is not None and usuario.is_authenticated
@@ -86,6 +87,7 @@ def general(request):
         "version": version_actual(),
         "inventario_activo": inventario,
         "marca": marca_actual(),
+        "moneda": moneda_actual(),
     }
     if autenticado:
         contexto["menu"] = menu(permisos, voc, inventario, request.path)

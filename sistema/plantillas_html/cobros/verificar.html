@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Verificar recibo</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Recibos</span>
+    <h1>Verificar recibo</h1>
+  </div>
+</div>
 <form method="get" class="formulario angosto" novalidate>
   {% include "comun/_campos.html" %}
   <div class="acciones"><button class="boton" type="submit">Verificar</button></div>

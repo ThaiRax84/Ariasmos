@@ -1,33 +1,54 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Turno de {{ turno.usuario }} en {{ turno.caja }}</h1>
-<p>Abierto {{ turno.abierto_en|date:"d/m/Y H:i" }}{% if turno.cerrado_en %} · cerrado {{ turno.cerrado_en|date:"d/m/Y H:i" }}{% endif %} · {{ cobros }} cobro{{ cobros|pluralize }}.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Mi caja · {{ turno.caja }} · Corte diario</span>
+    <h1>{% if arqueo %}Resultado del conteo{% else %}Turno de {{ turno.usuario }}{% endif %}</h1>
+    <p class="subtitulo">Turno de {{ turno.usuario }} en {{ turno.caja }} · abierto {{ turno.abierto_en|date:"d/m/Y H:i" }}{% if turno.cerrado_en %} · cerrado {{ turno.cerrado_en|date:"d/m/Y H:i" }}{% endif %} · {{ cobros }} cobro{{ cobros|pluralize }}.</p>
+  </div>
+</div>
 {% if arqueo %}
-<section class="panel{% if arqueo.supera_umbral %} alerta{% endif %}">
-  <h2>Arqueo</h2>
-  <dl class="datos">
-    <dt>Contado</dt><dd>{{ arqueo.contado|dinero }}{% if arqueo.con_reconteo %} (reconteo; el primer conteo fue {{ arqueo.primer_contado|dinero }}){% endif %}</dd>
-    <dt>Esperado</dt><dd>{{ arqueo.esperado|dinero }} (incluye fondo de {{ turno.fondo_inicial|dinero }})</dd>
-    <dt>Diferencia</dt><dd><strong>{{ arqueo.diferencia|dinero }}</strong></dd>
-    {% if arqueo.nota %}<dt>Nota</dt><dd>{{ arqueo.nota }}</dd>{% endif %}
-  </dl>
-  {% if piezas %}
-  <h3>Piezas por denominación{% if arqueo.con_reconteo %} (reconteo){% endif %}</h3>
-  <table class="tabla"><thead><tr><th>Denominación</th><th>Debe haber</th><th>Hay</th><th>Diferencia</th></tr></thead>
-  <tbody>{% for f in piezas %}<tr><td>{{ f.denominacion|dinero }}</td><td>{{ f.esperadas }}</td><td>{{ f.contadas }}</td><td>{{ f.diferencia }}</td></tr>{% endfor %}</tbody></table>
-  {% if primer_piezas %}
-  <h3>Primer conteo</h3>
-  <table class="tabla"><thead><tr><th>Denominación</th><th>Debe haber</th><th>Hubo</th><th>Diferencia</th></tr></thead>
-  <tbody>{% for f in primer_piezas %}<tr><td>{{ f.denominacion|dinero }}</td><td>{{ f.esperadas }}</td><td>{{ f.contadas }}</td><td>{{ f.diferencia }}</td></tr>{% endfor %}</tbody></table>
-  {% endif %}
-  {% endif %}
-</section>
-{% if retiros %}
-<section class="panel">
-  <h2>Retiros del turno</h2>
-  <ul class="lista">{% for r in retiros %}<li><a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a> · {{ r.motivo }} · {{ r.importe|dinero }}</li>{% endfor %}</ul>
-</section>
-{% endif %}
-{% elif turno.abierto %}<p>El turno sigue abierto: lo esperado se muestra hasta que se cierre con su arqueo.</p>{% endif %}
+<div class="columnas principal">
+  <div class="pila">
+    {% if piezas %}
+    <section class="panel">
+      <h2>Por denominación{% if arqueo.con_reconteo %} (reconteo){% endif %}</h2>
+      <table class="tabla"><thead><tr><th>Denominación</th><th class="num">Debe haber</th><th class="num">Hay</th><th class="num">Diferencia</th></tr></thead>
+      <tbody>{% for f in piezas %}<tr><td class="fuerte">{{ f.denominacion|dinero }}</td><td class="num">{{ f.esperadas }}</td><td class="num">{{ f.contadas }}</td><td class="num">{% if f.diferencia %}<span class="diferencia-otra">{{ f.diferencia }}</span>{% else %}<span class="diferencia-cero">0</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+      <p class="nota-pie">Las piezas son una guía: lo que cuenta para el corte es el total.</p>
+    </section>
+    {% if primer_piezas %}
+    <section class="panel">
+      <h2>Primer conteo</h2>
+      <table class="tabla"><thead><tr><th>Denominación</th><th class="num">Debe haber</th><th class="num">Hubo</th><th class="num">Diferencia</th></tr></thead>
+      <tbody>{% for f in primer_piezas %}<tr><td class="fuerte">{{ f.denominacion|dinero }}</td><td class="num">{{ f.esperadas }}</td><td class="num">{{ f.contadas }}</td><td class="num">{{ f.diferencia }}</td></tr>{% endfor %}</tbody></table>
+    </section>
+    {% endif %}
+    {% endif %}
+    {% if retiros %}
+    <section class="panel">
+      <h2>Retiros del turno</h2>
+      <ul class="lista">{% for r in retiros %}<li><a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a> · {{ r.motivo }} · {{ r.importe|dinero }}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+  </div>
+  <section class="panel">
+    <h2>Arqueo</h2>
+    <div class="cuadro{% if arqueo.diferencia %} aviso{% endif %}">
+      <span class="etiqueta">Diferencia</span>
+      <span class="valor cifra-importe media">{{ arqueo.diferencia|dinero }}</span>
+      <span class="ayuda">{% if arqueo.diferencia < 0 %}Falta efectivo respecto a lo esperado.{% elif arqueo.diferencia > 0 %}Sobra efectivo respecto a lo esperado.{% else %}El conteo coincide con lo esperado.{% endif %}</span>
+    </div>
+    <dl class="datos">
+      <dt>Fondo inicial</dt><dd>{{ turno.fondo_inicial|dinero }}</dd>
+      <dt>Esperado</dt><dd>{{ arqueo.esperado|dinero }} (incluye fondo de {{ turno.fondo_inicial|dinero }})</dd>
+      {% if arqueo.con_reconteo %}<dt>Primer conteo</dt><dd>{{ arqueo.primer_contado|dinero }}</dd>{% endif %}
+      <dt>Contado</dt><dd>{{ arqueo.contado|dinero }}{% if arqueo.con_reconteo %} (reconteo; el primer conteo fue {{ arqueo.primer_contado|dinero }}){% endif %}</dd>
+      {% if arqueo.nota %}<dt>Nota</dt><dd>{{ arqueo.nota }}</dd>{% endif %}
+    </dl>
+    <div class="acciones columna"><a class="boton secundario ancho" href="{% url 'cortes:lista' %}">Ver los cortes</a></div>
+  </section>
+</div>
+{% elif turno.abierto %}<p class="mensaje">El turno sigue abierto: lo esperado se muestra hasta que se cierre con su arqueo.</p>{% endif %}
 {% endblock %}

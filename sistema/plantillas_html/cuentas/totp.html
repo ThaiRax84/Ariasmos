@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Activa tu autenticador</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Activa tu autenticador</h1>
+  </div>
+</div>
 {% include "comun/_autenticador.html" %}
 <form method="post" class="formulario angosto">
   {% csrf_token %}

@@ -141,6 +141,37 @@
     splash.addEventListener("animationend", function () { if (!listo) { listo = true; splash.hidden = true; document.removeEventListener("keydown", quitar, true); } });
   }
 
+  function formatear(centavos, simbolo) {
+    var signo = centavos < 0 ? "-" : "";
+    var absoluto = Math.abs(centavos);
+    var enteros = Math.floor(absoluto / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    var resto = ("0" + (absoluto % 100)).slice(-2);
+    return signo + simbolo + enteros + "." + resto;
+  }
+
+  function prepararConteos() {
+    document.querySelectorAll("[data-conteo]").forEach(function (tabla) {
+      var simbolo = tabla.getAttribute("data-simbolo") || "$";
+      var contenedor = tabla.closest("form") || document;
+      var total = contenedor.querySelector("[data-contado]");
+      var calcular = function () {
+        var suma = 0;
+        tabla.querySelectorAll("tr[data-centavos]").forEach(function (fila) {
+          var campo = fila.querySelector("input");
+          var piezas = parseInt(campo && campo.value, 10);
+          var valor = parseInt(fila.getAttribute("data-centavos"), 10);
+          var subtotal = isNaN(piezas) || isNaN(valor) ? 0 : piezas * valor;
+          suma += subtotal;
+          var celda = fila.querySelector("[data-subtotal]");
+          if (celda) { celda.textContent = formatear(subtotal, simbolo); }
+        });
+        if (total) { total.textContent = formatear(suma, simbolo); }
+      };
+      tabla.addEventListener("input", calcular);
+      calcular();
+    });
+  }
+
   function prepararImprimir() {
     var imprimir = document.getElementById("imprimir");
     if (imprimir) { imprimir.addEventListener("click", function () { window.print(); }); }
@@ -152,5 +183,6 @@
     prepararMenuMas();
     prepararAvisosBreves();
     prepararSplash();
+    prepararConteos();
   });
 }());

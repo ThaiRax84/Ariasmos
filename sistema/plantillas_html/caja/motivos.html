@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Motivos de retiro</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración · Motivos de retiro</span>
+    <h1>Motivos de retiro</h1>
+  </div>
+</div>
 <div class="atajos"><a class="boton" href="{% url 'caja:motivo_nuevo' %}">Nuevo motivo</a></div>
 <table class="tabla">
 <thead><tr><th>Nombre</th><th>Activo</th><th></th></tr></thead>

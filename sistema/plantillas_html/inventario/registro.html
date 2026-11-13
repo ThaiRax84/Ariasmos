@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ registro.get_tipo_display }} {{ registro.pk }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>{{ registro.get_tipo_display }} {{ registro.pk }}</h1>
+  </div>
+</div>
 <dl class="datos">
   <dt>Artículo</dt><dd>{{ registro.articulo }}</dd>
   <dt>Cantidad</dt><dd>{{ registro.cantidad }}</dd>
