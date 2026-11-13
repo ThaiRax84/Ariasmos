@@ -22,6 +22,7 @@ if _datos is None:
     HTTPS_ACTIVO = False
     CERTIFICADO_SERVIDOR = ""
     RUTA_ANCLA_AUDITORIA = ""
+    RUTA_COMPROBANTES = ""
     DATABASES = base_de_datos(":memory:")
     ALLOWED_HOSTS = []
 else:
@@ -36,6 +37,7 @@ else:
     CLAVE_RESPALDO = bytes.fromhex(_datos.get("clave_respaldo", ""))
     RUTA_INSTANCIA = str(instancia.carpeta())
     RUTA_ANCLA_AUDITORIA = str(instancia.carpeta() / instancia.ANCLA)
+    RUTA_COMPROBANTES = str(instancia.carpeta() / instancia.COMPROBANTES)
     DATABASES = base_de_datos(_datos["base_datos"])
     ALLOWED_HOSTS = list(_datos.get("hosts", []))
     CSRF_TRUSTED_ORIGINS = list(_datos.get("origenes_confiables", []))

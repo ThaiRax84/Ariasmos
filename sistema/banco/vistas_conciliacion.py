@@ -159,7 +159,7 @@ def previa(request, token):
 
 @requiere_permiso(CONCILIA)
 def importaciones(request):
-    consulta = Importacion.objects.select_related("cuenta__banco", "creada_por", "revisada_por").annotate(aplicados_vigentes=Count("lista", filter=Q(lista__estado=MovimientoBancario.APLICADO)))
+    consulta = Importacion.objects.select_related("cuenta__banco", "creada_por", "revisada_por", "liberada_por").annotate(aplicados_vigentes=Count("lista", filter=Q(lista__estado=MovimientoBancario.APLICADO)))
     return render(request, "banco/importaciones.html", {"importaciones": consulta[:100]})
 
 
@@ -172,7 +172,8 @@ def importacion(request, pk):
         "movimientos": objeto.lista.select_related("pago__titular", "pago__recibo"),
         "aplicados": aplicados["n"],
         "monto": aplicados["t"] or 0,
-        "puede_revisar": objeto.requiere_revision and objeto.revisada_por_id is None and request.user.tiene_permiso(REVISA) and objeto.creada_por_id != request.user.pk,
+        "puede_revisar": objeto.requiere_revision and objeto.revisada_por_id is None and request.user.tiene_permiso(REVISA) and objeto.creada_por_id != request.user.pk and objeto.liberada_por_id != request.user.pk,
+        "puede_liberar": objeto.retenida and objeto.liberada_en is None and request.user.tiene_permiso(CONCILIA),
     }
     return render(request, "banco/importacion.html", contexto)
 
@@ -189,6 +190,19 @@ def revisada(request, pk):
         messages.error(request, str(error))
     else:
         messages.success(request, "Importación marcada como revisada.")
+    return redirect("conciliacion:importacion", pk=pk)
+
+
+@requiere_permiso(CONCILIA)
+@require_POST
+def liberar(request, pk):
+    objeto = get_object_or_404(Importacion.objects.select_related("cuenta"), pk=pk)
+    try:
+        aplicados, depositos = conciliacion.liberar(objeto, request.user, request)
+    except conciliacion.ErrorConciliacion as error:
+        messages.error(request, str(error))
+    else:
+        messages.success(request, f"Importación liberada: {aplicados} pago{'s' if aplicados != 1 else ''} aplicado{'s' if aplicados != 1 else ''} y {depositos} depósito{'s' if depositos != 1 else ''} conciliado{'s' if depositos != 1 else ''}.")
     return redirect("conciliacion:importacion", pk=pk)
 
 

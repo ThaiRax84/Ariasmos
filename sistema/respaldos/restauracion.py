@@ -49,6 +49,14 @@ def restaurar(archivo, texto_clave, reemplazar=False, destino=None):
         if servicios.ANCLA in extraidos:
             shutil.copyfile(extraidos[servicios.ANCLA], destino / instancia.ANCLA)
             os.chmod(destino / instancia.ANCLA, 0o600)
+        carpeta_comprobantes = destino / instancia.COMPROBANTES
+        for miembro, ruta in extraidos.items():
+            encontrado = servicios.PATRON_COMPROBANTE.match(miembro)
+            if encontrado is None:
+                continue
+            carpeta_comprobantes.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ruta, carpeta_comprobantes / encontrado.group(1))
+            os.chmod(carpeta_comprobantes / encontrado.group(1), 0o600)
         return {"destino": str(destino), "copia_anterior": str(copia) if copia else "", "conteos": revision["conteos"], "eventos": revision["eventos"]}
     finally:
         shutil.rmtree(temporal, ignore_errors=True)

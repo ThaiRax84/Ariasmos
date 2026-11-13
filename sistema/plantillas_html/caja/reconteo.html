@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>El conteo no coincide</h1>
+<p>Lo que contaste en {{ turno.caja }} no coincide con lo que debe haber. Puedes recontar una sola vez o cerrar con el primer conteo. En los dos casos escribe una nota; al cerrar verás lo esperado, lo contado y la diferencia.</p>
+<section class="panel">
+  <h2>Recontar</h2>
+  <form method="post" class="formulario angosto" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="reconteo">
+    {% include "comun/_campos.html" with formulario=recontar %}
+    <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Cerrar el turno con este reconteo?">Cerrar con el reconteo</button></div>
+  </form>
+</section>
+<section class="panel">
+  <h2>Cerrar con el primer conteo</h2>
+  <form method="post" class="formulario angosto" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="primero">
+    {% include "comun/_campos.html" with formulario=con_primero %}
+    <div class="acciones"><button class="boton secundario" type="submit" data-confirmar="¿Cerrar el turno con el primer conteo?">Cerrar con el primer conteo</button></div>
+  </form>
+</section>
+{% endblock %}

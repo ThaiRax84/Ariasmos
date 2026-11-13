@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from auditoria.servicios import diferencias, registrar
+from caja import acciones as retiros_acciones
 from cobros import acciones, generacion, libro
 from configuracion.models import hoy_negocio, parametro
 from cuentas.models import CodigoUsado
@@ -38,6 +39,9 @@ class Contexto:
 
 
 class Manejador:
+    motivo_obligatoria = "pago_cobrado_por_quien_revierte"
+    mensaje_propio = "Nadie resuelve la reversión de un pago que él mismo cobró."
+
     def llave(self, datos):
         return {}
 
@@ -159,9 +163,11 @@ MANEJADORES = {
     "condonar_recargo": acciones.Condonar(),
     "revertir_pago": acciones.Revertir(),
     "pago_sobre_tope": acciones.PagoSobreTope(),
+    "retiro_caja": retiros_acciones.RetiroSobreTope(),
+    "revertir_retiro": retiros_acciones.RevertirRetiro(),
 }
 
-ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro)
+ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion)
 
 
 def _validar(manejador, titular, datos):
@@ -171,22 +177,27 @@ def _validar(manejador, titular, datos):
         raise ErrorSolicitud(str(error))
 
 
+def _foto(titular):
+    return foto_titular(titular) if titular is not None else {}
+
+
 def _aplicar(manejador, titular, datos, contexto):
-    antes = foto_titular(titular)
+    antes = _foto(titular)
     try:
         detalle = dict(manejador.aplicar(titular, datos, contexto) or {})
     except ERRORES_DE_ACCION as error:
         raise ErrorSolicitud(str(error))
-    titular.refresh_from_db()
-    cambios = diferencias(antes, foto_titular(titular))
+    if titular is not None:
+        titular.refresh_from_db()
+    cambios = diferencias(antes, _foto(titular))
     cambios.update(detalle.pop("cambios", {}))
     return cambios, detalle
 
 
 def _rechazar(manejador, titular, datos, contexto=None):
-    antes = foto_titular(titular)
+    antes = _foto(titular)
     manejador.rechazar(titular, datos, contexto)
-    return diferencias(antes, foto_titular(titular))
+    return diferencias(antes, _foto(titular))
 
 
 def politica_de(accion):
@@ -222,17 +233,17 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
         raise PermissionDenied
     caducar_vencidas()
     with transaction.atomic():
-        titular = Titular.objects.get(pk=titular.pk)
+        titular = Titular.objects.get(pk=titular.pk) if titular is not None else None
         _validar(manejador, titular, datos)
         if Solicitud.objects.filter(titular=titular, accion=accion, estado=Solicitud.PENDIENTE, **manejador.llave(datos)).exists():
             raise ErrorSolicitud("Ya hay una solicitud pendiente para esta acción.")
         contexto = Contexto(ejecutor=usuario, autorizador=usuario, solicitante=usuario, request=request)
         forzada = manejador.exige_solicitud(usuario, titular, datos)
         if forzada:
-            registrar("solicitud_obligatoria", usuario=usuario, objeto=titular, datos={"accion": accion, "motivo": "pago_cobrado_por_quien_revierte"}, request=request)
+            registrar("solicitud_obligatoria", usuario=usuario, objeto=titular, datos={"accion": accion, "motivo": manejador.motivo_obligatoria}, request=request)
         if not forzada and usuario.tiene_permiso_de_rol(politica.permiso_directo):
             cambios, detalle = _aplicar(manejador, titular, datos, contexto)
-            registrar(f"{accion}_aplicada", usuario=usuario, objeto=titular, datos={"via": "directa", **datos, **detalle, "cambios": cambios}, request=request)
+            registrar(f"{accion}_aplicada", usuario=usuario, objeto=titular or contexto.resultado, datos={"via": "directa", **datos, **detalle, "cambios": cambios}, request=request)
             return Resultado("directa", objeto=contexto.resultado)
         if politica.permite_delegacion and not forzada:
             delegacion = usar_delegacion(usuario, politica.permiso_directo, request=request, contexto={"accion": accion, "titular": titular.pk})
@@ -242,7 +253,7 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
                 registrar(
                     f"{accion}_aplicada",
                     usuario=usuario,
-                    objeto=titular,
+                    objeto=titular or contexto.resultado,
                     datos={"via": "delegacion", "delegacion": delegacion.pk, "otorgante": str(delegacion.otorgante), **datos, **detalle, "cambios": cambios},
                     request=request,
                 )
@@ -256,7 +267,7 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
             solicitante=usuario,
             caduca_en=timezone.now() + timedelta(hours=politica.horas_caducidad),
         )
-        registrar("solicitud_creada", usuario=usuario, objeto=solicitud, datos={"accion": accion, "titular": titular.pk, **datos}, request=request)
+        registrar("solicitud_creada", usuario=usuario, objeto=solicitud, datos={"accion": accion, "titular": titular.pk if titular is not None else None, **datos}, request=request)
         return Resultado("solicitud", solicitud)
 
 
@@ -271,7 +282,7 @@ def _verificar_resolvible(solicitud, usuario, request, evento):
         raise ErrorSolicitud("Nadie puede resolver su propia solicitud.")
     if not MANEJADORES[solicitud.accion].puede_resolver(usuario, solicitud.datos):
         registrar(evento, usuario=usuario, objeto=solicitud, datos={"motivo": "cobro_propio"}, request=request)
-        raise ErrorSolicitud("Nadie resuelve la reversión de un pago que él mismo cobró.")
+        raise ErrorSolicitud(MANEJADORES[solicitud.accion].mensaje_propio)
 
 
 def _autorizar_resolucion(solicitud, usuario, politica, request):
@@ -363,7 +374,7 @@ def autorizar_con_codigo(solicitud, capturista, autorizador, codigo, request=Non
         raise ErrorSolicitud("Nadie puede autorizar su propia solicitud.")
     if not MANEJADORES[solicitud.accion].puede_resolver(autorizador, solicitud.datos):
         registrar("aprobacion_rechazada", usuario=capturista, objeto=solicitud, datos={"motivo": "cobro_propio", "autorizador": autorizador.pk}, request=request)
-        raise ErrorSolicitud("Nadie autoriza la reversión de un pago que él mismo cobró.")
+        raise ErrorSolicitud(MANEJADORES[solicitud.accion].mensaje_propio)
     if solicitud.estado != Solicitud.PENDIENTE:
         raise ErrorSolicitud("La solicitud ya no está pendiente.")
     if solicitud.caduca_en <= timezone.now():

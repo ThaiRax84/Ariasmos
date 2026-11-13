@@ -14,18 +14,34 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 ### Cobrar en efectivo
 
-1. Abre tu turno en **Mi caja** (el fondo inicial es opcional).
+1. Abre tu turno en **Mi caja** (el fondo inicial es opcional). Si el negocio captura piezas por denominación, escribe cuántos billetes y monedas de cada valor hay en el fondo.
 2. Menú **Cobrar** → busca al titular por nombre o matrícula.
 3. Escribe el importe recibido. El sistema muestra cómo se reparte entre los cargos pendientes (y los de su familia).
-4. Confirma. Se emite el recibo foliado; imprímelo o descárgalo en PDF.
+4. Si se capturan piezas: escribe los billetes y monedas que te entregan y elige **Calcular el cambio**. El sistema propone las piezas del cambio con las que debería haber en tu caja; entrega exactamente esas o corrígelas en pantalla antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
+5. Confirma. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
+
+### Retirar efectivo para un gasto
+
+1. Con tu turno abierto, en **Mi caja** elige **Retirar efectivo**.
+2. Escribe el importe, elige el motivo, anota en qué se gastó y adjunta la foto o el PDF del ticket (JPEG, PNG o PDF de hasta 5 MB). Puedes adjuntarlo después desde el retiro.
+3. Si el retiro cabe en los topes del negocio, queda registrado de inmediato con su folio. Si pasa de algún tope, queda como **solicitud** y se registra cuando otra persona lo autoriza (por la bandeja, con una delegación o con su código por teléfono).
+4. Solo se puede retirar efectivo cobrado en tu turno. Si no alcanza, el sistema lo dice sin decir cuánto hay; después de tres intentos así, los retiros de ese turno piden autorización.
+5. No puedes cerrar el turno con retiros sin comprobante: adjúntalo o declara que no lo hay con su motivo (Supervisión recibe el aviso).
+6. Un retiro no se borra. Si hubo un error, pide su **reversión**: la resuelve otra persona y el efectivo regresa a tu turno abierto.
 
 ### Corte diario
 
 1. Al terminar el día, en **Mi caja** elige **Cerrar turno**.
-2. Cuenta el efectivo por billete y moneda. No verás lo esperado hasta después de contar.
-3. Al cerrar se genera tu **corte diario**: los recibos del día, las devoluciones, lo contado y la diferencia. Lo ves en **Cortes**.
-4. Si cierras después de la hora límite (18:00 de inicio), el corte queda marcado como **tardío**; no pasa nada más.
-5. Entrega el efectivo a Supervisión desde **Mi caja** → **Entregar efectivo**; quien lo recibe lo confirma en su sesión.
+2. Cuenta el efectivo por billete y moneda y guarda el conteo. No verás lo esperado hasta que el turno quede cerrado, y el conteo guardado ya no se puede cambiar.
+3. Si coincide con lo que debe haber, el turno se cierra. Si no coincide, el sistema solo dice que **no coincide** (sin decir cuánto ni si sobra o falta) y te deja **recontar una sola vez** o cerrar con el primer conteo; en los dos casos escribe una nota.
+4. Al cerrar ves lo esperado, lo contado y la diferencia, en total y, si se capturan piezas, por denominación. Se genera tu **corte diario**: recibos, devoluciones, retiros, lo contado y la diferencia. Lo ves en **Cortes**.
+5. Cada negocio decide qué días hay corte y a qué hora. Un turno abierto en un día con corte debe cerrarse antes de la hora de ese día; si se abrió en un día sin corte, antes de la hora del siguiente día que sí tenga. Si cierras después, el corte queda marcado como **tardío**; no pasa nada más.
+6. Entrega el efectivo a Supervisión desde **Mi caja** → **Entregar efectivo**; quien lo recibe lo confirma en su sesión.
+
+### Verificar un recibo
+
+- **Verificar recibo** acepta el código del recibo con su folio, o el texto del QR: con un lector de códigos conectado por USB basta con leer el QR del recibo.
+- Responde si el recibo es auténtico, si está cancelado o si no se reconoce. Después de varios intentos fallidos en una hora, la verificación se bloquea un rato para esa persona y esa computadora.
 
 ## Supervisión
 
@@ -37,15 +53,22 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 ### Banco
 
-1. Menú **Banco** → **Importar**: sube el estado de cuenta en PDF o el archivo de movimientos del banco.
+1. Menú **Banco** → **Importar**: sube el estado de cuenta en PDF o el archivo de movimientos del banco. Si hay carpeta vigilada, basta con dejar ahí el archivo descargado; el sistema lo importa solo y lo muestra en el Inicio.
 2. Revisa la vista previa: cuántos pagos se aplican solos, cuántos quedan por identificar y cuántos ya estaban.
 3. En la **cola** de movimientos por identificar, confirma a quién pertenece cada uno, o márcalo como «no es un cobro».
 4. Los depósitos de efectivo de caja se emparejan con los movimientos del banco.
+5. Una importación de la carpeta vigilada que no continúa el estado anterior queda **retenida**: no aplica pagos. Revísala contra el banco y elige **Revisada: aplicar sus pagos**.
 
 ### Efectivo
 
-- **Efectivo** muestra quién tiene dinero en custodia, las entregas por confirmar y los depósitos por conciliar.
+- **Efectivo** muestra quién tiene dinero en custodia, las entregas por confirmar y los depósitos por conciliar. Si tú mismo tienes un turno abierto, tu efectivo no se muestra hasta que lo cierres.
 - Confirma las entregas que recibes contando el dinero; si no coincide, recházala.
+
+### Retiros de caja
+
+- **Efectivo** → **Retiros de caja** lista todos los retiros con su comprobante. Cada uno nace «por revisar»: ábrelo, revisa el comprobante y márcalo **Revisado** u **Observado** con una nota. Nadie revisa un retiro propio.
+- En el **Inicio** aparecen avisos cuando una caja llega al 80 % de un tope del periodo, cuando un retiro se declara sin comprobante y cuando hay retiros sin revisar desde hace varios días.
+- **Motivos de retiro** permite agregar o desactivar motivos.
 
 ### Corte mayor
 
@@ -68,7 +91,7 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes e importación inicial del padrón.
+- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
 
 ### Respaldos
@@ -80,7 +103,7 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 ### Revisión de importaciones
 
 - Cuando alguien importa un archivo de banco que no se puede comprobar contra el estado de cuenta anterior y con él se aplicaron pagos, aparece en tu Inicio como **importación por revisar**.
-- Ábrela, compárala con el banco y elige **Marcar como revisada**. Quien la importó no puede marcarla.
+- Ábrela, compárala con el banco y elige **Marcar como revisada**. Quien la importó, o quien la liberó si llegó por la carpeta vigilada, no puede marcarla.
 
 ### Bitácora
 

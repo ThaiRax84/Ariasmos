@@ -9,7 +9,7 @@ from caja.models import Turno
 from cobros.models import Pago
 from configuracion.models import Negocio, hoy_negocio, parametro
 
-from . import calculo, entrega, salida
+from . import calculo, calendario, entrega, salida
 from .models import COBRANZA, DIARIO, MAYOR, Corte, DefinicionCorte, Destino, Entrega, ReglaDestino
 
 ESPERA_MAXIMA_MINUTOS = 6 * 60
@@ -18,14 +18,6 @@ INTENTOS_MAXIMOS = 12
 
 class ErrorCorte(ValueError):
     pass
-
-
-def hora_limite():
-    texto = str(parametro("hora_limite_corte_diario"))
-    try:
-        return time.fromisoformat(texto)
-    except ValueError:
-        return time(18, 0)
 
 
 def _fin_de_mes(dia):
@@ -64,19 +56,22 @@ def _cerrar(corte, cifras, usuario=None, sin_revisar=False):
     return corte
 
 
+def con_movimientos(turno):
+    return Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO).exists() or turno.devoluciones.exists() or turno.retiros.exists() or turno.retiros_devueltos.exists()
+
+
 def crear_diario(turno, arqueo, request=None):
-    tiene = Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO).exists() or turno.devoluciones.exists()
-    if not tiene:
+    if not con_movimientos(turno):
         return None
     turno.refresh_from_db()
     abierto = calculo.local(turno.abierto_en)
     cerrado = calculo.local(turno.cerrado_en or timezone.now())
-    limite = datetime.combine(abierto.date(), hora_limite(), tzinfo=abierto.tzinfo)
+    limite = calendario.limite(abierto)
     numero = (Corte.objects.filter(tipo=DIARIO, fecha=abierto.date(), caja=turno.caja).aggregate(n=Max("numero"))["n"] or 0) + 1
     cifras = calculo.cifras_diario(turno, arqueo)
     corte = Corte.objects.create(
         tipo=DIARIO, fecha=abierto.date(), periodo_inicio=abierto.date(), periodo_fin=cerrado.date(), turno=turno, caja=turno.caja,
-        usuario=turno.usuario, numero=numero, tardio=cerrado > limite, cifras=cifras,
+        usuario=turno.usuario, numero=numero, tardio=limite is not None and cerrado > limite, cifras=cifras,
     )
     _cerrar(corte, cifras, turno.usuario)
     crear_entregas(corte)
@@ -86,15 +81,17 @@ def crear_diario(turno, arqueo, request=None):
 
 def diarios_pendientes(ahora=None):
     ahora = calculo.local(ahora or timezone.now())
-    hoy = ahora.date()
-    pasada = ahora.time() >= hora_limite()
-    inicio_hoy = datetime.combine(hoy, time.min, tzinfo=ahora.tzinfo)
+    inicio_hoy = datetime.combine(ahora.date(), time.min, tzinfo=ahora.tzinfo)
+    reglas = calendario.actual()
     pendientes = []
     for turno in Turno.objects.filter(estado=Turno.ABIERTO).select_related("caja", "usuario"):
+        abierto = calculo.local(turno.abierto_en)
+        limite = calendario.limite(abierto, reglas)
+        if limite is None or ahora < limite:
+            continue
         anterior = turno.abierto_en < inicio_hoy
-        con_cobros = turno.pagos.filter(fecha__gte=inicio_hoy).exists() or turno.devoluciones.exists()
-        if anterior or (pasada and con_cobros):
-            pendientes.append({"turno": turno, "persona": turno.usuario, "caja": turno.caja, "desde": calculo.local(turno.abierto_en), "dia_anterior": anterior})
+        if anterior or con_movimientos(turno):
+            pendientes.append({"turno": turno, "persona": turno.usuario, "caja": turno.caja, "desde": abierto, "limite": limite, "dia_anterior": anterior})
     return pendientes
 
 

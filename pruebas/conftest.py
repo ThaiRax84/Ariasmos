@@ -60,6 +60,12 @@ def ancla_temporal(settings, tmp_path):
     return settings.RUTA_ANCLA_AUDITORIA
 
 
+@pytest.fixture(autouse=True)
+def comprobantes_temporales(settings, tmp_path):
+    settings.RUTA_COMPROBANTES = str(tmp_path / "comprobantes")
+    return settings.RUTA_COMPROBANTES
+
+
 @pytest.fixture
 def roles(db):
     return configurar("escuela")

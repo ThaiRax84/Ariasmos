@@ -15,7 +15,7 @@ Esta guía es para la persona que instala el sistema en el equipo que hará de s
 2. Comprueba que el instalador no se dañó ni fue cambiado. Abre **PowerShell** (menú Inicio → escribe «PowerShell») y escribe, cambiando la ruta por la de tu carpeta de descargas:
 
    ```
-   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.4.0-instalador.exe" -Algorithm SHA256
+   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.5.0-instalador.exe" -Algorithm SHA256
    ```
 
 3. El texto largo que aparece en la columna **Hash** debe ser **igual** al que viene en `SHA256SUMS.txt` (no importan mayúsculas o minúsculas). Si no es igual, **no instales**: vuelve a descargarlo.
@@ -41,13 +41,24 @@ El navegador se abre en `https://localhost/`. El asistente te lleva paso a paso:
 2. **Vocabulario y conceptos**: cómo se llaman las personas a las que se cobra y qué conceptos se cobran. Se puede dejar como viene.
 3. **Importes** de cada concepto y, si aplica, el recargo por pago tardío.
 4. **Datos de pago**: la cuenta bancaria (CLABE y beneficiario) que aparece en las fichas de pago. Se puede completar después.
-5. **Cortes y respaldo**: la carpeta donde se dejan los cortes y la carpeta del respaldo diario. Aquí aparece la **clave de recuperación** (ver abajo).
-6. **Primer usuario de Dirección**: tu usuario y contraseña.
-7. **Autenticador**: instala en tu teléfono una aplicación gratuita como Google Authenticator, Microsoft Authenticator, Authy o 2FAS, escanea el código QR y escribe el código de 6 dígitos.
+5. **Caja: cortes y retiros**: qué días de la semana hay corte de caja y la hora límite de cada uno (propone lunes a sábado a las 18:00; deja vacío el día que no tenga corte), si se capturan las piezas de cada billete y moneda, y los topes de los retiros de caja (importe máximo por retiro, importe y número máximo de retiros por día o por semana y efectivo máximo en caja). Lo que pase de un tope necesita la autorización de otra persona.
+6. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** (ver abajo). Aquí aparece la **clave de recuperación** (ver abajo).
+7. **Primer usuario de Dirección**: tu usuario y contraseña.
+8. **Autenticador**: instala en tu teléfono una aplicación gratuita como Google Authenticator, Microsoft Authenticator, Authy o 2FAS, escanea el código QR y escribe el código de 6 dígitos.
+
+### Carpeta vigilada del banco
+
+Es una carpeta donde alguien deja el archivo descargado de la banca en línea (estado de cuenta en PDF o archivo de movimientos en Excel o CSV). Cada pocos minutos el sistema la revisa e importa lo nuevo con las mismas revisiones que una importación manual.
+
+- Solo toma archivos `.pdf`, `.xlsx` y `.csv` que ya terminaron de copiarse; un archivo que ya se importó no se vuelve a importar.
+- Lo importado pasa a la subcarpeta `procesados`; lo rechazado, a `rechazados`, junto con un archivo `.motivo.txt` que dice por qué.
+- Un Excel o CSV solo se reconoce si antes se importó a mano uno con las mismas columnas.
+- Si el archivo no continúa el estado de cuenta anterior (por ejemplo, el primero o un Excel), sus pagos **no se aplican** hasta que alguien con permiso de conciliar lo revise contra el banco y elija **Revisada: aplicar sus pagos**.
+- La carpeta no puede estar dentro de la carpeta del programa ni de la de datos. Si es una carpeta de tu usuario, dale permiso como se explica en la sección 6.
 
 ## 4. La clave de recuperación
 
-En el paso de cortes y respaldo aparece una clave larga en grupos de 4 letras y números. **Es la única forma de abrir los respaldos.** Sin ella, si el equipo se descompone o se pierde, la información no se puede recuperar.
+En el paso de entrega y respaldo aparece una clave larga en grupos de 4 letras y números. **Es la única forma de abrir los respaldos.** Sin ella, si el equipo se descompone o se pierde, la información no se puede recuperar.
 
 - Imprímela o cópiala a mano, completa.
 - Guárdala **fuera de este equipo**, en un lugar seguro (no en la misma carpeta de los respaldos ni en una foto en el mismo equipo).
@@ -73,12 +84,12 @@ Cuando falten 60 días o menos para el vencimiento, quienes aprueban equipos ver
 
 ## 6. Dar permiso a una carpeta
 
-El sistema corre con una cuenta de Windows limitada que, por seguridad, no puede escribir en las carpetas personales de los usuarios. Si quieres que los cortes o los respaldos se guarden, por ejemplo, en una carpeta de OneDrive de tu usuario:
+El sistema corre con una cuenta de Windows limitada que, por seguridad, no puede escribir en las carpetas personales de los usuarios. Si quieres que los cortes, los respaldos o la carpeta vigilada del banco estén, por ejemplo, en una carpeta de OneDrive de tu usuario:
 
 1. Menú Inicio → **Ariasmos** → **Dar permiso a una carpeta**.
 2. Acepta el permiso de administrador.
 3. Escribe o pega la ruta completa de la carpeta y presiona Enter.
-4. Vuelve a la pantalla de **Destinos de cortes** o de **Respaldos** y guarda la carpeta otra vez.
+4. Vuelve a la pantalla de **Destinos de cortes**, de **Respaldos** o de **Carpeta vigilada del banco** y guarda la carpeta otra vez.
 
 Si la pantalla dice que el servicio no tiene permiso para escribir en la carpeta, es este paso el que falta.
 

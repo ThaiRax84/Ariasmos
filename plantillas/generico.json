@@ -24,7 +24,8 @@
         "turno_caja",
         "solicitar_ajustes",
         "cargo_manual",
-        "sugerir_conciliacion"
+        "sugerir_conciliacion",
+        "retirar_efectivo"
       ]
     },
     {
@@ -49,7 +50,10 @@
         "conciliar_banco",
         "administrar_conceptos",
         "cerrar_cortes",
-        "aprobar_dispositivos"
+        "aprobar_dispositivos",
+        "retirar_efectivo",
+        "revisar_retiros",
+        "administrar_motivos_retiro"
       ]
     },
     {
@@ -80,7 +84,10 @@
         "administrar_politicas",
         "administrar_configuracion",
         "ver_auditoria",
-        "administrar_respaldos"
+        "administrar_respaldos",
+        "retirar_efectivo",
+        "revisar_retiros",
+        "administrar_motivos_retiro"
       ]
     }
   ],
@@ -195,6 +202,26 @@
       "horas_resaltar": 24,
       "permite_delegacion": true,
       "permite_codigo": true
+    },
+    {
+      "accion": "retiro_caja",
+      "permiso_directo": "aprobar_solicitudes",
+      "permiso_solicitar": "retirar_efectivo",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "revertir_retiro",
+      "permiso_directo": "aprobar_solicitudes",
+      "permiso_solicitar": "retirar_efectivo",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
     }
   ],
   "motivos_baja": [
@@ -259,6 +286,13 @@
   "cajas": [
     "Caja 1"
   ],
+  "motivos_retiro": [
+    "Compra de insumos",
+    "Pago a proveedor",
+    "Mensajería y envíos",
+    "Mantenimiento",
+    "Otro gasto del negocio"
+  ],
   "denominaciones": [
     100000,
     50000,
@@ -272,6 +306,18 @@
     100,
     50
   ],
+  "caja": {
+    "calendario_corte": {
+      "0": "18:00",
+      "1": "18:00",
+      "2": "18:00",
+      "3": "18:00",
+      "4": "18:00",
+      "5": "18:00"
+    },
+    "control_denominaciones": false,
+    "periodo_retiros": "dia"
+  },
   "cortes": [
     {
       "tipo": "diario",

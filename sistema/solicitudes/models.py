@@ -18,6 +18,8 @@ ACCIONES = [
     ("condonar_recargo", "Condonación de recargo"),
     ("revertir_pago", "Reversión de pago"),
     ("pago_sobre_tope", "Pago mayor al tope"),
+    ("retiro_caja", "Retiro de caja"),
+    ("revertir_retiro", "Reversión de retiro de caja"),
 ]
 
 
@@ -52,7 +54,7 @@ class Solicitud(models.Model):
 
     accion = models.CharField(max_length=30, choices=ACCIONES)
     estado = models.CharField(max_length=10, choices=ESTADOS, default=PENDIENTE)
-    titular = models.ForeignKey("titulares.Titular", on_delete=models.PROTECT, related_name="solicitudes")
+    titular = models.ForeignKey("titulares.Titular", null=True, blank=True, on_delete=models.PROTECT, related_name="solicitudes")
     datos = models.JSONField(default=dict, blank=True)
     solicitante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="solicitudes")
     creada = models.DateTimeField(auto_now_add=True)
@@ -66,6 +68,8 @@ class Solicitud(models.Model):
         ordering = ["-creada"]
 
     def __str__(self):
+        if self.titular_id is None:
+            return self.get_accion_display()
         return f"{self.get_accion_display()} · {self.titular}"
 
     def politica(self):

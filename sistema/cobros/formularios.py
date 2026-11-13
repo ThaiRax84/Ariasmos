@@ -1,7 +1,9 @@
+import re
+
 from django import forms
 
 from nucleo.dinero import ErrorImporte, a_centavos, a_texto
-from proyecto.captura import EntradaDinero, EntradaPorcentaje
+from proyecto.captura import CampoGuiadoTexto, EntradaDinero, EntradaPorcentaje
 from titulares.models import Agrupacion, Titular
 
 from .models import ConceptoCobro, PlanCobro, ReglaRecargo
@@ -120,8 +122,28 @@ class FormularioReversion(forms.Form):
 
 
 class FormularioVerificarRecibo(forms.Form):
-    folio = forms.RegexField(label="Folio (serie-número)", regex=r"^[A-Za-z0-9]{1,10}-[0-9]{1,12}$", max_length=24)
-    codigo = forms.CharField(label="Código de verificación", max_length=20)
+    codigo = CampoGuiadoTexto(label="Código de verificación o texto del QR (un lector de códigos lo escribe solo)", max_length=60, acepta="recibo", maximo_tecleo=60)
+    folio = CampoGuiadoTexto(label="Folio (serie-número; no hace falta si leíste el QR)", max_length=24, required=False, acepta="folio", maximo_tecleo=24)
+
+    def clean(self):
+        datos = super().clean()
+        texto = "".join((datos.get("codigo") or "").split()).upper()
+        if texto.startswith("AR1|"):
+            partes = texto.split("|")
+            if len(partes) != 4 or not re.fullmatch(r"[A-Z0-9]{1,10}", partes[1]) or not re.fullmatch(r"[0-9]{1,12}", partes[2]):
+                raise forms.ValidationError("El texto del QR no es de un recibo.")
+            serie, folio, codigo = partes[1], int(partes[2]), partes[3]
+        else:
+            encontrado = re.fullmatch(r"([A-Z0-9]{1,10})-([0-9]{1,12})", (datos.get("folio") or "").strip().upper())
+            if encontrado is None:
+                raise forms.ValidationError("Escribe el folio del recibo (serie-número) o lee el QR.")
+            serie, folio, codigo = encontrado.group(1), int(encontrado.group(2)), texto
+        if re.fullmatch(r"[A-Z0-9]{10}", codigo):
+            codigo = f"{codigo[:5]}-{codigo[5:]}"
+        if not re.fullmatch(r"[A-Z0-9]{5}-[A-Z0-9]{5}", codigo):
+            raise forms.ValidationError("El código de verificación tiene 10 letras y números.")
+        datos.update({"serie": serie, "numero": folio, "codigo_limpio": codigo})
+        return datos
 
 
 def valor_de_recargo(tipo, importe, porcentaje):

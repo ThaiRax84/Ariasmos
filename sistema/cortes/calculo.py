@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from banco.ficha import datos_de_pago
 from banco.models import Importacion, MovimientoBancario
-from caja.models import Arqueo, Traslado
+from caja.models import Arqueo, RetiroCaja, ReversionRetiro, Traslado, Turno
 from caja.servicios import custodia
 from cobros import libro
 from cobros.models import Aplicacion, Beca, CancelacionCargo, Cargo, ConceptoCobro, Pago, Prorroga, ReversionPago
@@ -92,8 +92,18 @@ def cifras_diario(turno, arqueo):
         }
         for t in Traslado.objects.filter(origen=turno.usuario, creado__gte=turno.abierto_en, creado__lte=hasta).select_related("destino", "cuenta_bancaria").order_by("creado", "id")
     ]
+    retiros = [
+        {"folio": str(r), "hora": f"{local(r.creado):%H:%M}", "motivo": r.motivo.nombre, "nota": r.nota, "importe": r.importe, "comprobante": r.get_comprobante_display(), "autorizo": persona(r.autorizado_por)}
+        for r in RetiroCaja.objects.filter(turno=turno).select_related("motivo", "autorizado_por").order_by("creado", "id")
+    ]
+    regresos = [
+        {"folio": str(r.retiro), "hora": f"{local(r.creada):%H:%M}", "importe": r.retiro.importe, "motivo": r.motivo}
+        for r in ReversionRetiro.objects.filter(turno=turno).select_related("retiro").order_by("creada", "id")
+    ]
     cobrado = sum(p.importe for p in pagos)
     devuelto = sum(d.pago.importe for d in devoluciones)
+    retirado = sum(r["importe"] for r in retiros)
+    regresado = sum(r["importe"] for r in regresos)
     datos = base("diario", "Corte diario de caja", local(turno.abierto_en).date(), local(hasta).date())
     datos["encabezado"] = {
         "caja": turno.caja.nombre,
@@ -105,13 +115,29 @@ def cifras_diario(turno, arqueo):
         "fondo_inicial": turno.fondo_inicial,
         "total_cobrado": cobrado,
         "total_devuelto": devuelto,
+        "total_retirado": retirado,
+        "total_regresado": regresado,
         "recibos": len(recibos),
         "esperado": arqueo.esperado,
         "contado": arqueo.contado,
         "diferencia": arqueo.diferencia,
         "nota": arqueo.nota,
+        "con_reconteo": arqueo.con_reconteo,
+        "primer_contado": arqueo.primer_contado if arqueo.primer_contado is not None else arqueo.contado,
     }
-    datos["secciones"] = [seccion("recibos", "Recibos del turno", recibos), seccion("devoluciones", "Devoluciones", filas_devoluciones), seccion("traslados", "Traslados", traslados)]
+    datos["secciones"] = [
+        seccion("recibos", "Recibos del turno", recibos),
+        seccion("devoluciones", "Devoluciones", filas_devoluciones),
+        seccion("retiros", "Retiros de caja", retiros),
+        seccion("retiros_revertidos", "Retiros revertidos que regresaron a esta caja", regresos),
+        seccion("traslados", "Traslados", traslados),
+    ]
+    if arqueo.esperado_piezas:
+        filas_piezas = []
+        for valor in sorted({int(v) for v in list(arqueo.esperado_piezas) + list(arqueo.conteo)}, reverse=True):
+            esperadas, contadas = int(arqueo.esperado_piezas.get(str(valor), 0)), int(arqueo.conteo.get(str(valor), 0))
+            filas_piezas.append({"denominacion": valor, "esperadas": esperadas, "contadas": contadas, "diferencia": contadas - esperadas})
+        datos["secciones"].append(seccion("piezas", "Piezas por denominación", filas_piezas))
     return datos
 
 
@@ -182,10 +208,29 @@ def cifras_mayor(inicio, fin, al_dia=None):
                 cartera[clave] += cargo.saldo
     altas = [{"titular": titular(t), "desde": t.activo_desde.isoformat()} for t in Titular.objects.filter(activo_desde__gte=inicio, activo_desde__lte=fin).select_related("familia")]
     bajas = [{"titular": titular(t), "fecha": f"{local(t.fecha_baja):%d/%m/%Y}"} for t in Titular.objects.filter(fecha_baja__gte=desde, fecha_baja__lt=hasta).select_related("familia")]
-    efectivo_total = Pago.objects.filter(medio=Pago.EFECTIVO).aggregate(t=Sum("importe"))["t"] or 0
-    devuelto_total = ReversionPago.objects.filter(turno__isnull=False).aggregate(t=Sum("pago__importe"))["t"] or 0
+    cerrados = Turno.objects.filter(estado=Turno.CERRADO)
+    efectivo_total = Pago.objects.filter(medio=Pago.EFECTIVO, turno__in=cerrados).aggregate(t=Sum("importe"))["t"] or 0
+    devuelto_total = ReversionPago.objects.filter(turno__in=cerrados).aggregate(t=Sum("pago__importe"))["t"] or 0
+    retirado_total = RetiroCaja.objects.filter(turno__in=cerrados).aggregate(t=Sum("importe"))["t"] or 0
+    regresado_total = ReversionRetiro.objects.filter(turno__in=cerrados).aggregate(t=Sum("retiro__importe"))["t"] or 0
     depositado_total = Traslado.objects.filter(tipo=Traslado.DEPOSITO).aggregate(t=Sum("importe"))["t"] or 0
-    en_custodia = sum(custodia(u) for u in Usuario.objects.all())
+    abiertos = Turno.objects.filter(estado=Turno.ABIERTO)
+    en_custodia = sum(custodia(u) for u in Usuario.objects.all()) - sum(_neto(t) for t in abiertos)
+    retiros_mes = [
+        {
+            "fecha": f"{local(r.creado):%d/%m/%Y}",
+            "folio": str(r),
+            "caja": r.caja.nombre,
+            "persona": persona(r.registrado_por),
+            "motivo": r.motivo.nombre,
+            "importe": r.importe,
+            "comprobante": r.get_comprobante_display(),
+            "revision": r.get_revision_display(),
+            "autorizo": persona(r.autorizado_por),
+            "revertido": hasattr(r, "reversion"),
+        }
+        for r in RetiroCaja.objects.filter(creado__gte=desde, creado__lt=hasta, turno__in=cerrados).select_related("caja", "registrado_por", "motivo", "autorizado_por", "reversion")
+    ]
     arqueos = [
         {"fecha": f"{local(a.creado):%d/%m/%Y}", "caja": a.turno.caja.nombre, "persona": persona(a.turno.usuario), "diferencia": a.diferencia, "nota": a.nota}
         for a in Arqueo.objects.filter(creado__gte=desde, creado__lt=hasta).exclude(diferencia=0).select_related("turno__caja", "turno__usuario")
@@ -230,9 +275,12 @@ def cifras_mayor(inicio, fin, al_dia=None):
         "altas": len(altas),
         "bajas": len(bajas),
         "efectivo_cobrado_neto": efectivo_total - devuelto_total,
+        "efectivo_retirado_neto": retirado_total - regresado_total,
         "efectivo_en_custodia": en_custodia,
         "efectivo_depositado": depositado_total,
-        "efectivo_cuadra": efectivo_total - devuelto_total == en_custodia + depositado_total,
+        "efectivo_cuadra": efectivo_total - devuelto_total - retirado_total + regresado_total == en_custodia + depositado_total,
+        "nota_efectivo": "Las cifras de efectivo cuentan solo turnos cerrados.",
+        "retiros_del_mes": sum(r["importe"] for r in retiros_mes),
         "efectivo_del_mes": pagos.filter(medio=Pago.EFECTIVO).aggregate(t=Sum("importe"))["t"] or 0,
         "banco": banco["totales"],
     }
@@ -244,6 +292,7 @@ def cifras_mayor(inicio, fin, al_dia=None):
         seccion("altas", "Altas", altas),
         seccion("bajas", "Bajas", bajas),
         seccion("diferencias_arqueo", "Diferencias de arqueo", arqueos),
+        seccion("retiros", "Retiros de caja", retiros_mes),
         seccion("depositos_sin_conciliar", "Depósitos sin conciliar", depositos),
         seccion("banco_no_confirmados", "Pagos de importaciones no verificables sin confirmar por el estado oficial", banco["no_confirmados"]),
         seccion("importaciones_por_revisar", "Importaciones pendientes de revisión", banco["por_revisar"]),
@@ -251,6 +300,12 @@ def cifras_mayor(inicio, fin, al_dia=None):
         seccion("cancelaciones", "Cancelaciones y condonaciones", cancelaciones),
     ]
     return datos
+
+
+def _neto(turno):
+    from caja.servicios import neto_de
+
+    return neto_de(turno)
 
 
 def _banco(inicio, fin, desde, hasta):
@@ -279,7 +334,7 @@ def _banco(inicio, fin, desde, hasta):
                 }
             )
     por_revisar = [
-        {"archivo": i.nombre_archivo, "importo": persona(i.creada_por), "fecha": f"{local(i.creada):%d/%m/%Y}", "pagos": i.pagos, "importe": i.monto or 0, "clasificacion": i.get_continuidad_display()}
+        {"archivo": i.nombre_archivo, "importo": persona(i.creada_por) or "Carpeta vigilada", "fecha": f"{local(i.creada):%d/%m/%Y}", "pagos": i.pagos, "importe": i.monto or 0, "clasificacion": i.get_continuidad_display()}
         for i in conciliacion.pendientes_de_revision()
     ]
     pendientes = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR)

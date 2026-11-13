@@ -5,8 +5,10 @@
 {% if turno %}
 <section class="panel">
   <h2>Turno abierto en {{ turno.caja }}</h2>
-  <p>Desde {{ turno.abierto_en|date:"d/m/Y H:i" }} · {{ cobros }} cobro{{ cobros|pluralize }} registrado{{ cobros|pluralize }}.</p>
-  <div class="acciones"><a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a><a class="boton secundario" href="{% url 'caja:cerrar' turno.pk %}">Cerrar turno</a></div>
+  <p>Desde {{ turno.abierto_en|date:"d/m/Y H:i" }} · {{ cobros }} cobro{{ cobros|pluralize }} registrado{{ cobros|pluralize }}{% if retiros %} · {{ retiros }} retiro{{ retiros|pluralize }}{% endif %}.</p>
+  {% if en_arqueo %}<p class="mensaje warning">El turno está en arqueo: ya no recibe cobros ni retiros. <a href="{% url 'caja:reconteo' turno.pk %}">Termina de cerrarlo</a>.</p>{% endif %}
+  {% if pendientes_comprobante %}<p class="mensaje warning">Retiros con comprobante pendiente: {% for r in pendientes_comprobante %}<a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  <div class="acciones"><a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% if "retirar_efectivo" in permisos %}<a class="boton secundario" href="{% url 'caja:retiro_nuevo' %}">Retirar efectivo</a>{% endif %}<a class="boton secundario" href="{% url 'caja:cerrar' turno.pk %}">Cerrar turno</a></div>
 </section>
 {% else %}
 <form method="post" action="{% url 'caja:abrir' %}" class="formulario angosto" novalidate>

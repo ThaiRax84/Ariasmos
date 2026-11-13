@@ -22,6 +22,9 @@ PERMISOS = {
     "administrar_configuracion": "Administrar configuración",
     "ver_auditoria": "Ver auditoría",
     "administrar_respaldos": "Administrar respaldos",
+    "retirar_efectivo": "Retirar efectivo de su caja para gastos",
+    "revisar_retiros": "Revisar retiros de caja",
+    "administrar_motivos_retiro": "Administrar motivos de retiro",
 }
 
 OPCIONES = list(PERMISOS.items())
