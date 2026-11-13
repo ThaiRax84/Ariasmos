@@ -1,15 +1,29 @@
+import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django import forms
 
 from banco.models import MedioPago
+from caja.models import Caja, Denominacion
 from cobros.formularios import CampoImporte
+from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
 from .models import PARAMETROS, VOCABULARIO_BASE, Negocio
+
+
+ETIQUETAS_VOCABULARIO = {
+    "titular": "Cómo se llama a cada titular (singular)",
+    "titulares": "Plural",
+    "matricula": "Cómo se llama la matrícula",
+    "agrupacion": "Cómo se llama una agrupación (singular)",
+    "agrupaciones": "Plural",
+    "familia": "Cómo se llama a quienes paga la misma persona (singular)",
+    "familias": "Plural",
+}
 
 
 def validar_zona(valor):
@@ -62,13 +76,7 @@ class FormularioAjustesAvanzados(forms.ModelForm):
 class FormularioVocabulario(forms.Form):
     def __init__(self, *args, textos=None, **kwargs):
         super().__init__(*args, **kwargs)
-        etiquetas = {
-            "titular": "Cómo se llama a cada titular (singular)",
-            "titulares": "Plural",
-            "matricula": "Cómo se llama la matrícula",
-            "agrupacion": "Cómo se llama una agrupación (singular)",
-            "agrupaciones": "Plural",
-        }
+        etiquetas = ETIQUETAS_VOCABULARIO
         for clave in VOCABULARIO_BASE:
             self.fields[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave])
 
@@ -77,7 +85,47 @@ class FormularioParametros(forms.Form):
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
         for clave, (defecto, descripcion) in PARAMETROS.items():
-            self.fields[clave] = forms.IntegerField(label=descripcion, min_value=0, max_value=100000, initial=(valores or {}).get(clave, defecto))
+            inicial = (valores or {}).get(clave, defecto)
+            if isinstance(defecto, str):
+                self.fields[clave] = forms.CharField(label=descripcion, max_length=200, initial=inicial)
+            else:
+                self.fields[clave] = forms.IntegerField(label=descripcion, min_value=0, max_value=10 ** 11, initial=inicial)
+
+    def clean_orden_reparto(self):
+        try:
+            return validar_orden(self.cleaned_data["orden_reparto"])
+        except ErrorLibro as error:
+            raise forms.ValidationError(str(error))
+
+    def _serie(self, clave):
+        serie = self.cleaned_data[clave].strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]{1,10}", serie):
+            raise forms.ValidationError("Usa de 1 a 10 letras mayúsculas o números.")
+        return serie
+
+    def clean_serie_recibos_banco(self):
+        return self._serie("serie_recibos_banco")
+
+    def clean_serie_recibos_saldo_inicial(self):
+        return self._serie("serie_recibos_saldo_inicial")
+
+    def clean_aplicar_solo_por_pagador(self):
+        valor = self.cleaned_data["aplicar_solo_por_pagador"]
+        if valor not in (0, 1):
+            raise forms.ValidationError("Escribe 0 o 1.")
+        return valor
+
+    def clean_confirmaciones_pagador_confiable(self):
+        valor = self.cleaned_data["confirmaciones_pagador_confiable"]
+        if valor < 1:
+            raise forms.ValidationError("Debe ser al menos 1.")
+        return valor
+
+    def clean_dia_generacion_cargos(self):
+        dia = self.cleaned_data["dia_generacion_cargos"]
+        if not 1 <= dia <= 28:
+            raise forms.ValidationError("El día va de 1 a 28.")
+        return dia
 
 
 class FormularioAgrupacion(forms.ModelForm):
@@ -96,6 +144,35 @@ class FormularioRelacion(forms.ModelForm):
     class Meta:
         model = RelacionContacto
         fields = ["nombre", "activa"]
+
+
+class FormularioCaja(forms.ModelForm):
+    class Meta:
+        model = Caja
+        fields = ["nombre", "serie_recibos", "activa"]
+        labels = {"serie_recibos": "Serie de los recibos (letras mayúsculas y números)"}
+
+    def clean_serie_recibos(self):
+        serie = self.cleaned_data["serie_recibos"].strip().upper()
+        if not (serie.isascii() and serie.isalnum() and 1 <= len(serie) <= 10):
+            raise forms.ValidationError("Solo letras y números, hasta 10.")
+        if self.instance.pk and self.instance.serie_recibos != serie and self.instance.turnos.exists():
+            raise forms.ValidationError("La caja ya emitió recibos: la serie no se cambia.")
+        return serie
+
+
+class FormularioDenominacion(forms.ModelForm):
+    valor = CampoImporte(label="Valor")
+
+    class Meta:
+        model = Denominacion
+        fields = ["valor", "activa"]
+
+    def clean_valor(self):
+        valor = self.cleaned_data["valor"]
+        if not valor or valor <= 0:
+            raise forms.ValidationError("El valor debe ser mayor que cero.")
+        return valor
 
 
 class FormularioMedioPago(forms.ModelForm):
@@ -143,6 +220,22 @@ class FormularioAsistenteInicio(forms.Form):
         return datos
 
 
+class FormularioRevisarPlantilla(forms.Form):
+    confirmo = forms.BooleanField(label="Leí las advertencias y quiero aplicar la plantilla así", required=False)
+
+    def __init__(self, *args, advertencias=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.advertencias = advertencias
+        if not advertencias:
+            del self.fields["confirmo"]
+
+    def clean(self):
+        datos = super().clean()
+        if self.advertencias and not datos.get("confirmo"):
+            raise forms.ValidationError("La plantilla tiene advertencias: confirma explícitamente para aplicarla.")
+        return datos
+
+
 class FormularioPersonalizar(forms.Form):
     nuevo_nombre = forms.CharField(label="Agregar concepto: nombre", max_length=100, required=False)
     nuevo_tipo = forms.ChoiceField(label="Tipo", choices=ConceptoCobro.TIPOS, required=False)
@@ -153,13 +246,7 @@ class FormularioPersonalizar(forms.Form):
     def __init__(self, *args, textos=None, conceptos=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.conceptos = list(conceptos)
-        etiquetas = {
-            "titular": "Cómo se llama a cada titular (singular)",
-            "titulares": "Plural",
-            "matricula": "Cómo se llama la matrícula",
-            "agrupacion": "Cómo se llama una agrupación (singular)",
-            "agrupaciones": "Plural",
-        }
+        etiquetas = ETIQUETAS_VOCABULARIO
         campos = {}
         for clave in VOCABULARIO_BASE:
             campos[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave])

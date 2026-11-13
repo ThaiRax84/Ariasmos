@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from auditoria.servicios import diferencias, registrar
 from cuentas.decoradores import requiere_permiso
 from banco.models import MedioPago
+from caja.models import Caja, Denominacion
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
 from . import plantillas
@@ -14,7 +15,9 @@ from . import plantillas
 from .formularios import (
     FormularioAgrupacion,
     FormularioAjustesAvanzados,
+    FormularioCaja,
     FormularioCampoContacto,
+    FormularioDenominacion,
     FormularioMedioPago,
     FormularioMotivo,
     FormularioNegocio,
@@ -115,6 +118,8 @@ CATALOGOS = {
     "relaciones": (RelacionContacto, FormularioRelacion, "relacion_contacto"),
     "campos": (CampoContacto, FormularioCampoContacto, "campo_contacto"),
     "medios": (MedioPago, FormularioMedioPago, "medio_pago"),
+    "cajas": (Caja, FormularioCaja, "caja"),
+    "denominaciones": (Denominacion, FormularioDenominacion, "denominacion"),
 }
 
 TITULOS = {
@@ -123,6 +128,8 @@ TITULOS = {
     "relaciones": "Relaciones de contacto",
     "campos": "Campos de contacto",
     "medios": "Medios de pago",
+    "cajas": "Cajas",
+    "denominaciones": "Denominaciones para el arqueo",
 }
 
 

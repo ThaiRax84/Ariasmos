@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>{{ voc.familia }} {{ familia }}</h1>
+<p><a class="boton secundario" href="{% url 'titulares:familia_estado_pdf' familia.pk %}">Estado de cuenta (PDF)</a></p>
+<section class="panel">
+  <h2>{{ voc.titulares }}</h2>
+  <ul class="lista">{% for t in miembros %}<li><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a> <span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span>{% if "registrar_pago_efectivo" in permisos %} · <a href="{% url 'cobros:cobrar' t.pk %}">Cobrar</a>{% endif %}</li>{% endfor %}</ul>
+</section>
+<section class="panel">
+  <h2>Contacto responsable</h2>
+  {% for contacto, filas in contactos %}
+  <div class="contacto{% if contacto.principal %} principal{% endif %}"><strong>{{ contacto.nombre }}</strong>{% if contacto.relacion %} · {{ contacto.relacion }}{% endif %}{% if contacto.principal %} · <em>principal</em>{% endif %}
+    <ul>{% for etiqueta, valor, medio in filas %}<li>{{ etiqueta }}: {{ valor }}</li>{% endfor %}</ul>
+    {% if puede_capturar %}<a href="{% url 'titulares:familia_contacto_editar' familia.pk contacto.pk %}">Editar</a>{% endif %}</div>
+  {% empty %}<p>Sin contacto compartido.</p>{% endfor %}
+  {% if puede_capturar %}<p><a class="boton secundario" href="{% url 'titulares:familia_contacto_nuevo' familia.pk %}">Agregar contacto</a></p>{% endif %}
+</section>
+{% include "cobros/_estado_cuenta.html" with varios=1 %}
+{% endblock %}

@@ -6,7 +6,9 @@
     "titulares": "Alumnos",
     "matricula": "Matrícula",
     "agrupacion": "Grupo",
-    "agrupaciones": "Grupos"
+    "agrupaciones": "Grupos",
+    "familia": "Familia",
+    "familias": "Familias"
   },
   "roles": [
     {
@@ -123,6 +125,76 @@
       "horas_resaltar": 24,
       "permite_delegacion": true,
       "permite_codigo": true
+    },
+    {
+      "accion": "cambio_familia",
+      "permiso_directo": "alta_baja_directa",
+      "permiso_solicitar": "solicitar_alta_baja",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "beca",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "solicitar_ajustes",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "prorroga",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "solicitar_ajustes",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "cancelar_cargo",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "solicitar_ajustes",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "condonar_recargo",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "solicitar_ajustes",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "revertir_pago",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "solicitar_ajustes",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "pago_sobre_tope",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "solicitar_ajustes",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
     }
   ],
   "motivos_baja": [
@@ -194,5 +266,21 @@
     "Transferencia SPEI",
     "Depósito en ventanilla",
     "Efectivo en caja"
+  ],
+  "cajas": [
+    "Caja 1"
+  ],
+  "denominaciones": [
+    100000,
+    50000,
+    20000,
+    10000,
+    5000,
+    2000,
+    1000,
+    500,
+    200,
+    100,
+    50
   ]
 }

@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "solicitudes",
     "cobros",
     "banco",
+    "caja",
 ]
 
 MIDDLEWARE = [

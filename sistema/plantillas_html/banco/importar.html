@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Importar movimientos del banco</h1>
+<p>Sube el estado de cuenta en PDF (sin contraseña, hasta 10 MB) o el archivo de movimientos de la banca en línea en Excel o CSV (hasta 5 MB). Antes de guardar verás qué pasará con cada movimiento.</p>
+<form method="post" enctype="multipart/form-data" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Revisar archivo</button><a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones anteriores</a></div>
+</form>
+{% endblock %}

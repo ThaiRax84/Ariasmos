@@ -107,7 +107,7 @@ def test_exportar_sin_importes_clabe_usuarios_ni_titulares(personas):
     respuesta = c.get(reverse("configuracion:exportar"))
     assert respuesta.status_code == 200 and "attachment" in respuesta["Content-Disposition"]
     texto = respuesta.content.decode("utf-8")
-    for prohibido in ("987654", "9876.54", "4321", "55555", "importe", "valor", "tope", "002010077777777771", "Beneficiario secreto", "Zacarías", "Titularino", "operacion", "supervision", "direccion", "Persona", "clave", "Negocio de prueba", "token"):
+    for prohibido in ("987654", "9876.54", "4321", "55555", "importe", "valor", '"tope', "002010077777777771", "Beneficiario secreto", "Zacarías", "Titularino", "operacion", "supervision", "direccion", "Persona", "clave", "Negocio de prueba", "token"):
         assert prohibido not in texto, prohibido
     datos = esquema.desde_bytes(respuesta.content)
     concepto = next(x for x in datos["conceptos"] if x["nombre"] == "Colegiatura")

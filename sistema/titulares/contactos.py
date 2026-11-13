@@ -79,4 +79,8 @@ def detalle(contacto):
 
 
 def principal(titular):
+    if titular.familia_id:
+        compartido = Contacto.objects.filter(familia_id=titular.familia_id, principal=True).select_related("relacion").first()
+        if compartido is not None:
+            return compartido
     return Contacto.objects.filter(titular=titular, principal=True).select_related("relacion").first()

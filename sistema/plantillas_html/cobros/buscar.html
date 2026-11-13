@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Cobrar</h1>
+{% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
+<form method="get" class="busqueda">
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ voc.matricula }} o nombre" aria-label="Buscar" autofocus>
+  <button class="boton" type="submit">Buscar</button>
+</form>
+<ul class="lista">
+{% for t in resultados %}<li><a href="{% url 'cobros:cobrar' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a>{% if t.familia %} <small>({{ voc.familia|lower }} {{ t.familia }})</small>{% endif %} <span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span></li>{% empty %}{% if q %}<li>Sin resultados.</li>{% endif %}{% endfor %}
+</ul>
+{% endblock %}

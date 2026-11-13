@@ -1,0 +1,42 @@
+{% load formato %}
+<section class="panel">
+  <h2>Estado de cuenta</h2>
+  <p class="matricula-grande">Adeudo: <strong>{{ estado.adeudo|dinero }}</strong>{% if estado.a_favor %} · A favor: <strong>{{ estado.a_favor|dinero }}</strong>{% endif %}</p>
+  <table class="tabla compacta">
+    <thead><tr>{% if varios %}<th>{{ voc.titular }}</th>{% endif %}<th>Cargo</th><th>Vence</th><th>Original</th><th>Beca</th><th>Importe</th><th>Cancelado</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    {% for fila in estado.cargos %}{% with c=fila.cargo %}
+    <tr class="{% if c.origen == 'recargo' %}recargo{% endif %}">
+      {% if varios %}<td>{{ c.titular.nombre_completo }}</td>{% endif %}
+      <td>{{ c }}{% if c.origen == "recargo" %} <small>(recargo)</small>{% endif %}{% if c.prorroga %}<br><small>Prórroga hasta {{ c.prorroga|date:"d/m/Y" }}</small>{% endif %}</td>
+      <td>{{ c.vencimiento|date:"d/m/Y" }}</td>
+      <td>{{ c.importe_original|dinero }}</td>
+      <td>{% if c.beca %}{{ c.beca.porcentaje_texto }} (−{{ c.descuento|dinero }}){% else %}—{% endif %}</td>
+      <td>{{ c.importe_final|dinero }}</td>
+      <td>{% if c.cancelado %}{{ c.cancelado|dinero }}{% else %}—{% endif %}</td>
+      <td>{% if c.aplicado %}{{ c.aplicado|dinero }}{% else %}—{% endif %}</td>
+      <td><strong>{{ c.saldo|dinero }}</strong></td>
+      <td><span class="estado {{ fila.estado }}">{{ fila.estado|capfirst }}</span></td>
+      <td>{% if c.saldo > 0 %}{% if "solicitar_ajustes" in permisos or "aplicar_ajustes" in permisos %}{% if c.origen != "recargo" %}<a href="{% url 'cobros:prorroga' c.pk %}">Prórroga</a> · {% endif %}<a href="{% url 'cobros:cancelar' c.pk %}">{% if c.origen == "recargo" %}Condonar{% else %}Cancelar{% endif %}</a>{% endif %}{% endif %}</td>
+    </tr>
+    {% endwith %}{% empty %}<tr><td colspan="11">Sin cargos.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <h3>Pagos</h3>
+  <table class="tabla compacta">
+    <thead><tr><th>Recibo</th><th>Fecha</th>{% if varios %}<th>Pagó con</th>{% endif %}<th>Importe</th><th>Aplicado a</th><th>A favor</th><th></th></tr></thead>
+    <tbody>
+    {% for p in estado.pagos %}
+    <tr class="{% if p.revertido %}revertido{% endif %}">
+      <td><a href="{% url 'cobros:recibo' p.recibo.pk %}">{{ p.recibo }}</a>{% if p.revertido %} <strong>CANCELADO</strong>{% endif %}</td>
+      <td>{{ p.fecha|date:"d/m/Y H:i" }}</td>
+      {% if varios %}<td>{{ p.titular.nombre_completo }}</td>{% endif %}
+      <td>{{ p.importe|dinero }}</td>
+      <td>{% for a in p.aplicaciones.all %}{{ a.cargo }}{% if varios or a.cargo.titular_id != p.titular_id %} ({{ a.cargo.titular.nombre }}){% endif %}: {{ a.importe|dinero }}{% if p.revertido %} (anulada){% endif %}<br>{% empty %}—{% endfor %}</td>
+      <td>{% if p.disponible %}{{ p.disponible|dinero }}{% else %}—{% endif %}</td>
+      <td>{% if not p.revertido %}{% if "solicitar_ajustes" in permisos or "aplicar_ajustes" in permisos %}<a href="{% url 'cobros:revertir' p.pk %}">Revertir</a>{% endif %}{% else %}<small>{{ p.reversion.motivo }}</small>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="7">Sin pagos.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>

@@ -5,6 +5,7 @@ from django.db import transaction
 
 from auditoria.servicios import registrar
 from banco.models import MedioPago
+from caja.models import Caja, Denominacion
 from cobros.models import ConceptoCobro
 from cuentas.models import PermisoRol, Rol
 from cuentas.permisos import INDISPENSABLES
@@ -60,6 +61,10 @@ def cargar_datos(datos, origen, usuario=None, request=None):
             MotivoBaja.objects.get_or_create(nombre=motivo)
         for relacion in datos["relaciones_contacto"]:
             RelacionContacto.objects.get_or_create(nombre=relacion)
+        for nombre in datos["cajas"]:
+            Caja.objects.get_or_create(nombre=nombre)
+        for valor in datos["denominaciones"]:
+            Denominacion.objects.get_or_create(valor=valor)
         for orden, medio in enumerate(datos["medios_pago"], start=1):
             MedioPago.objects.get_or_create(nombre=medio, defaults={"orden": orden * 10})
         for campo in datos["campos_contacto"]:
@@ -132,6 +137,8 @@ def exportar():
         ],
         "conceptos": conceptos,
         "medios_pago": list(MedioPago.objects.filter(activo=True).values_list("nombre", flat=True)),
+        "cajas": list(Caja.objects.filter(activa=True).values_list("nombre", flat=True)),
+        "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
     }
     esquema.validar(datos)
     return datos

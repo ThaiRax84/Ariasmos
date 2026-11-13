@@ -85,7 +85,7 @@ def test_personalizar_vocabulario_y_conceptos():
     c = Client()
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
     quitar = ConceptoCobro.objects.get(nombre="Otro cargo")
-    datos = {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", f"quitar_{quitar.pk}": "on", "nuevo_nombre": "Cuota anual", "nuevo_tipo": "recurrente", "nuevo_periodicidad": "anual", "nuevo_aplica_a": "todos", "nuevo_recargo": "on", "seguir": "continuar"}
+    datos = {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas", f"quitar_{quitar.pk}": "on", "nuevo_nombre": "Cuota anual", "nuevo_tipo": "recurrente", "nuevo_periodicidad": "anual", "nuevo_aplica_a": "todos", "nuevo_recargo": "on", "seguir": "continuar"}
     assert c.post(reverse("asistente:personalizar"), datos).url == reverse("asistente:conceptos")
     assert vocabulario()["titular"] == "Socio"
     assert not ConceptoCobro.objects.filter(nombre="Otro cargo").exists()
@@ -104,7 +104,11 @@ def test_importar_plantilla_de_punta_a_punta():
     archivo = SimpleUploadedFile("mia.json", json.dumps(datos).encode("utf-8"), content_type="application/json")
     c = Client()
     respuesta = c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "importar", archivo))
-    assert respuesta.url == reverse("asistente:personalizar")
+    assert respuesta.url == reverse("asistente:revisar")
+    assert not ConceptoCobro.objects.filter(nombre="Membresía").exists()
+    resumen = c.get(reverse("asistente:revisar")).content.decode()
+    assert "Gimnasio de ejemplo" in resumen and "Quién hace cada cosa" in resumen
+    assert c.post(reverse("asistente:revisar"), {}).url == reverse("asistente:personalizar")
     assert Negocio.objects.get().plantilla == "importada"
     assert vocabulario()["titular"] == "Miembro"
     membresia = ConceptoCobro.objects.get(nombre="Membresía")

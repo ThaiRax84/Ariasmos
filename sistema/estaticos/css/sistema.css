@@ -76,3 +76,9 @@ code.uri { word-break: break-all; font-size: .85rem; }
   .no-imprimir, .barra { display: none; }
   .hoja { border: 0; margin: 0; }
 }
+.sello-cancelado { font-size: 2rem; font-weight: 800; color: var(--peligro); border: 3px solid var(--peligro); display: inline-block; padding: .2rem 1rem; transform: rotate(-4deg); }
+tr.revertido td { color: var(--suave); text-decoration: line-through; }
+tr.revertido td:first-child, tr.revertido td:last-child { text-decoration: none; }
+.estado.pagado { background: var(--exito); }
+.estado.parcial { background: var(--aviso); }
+.estado.cancelado { background: #e8ebef; }

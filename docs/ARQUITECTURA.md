@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.6 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
+Versión 0.11 · 12/11/2026 · Estado: Fase 1 construida; fases 2 a 4 en curso.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -129,11 +129,20 @@ Orden de aplicación por defecto (configurable): recargos, luego cargos por venc
 
 Nada se edita ni se borra: una cancelación crea el asiento inverso y deja ambos visibles.
 
-**Becas.** Una beca es un descuento (porcentaje o importe fijo) sobre un concepto recurrente de un titular, con vigencia y motivo. Se aplica sola al generar cada cargo y queda visible en él. Sustituye al descuento suelto del plan.
+**Reglas de cálculo.** Viven en `nucleo/recargos.py` y `nucleo/reparto.py`, Python puro con sus pruebas; nadie más calcula recargos, becas ni repartos.
+
+- *Generación.* Un concepto recurrente produce un cargo por titular activo con plan vigente y por periodo, el día configurado. Es idempotente por (titular, concepto, periodo). Los conceptos únicos para titulares nuevos se cargan al aprobarse el alta.
+- *Recargo.* El primero nace el día siguiente a `máx(vencimiento, prórroga) + días de gracia` si el cargo base sigue con saldo. Si la regla se repite, nace otro cada mes en ese mismo día. Fijo: el importe de la regla. Porcentaje: sobre el saldo pendiente del cargo base en ese momento, redondeado al centavo más cercano. El tope limita la suma de recargos de un mismo cargo. Un recargo nunca genera recargo. Si el equipo estuvo apagado, los recargos atrasados se generan al volver, sin duplicar.
+- *Beca.* Se descuenta al generar el cargo; el cargo guarda importe original, descuento e importe final. Nunca baja de cero.
+- *Saldo a favor.* No es una cuenta aparte: es la parte de un pago que todavía no se aplica a ningún cargo. Cuando nace un cargo nuevo se le aplica primero el saldo a favor más antiguo del titular o de su familia.
+- *Reversos.* Cancelar un cargo, condonar un recargo o revertir un pago crea un asiento de reverso ligado al original, con motivo y autorización. El saldo de un cargo es `importe − cancelado − aplicado por pagos vigentes`.
+- *Cargo manual.* Operación lo crea con el importe del concepto; cambiar el importe exige el permiso de ajustes o una solicitud.
+
+**Becas.** Una beca es un descuento **en porcentaje** (de 1 a 100, con hasta dos decimales) sobre un concepto recurrente de un titular, con vigencia y motivo. No hay becas de importe fijo. Se aplica sola al generar cada cargo y queda visible en él. Sustituye al descuento suelto del plan.
 
 **Prórrogas.** Una prórroga mueve la fecha a partir de la cual un cargo genera recargo. No cambia el importe ni borra recargos ya generados.
 
-Becas y prórrogas son acciones del motor de aprobaciones (`beca`, `prorroga`): Operación las solicita y las autoriza un nivel superior por cualquiera de las tres vías. Cada política decide qué permiso aprueba, así que un negocio puede reservar las becas a Dirección.
+Becas y prórrogas son acciones del motor de aprobaciones (`beca`, `prorroga`), con el mismo flujo que el alta: Operación las solicita y Supervisión las otorga directamente o aprueba la solicitud por cualquiera de las tres vías. Cada política decide qué permiso aprueba, así que un negocio puede reservar las becas a Dirección.
 
 **Saldo inicial.** Al migrar desde otro control, lo que cada titular debía o tenía a favor entra como un cargo o un pago de tipo `saldo_inicial`, fechado al día de la migración.
 
@@ -275,6 +284,12 @@ Objetivo: que Operación cobre sin esperar a nadie y que cada billete tenga due�
 
 Cadena de custodia: `caja → resguardo → banco`. En todo momento el sistema sabe cuánto efectivo debería tener cada persona.
 
+Reglas fijas del efectivo, para cualquier rol:
+
+- **Nadie revierte solo un pago que él mismo cobró.** Aunque tenga permiso de ajustes, su reversión queda como solicitud y la resuelve otra persona.
+- **Solo se devuelve efectivo que se tiene.** La devolución de un pago revertido sale del turno abierto de quien la ejecuta, y solo si ese turno tiene cobrado al menos ese importe. La custodia de una persona nunca queda negativa.
+- **Un depósito registrado no desaparece de la vista.** Queda «por conciliar» a nombre de quien lo registró, visible en la pantalla de custodia, hasta que aparece en el banco. Si pasa del plazo configurado sin aparecer, es una alerta.
+
 ## 8. Banco y conciliación
 
 ### 8.1 Entrada de movimientos
@@ -284,12 +299,24 @@ Hoy no existe en México una API bancaria abierta y gratuita para leer los movim
 | Adaptador | Costo | Cómo llega | Estado |
 |---|---|---|---|
 | `archivo` | Gratis | Se sube el archivo de movimientos de la banca en línea, o se deja en una carpeta vigilada | Fase 3 |
-| `estado_pdf` | Gratis | Estado de cuenta mensual en PDF | Fase 3, respaldo |
+| `estado_pdf` | Gratis | Estado de cuenta en PDF | Fase 3. Formato de Santander PyME documentado en `docs/formatos/` |
 | `correo` | Gratis | Avisos de abono leídos del buzón | Posterior, si el banco los envía con concepto |
 | `convenio` | De pago | Archivo diario de cobranza referenciada | Posterior |
 | `clabe_virtual` | De pago | Una CLABE por titular vía proveedor, por consulta periódica | Posterior |
 
 El adaptador `archivo` no depende de un formato fijo: detecta encabezados y columnas por nombre y contenido (fecha, descripción, referencia, cargo, abono, saldo) y guarda la correspondencia aprendida por cuenta. Subir el archivo es el único paso manual; todo lo demás es automático.
+
+Toda importación debe **cuadrar al centavo** (saldo inicial + depósitos − retiros = saldo final) o se rechaza completa. El sentido de cada movimiento se decide por el saldo, no por la posición de la columna.
+
+Lo que un movimiento trae para identificar a quien paga depende de cómo pagó:
+
+| Forma de pago | Referencia numérica | Concepto | Cuenta y nombre del pagador |
+|---|:-:|:-:|:-:|
+| SPEI desde otro banco | ✓ | ✓ | ✓ |
+| Transferencia desde el mismo banco | — | ✓ | — |
+| Depósito en efectivo | — | — | — |
+
+Por eso la ficha pide siempre la matrícula en referencia **y** en concepto, y la matrícula nunca empieza en cero.
 
 Cada movimiento lleva una **huella** (cuenta, fecha, importe, referencia, descripción normalizada y ordinal dentro del día) para que reimportar el mismo archivo no duplique nada.
 
@@ -297,15 +324,34 @@ Cada movimiento lleva una **huella** (cuenta, fecha, importe, referencia, descri
 
 Para cada abono:
 
+Las reglas viven en `nucleo/identificacion.py`, Python puro con sus pruebas.
+
 1. **Extraer.** Se buscan en referencia y concepto todas las secuencias de `L` dígitos (también partidas por espacios o guiones) que pasen el dígito verificador.
 2. **Decidir.**
-   - Una sola matrícula válida y existente → **aplicación automática**.
+   - Una sola matrícula válida y existente, escrita **aislada** (no pegada a otros dígitos) → **aplicación automática**. Si viene incrustada en un número más largo, solo se sugiere.
+   - Si esa matrícula contradice a un pagador ya conocido y confiable, tampoco se aplica sola.
    - Ninguna válida → se buscan matrículas existentes a un error de distancia (dígito cambiado, faltante, sobrante o intercambiado) y se ordenan por coincidencia de importe con lo que debe el titular y por historial del pagador. Va a la cola «por identificar» como sugerencia.
    - Varias válidas o ninguna pista → cola «por identificar» sin sugerencia.
-3. **Aprender.** Cuando una persona confirma a quién pertenece un abono, se guarda una `ReglaPagador` (cuenta u ordenante → titular). Tras el número de confirmaciones configurado, los siguientes abonos de ese pagador se sugieren en primer lugar; solo se aplican solos si la política lo permite.
+3. **Aprender.** Cuando una persona confirma a quién pertenece un abono, se guarda una `ReglaPagador` (CLABE del pagador → titular o familia). Tras el número de confirmaciones configurado, los siguientes abonos de ese pagador se sugieren en primer lugar; solo se aplican solos si la política lo permite.
 4. **Aplicar.** El pago se reparte según §5.1.
 
-Operación puede sugerir la identificación; Supervisión la confirma. Los depósitos de efectivo de §7 se emparejan contra los traslados registrados, no contra titulares.
+Operación puede sugerir la identificación; Supervisión la confirma. Los depósitos de efectivo de §7 se emparejan contra los traslados registrados (mismo importe y fecha cercana), no contra titulares; el que no empareja va a la cola.
+
+Otras reglas de la importación:
+
+- El archivo debe ser de una cuenta bancaria registrada del negocio (misma CLABE); si no, se rechaza.
+- Un movimiento nunca produce dos pagos: la huella es única y la aplicación va dentro de la misma transacción.
+- De quien paga se guarda lo necesario para identificarlo (banco, CLABE, nombre, clave de rastreo, referencia y concepto). El RFC no se guarda.
+- Operación ve fecha, importe, referencia, concepto y nombre del pagador; la CLABE completa solo la ve quien concilia.
+- Deshacer una aplicación bancaria es una reversión de pago por el motor de aprobaciones; el movimiento vuelve a la cola.
+
+**Continuidad y revisión de importaciones.** Quien puede importar podría subir un archivo fabricado para acreditar pagos que no existieron. El sistema no puede comprobar un archivo contra el banco, así que lo acota de tres formas:
+
+- *Continuidad.* Un estado de cuenta en PDF cuyo periodo empieza al día siguiente del último estado importado de esa cuenta debe abrir con el saldo con que aquel cerró; si no, se rechaza completo. Cada importación queda clasificada: `verificada` (encadena con la anterior), `primera`, `con_hueco` (hay días sin importar entre ambas) o `no_verificable` (archivo genérico de Excel o CSV, que cualquiera puede editar).
+- *Revisión por otra persona.* Toda importación `con_hueco` o `no_verificable` que haya aplicado pagos aparece como pendiente en el inicio de quien puede ver la bitácora, hasta que alguien distinto de quien la importó la marca como revisada. Marcarla queda en la bitácora.
+- *Cruce con el estado oficial.* El corte mayor (Fase 4) compara lo aplicado por banco contra el estado de cuenta en PDF del mes.
+
+Riesgo que queda: dos personas de acuerdo, una que importa y otra que revisa, pueden acreditar un pago inexistente; lo delata el cruce con el estado oficial.
 
 ## 9. Cortes y reportes
 
