@@ -619,6 +619,8 @@ Pensado para inventarios pequeños. Se enciende con el parámetro `modulo_invent
   - **Saldo a favor** del titular: Operación lo hace al momento; nace «por revisar» para Supervisión.
   - **Efectivo:** siempre por solicitud que resuelve otra persona, y con las reglas fijas del efectivo (sale del turno abierto de quien la ejecuta y solo si ese turno tiene ese efectivo; captura piezas si §15.2 está encendido). Entra en el esperado del arqueo y en los cortes.
 - Una venta sin matrícula solo se devuelve en efectivo. Una venta que se fue al adeudo y no se ha pagado se devuelve cancelando lo pendiente de ese cargo, sin mover dinero.
+- **Nunca regresa más dinero del que entró.** Por cada renglón, el dinero que regresa es a lo más lo realmente pagado de su cargo (aplicaciones de pagos vigentes) menos lo ya regresado; lo cancelado, condonado o descontado no se regresa.
+- Un pago en efectivo, o de una venta sin matrícula, que cubre artículos cuya devolución ya regresó dinero **no se puede revertir completo**: lo que falte se devuelve desde la venta. Así una misma venta no saca dinero dos veces.
 - Revertir completo el pago de una venta sigue el camino de reversiones existente y pregunta, renglón por renglón, si el artículo regresó.
 
 ### 16.4 Entradas y mermas
