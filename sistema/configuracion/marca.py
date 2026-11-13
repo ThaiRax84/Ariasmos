@@ -1,9 +1,12 @@
 import hashlib
 import re
+from datetime import timedelta
+from io import BytesIO
 
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
 
 from auditoria.servicios import registrar
 
@@ -11,6 +14,8 @@ from .models import MarcaNegocio
 
 COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
 LIMITE_LOGO = 1024 * 1024
+LADO_MAXIMO_LOGO = 512
+HORAS_ENTRE_AVISOS = 6
 BLANCO = "#FFFFFF"
 TINTA_ARIASMOS = "#1F1813"
 SUAVE_ARIASMOS = "#5C5047"
@@ -159,9 +164,29 @@ def preparar_logo(contenido):
         raise MarcaInvalida(str(error).replace("Solo se aceptan fotos JPEG o PNG y archivos PDF.", "El logo debe ser una imagen JPEG o PNG.").replace("El comprobante pasa de 5 MB.", "El logo pasa de 1 MB."))
     if tipo not in (ComprobanteRetiro.JPEG, ComprobanteRetiro.PNG):
         raise MarcaInvalida("El logo debe ser una imagen JPEG o PNG.")
+    limpio = _reducir(tipo, limpio)
     if len(limpio) > LIMITE_LOGO:
         raise MarcaInvalida("El logo pasa de 1 MB al reconstruirlo; usa una imagen más pequeña.")
     return tipo, limpio
+
+
+def _reducir(tipo, limpio):
+    from PIL import Image
+
+    from caja import comprobantes
+    from caja.models import ComprobanteRetiro
+
+    with Image.open(BytesIO(limpio)) as imagen:
+        imagen.load()
+        if max(imagen.size) <= LADO_MAXIMO_LOGO:
+            return limpio
+        imagen.thumbnail((LADO_MAXIMO_LOGO, LADO_MAXIMO_LOGO), Image.LANCZOS)
+        salida = BytesIO()
+        if tipo == ComprobanteRetiro.JPEG:
+            comprobantes._solo_pixeles(imagen, "RGB").save(salida, format="JPEG", quality=85)
+        else:
+            comprobantes._solo_pixeles(imagen, "RGBA" if imagen.mode in ("RGBA", "LA", "P") else "RGB").save(salida, format="PNG")
+    return salida.getvalue()
 
 
 def guardar_logo(contenido, usuario, request=None):
@@ -173,14 +198,34 @@ def guardar_logo(contenido, usuario, request=None):
         with transaction.atomic():
             marca = _obtener_para_cambiar()
             antes = {"logo_sha256": marca.logo_sha256}
+            anterior = marca.logo
             MarcaNegocio.objects.filter(pk=1).update(logo=nombre, logo_tipo=tipo, logo_sha256=huella, version=F("version") + 1)
             marca.refresh_from_db()
             registrar("marca_cambiada", usuario=usuario, objeto=marca, datos={"cambio": "logo", "antes": antes, "despues": {"logo_sha256": huella, "tipo": tipo, "tamano": len(limpio)}}, request=request)
     except Exception:
         comprobantes.descartar(nombre)
         raise
+    _retirar_archivo(anterior)
     _olvidar(marca.version - 1)
     return marca
+
+
+def _retirar_archivo(nombre):
+    from caja import comprobantes
+
+    if nombre and not MarcaNegocio.objects.filter(logo=nombre).exists():
+        try:
+            comprobantes.descartar(nombre)
+        except comprobantes.ComprobanteInvalido:
+            pass
+
+
+def avisar_logo_alterado(marca, request=None):
+    from auditoria.models import Evento
+
+    if Evento.objects.filter(accion="logo_alterado", momento__gte=timezone.now() - timedelta(hours=HORAS_ENTRE_AVISOS)).exists():
+        return
+    registrar("logo_alterado", request=request, objeto=marca, datos={"archivo": marca.logo})
 
 
 def quitar_logo(usuario, request=None):
@@ -189,9 +234,11 @@ def quitar_logo(usuario, request=None):
         if not marca.logo:
             raise MarcaInvalida("No hay logo que quitar.")
         antes = {"logo_sha256": marca.logo_sha256}
+        anterior = marca.logo
         MarcaNegocio.objects.filter(pk=1).update(logo="", logo_tipo="", logo_sha256="", version=F("version") + 1)
         marca.refresh_from_db()
         registrar("marca_cambiada", usuario=usuario, objeto=marca, datos={"cambio": "logo_quitado", "antes": antes}, request=request)
+    _retirar_archivo(anterior)
     _olvidar(marca.version - 1)
     return marca
 

@@ -112,7 +112,7 @@ def marca_logo(request):
     try:
         contenido = marca_negocio.leer_logo(actual)
     except (OSError, comprobantes.ComprobanteInvalido, marca_negocio.MarcaInvalida):
-        registrar_alterado(request, actual)
+        marca_negocio.avisar_logo_alterado(actual, request)
         raise Http404
     respuesta = HttpResponse(contenido, content_type=comprobantes.TIPOS_MIME[actual.logo_tipo])
     respuesta["Content-Security-Policy"] = "default-src 'none'; sandbox"
@@ -123,8 +123,3 @@ def marca_logo(request):
         return respuesta
     return _guardable(respuesta, actual.version, "logo")
 
-
-def registrar_alterado(request, actual):
-    from auditoria.servicios import registrar
-
-    registrar("logo_alterado", request=request, objeto=actual, datos={"archivo": actual.logo})

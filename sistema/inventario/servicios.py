@@ -4,7 +4,7 @@ import re
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Max, OuterRef, Subquery, Sum
 from django.utils import timezone
 
 from auditoria.servicios import registrar
@@ -606,17 +606,23 @@ def bajo_minimo():
 
 
 def niveles_referencia(articulos):
-    niveles = {}
-    for articulo in articulos:
-        candidatos = []
-        entrada = MovimientoInventario.objects.filter(articulo=articulo, tipo=MovimientoInventario.ENTRADA).order_by("-id").first()
-        if entrada is not None:
-            despues = MovimientoInventario.objects.filter(articulo=articulo, id__lte=entrada.pk).aggregate(total=Sum("cantidad"))["total"] or 0
-            candidatos.append((entrada.creado, despues))
-        renglon = RenglonConteo.objects.filter(articulo=articulo, conteo__aplicado_en__isnull=False).select_related("conteo").order_by("-conteo__aplicado_en", "-id").first()
-        if renglon is not None:
-            candidatos.append((renglon.conteo.aplicado_en, renglon.contado))
-        niveles[articulo.pk] = max(candidatos, key=lambda c: c[0])[1] if candidatos else 0
+    claves = [articulo.pk for articulo in articulos]
+    niveles = dict.fromkeys(claves, 0)
+    if not claves:
+        return niveles
+    ultima_entrada = MovimientoInventario.objects.filter(articulo=OuterRef("articulo"), tipo=MovimientoInventario.ENTRADA).order_by("-id").values("id")[:1]
+    hasta_entrada = MovimientoInventario.objects.filter(articulo__in=claves, id__lte=Subquery(ultima_entrada))
+    candidatos = {}
+    for fila in hasta_entrada.values("articulo").annotate(total=Sum("cantidad"), momento=Max("creado")).order_by():
+        candidatos[fila["articulo"]] = (fila["momento"], fila["total"] or 0)
+    ultimo_conteo = RenglonConteo.objects.filter(articulo=OuterRef("articulo"), conteo__aplicado_en__isnull=False).order_by("-conteo__aplicado_en", "-id").values("id")[:1]
+    contados = RenglonConteo.objects.filter(articulo__in=claves, conteo__aplicado_en__isnull=False, id=Subquery(ultimo_conteo))
+    for articulo, momento, contado in contados.values_list("articulo", "conteo__aplicado_en", "contado"):
+        previo = candidatos.get(articulo)
+        if previo is None or momento > previo[0]:
+            candidatos[articulo] = (momento, contado)
+    for articulo, (_, nivel) in candidatos.items():
+        niveles[articulo] = nivel
     return niveles
 
 

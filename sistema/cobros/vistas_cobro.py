@@ -262,6 +262,11 @@ def recibo(request, pk):
     return render(request, "cobros/recibo.html", _datos_recibo(objeto))
 
 
+MARGEN_INFERIOR_RECIBO = 40
+ALTO_CIERRE_RECIBO = 190
+ALTO_CANCELADO_RECIBO = 24
+
+
 def _colores_recibo():
     from configuracion import marca as marca_negocio
 
@@ -321,8 +326,15 @@ def recibo_pdf(request, pk):
     hoja.line(izquierda, y, derecha, y)
     y -= 26
 
+    def reservar(espacio):
+        nonlocal y
+        if y - espacio < MARGEN_INFERIOR_RECIBO:
+            hoja.showPage()
+            y = alto - 80
+
     def renglon(etiqueta, valor, negritas=True):
         nonlocal y
+        reservar(26)
         hoja.setFont("Helvetica", 10)
         hoja.setFillColor(suave)
         hoja.drawString(izquierda, y, etiqueta[:70])
@@ -340,6 +352,7 @@ def recibo_pdf(request, pk):
         renglon(voc["matricula"], datos["titular"].matricula_formateada)
     renglon("Forma de pago", datos["pago"].get_medio_display().capitalize())
     y -= 6
+    reservar(46)
     hoja.setFont("Helvetica-Bold", 9)
     hoja.setFillColor(suave)
     hoja.drawString(izquierda, y, "Aplicado a")
@@ -352,6 +365,7 @@ def recibo_pdf(request, pk):
     if datos["a_favor"]:
         renglon("Queda a favor", formatear(datos["a_favor"], pdf=True), negritas=False)
     y -= 8
+    reservar(ALTO_CIERRE_RECIBO + (ALTO_CANCELADO_RECIBO if datos["cancelado"] else 0))
     hoja.setFillColor(tinte)
     hoja.roundRect(izquierda, y - 26, derecha - izquierda, 44, 10, fill=1, stroke=0)
     hoja.setFillColor(tinta)
