@@ -2,6 +2,7 @@ import time
 from datetime import date
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import close_old_connections, connection
 
 from configuracion.models import Negocio, parametro
 from configuracion.trabajador import ejecutar_ciclo
@@ -14,6 +15,10 @@ class Command(BaseCommand):
         parser.add_argument("--una-vez", action="store_true", help="Ejecuta un ciclo y termina")
         parser.add_argument("--fecha", help="Fecha del negocio a usar (AAAA-MM-DD); solo para pruebas o recuperación")
 
+    def _renovar_conexion(self):
+        if not connection.in_atomic_block:
+            close_old_connections()
+
     def handle(self, *args, **opciones):
         negocio = Negocio.actual()
         if negocio is None or not negocio.configurado:
@@ -25,8 +30,10 @@ class Command(BaseCommand):
             except ValueError:
                 raise CommandError("Fecha no válida; usa AAAA-MM-DD.")
         while True:
+            self._renovar_conexion()
             for nombre, exito, texto in ejecutar_ciclo(fecha):
                 self.stdout.write(f"{'ok   ' if exito else 'FALLA'} {nombre}: {texto}")
+            self._renovar_conexion()
             if opciones["una_vez"]:
                 return
             try:

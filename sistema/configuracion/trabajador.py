@@ -1,6 +1,5 @@
 import traceback
 
-from django.db import close_old_connections
 from django.utils import timezone
 
 from auditoria.servicios import registrar, verificar_cadena
@@ -45,7 +44,6 @@ TAREAS = (
 
 
 def ejecutar_ciclo(hoy=None):
-    close_old_connections()
     hoy = hoy or hoy_negocio()
     informe = []
     for nombre, funcion, diaria in TAREAS:
@@ -62,5 +60,4 @@ def ejecutar_ciclo(hoy=None):
             registrar("tarea_fallida", datos={"tarea": nombre, "error": texto, "detalle": traceback.format_exc()[-1500:]})
         Tarea.objects.filter(pk=tarea.pk).update(ultima_ejecucion=timezone.now(), ultima_fecha=hoy, exito=exito, resultado=texto, ejecuciones=tarea.ejecuciones + 1)
         informe.append((nombre, exito, texto))
-    close_old_connections()
     return informe
