@@ -477,7 +477,8 @@ a.cifra:hover { border-color: var(--tinta); color: var(--tinta); box-shadow: 0 8
 a.cifra.aviso:hover { color: var(--aviso-texto); }
 .renglon-enlaces { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: 13px; font-weight: 700; }
 .lista-estado li:last-child { border-bottom: 0; }
-.piezas.mosaicos { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+.piezas.mosaicos { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); align-items: start; }
+.pieza.con-mosaico:not(.elegida):not(.con-error) .mosaico-quitar, .pieza.con-mosaico:not(.elegida):not(.con-error) input { display: none; }
 .pieza.con-mosaico { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; padding: 0; border: 0; background: transparent; }
 .pieza.con-mosaico > .denominacion { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .pieza.con-mosaico .error { grid-column: 1 / -1; }

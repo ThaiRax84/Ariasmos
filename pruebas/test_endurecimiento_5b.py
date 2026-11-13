@@ -160,3 +160,40 @@ def test_el_menu_nunca_enlaza_a_algo_prohibido(personas, limpio):
         assert enlaces
         for url in enlaces:
             assert c.get(url).status_code == 200, (clave, url)
+
+
+def test_venta_ignora_cantidad_en_cero_de_un_articulo_que_ya_no_esta(personas, limpio):
+    from inventario.models import Venta
+
+    preparar_conceptos()
+    Parametro.objects.update_or_create(clave="modulo_inventario", defaults={"valor": "1"})
+    libros = ConceptoCobro.objects.get(nombre="Libros")
+    vigente = Articulo.objects.create(clave="A-1", nombre="Vigente", precio=1000, concepto=libros)
+    retirado = Articulo.objects.create(clave="A-2", nombre="Retirado", precio=1000, concepto=libros, activo=False)
+    ana = titular_activo(personas["op"], personas["sup"], "Ana")
+    c = cliente(personas["op"])
+    url = reverse("inventario:vender_titular", args=[ana.pk])
+    assert c.post(url, {"modo": "adeudo", f"cantidad_{vigente.pk}": "2", f"cantidad_{retirado.pk}": "0", "cantidad_999999": ""}).status_code == 302
+    assert Venta.objects.count() == 1
+    for malo in ({f"cantidad_{retirado.pk}": "1"}, {"cantidad_999999": "3"}, {"cantidad_x": "1"}, {f"cantidad_{retirado.pk}": ["0", "4"]}):
+        assert c.post(url, {"modo": "adeudo", f"cantidad_{vigente.pk}": "2", **malo}).status_code == 200
+    assert Venta.objects.count() == 1
+
+
+@pytest.mark.parametrize("clave", ["sup", "dir"])
+def test_inicio_no_revela_el_turno_abierto_de_quien_mira(personas, limpio, clave):
+    from cuentas.models import PermisoRol
+
+    preparar_conceptos()
+    ana = titular_activo(personas["op"], personas["sup"], "Ana")
+    usuario = personas[clave]
+    for permiso in ("turno_caja", "registrar_pago_efectivo"):
+        PermisoRol.objects.get_or_create(rol=usuario.rol, permiso=permiso)
+    usuario = type(usuario).objects.get(pk=usuario.pk)
+    turno = caja.abrir_turno(usuario, Caja.objects.get_or_create(nombre="Caja 9")[0], 77777)
+    libro.registrar_pago(ana, 123456, Pago.EFECTIVO, usuario, turno=turno)
+    libro.registrar_pago(ana, 432101, Pago.EFECTIVO, usuario, turno=turno)
+    pagina = cliente(usuario).get(reverse("inicio")).content.decode()
+    for huella in ("5,555.57", "5555.57", "555557", "6,333.34", "6333.34", "633334", "1,234.56", "4,321.01"):
+        assert huella not in pagina
+    assert pagina.count("Se muestra al cerrar tu turno") >= 2

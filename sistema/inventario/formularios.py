@@ -63,7 +63,10 @@ class FormularioVenta(forms.Form):
     def clean(self):
         datos = super().clean()
         for nombre in self.data:
-            if nombre.startswith(PREFIJO_CANTIDAD) and nombre not in self.fields:
+            if not nombre.startswith(PREFIJO_CANTIDAD) or nombre in self.fields:
+                continue
+            valores = self.data.getlist(nombre) if hasattr(self.data, "getlist") else [self.data.get(nombre)]
+            if any(str(valor or "").strip() not in ("", "0") for valor in valores):
                 raise forms.ValidationError("Uno de los artículos no existe o no está activo.")
         renglones = []
         for articulo in self.articulos:
