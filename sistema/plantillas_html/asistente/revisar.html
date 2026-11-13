@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block contenido %}
+<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
+<h1>{{ titulo }}</h1>
+<p>Plantilla importada: <strong>{{ nombre }}</strong>. Todavía no se aplica nada.</p>
+{% if resumen.advertencias %}
+<section class="panel alerta">
+  <h2>Advertencias</h2>
+  <ul class="lista">{% for a in resumen.advertencias %}<li>{{ a }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<section class="panel">
+  <h2>Roles</h2>
+  <ul class="lista">{% for r in resumen.roles %}<li><strong>{{ r.nombre }}</strong> (nivel {{ r.nivel }}, {{ r.total }} permisos){% if r.delicados %}: puede {{ r.delicados|join:", "|lower }}{% else %}: sin permisos delicados{% endif %}.</li>{% endfor %}</ul>
+</section>
+<section class="panel">
+  <h2>Quién hace cada cosa</h2>
+  <table class="tabla compacta"><thead><tr><th>Acción</th><th>Hace directo</th><th>Solicita</th><th>Aprueba</th></tr></thead>
+  <tbody>{% for p in resumen.politicas %}<tr><td>{{ p.accion }}</td><td>{{ p.directo }}</td><td>{{ p.solicita }}</td><td>{{ p.aprueba }}</td></tr>{% endfor %}</tbody></table>
+</section>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton grande" type="submit">Aplicar plantilla</button><a class="boton secundario" href="{% url 'asistente:inicio' %}">Elegir otra</a></div>
+</form>
+{% endblock %}

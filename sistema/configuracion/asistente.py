@@ -21,8 +21,9 @@ from cuentas.models import CodigoUsado, Usuario
 from nucleo import totp
 
 from . import esquema, plantillas
-from .formularios import IMPORTAR, FormularioAsistenteConceptos, FormularioAsistenteInicio, FormularioAsistenteUsuario, FormularioPersonalizar
-from .models import VOCABULARIO_BASE, Negocio, Vocabulario, vocabulario
+from .formularios import IMPORTAR, FormularioAsistenteConceptos, FormularioAsistenteInicio, FormularioAsistenteUsuario, FormularioPersonalizar, FormularioRevisarPlantilla
+from .resumen import resumir
+from .models import VOCABULARIO_BASE, Negocio, Vocabulario, hoy_negocio, vocabulario
 
 CLAVE_SESION = "asistente"
 
@@ -89,11 +90,38 @@ def inicio(request):
                 pk=1,
                 defaults={"nombre": formulario.cleaned_data["nombre"], "zona_horaria": formulario.cleaned_data["zona_horaria"], "plantilla": origen, "configurado": False},
             )
-            plantillas.cargar_datos(datos, origen, request=request)
             registrar("asistente_negocio", objeto=guardado, datos={"nombre": guardado.nombre, "plantilla": origen}, request=request)
-        _guardar_estado(request, autorizado=True, rol_inicial=datos["rol_inicial"], recargos=plantillas.recargos(datos))
+        if origen == "importada":
+            _guardar_estado(request, autorizado=True, pendiente=datos)
+            return redirect("asistente:revisar")
+        _aplicar_plantilla(request, datos, origen)
         return redirect("asistente:personalizar")
     return _paso(request, "asistente/paso.html", formulario, 1, "Datos del negocio y plantilla")
+
+
+def _aplicar_plantilla(request, datos, origen):
+    with transaction.atomic():
+        plantillas.cargar_datos(datos, origen, request=request)
+    _guardar_estado(request, autorizado=True, pendiente=None, rol_inicial=datos["rol_inicial"], recargos=plantillas.recargos(datos))
+
+
+def revisar(request):
+    negocio = _exigir_autorizado(request)
+    pendiente = _estado(request).get("pendiente")
+    if negocio is None or not pendiente:
+        return redirect("asistente:inicio")
+    try:
+        datos = esquema.validar(pendiente)
+    except esquema.PlantillaInvalida:
+        return redirect("asistente:inicio")
+    resumen = resumir(datos)
+    formulario = FormularioRevisarPlantilla(request.POST if request.method == "POST" else None, advertencias=bool(resumen["advertencias"]))
+    if request.method == "POST" and formulario.is_valid():
+        if resumen["advertencias"]:
+            registrar("plantilla_aceptada_con_advertencias", datos={"advertencias": resumen["advertencias"]}, request=request)
+        _aplicar_plantilla(request, datos, "importada")
+        return redirect("asistente:personalizar")
+    return _paso(request, "asistente/revisar.html", formulario, 1, "Revisa la plantilla antes de aplicarla", resumen=resumen, nombre=datos["nombre"])
 
 
 def _exigir_autorizado(request):
@@ -227,6 +255,7 @@ def codigo(request):
                 dispositivo = request.dispositivo
                 cuentas_servicios.aprobar_dispositivo(dispositivo, nuevo, "Servidor (asistente)", request)
                 Negocio.objects.filter(pk=1).update(configurado=True)
+                Negocio.objects.filter(pk=1, cobro_desde__isnull=True).update(cobro_desde=hoy_negocio())
                 registrar("asistente_completado", usuario=nuevo, objeto=negocio, request=request)
         if usado is not None:
             request.session.pop(CLAVE_SESION, None)
