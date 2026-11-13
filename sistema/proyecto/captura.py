@@ -11,6 +11,9 @@ ENTRADA = {
     "entero": "numeric",
     "usuario": "text",
     "codigo_activacion": "text",
+    "recibo": "text",
+    "folio": "text",
+    "hora": "text",
 }
 
 

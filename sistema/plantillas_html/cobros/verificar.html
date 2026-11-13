@@ -11,7 +11,7 @@
   {% if resultado.valido %}
   <h2>{% if resultado.cancelado %}Recibo auténtico, pero CANCELADO{% else %}Recibo auténtico{% endif %}</h2>
   <p>{{ resultado.recibo }} · {{ resultado.recibo.pago.titular.nombre_completo }} · {{ resultado.recibo.pago.importe|dinero }} · {{ resultado.recibo.pago.fecha|date:"d/m/Y" }}</p>
-  {% else %}<h2>El folio y el código no corresponden a un recibo emitido.</h2>{% endif %}
+  {% else %}<h2>No reconocido: el folio y el código no corresponden a un recibo emitido.</h2>{% endif %}
 </section>
 {% endif %}
 {% endblock %}

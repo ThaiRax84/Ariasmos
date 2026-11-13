@@ -12,6 +12,25 @@
     {% for cargo, parte in propuesta.partes %}<li>{{ cargo }}{% if cargo.titular_id != titular.pk %} ({{ cargo.titular.nombre_completo }}){% endif %}: {{ parte|dinero }}</li>{% empty %}<li>No hay cargos pendientes.</li>{% endfor %}
     {% if propuesta.resto %}<li>Queda a favor: <strong>{{ propuesta.resto|dinero }}</strong></li>{% endif %}
   </ul>
+  {% if con_piezas %}
+  <form method="post" class="formulario angosto" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="paso" value="{% if piezas.listo %}confirmar{% else %}cambio{% endif %}">
+    <input type="hidden" name="importe" value="{{ importe }}">
+    <input type="hidden" name="ficha" value="{{ ficha }}">
+    {% if piezas.listo %}
+    {% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}
+    <p>Cambio a entregar: <strong>{{ piezas.cambio|dinero }}</strong>{% if piezas.cambio %}. Entrega exactamente estas piezas; si entregas otras, corrígelas aquí antes de confirmar.{% endif %}</p>
+    {% else %}
+    <p>Escribe las piezas que te entregan; el sistema calcula el cambio.</p>
+    {% endif %}
+    {% include "comun/_campos.html" with formulario=piezas.formulario %}
+    <div class="acciones">
+      {% if piezas.listo %}<button class="boton grande" type="submit">Confirmar y emitir recibo</button>{% else %}<button class="boton grande" type="submit">Calcular el cambio</button>{% endif %}
+      <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}">Corregir</a>
+    </div>
+  </form>
+  {% else %}
   <form method="post" class="acciones">
     {% csrf_token %}
     <input type="hidden" name="paso" value="confirmar">
@@ -20,6 +39,7 @@
     <button class="boton grande" type="submit">Confirmar y emitir recibo</button>
     <a class="boton secundario" href="{% url 'cobros:cobrar' titular.pk %}">Corregir</a>
   </form>
+  {% endif %}
 </section>
 {% elif turno %}
 <form method="post" class="formulario angosto" novalidate>
