@@ -5,9 +5,13 @@ from banco import conciliacion
 from banco.models import CuentaBancaria, Importacion, MovimientoBancario
 from caja.models import Denominacion, Traslado
 from caja.servicios import alertas as alertas_caja
+from configuracion.models import Negocio
+from cortes import servicios as cortes
+from cortes.models import MAYOR, Corte
 from cuentas.decoradores import requiere_sesion
 from cuentas.models import Delegacion, Dispositivo
 from cuentas.servicios import avisos_pendientes, por_revisar
+from respaldos import servicios as respaldos
 from solicitudes import motor
 from solicitudes.models import Solicitud
 from solicitudes.views import pendientes_para
@@ -26,6 +30,7 @@ def inicio(request):
         "dispositivos_pendientes": Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() if usuario.tiene_permiso("aprobar_dispositivos") else 0,
     }
     if usuario.tiene_permiso("recibir_efectivo"):
+        contexto["diarios_pendientes"] = cortes.diarios_pendientes()
         contexto["alertas"] = alertas_caja()
         contexto["por_recibir"] = Traslado.objects.filter(destino=usuario, estado=Traslado.PENDIENTE).count()
     if usuario.tiene_permiso("conciliar_banco"):
@@ -36,6 +41,12 @@ def inicio(request):
     if usuario.tiene_permiso("administrar_configuracion"):
         contexto["falta_cuenta"] = CuentaBancaria.principal_activa() is None
         contexto["faltan_denominaciones"] = not Denominacion.objects.filter(activa=True).exists()
+        contexto["entregas_con_problema"] = cortes.entregas_con_problema().count()
+    if usuario.tiene_permiso("administrar_respaldos"):
+        contexto["alertas_respaldo"] = respaldos.alertas()
+        contexto["clave_pendiente"] = Negocio.objects.filter(pk=1, clave_recuperacion_pendiente=True).exists()
+    if usuario.tiene_permiso("cerrar_cortes"):
+        contexto["mayores_borrador"] = Corte.objects.filter(tipo=MAYOR, estado=Corte.BORRADOR).order_by("fecha")
     if usuario.tiene_permiso("ver_auditoria"):
         contexto["importaciones_por_revisar"] = list(conciliacion.pendientes_de_revision()[:50])
         verificacion = ultima_verificacion()

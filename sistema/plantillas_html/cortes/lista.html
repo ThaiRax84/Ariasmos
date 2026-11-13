@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Cortes</h1>
+{% if ve_todos %}
+<div class="atajos">
+  <form method="post" action="{% url 'cortes:cobranza' %}">{% csrf_token %}<button class="boton" type="submit">Generar lista de cobranza ahora</button></form>
+</div>
+{% if pendientes %}
+<section class="panel alerta">
+  <h2>Corte diario pendiente</h2>
+  <ul class="lista">{% for p in pendientes %}<li>{{ p.persona }} · {{ p.caja }} · abierto desde {{ p.desde|date:"d/m/Y H:i" }}{% if p.dia_anterior %} (de un día anterior){% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% else %}
+<p>Aquí están los cortes diarios de tus turnos de caja.</p>
+{% endif %}
+<table class="tabla">
+<thead><tr><th>Tipo</th><th>Fecha</th><th>Caja</th><th>Persona</th><th>Estado</th><th>Marcas</th></tr></thead>
+<tbody>{% for c in cortes %}<tr><td><a href="{% url 'cortes:detalle' c.pk %}">{{ c.get_tipo_display }}</a></td><td>{% if c.tipo == "mayor" %}{{ c.fecha|date:"m/Y" }}{% else %}{{ c.fecha|date:"d/m/Y" }}{% endif %}{% if c.numero > 1 %} ({{ c.numero }}){% endif %}</td><td>{{ c.caja|default:"" }}</td><td>{{ c.usuario|default:"" }}</td><td>{{ c.get_estado_display }}</td><td>{% if c.tardio %}tardío {% endif %}{% if c.sin_revisar %}sin revisar{% endif %}</td></tr>{% empty %}<tr><td colspan="6">Todavía no hay cortes.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

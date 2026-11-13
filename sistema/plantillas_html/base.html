@@ -27,6 +27,8 @@
     {% if "administrar_roles" in permisos %}<a href="{% url 'roles' %}">Roles</a>{% endif %}
     {% if "administrar_politicas" in permisos %}<a href="{% url 'solicitudes:politicas' %}">Políticas</a>{% endif %}
     {% if "administrar_configuracion" in permisos %}<a href="{% url 'configuracion:indice' %}">Configuración</a>{% endif %}
+    {% if "turno_caja" in permisos or "ver_cortes" in permisos %}<a href="{% url 'cortes:lista' %}">Cortes</a>{% endif %}
+    {% if "administrar_respaldos" in permisos %}<a href="{% url 'respaldos:panel' %}">Respaldos</a>{% endif %}
     {% if "ver_auditoria" in permisos %}<a href="{% url 'auditoria:lista' %}">Auditoría</a>{% endif %}
   </nav>
   <div class="sesion">

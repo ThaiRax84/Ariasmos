@@ -19,12 +19,15 @@ from cuentas import qr, secretos
 from cuentas import servicios as cuentas_servicios
 from cuentas.formularios import FormularioCodigo
 from cuentas.models import CodigoUsado, Usuario
-from nucleo import totp
+from cortes.models import TIPOS as TIPOS_CORTE
+from cortes.models import DefinicionCorte, Destino, ReglaDestino
+from nucleo import sobre, totp
+from respaldos.servicios import clave_respaldo
 
 from . import esquema, plantillas
-from .formularios import IMPORTAR, FormularioAsistenteConceptos, FormularioAsistenteInicio, FormularioAsistenteUsuario, FormularioPersonalizar, FormularioRevisarPlantilla
+from .formularios import IMPORTAR, FormularioAsistenteConceptos, FormularioAsistenteCortes, FormularioAsistenteInicio, FormularioAsistenteUsuario, FormularioPersonalizar, FormularioRevisarPlantilla
 from .resumen import resumir
-from .models import VOCABULARIO_BASE, Negocio, Vocabulario, hoy_negocio, vocabulario
+from .models import VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, hoy_negocio, parametro, vocabulario
 
 CLAVE_SESION = "asistente"
 
@@ -53,7 +56,7 @@ def _token_valido(token):
     return hmac.compare_digest(hashlib.sha256(token.encode("utf-8")).hexdigest(), esperado)
 
 
-TOTAL_PASOS = 6
+TOTAL_PASOS = 7
 
 
 def _paso(request, plantilla, formulario, numero, titulo, **extra):
@@ -207,8 +210,42 @@ def pago(request):
     if request.method == "POST" and formulario.is_valid():
         guardada = guardar_cuenta(formulario, None, cuenta=actual, request=request, forzar_principal=True)
         avisar_banco(request, formulario, guardada)
-        return redirect("asistente:usuario")
+        return redirect("asistente:cortes")
     return _paso(request, "asistente/pago.html", formulario, 4, "Datos de pago")
+
+
+def cortes(request):
+    negocio = _exigir_autorizado(request)
+    if negocio is None:
+        return redirect("asistente:inicio")
+    if request.method == "POST" and request.POST.get("omitir"):
+        registrar("asistente_cortes_omitido", request=request)
+        return redirect("asistente:usuario")
+    niveles = {d.tipo: d.nivel for d in DefinicionCorte.objects.all()}
+    pendiente = Negocio.objects.filter(pk=1, clave_recuperacion_pendiente=True).exists()
+    formulario = FormularioAsistenteCortes(request.POST if request.method == "POST" else None, niveles=niveles, hora=str(parametro("hora_limite_corte_diario")), carpeta=negocio.carpeta_respaldo, pide_clave=pendiente)
+    if request.method == "POST" and formulario.is_valid():
+        datos = formulario.cleaned_data
+        with transaction.atomic():
+            if datos["carpeta_entrega"]:
+                destino = Destino.objects.create(nombre="Carpeta de cortes", ruta=datos["carpeta_entrega"])
+                for tipo, _ in TIPOS_CORTE:
+                    ReglaDestino.objects.create(destino=destino, tipo=tipo, entregar=True, nivel=datos[f"nivel_{tipo}"])
+                registrar("destino_guardado", objeto=destino, datos={"origen": "asistente", "niveles": {t: datos[f"nivel_{t}"] for t, _ in TIPOS_CORTE}}, request=request)
+            for tipo, _ in TIPOS_CORTE:
+                DefinicionCorte.objects.filter(tipo=tipo).update(nivel=datos[f"nivel_{tipo}"])
+            Parametro.objects.update_or_create(clave="hora_limite_corte_diario", defaults={"valor": datos["hora_limite_corte_diario"]})
+            if datos["carpeta_respaldo"]:
+                Negocio.objects.filter(pk=1).update(carpeta_respaldo=datos["carpeta_respaldo"])
+            if pendiente and datos.get("guardada"):
+                Negocio.objects.filter(pk=1).update(clave_recuperacion_pendiente=False)
+                registrar("clave_recuperacion_guardada", objeto=negocio, request=request)
+            registrar("asistente_cortes", datos={"entrega": bool(datos["carpeta_entrega"]), "respaldo": bool(datos["carpeta_respaldo"]), "hora_limite": datos["hora_limite_corte_diario"]}, request=request)
+        return redirect("asistente:usuario")
+    contexto = {"texto_clave": sobre.clave_a_texto(clave_respaldo()) if pendiente else ""}
+    respuesta = _paso(request, "asistente/cortes.html", formulario, 5, "Cortes y respaldo (opcional)", **contexto)
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta
 
 
 def usuario(request):
@@ -235,7 +272,7 @@ def usuario(request):
                 registrar("usuario_creado", objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": rol.pk, "origen": "asistente"}, request=request)
             _guardar_estado(request, usuario=nuevo.pk, secreto=totp.generar_secreto())
             return redirect("asistente:codigo")
-    return _paso(request, "asistente/paso.html", formulario, 5, "Primer usuario de Dirección")
+    return _paso(request, "asistente/paso.html", formulario, 6, "Primer usuario de Dirección")
 
 
 def codigo(request):
@@ -270,7 +307,7 @@ def codigo(request):
         messages.error(request, "El código no coincide. Revisa la hora del teléfono.")
     contexto = {
         "formulario": formulario,
-        "paso": 6,
+        "paso": 7,
         "total": TOTAL_PASOS,
         "titulo": "Autenticador del primer usuario",
         **qr.contexto(secreto, nuevo.usuario, negocio.nombre),

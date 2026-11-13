@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Destinos de entrega de cortes</h1>
+<p>Cada corte cerrado y cada lista de cobranza se escribe en estas carpetas como PDF, CSV y JSON, con un <code>manifiesto.json</code> firmado.</p>
+<div class="atajos"><a class="boton" href="{% url 'cortes:destino_nuevo' %}">Agregar carpeta</a></div>
+<table class="tabla">
+<thead><tr><th>Nombre</th><th>Carpeta</th><th>Activo</th><th>Qué recibe</th></tr></thead>
+<tbody>{% for d in destinos %}<tr><td><a href="{% url 'cortes:destino_editar' d.pk %}">{{ d.nombre }}</a></td><td><code>{{ d.ruta }}</code></td><td>{{ d.activo|yesno:"sí,no" }}</td><td>{% for r in d.reglas.all %}{% if r.entregar %}{{ r.get_tipo_display }} ({{ r.get_nivel_display|truncatewords:2 }}){% if not forloop.last %}; {% endif %}{% endif %}{% endfor %}</td></tr>{% empty %}<tr><td colspan="4">No hay destinos: los cortes no se entregan a ninguna carpeta.</td></tr>{% endfor %}</tbody>
+</table>
+{% if problemas %}
+<section class="panel alerta">
+  <h2>Entregas con problemas</h2>
+  <ul class="lista">{% for e in problemas %}<li>{{ e.corte }} → {{ e.destino }} · {{ e.intentos }} intento{{ e.intentos|pluralize }} · {{ e.get_estado_display }} · {{ e.ultimo_error }} <form method="post" action="{% url 'cortes:reintentar' e.pk %}" class="en-linea">{% csrf_token %}<button class="boton secundario" type="submit">Reintentar</button></form></li>{% endfor %}</ul>
+</section>
+{% endif %}
+<h2>Entregas recientes</h2>
+<ul class="lista">{% for e in recientes %}<li>{{ e.corte }} → {{ e.destino }} · {{ e.get_estado_display }}{% if e.entregada_en %} · {{ e.entregada_en|date:"d/m/Y H:i" }}{% endif %}</li>{% empty %}<li>Sin entregas.</li>{% endfor %}</ul>
+{% endblock %}

@@ -25,6 +25,24 @@
 </section>
 {% endif %}
 {% if por_recibir %}<section class="panel alerta"><h2>Tienes {{ por_recibir }} entrega{{ por_recibir|pluralize }} de efectivo por confirmar</h2><a class="boton" href="{% url 'caja:traslados' %}">Revisar</a></section>{% endif %}
+{% if diarios_pendientes %}
+<section class="panel alerta">
+  <h2>Corte diario pendiente</h2>
+  <ul class="lista">{% for p in diarios_pendientes %}<li>{{ p.persona }} · {{ p.caja }} · turno abierto desde {{ p.desde|date:"d/m/Y H:i" }}{% if p.dia_anterior %} (de un día anterior){% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if clave_pendiente %}
+<section class="panel alerta"><h2>Guarda la clave de recuperación</h2><p>Sin ella ningún respaldo se puede abrir. Se muestra una sola vez.</p><a class="boton" href="{% url 'respaldos:clave' %}">Ver la clave</a></section>
+{% endif %}
+{% if alertas_respaldo %}
+<section class="panel alerta"><h2>Respaldos</h2><ul class="lista">{% for a in alertas_respaldo %}<li>{{ a }}</li>{% endfor %}</ul><a class="boton" href="{% url 'respaldos:panel' %}">Ir a respaldos</a></section>
+{% endif %}
+{% if entregas_con_problema %}
+<section class="panel alerta"><h2>Hay {{ entregas_con_problema }} entrega{{ entregas_con_problema|pluralize }} de cortes con problemas</h2><a class="boton" href="{% url 'cortes:destinos' %}">Revisar</a></section>
+{% endif %}
+{% if mayores_borrador %}
+<section class="panel"><h2>Cortes mayores por cerrar</h2><ul class="lista">{% for c in mayores_borrador %}<li><a href="{% url 'cortes:detalle' c.pk %}">{{ c.fecha|date:"m/Y" }}</a></li>{% endfor %}</ul></section>
+{% endif %}
 {% if faltan_denominaciones %}
 <section class="panel alerta">
   <h2>Faltan las denominaciones de caja</h2>

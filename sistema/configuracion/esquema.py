@@ -6,7 +6,7 @@ from solicitudes.politicas import POR_DEFECTO, definicion
 from . import moneda
 
 LIMITE_BYTES = 256 * 1024
-MAXIMO_LISTA = {"roles": 20, "politicas": 20, "motivos_baja": 100, "relaciones_contacto": 50, "campos_contacto": 20, "conceptos": 100, "medios_pago": 30, "cajas": 20, "denominaciones": 30}
+MAXIMO_LISTA = {"roles": 20, "politicas": 20, "motivos_baja": 100, "relaciones_contacto": 50, "campos_contacto": 20, "conceptos": 100, "medios_pago": 30, "cajas": 20, "denominaciones": 30, "cortes": 3}
 VOCABULARIO = ("titular", "titulares", "matricula", "agrupacion", "agrupaciones", "familia", "familias")
 REQUERIDAS = ("alta", "baja", "reactivacion", "correccion_nombre")
 ACCIONES = REQUERIDAS + tuple(a for a in POR_DEFECTO if a not in REQUERIDAS)
@@ -30,7 +30,11 @@ RAIZ = {
     "cajas": False,
     "denominaciones": False,
     "moneda": False,
+    "cortes": False,
 }
+TIPOS_CORTE = ("diario", "mayor", "cobranza")
+NIVELES_CORTE = ("completo", "solo_nombres", "sin_nombres")
+NIVELES_POR_DEFECTO = {"diario": "solo_nombres", "mayor": "solo_nombres", "cobranza": "completo"}
 
 
 class PlantillaInvalida(ValueError):
@@ -152,6 +156,17 @@ def _campo(valor, ruta):
     }
 
 
+def _corte(valor, ruta):
+    _objeto(valor, ruta, ("tipo", "nombre", "nivel", "activa"), ("tipo",))
+    tipo = _opcion(valor["tipo"], f"{ruta}.tipo", TIPOS_CORTE)
+    return {
+        "tipo": tipo,
+        "nombre": _texto(valor.get("nombre", tipo.capitalize()), f"{ruta}.nombre", 60),
+        "nivel": _opcion(valor.get("nivel", NIVELES_POR_DEFECTO[tipo]), f"{ruta}.nivel", NIVELES_CORTE),
+        "activa": _logico(valor.get("activa", True), f"{ruta}.activa"),
+    }
+
+
 def _recargo(valor, ruta):
     if valor is None:
         return None
@@ -230,6 +245,9 @@ def validar(datos):
     _sin_repetidos([c["etiqueta"] for c in limpia["campos_contacto"]], "campos_contacto")
     if sum(1 for c in limpia["campos_contacto"] if c["principal"]) > 1:
         _falla("campos_contacto", "solo un campo puede ser el principal")
+    cortes = _lista(datos.get("cortes", []), "cortes", "cortes")
+    limpia["cortes"] = [_corte(c, f"cortes[{i}]") for i, c in enumerate(cortes)]
+    _sin_repetidos([c["tipo"] for c in limpia["cortes"]], "cortes")
     conceptos = _lista(datos.get("conceptos", []), "conceptos", "conceptos")
     limpia["conceptos"] = [_concepto(c, f"conceptos[{i}]") for i, c in enumerate(conceptos)]
     _sin_repetidos([c["nombre"] for c in limpia["conceptos"]], "conceptos")
