@@ -86,7 +86,11 @@ def _contexto_moneda(actual, formulario=None):
 @require_POST
 def cambiar_moneda(request):
     actual = Negocio.objects.get(pk=1)
-    formulario = FormularioMoneda(request.POST, bloqueada=moneda_bloqueada())
+    if moneda_bloqueada():
+        registrar("moneda_rechazada", usuario=request.user, objeto=actual, datos={"motivo": "ya_hay_movimientos", "pedida": str(request.POST.get("moneda", ""))[:3]}, request=request)
+        messages.error(request, "Ya hay cargos o pagos registrados: la moneda no se puede cambiar.")
+        return redirect("configuracion:avanzado")
+    formulario = FormularioMoneda(request.POST)
     if not formulario.is_valid():
         return render(request, "configuracion/avanzado.html", {"formulario": FormularioAjustesAvanzados(instance=actual), "bloqueado": actual.matriculas_emitidas, **_contexto_moneda(actual, formulario)})
     nueva = formulario.cleaned_data["moneda"]
