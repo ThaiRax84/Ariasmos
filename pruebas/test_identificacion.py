@@ -20,7 +20,7 @@ def decidir(ref, concepto, importe, **extra):
 
 
 def test_matricula_en_referencia_o_en_concepto_es_automatica():
-    for ref, concepto in ((A, "colegiatura"), ("0260803", f"pago {A}"), ("", f"mat {A[:3]} {A[3:]}"), ("835060", f"{A[:3]}-{A[3:]} nov")):
+    for ref, concepto in ((A, "colegiatura"), ("0260803", f"pago {A}"), ("", f"mat {A[:3]} {A[3:]}"), ("123456", f"{A[:3]}-{A[3:]} nov")):
         d = decidir(ref, concepto, 130000)
         assert (d.resultado, d.matricula, d.motivo) == (ident.AUTOMATICA, A, ident.POR_MATRICULA)
         assert d.coincide_importe
