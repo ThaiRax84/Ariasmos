@@ -1,8 +1,6 @@
-{% extends "base.html" %}
-{% block contenido %}
-<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
-<h1>{{ titulo }}</h1>
-<p>Estos datos arman la ficha de pago que se entrega a cada {{ voc.titular|lower }}. El banco se reconoce por los tres primeros dígitos de la CLABE.</p>
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<p class="subtitulo">Estos datos arman la ficha de pago que se entrega a cada {{ voc.titular|lower }}. El banco se reconoce por los tres primeros dígitos de la CLABE.</p>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

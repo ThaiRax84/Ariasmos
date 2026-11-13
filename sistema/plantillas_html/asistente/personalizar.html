@@ -1,8 +1,6 @@
-{% extends "base.html" %}
-{% block contenido %}
-<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
-<h1>{{ titulo }}</h1>
-<p>La plantilla ya quedó cargada. Si te sirve como está, sigue adelante; todo se puede cambiar después en Configuración.</p>
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<p class="subtitulo">La plantilla ya quedó cargada. Si te sirve como está, sigue adelante; todo se puede cambiar después en Configuración.</p>
 <div class="acciones"><a class="boton grande" href="{% url 'asistente:conceptos' %}">Usar tal cual</a></div>
 <details>
   <summary>Personalizar vocabulario y conceptos</summary>

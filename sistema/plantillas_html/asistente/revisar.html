@@ -1,8 +1,6 @@
-{% extends "base.html" %}
-{% block contenido %}
-<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
-<h1>{{ titulo }}</h1>
-<p>Plantilla importada: <strong>{{ nombre }}</strong>. Todavía no se aplica nada.</p>
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<p class="subtitulo">Plantilla importada: <strong>{{ nombre }}</strong>. Todavía no se aplica nada.</p>
 <p>Moneda de la plantilla: {{ resumen.moneda }}.{% if negocio and resumen.moneda != negocio.moneda %} Elegiste {{ negocio.moneda }}: sus {{ resumen.denominaciones }} denominaciones de caja no se cargarán y tendrás que capturar las de tu moneda.{% endif %}</p>
 {% if resumen.advertencias %}
 <section class="panel alerta">
