@@ -3,6 +3,7 @@ import traceback
 from django.utils import timezone
 
 from auditoria.servicios import registrar, verificar_cadena
+from banco import carpeta as carpeta_banco
 from banco.models import depurar_cargas
 from cobros import generacion
 from cortes import servicios as cortes
@@ -40,6 +41,13 @@ def _secretos(hoy):
     if secretos.en_claro():
         raise RuntimeError("quedan secretos del autenticador en claro")
     return f"{cambiados} secretos del autenticador cifrados"
+
+
+def _carpeta_banco(hoy):
+    informe = carpeta_banco.revisar()
+    if informe.get("sin_carpeta"):
+        return "sin carpeta vigilada del banco"
+    return f"{informe['importados']} importados, {informe['rechazados']} rechazados y {informe['esperando']} en espera en la carpeta del banco"
 
 
 def _mayores(hoy):
@@ -98,6 +106,7 @@ TAREAS = (
     ("caducar_solicitudes", _solicitudes, False),
     ("depurar_equipos", _equipos, False),
     ("depurar_cargas", _cargas, False),
+    ("carpeta_banco", _carpeta_banco, False),
     ("cifrar_secretos", _secretos, False),
     ("generar_cortes_mayores", _mayores, False),
     ("cerrar_cortes_vencidos", _vencidos, False),

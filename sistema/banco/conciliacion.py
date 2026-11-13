@@ -3,7 +3,7 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
 from django.utils import timezone
 
 from auditoria.servicios import registrar
@@ -294,7 +294,41 @@ class RevisionPropia(ErrorConciliacion):
     pass
 
 
+class ErrorLiberacion(ErrorConciliacion):
+    pass
+
+
+def liberar(importacion, usuario, request=None):
+    if not usuario.tiene_permiso("conciliar_banco"):
+        raise ErrorLiberacion("Solo quien concilia libera una importación retenida.")
+    with transaction.atomic():
+        hechos = Importacion.objects.filter(pk=importacion.pk, retenida=True, liberada_en__isnull=True).update(liberada_por=usuario, liberada_en=timezone.now())
+        if hechos != 1:
+            raise ErrorLiberacion("La importación no está retenida o ya se liberó.")
+        aplicados = depositos = 0
+        cuenta = importacion.cuenta
+        for movimiento in importacion.lista.filter(estado=MovimientoBancario.POR_IDENTIFICAR, propuesta__isnull=True, posible_duplicado=False).order_by("id"):
+            datos = {
+                "sentido": movimiento.sentido, "clase": movimiento.clase, "importe": movimiento.importe, "fecha": movimiento.fecha.isoformat(),
+                "referencia": movimiento.referencia, "concepto": movimiento.concepto, "cuenta_pagador": movimiento.cuenta_pagador,
+            }
+            resultado, extra = destino(datos, cuenta)
+            if resultado == "deposito":
+                conciliar_deposito(movimiento, extra, usuario, request)
+                depositos += 1
+            elif resultado == identificacion.AUTOMATICA:
+                aplicar(movimiento, _titular(extra.matricula), usuario, request)
+                MovimientoBancario.objects.filter(pk=movimiento.pk).update(motivo="")
+                aplicados += 1
+        Importacion.objects.filter(pk=importacion.pk).update(aplicados=F("aplicados") + aplicados, depositos_emparejados=F("depositos_emparejados") + depositos)
+        registrar("importacion_liberada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "aplicados": aplicados, "depositos": depositos}, request=request)
+    return aplicados, depositos
+
+
 def marcar_revisada(importacion, usuario, request=None):
+    if importacion.liberada_por_id == usuario.pk:
+        registrar("revision_propia_denegada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo, "motivo": "la_libero"}, request=request)
+        raise RevisionPropia("Quien liberó la importación no puede revisarla.")
     if importacion.creada_por_id == usuario.pk:
         registrar("revision_propia_denegada", usuario=usuario, objeto=importacion, datos={"archivo": importacion.nombre_archivo}, request=request)
         raise RevisionPropia("Quien importó no puede revisar su propia importación.")
@@ -309,7 +343,7 @@ def marcar_revisada(importacion, usuario, request=None):
             "importacion_revisada",
             usuario=usuario,
             objeto=importacion,
-            datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "importo": str(importacion.creada_por), "pagos": aplicados["n"], "monto": aplicados["t"] or 0},
+            datos={"archivo": importacion.nombre_archivo, "continuidad": importacion.continuidad, "importo": str(importacion.importo), "pagos": aplicados["n"], "monto": aplicados["t"] or 0},
             request=request,
         )
 
@@ -453,12 +487,15 @@ def conciliar_deposito(movimiento, traslado, usuario, request=None):
         registrar("deposito_conciliado", usuario=usuario, objeto=traslado, datos={"movimiento": fresco.pk, "importe": fresco.importe, "registro": str(traslado.origen)}, request=request)
 
 
-def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=None, request=None):
+def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=None, request=None, origen=Importacion.MANUAL):
     resumen = resumen or {}
+    if origen == Importacion.MANUAL and usuario is None:
+        raise ErrorConciliacion("Una importación manual necesita a la persona que la hace.")
     with transaction.atomic():
         clasificacion = continuidad(cuenta, adaptador, resumen)
+        retener = origen == Importacion.CARPETA and clasificacion != Importacion.VERIFICADA
         importacion = Importacion.objects.create(
-            continuidad=clasificacion,
+            continuidad=clasificacion, origen=origen, retenida=retener,
             cuenta=cuenta, nombre_archivo=lectura.nombre_saneado(nombre), sha256=sha256, adaptador=adaptador,
             periodo_inicio=resumen.get("periodo_inicio") or min(m["fecha"] for m in movimientos),
             periodo_fin=resumen.get("periodo_fin") or max(m["fecha"] for m in movimientos),
@@ -492,6 +529,11 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
                 **{k: v for k, v in datos.items() if k not in ("fecha",)}, fecha=datetime.fromisoformat(datos["fecha"]).date(),
             )
             cuentas["nuevos"] += 1
+            if retener and resultado in ("deposito", identificacion.AUTOMATICA):
+                if resultado == identificacion.AUTOMATICA:
+                    MovimientoBancario.objects.filter(pk=movimiento.pk).update(sugerencia=extra.matricula, alternativas=list(extra.alternativas), motivo="retenido_sin_revision", coincide_importe=extra.coincide_importe)
+                cuentas["retenidos"] += 1
+                continue
             if resultado == "deposito":
                 conciliar_deposito(movimiento, extra, usuario, request)
                 cuentas["depositos"] += 1
@@ -514,7 +556,7 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
             usuario=usuario,
             objeto=importacion,
             datos={
-                "archivo": importacion.nombre_archivo, "sha256": sha256, "cuenta": str(cuenta), "adaptador": adaptador, "continuidad": clasificacion,
+                "archivo": importacion.nombre_archivo, "sha256": sha256, "cuenta": str(cuenta), "adaptador": adaptador, "continuidad": clasificacion, "origen": origen, "retenida": retener,
                 "periodo": [str(importacion.periodo_inicio), str(importacion.periodo_fin)], "saldo_inicial": importacion.saldo_inicial, "saldo_final": importacion.saldo_final,
                 "total_abonos": importacion.depositos, "total_cargos": importacion.retiros, "movimientos": len(movimientos),
                 "aplicados_monto": importacion.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(t=Sum("importe"))["t"] or 0, **dict(cuentas),
