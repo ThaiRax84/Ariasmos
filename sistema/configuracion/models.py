@@ -112,3 +112,18 @@ def hoy_negocio():
     negocio = Negocio.actual()
     zona = ZoneInfo(negocio.zona_horaria) if negocio else timezone.get_default_timezone()
     return timezone.localtime(timezone.now(), zona).date()
+
+
+class Tarea(models.Model):
+    nombre = models.CharField(max_length=60, unique=True)
+    ultima_ejecucion = models.DateTimeField(null=True, blank=True)
+    ultima_fecha = models.DateField(null=True, blank=True)
+    exito = models.BooleanField(default=True)
+    resultado = models.CharField(max_length=500, blank=True)
+    ejecuciones = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
