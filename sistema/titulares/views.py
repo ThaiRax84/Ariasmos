@@ -2,10 +2,12 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicios import diferencias, registrar
 from banco.ficha import datos_de_pago
+from cobros import estado_pdf
 from cobros.estado import estado_cuenta
 from configuracion.models import parametro, vocabulario
 from cuentas.decoradores import requiere_permiso
@@ -142,6 +144,30 @@ def cambiar_familia(request, pk):
             return redirect("titulares:detalle", pk=pk)
     actual = f" (hoy: {titular.familia})" if titular.familia_id else ""
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Familia de {titular}{actual}", "boton": "Enviar"})
+
+
+def _pdf_estado(request, titulares, titulo, nombre):
+    contenido = estado_pdf.generar(titulares, titulo, getattr(request, "negocio", None))
+    for titular in titulares:
+        registrar("estado_de_cuenta_emitido", objeto=titular, request=request, datos={"titulo": titulo, "titulares": len(titulares)})
+    respuesta = HttpResponse(contenido, content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'inline; filename="estado-de-cuenta-{nombre}.pdf"'
+    return respuesta
+
+
+@requiere_permiso("ver_titulares")
+def estado_titular_pdf(request, pk):
+    titular = get_object_or_404(Titular, pk=pk)
+    return _pdf_estado(request, [titular], titular.nombre_completo, titular.matricula)
+
+
+@requiere_permiso("ver_titulares")
+def estado_familia_pdf(request, pk):
+    objeto = get_object_or_404(Familia, pk=pk)
+    miembros = list(objeto.miembros.order_by("apellidos", "nombre"))
+    if not miembros:
+        raise Http404
+    return _pdf_estado(request, miembros, f"{vocabulario()['familia']} {objeto}", f"familia-{objeto.pk}")
 
 
 @requiere_permiso("ver_titulares")
