@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "instalacion/**"
+      - "escritorio/**"
       - "sistema/**"
       - "nucleo/**"
       - "datos/**"
@@ -70,7 +71,42 @@ jobs:
           taskkill //F //T //PID "$(cat /proc/$proceso/winpid)" || true
           exit 1
 
+  escritorio:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Pruebas del programa de escritorio
+        run: |
+          dotnet test escritorio/Pruebas/Ariasmos.Pruebas.csproj -c Release --nologo --logger "console;verbosity=normal"
+          if ($LASTEXITCODE -ne 0) { throw "Las pruebas de Ariasmos.exe fallaron" }
+      - name: Compilar Ariasmos.exe
+        run: |
+          dotnet build escritorio/Ariasmos/Ariasmos.csproj -c Release --nologo -o build/escritorio
+          if ($LASTEXITCODE -ne 0) { throw "No se pudo compilar Ariasmos.exe" }
+          $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
+          $info = (Get-Item -LiteralPath build/escritorio/Ariasmos.exe).VersionInfo
+          Write-Host "Ariasmos.exe: $($info.ProductName) $($info.ProductVersion) $($info.FileVersion)"
+          if ($info.ProductName -ne 'Ariasmos') { throw "El nombre del producto de Ariasmos.exe es '$($info.ProductName)'" }
+          if (-not $info.ProductVersion.StartsWith($version)) { throw "La versión de Ariasmos.exe ($($info.ProductVersion)) no es $version" }
+          Get-ChildItem -LiteralPath build/escritorio -Recurse -File | ForEach-Object { Write-Host "  $($_.FullName.Substring((Resolve-Path build/escritorio).Path.Length)) $($_.Length)" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ariasmos-escritorio
+          if-no-files-found: error
+          retention-days: 7
+          path: build/escritorio
+
   instalador-windows:
+    needs: escritorio
     runs-on: windows-latest
     timeout-minutes: 90
     defaults:
@@ -84,6 +120,10 @@ jobs:
         with:
           python-version: "3.12"
           architecture: x64
+      - uses: actions/download-artifact@v4
+        with:
+          name: ariasmos-escritorio
+          path: build/escritorio
       - name: Construir el paquete
         run: |
           ./instalacion/construir.ps1 -Python (Get-Command python).Source
