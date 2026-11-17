@@ -21,6 +21,7 @@ if _datos is None:
     RUTA_INSTANCIA = ""
     HTTPS_ACTIVO = False
     CERTIFICADO_SERVIDOR = ""
+    PUERTO_HTTPS = 443
     RUTA_ANCLA_AUDITORIA = ""
     RUTA_COMPROBANTES = ""
     RUTA_ACTUALIZACIONES = ""
@@ -47,7 +48,11 @@ else:
     PROXIES_CONFIABLES = list(_datos.get("proxies_confiables", ["127.0.0.1", "::1"]))
     HTTPS_ACTIVO = bool(_datos.get("https", True))
     CERTIFICADO_SERVIDOR = str(_datos.get("certificado_servidor", ""))
+    PUERTO_HTTPS = int(_datos.get("puerto", 443))
     if _datos.get("https", True):
+        from . import equipo as _equipo
+
+        ALLOWED_HOSTS += [ip for ip in _equipo.direcciones_locales() if ip not in ALLOWED_HOSTS]
         SESSION_COOKIE_SECURE = True
         CSRF_COOKIE_SECURE = True
         COOKIE_DISPOSITIVO_SEGURA = True

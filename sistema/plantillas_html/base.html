@@ -8,7 +8,9 @@
 <link rel="stylesheet" href="{% static 'css/sistema.css' %}">
 {% block transicion %}<link rel="stylesheet" href="{% static 'css/transiciones.css' %}">{% endblock %}
 {% if user.is_authenticated and marca.con_colores %}<link rel="stylesheet" href="{% url 'marca_css' %}?v={{ marca.version }}">{% endif %}
+<link rel="stylesheet" href="{% static 'css/escritorio.css' %}">
 <script src="{% static 'js/sistema.js' %}" defer></script>
+<script src="{% static 'js/escritorio.js' %}" defer></script>
 <script src="{% static 'js/captura.js' %}" defer></script>
 {% block cabeza %}{% endblock %}
 </head>
@@ -17,6 +19,10 @@
 <div class="franja"></div>
 {% block barra %}
 <header class="barra">
+  <div class="navegacion" data-navegacion hidden>
+    <button class="flecha" type="button" data-ir-atras aria-label="Atrás (Alt + flecha izquierda)" title="Atrás"></button>
+    <button class="flecha" type="button" data-ir-adelante aria-label="Adelante (Alt + flecha derecha)" title="Adelante"></button>
+  </div>
   <a class="marcas" href="{% if user.is_authenticated %}{% url 'inicio' %}{% else %}{% url 'entrar' %}{% endif %}">
     <span class="marca-ariasmos"><img class="medallon" src="{% static 'marca/grifo-medallon.jpg' %}" alt="" width="46" height="46"><span class="nombre-ariasmos">ARIASMOS</span></span>
     {% if negocio %}<span class="separador-marcas"></span>
@@ -41,6 +47,7 @@
 </header>
 {% endblock %}
 <main class="contenido" id="contenido">
+  {% if programa.viejo %}<p class="mensaje warning aviso-programa" role="status">El programa Ariasmos de esta computadora (ver. {{ programa.version }}) es más viejo que el del servidor (ver. {{ version }}). Instala en esta computadora la versión nueva con el mismo instalador que se usó en la computadora principal.</p>{% endif %}
   {% if messages %}
   <ul class="mensajes">{% for m in messages %}{% if m.tags != "success" %}<li class="mensaje {{ m.tags }}">{{ m }}</li>{% endif %}{% endfor %}</ul>
   <ul class="avisos-breves" role="status">{% for m in messages %}{% if m.tags == "success" %}<li class="aviso-breve" data-aviso-breve><span>{{ m }}</span></li>{% endif %}{% endfor %}</ul>

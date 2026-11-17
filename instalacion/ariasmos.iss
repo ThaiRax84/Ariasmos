@@ -27,7 +27,9 @@ MinVersion=10.0.17763
 WizardStyle=modern
 UninstallDisplayName=Ariasmos
 SetupLogging=yes
-CloseApplications=no
+CloseApplications=yes
+CloseApplicationsFilter=Ariasmos.exe
+RestartApplications=no
 LicenseFile={#Raiz}\LICENSE
 SetupIconFile={#Raiz}\instalacion\ariasmos.ico
 UninstallDisplayIcon={app}\ariasmos.ico
@@ -36,25 +38,44 @@ UninstallDisplayIcon={app}\ariasmos.ico
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
-Source: "{#Paquete}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#Paquete}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; Check: EsPrincipal
+Source: "{#Raiz}\build\escritorio\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "{#Raiz}\instalacion\ariasmos.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#Raiz}\instalacion\herramientas\conexion.ps1"; Flags: dontcopy
+Source: "{#Raiz}\build\descargas\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
+
+[InstallDelete]
+Type: files; Name: "{commondesktop}\Ariasmos.url"
+Type: files; Name: "{group}\Ariasmos.url"
+Type: files; Name: "{commonappdata}\Ariasmos\certificado\instalar-certificado.cmd"
+
+[Registry]
+Root: HKLM; Subkey: "SOFTWARE\Ariasmos"; ValueType: string; ValueName: "Modo"; ValueData: "{code:ModoElegido}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\Ariasmos"; ValueType: dword; ValueName: "Puerto"; ValueData: "{code:PuertoElegido}"; Check: EsPrincipal
 
 [Icons]
-Name: "{group}\Ariasmos"; Filename: "https://localhost/"; IconFilename: "{app}\ariasmos.ico"
-Name: "{commondesktop}\Ariasmos"; Filename: "https://localhost/"; IconFilename: "{app}\ariasmos.ico"
-Name: "{group}\Generar token nuevo del asistente"; Filename: "{app}\herramientas\token-nuevo.cmd"; WorkingDir: "{app}\herramientas"
-Name: "{group}\Dar permiso a una carpeta"; Filename: "{app}\herramientas\permiso-carpeta.cmd"; WorkingDir: "{app}\herramientas"
-Name: "{group}\Instalar actualización"; Filename: "{app}\herramientas\instalar-actualizacion.cmd"; WorkingDir: "{app}\herramientas"; IconFilename: "{app}\ariasmos.ico"
+Name: "{group}\Ariasmos"; Filename: "{app}\Ariasmos.exe"; WorkingDir: "{app}"
+Name: "{commondesktop}\Ariasmos"; Filename: "{app}\Ariasmos.exe"; WorkingDir: "{app}"
+Name: "{group}\Generar token nuevo del asistente"; Filename: "{app}\herramientas\token-nuevo.cmd"; WorkingDir: "{app}\herramientas"; Check: EsPrincipal
+Name: "{group}\Dar permiso a una carpeta"; Filename: "{app}\herramientas\permiso-carpeta.cmd"; WorkingDir: "{app}\herramientas"; Check: EsPrincipal
+Name: "{group}\Instalar actualización"; Filename: "{app}\herramientas\instalar-actualizacion.cmd"; WorkingDir: "{app}\herramientas"; IconFilename: "{app}\ariasmos.ico"; Check: EsPrincipal
 Name: "{group}\Desinstalar Ariasmos"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "https://localhost/"; Description: "Abrir Ariasmos en el navegador"; Flags: postinstall shellexec nowait skipifsilent
+Filename: "{app}\Ariasmos.exe"; WorkingDir: "{app}"; Description: "Abrir Ariasmos"; Flags: postinstall nowait skipifsilent runasoriginaluser; Check: InstalacionCorrecta
 
 [Code]
 const
   WM_COPY = $0301;
 
 var
+  PaginaModo: TInputOptionWizardPage;
+  PaginaPuerto: TInputQueryWizardPage;
+  PaginaConexion: TInputFileWizardPage;
+  Modo: String;
+  Puerto: Integer;
+  PuertoAnterior: Integer;
+  ConexionExistente: Boolean;
   PaginaRestaurar: TWizardPage;
   CasillaRestaurar: TNewCheckBox;
   EtiquetaArchivo: TNewStaticText;
@@ -79,9 +100,149 @@ begin
   Result := FileExists(CarpetaDatos() + '\instancia\configuracion.json');
 end;
 
-function PowerShell(): String;
+function EsPrincipal(): Boolean;
+begin
+  Result := Modo = 'principal';
+end;
+
+function EsAdicional(): Boolean;
+begin
+  Result := Modo = 'adicional';
+end;
+
+function ModoElegido(Parametro: String): String;
+begin
+  Result := Modo;
+end;
+
+function PuertoElegido(Parametro: String): String;
+begin
+  Result := IntToStr(Puerto);
+end;
+
+function InstalacionCorrecta(): Boolean;
+begin
+  Result := ErrorInstalacion = '';
+end;
+
+function SistemaPowerShell(): String;
 begin
   Result := ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
+end;
+
+function PuertoLibre(Valor: Integer): Boolean;
+var
+  Codigo: Integer;
+begin
+  Result := True;
+  if Exec(SistemaPowerShell(), '-NoProfile -NonInteractive -Command "if (Get-NetTCPConnection -State Listen -LocalPort ' + IntToStr(Valor) + ' -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"', '', SW_HIDE, ewWaitUntilTerminated, Codigo) then
+    Result := Codigo = 0;
+end;
+
+function PuertoPropuesto(): Integer;
+var
+  Candidatos: array[0..4] of Integer;
+  I: Integer;
+begin
+  if PuertoAnterior > 0 then
+  begin
+    Result := PuertoAnterior;
+    Exit;
+  end;
+  Candidatos[0] := 443;
+  Candidatos[1] := 8443;
+  Candidatos[2] := 9443;
+  Candidatos[3] := 10443;
+  Candidatos[4] := 44300;
+  Result := 443;
+  for I := 0 to 4 do
+    if PuertoLibre(Candidatos[I]) then
+    begin
+      Result := Candidatos[I];
+      Exit;
+    end;
+end;
+
+function PuertoValido(const Texto: String; var Valor: Integer; var Motivo: String): Boolean;
+begin
+  Result := False;
+  Valor := StrToIntDef(Trim(Texto), -1);
+  if (Valor < 1) or (Valor > 65535) or (IntToStr(Valor) <> Trim(Texto)) then
+    Motivo := 'Escribe un puerto entre 1 y 65535.'
+  else if (Valor = 80) or (Valor = 8000) then
+    Motivo := 'Los puertos 80 y 8000 los usa el propio sistema; elige otro (por ejemplo 443 u 8443).'
+  else if (Valor <> PuertoAnterior) and (not PuertoLibre(Valor)) then
+    Motivo := 'El puerto ' + IntToStr(Valor) + ' ya lo usa otro programa en esta computadora; elige otro.'
+  else
+    Result := True;
+end;
+
+function WebView2Instalado(): Boolean;
+var
+  Version: String;
+begin
+  Result := False;
+  if RegQueryStringValue(HKLM32, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) then
+    Result := (Version <> '') and (Version <> '0.0.0.0');
+  if (not Result) and RegQueryStringValue(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) then
+    Result := (Version <> '') and (Version <> '0.0.0.0');
+end;
+
+function ValidarConexion(const Ruta: String; var Motivo: String): Boolean;
+var
+  Resultado: TExecOutput;
+  Codigo: Integer;
+  I: Integer;
+begin
+  Result := False;
+  Motivo := 'No se pudo revisar el archivo de conexión.';
+  if not FileExists(ExpandConstant('{tmp}\conexion.ps1')) then
+    ExtractTemporaryFile('conexion.ps1');
+  if not ExecAndCaptureOutput(SistemaPowerShell(), '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + AddQuotes(ExpandConstant('{tmp}\conexion.ps1')) + ' -Accion Validar -Archivo ' + AddQuotes(Ruta), ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Codigo, Resultado) then
+    Exit;
+  for I := 0 to GetArrayLength(Resultado.StdOut) - 1 do
+  begin
+    Log('conexion.ps1: ' + Resultado.StdOut[I]);
+    if Pos('ERROR-CONEXION:', Resultado.StdOut[I]) = 1 then
+      Motivo := Trim(Copy(Resultado.StdOut[I], Length('ERROR-CONEXION:') + 1, MaxInt));
+  end;
+  Result := Codigo = 0;
+end;
+
+function InstalarConexion(const Ruta: String): Boolean;
+var
+  Resultado: TExecOutput;
+  Codigo: Integer;
+  I: Integer;
+begin
+  Result := False;
+  if not FileExists(ExpandConstant('{tmp}\conexion.ps1')) then
+    ExtractTemporaryFile('conexion.ps1');
+  if not ExecAndCaptureOutput(SistemaPowerShell(), '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + AddQuotes(ExpandConstant('{tmp}\conexion.ps1')) + ' -Accion Instalar -Archivo ' + AddQuotes(Ruta) + ' -Datos ' + AddQuotes(CarpetaDatos()), ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Codigo, Resultado) then
+    Exit;
+  for I := 0 to GetArrayLength(Resultado.StdOut) - 1 do
+    Log('conexion.ps1: ' + Resultado.StdOut[I]);
+  Result := Codigo = 0;
+end;
+
+procedure InstalarWebView2();
+var
+  Codigo: Integer;
+begin
+  if WebView2Instalado() then
+  begin
+    Log('WebView2 ya está instalado.');
+    Exit;
+  end;
+  Log('Instalando WebView2 con el instalador oficial de Microsoft.');
+  ExtractTemporaryFile('MicrosoftEdgeWebview2Setup.exe');
+  if (not Exec(ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe'), '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, Codigo)) or (not WebView2Instalado()) then
+    SuppressibleMsgBox('No se pudo instalar el componente WebView2 de Microsoft, que la ventana de Ariasmos necesita. Conecta esta computadora a internet y vuelve a ejecutar el instalador.', mbError, MB_OK, IDOK);
+end;
+
+function PowerShell(): String;
+begin
+  Result := SistemaPowerShell();
 end;
 
 function ParametrosScript(const Script, Extra: String): String;
@@ -141,9 +302,54 @@ begin
 end;
 
 procedure InitializeWizard();
+var
+  Parametro: String;
+  Anterior: String;
+  ValorPuerto: Cardinal;
 begin
   Actualizacion := HayInstancia();
-  PaginaRestaurar := CreateCustomPage(wpLicense, 'Restaurar desde un respaldo', 'Solo si este equipo reemplaza a otro donde ya se usaba el sistema.');
+  ConexionExistente := FileExists(CarpetaDatos() + '\conexion.json');
+  PuertoAnterior := 0;
+  if RegQueryDWordValue(HKLM, 'SOFTWARE\Ariasmos', 'Puerto', ValorPuerto) then
+    PuertoAnterior := ValorPuerto
+  else if Actualizacion then
+    PuertoAnterior := 443;
+  Anterior := '';
+  RegQueryStringValue(HKLM, 'SOFTWARE\Ariasmos', 'Modo', Anterior);
+  Parametro := Lowercase(Trim(ExpandConstant('{param:MODO|}')));
+  if Actualizacion then
+    Modo := 'principal'
+  else if (Parametro = 'principal') or (Parametro = 'adicional') then
+    Modo := Parametro
+  else if (Anterior = 'principal') or (Anterior = 'adicional') then
+    Modo := Anterior
+  else
+    Modo := 'principal';
+
+  PaginaModo := CreateInputOptionPage(wpLicense, 'Tipo de computadora', '¿Qué papel tiene esta computadora?',
+    'Si el negocio usa una sola computadora, elige «Computadora principal». Cada computadora adicional necesita el archivo de conexión que se genera en la principal (Equipos, «Conectar otra computadora»).', True, False);
+  PaginaModo.Add('Computadora principal: guarda los datos y da servicio a las demás.');
+  PaginaModo.Add('Computadora adicional: solo instala el programa y se conecta a la principal.');
+  if Modo = 'adicional' then
+    PaginaModo.SelectedValueIndex := 1
+  else
+    PaginaModo.SelectedValueIndex := 0;
+
+  PaginaPuerto := CreateInputQueryPage(PaginaModo.ID, 'Puerto', 'Puerto por el que las demás computadoras se conectan a esta.',
+    'Se propone 443; si otro programa ya lo usa, se propone otro libre. El puerto queda en el archivo de conexión.');
+  PaginaPuerto.Add('Puerto:', False);
+  Parametro := Trim(ExpandConstant('{param:PUERTO|}'));
+  if Parametro <> '' then
+    PaginaPuerto.Values[0] := Parametro
+  else
+    PaginaPuerto.Values[0] := IntToStr(PuertoPropuesto());
+
+  PaginaConexion := CreateInputFilePage(PaginaModo.ID, 'Archivo de conexión', 'Elige el archivo de conexión que se generó en la computadora principal.',
+    'En la computadora principal: Equipos, «Conectar otra computadora», «Descargar el archivo de conexión». Tráelo en una memoria USB o en persona, nunca por correo ni por un chat.');
+  PaginaConexion.Add('Archivo de conexión (ariasmos-conexion.json):', 'Archivo de conexión de Ariasmos (*.json)|*.json|Todos los archivos (*.*)|*.*', '.json');
+  PaginaConexion.Values[0] := Trim(ExpandConstant('{param:CONEXION|}'));
+
+  PaginaRestaurar := CreateCustomPage(PaginaPuerto.ID, 'Restaurar desde un respaldo', 'Solo si este equipo reemplaza a otro donde ya se usaba el sistema.');
   CasillaRestaurar := TNewCheckBox.Create(PaginaRestaurar);
   CasillaRestaurar.Parent := PaginaRestaurar.Surface;
   CasillaRestaurar.Caption := 'Restaurar la información desde un archivo de respaldo (.respaldo)';
@@ -178,13 +384,51 @@ end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := (PageID = PaginaRestaurar.ID) and Actualizacion;
+  Result := False;
+  if PageID = PaginaModo.ID then
+    Result := Actualizacion
+  else if PageID = PaginaPuerto.ID then
+    Result := not EsPrincipal()
+  else if PageID = PaginaConexion.ID then
+    Result := not EsAdicional()
+  else if PageID = PaginaRestaurar.ID then
+    Result := Actualizacion or (not EsPrincipal());
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Motivo: String;
+  Valor: Integer;
 begin
   Result := True;
-  if (CurPageID = PaginaRestaurar.ID) and CasillaRestaurar.Checked then
+  if CurPageID = PaginaModo.ID then
+  begin
+    if PaginaModo.SelectedValueIndex = 1 then
+      Modo := 'adicional'
+    else
+      Modo := 'principal';
+  end
+  else if CurPageID = PaginaPuerto.ID then
+  begin
+    if PuertoValido(PaginaPuerto.Values[0], Valor, Motivo) then
+      Puerto := Valor
+    else
+    begin
+      SuppressibleMsgBox(Motivo, mbError, MB_OK, IDOK);
+      Result := False;
+    end;
+  end
+  else if CurPageID = PaginaConexion.ID then
+  begin
+    if (Trim(PaginaConexion.Values[0]) = '') and ConexionExistente then
+      Result := True
+    else if not ValidarConexion(Trim(PaginaConexion.Values[0]), Motivo) then
+    begin
+      SuppressibleMsgBox('El archivo de conexión no sirve: ' + Motivo, mbError, MB_OK, IDOK);
+      Result := False;
+    end;
+  end
+  else if (CurPageID = PaginaRestaurar.ID) and CasillaRestaurar.Checked then
   begin
     if not FileExists(EditArchivo.Text) then
     begin
@@ -203,8 +447,31 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Salida: TArrayOfString;
   Codigo: Integer;
+  Motivo: String;
+  Valor: Integer;
 begin
   Result := '';
+  if Actualizacion and EsAdicional() then
+  begin
+    Result := 'Esta computadora ya es la principal (tiene los datos del negocio): no se puede instalar como adicional.';
+    Exit;
+  end;
+  if EsPrincipal() and (Puerto = 0) then
+  begin
+    if PuertoValido(PaginaPuerto.Values[0], Valor, Motivo) then
+      Puerto := Valor
+    else
+    begin
+      Result := Motivo;
+      Exit;
+    end;
+  end;
+  if EsAdicional() and not ((Trim(PaginaConexion.Values[0]) = '') and ConexionExistente) then
+    if not ValidarConexion(Trim(PaginaConexion.Values[0]), Motivo) then
+    begin
+      Result := 'El archivo de conexión no sirve: ' + Motivo;
+      Exit;
+    end;
   if Actualizacion and FileExists(ExpandConstant('{app}\herramientas\preparar-actualizacion.ps1')) then
   begin
     Codigo := EjecutarScript('preparar-actualizacion.ps1', '', Salida);
@@ -238,12 +505,23 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Salida: TArrayOfString;
-  Modo: String;
+  ModoScript: String;
   Codigo: Integer;
 begin
   if CurStep <> ssPostInstall then
     Exit;
   ErrorInstalacion := '';
+  InstalarWebView2();
+  if EsAdicional() then
+  begin
+    if not ((Trim(PaginaConexion.Values[0]) = '') and ConexionExistente) then
+      if not InstalarConexion(Trim(PaginaConexion.Values[0])) then
+      begin
+        ErrorInstalacion := 'No se pudo guardar el archivo de conexión.';
+        SuppressibleMsgBox(ErrorInstalacion, mbCriticalError, MB_OK, IDOK);
+      end;
+    Exit;
+  end;
   if (not Actualizacion) and CasillaRestaurar.Checked then
     Restaurar();
   if ErrorInstalacion <> '' then
@@ -252,12 +530,12 @@ begin
     Exit;
   end;
   if Actualizacion then
-    Modo := 'actualizar'
+    ModoScript := 'actualizar'
   else if Restaurada then
-    Modo := 'restaurada'
+    ModoScript := 'restaurada'
   else
-    Modo := 'nueva';
-  Codigo := EjecutarScript('instalar.ps1', ' -Modo ' + Modo, Salida);
+    ModoScript := 'nueva';
+  Codigo := EjecutarScript('instalar.ps1', ' -Modo ' + ModoScript + ' -Puerto ' + IntToStr(Puerto), Salida);
   Token := BuscarLinea(Salida, 'TOKEN-ASISTENTE:');
   if Codigo <> 0 then
   begin
@@ -292,6 +570,8 @@ begin
   Etiqueta.Height := ScaleY(60);
   if ErrorInstalacion <> '' then
     Etiqueta.Caption := 'La instalación no terminó bien. Revisa ' + CarpetaDatos() + '\registros\instalacion.log y vuelve a ejecutar el instalador.'
+  else if EsAdicional() then
+    Etiqueta.Caption := 'Ariasmos quedó instalado en esta computadora. Al abrirlo por primera vez queda pendiente de aprobación: apruébala en la computadora principal (Equipos).'
   else if Token <> '' then
   begin
     Etiqueta.Caption := 'Token del asistente. Se pide en el primer paso y no se vuelve a mostrar: cópialo ahora. Si lo pierdes, usa "Generar token nuevo del asistente" en el menú Inicio.';
@@ -324,6 +604,11 @@ var
 begin
   if CurUninstallStep <> usUninstall then
     Exit;
+  if not FileExists(ExpandConstant('{app}\herramientas\desinstalar.ps1')) then
+  begin
+    DeleteFile(ExpandConstant('{commonappdata}\Ariasmos\conexion.json'));
+    Exit;
+  end;
   Accion := 'conservar';
   if SuppressibleMsgBox('¿Borrar también los datos?' + #13#10#13#10 +
     'Si eliges Sí se borran la base de datos, las claves y los registros de ' + CarpetaDatos() + '. No se puede deshacer y sin un respaldo la información se pierde.' + #13#10#13#10 +

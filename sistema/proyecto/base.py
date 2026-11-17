@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "cortes",
     "respaldos",
     "actualizaciones",
+    "envios",
 ]
 
 MIDDLEWARE = [
@@ -35,6 +36,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "envios.middleware.FichaDeEnvio",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "configuracion.middleware.Instalacion",
     "cuentas.middleware.ControlDispositivo",
@@ -55,6 +57,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "configuracion.contexto.general",
+                "proyecto.escritorio.programa",
             ],
         },
     },

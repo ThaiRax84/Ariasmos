@@ -30,7 +30,17 @@ class Command(BaseCommand):
         parser.add_argument("--sin-https", action="store_true", help="Cookies sin marca Secure (solo para pruebas locales sin TLS)")
         parser.add_argument("--nuevo-token", action="store_true", help="Genera otro token para el asistente si se perdió")
         parser.add_argument("--host", action="append", default=[], help="Nombre del equipo para hosts y orígenes de confianza (repetible; se sanea)")
-        parser.add_argument("--certificado-servidor", default="", help="Ruta absoluta del certificado público del servidor que se ofrece a otras computadoras")
+        parser.add_argument("--certificado-servidor", default="", help="Ruta absoluta del certificado público del servidor, cuya huella va en el archivo de conexión")
+        parser.add_argument("--puerto", default="", help="Puerto HTTPS en la red local (se guarda para el archivo de conexión)")
+
+    def _puerto(self, datos, valor):
+        if not valor:
+            return datos
+        puerto = equipo.puerto_valido(valor)
+        if puerto is None:
+            raise CommandError("El puerto no es válido.")
+        datos["puerto"] = puerto
+        return datos
 
     def _certificado(self, datos, ruta):
         if not ruta:
@@ -48,7 +58,7 @@ class Command(BaseCommand):
         token = secrets.token_urlsafe(18)
         if datos is None:
             datos = instancia.nueva(https=not opciones["sin_https"])
-            datos = self._certificado(agregar_hosts(datos, nombres_crudos), opciones["certificado_servidor"])
+            datos = self._puerto(self._certificado(agregar_hosts(datos, nombres_crudos), opciones["certificado_servidor"]), opciones["puerto"])
             datos["token_asistente_hash"] = hashlib.sha256(token.encode("utf-8")).hexdigest()
             ruta = instancia.escribir(datos)
             self.stdout.write(self.style.SUCCESS(f"Instancia creada en {ruta.parent}"))
@@ -59,10 +69,10 @@ class Command(BaseCommand):
         else:
             antes = dict(datos)
             nuevas = instancia.faltantes(datos)
-            datos = self._certificado(agregar_hosts({**datos, **nuevas}, nombres_crudos), opciones["certificado_servidor"])
+            datos = self._puerto(self._certificado(agregar_hosts({**datos, **nuevas}, nombres_crudos), opciones["certificado_servidor"]), opciones["puerto"])
             if datos != antes:
                 instancia.reemplazar(datos)
-                cambios = sorted(set(nuevas) | {k for k in ("hosts", "origenes_confiables", "certificado_servidor") if datos.get(k) != antes.get(k)})
+                cambios = sorted(set(nuevas) | {k for k in ("hosts", "origenes_confiables", "certificado_servidor", "puerto") if datos.get(k) != antes.get(k)})
                 self.stdout.write(self.style.SUCCESS(f"Instancia existente completada con: {', '.join(cambios)}"))
             else:
                 self.stdout.write(f"La instancia ya existe en {instancia.carpeta()}; no se cambió nada.")

@@ -22,6 +22,7 @@ CLAVE_RESPALDO = bytes(range(96, 128))
 RUTA_INSTANCIA = ""
 HTTPS_ACTIVO = False
 CERTIFICADO_SERVIDOR = ""
+PUERTO_HTTPS = 443
 RUTA_ANCLA_AUDITORIA = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-ancla-{os.getpid()}.json")
 RUTA_COMPROBANTES = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-comprobantes-{os.getpid()}")
 RUTA_ACTUALIZACIONES = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-actualizaciones-{os.getpid()}")

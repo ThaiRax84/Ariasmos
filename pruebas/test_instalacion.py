@@ -18,6 +18,7 @@ from django.core.management import CommandError, call_command
 from django.urls import reverse
 from django.utils import timezone
 
+from auditoria.models import Evento
 from cuentas import conectar
 from proyecto import certificado, equipo, instancia
 from proyecto.version import actual
@@ -61,6 +62,11 @@ def test_inicializar_con_nombres_de_equipo(tmp_path):
     assert "Token" not in nueva.stdout and "segundo" in despues["hosts"] and all(despues[k] == v for k, v in antes.items() if k not in ("hosts", "origenes_confiables"))
     assert manage("inicializar", "--host", ";;;", entorno=entorno).returncode != 0
     assert manage("inicializar", "--certificado-servidor", "relativo.crt", entorno={"COBRO_INSTANCIA": str(tmp_path / "otra")}).returncode != 0
+    assert "puerto" not in despues
+    puerto = manage("inicializar", "--puerto", "8443", entorno=entorno)
+    assert "puerto" in puerto.stdout and json.loads((carpeta / "configuracion.json").read_text(encoding="utf-8"))["puerto"] == 8443
+    for malo in ("80", "8000", "0", "70000", "abc", "-1"):
+        assert manage("inicializar", "--puerto", malo, entorno=entorno).returncode != 0, malo
 
 
 def test_instancia_existente_recibe_claves_nuevas(tmp_path):
@@ -101,26 +107,34 @@ def test_configuracion_de_caddy_sin_autoridad_local():
     assert "tls internal" not in texto and "internal" not in texto and "pki" not in texto and "authorities" not in texto and "automation" not in texto
     https = configuracion["apps"]["http"]["servers"]["ariasmos"]
     assert https["listen"] == [":443"] and https["automatic_https"] == {"disable": True}
-    assert https["routes"][0]["match"] == [{"host": ["equipo01respondhola", "localhost"]}]
+    assert "match" not in https["routes"][0] and https["tls_connection_policies"][0]["default_sni"] == "equipo01respondhola"
     assert https["routes"][0]["handle"][0] == {"handler": "reverse_proxy", "upstreams": [{"dial": "127.0.0.1:8000"}]}
     archivos = configuracion["apps"]["tls"]["certificates"]["load_files"]
     assert archivos == [{"certificate": "C:/Datos/caddy/servidor.crt", "key": "C:/Datos/caddy/servidor.key", "tags": ["ariasmos"]}]
-    assert https["tls_connection_policies"] == [{"certificate_selection": {"any_tag": ["ariasmos"]}}]
+    assert https["tls_connection_policies"] == [{"certificate_selection": {"any_tag": ["ariasmos"]}, "default_sni": "equipo01respondhola"}]
     redireccion = configuracion["apps"]["http"]["servers"]["redireccion"]
     assert redireccion["listen"] == [":80"] and redireccion["routes"][0]["handle"][0]["status_code"] == 308
     sin = equipo.configuracion_caddy("caja", "/c/s.crt", "/c/s.key", redirigir_http=False)
     assert set(sin["apps"]["http"]["servers"]) == {"ariasmos"}
-    assert equipo.configuracion_caddy(";;;", "/c/s.crt", "/c/s.key")["apps"]["http"]["servers"]["ariasmos"]["routes"][0]["match"] == [{"host": ["localhost"]}]
-    assert equipo.configuracion_caddy("localhost", "/c/s.crt", "/c/s.key")["apps"]["http"]["servers"]["ariasmos"]["routes"][0]["match"] == [{"host": ["localhost"]}]
+    assert equipo.configuracion_caddy(";;;", "/c/s.crt", "/c/s.key")["apps"]["http"]["servers"]["ariasmos"]["tls_connection_policies"][0]["default_sni"] == "localhost"
+    assert equipo.configuracion_caddy("localhost", "/c/s.crt", "/c/s.key")["apps"]["http"]["servers"]["redireccion"]["routes"][0]["match"] == [{"host": ["localhost"]}]
+    otro = equipo.configuracion_caddy("caja", "/c/s.crt", "/c/s.key", puerto=8443)["apps"]["http"]["servers"]
+    assert otro["ariasmos"]["listen"] == [":8443"] and otro["redireccion"]["routes"][0]["handle"][0]["headers"]["Location"] == ["https://{http.request.host}:8443{http.request.uri}"]
+    for malo in (0, 80, 8000, 65536, "443x", "", None, -1):
+        with pytest.raises(ValueError):
+            equipo.configuracion_caddy("caja", "/c/s.crt", "/c/s.key", puerto=malo)
     with pytest.raises(ValueError):
         equipo.configuracion_caddy("caja", "/c/s.crt\n", "/c/s.key")
 
 
 def test_comando_generar_config_caddy(tmp_path):
     salida = tmp_path / "caddy" / "caddy.json"
-    call_command("generar_config_caddy", "--nombre", "Caja$1", "--cert", str(tmp_path / "s.crt"), "--clave", str(tmp_path / "s.key"), "--salida", str(salida), "--sin-redireccion")
+    call_command("generar_config_caddy", "--nombre", "Caja$1", "--cert", str(tmp_path / "s.crt"), "--clave", str(tmp_path / "s.key"), "--salida", str(salida), "--sin-redireccion", "--puerto", "9443")
     datos = json.loads(salida.read_text(encoding="utf-8"))
-    assert datos["apps"]["http"]["servers"]["ariasmos"]["routes"][0]["match"] == [{"host": ["caja1", "localhost"]}] and "redireccion" not in datos["apps"]["http"]["servers"]
+    servidor = datos["apps"]["http"]["servers"]["ariasmos"]
+    assert servidor["tls_connection_policies"][0]["default_sni"] == "caja1" and servidor["listen"] == [":9443"] and "redireccion" not in datos["apps"]["http"]["servers"]
+    with pytest.raises(CommandError):
+        call_command("generar_config_caddy", "--nombre", "x", "--cert", str(tmp_path / "s.crt"), "--clave", str(tmp_path / "s.key"), "--salida", str(salida), "--puerto", "80")
     with pytest.raises(CommandError):
         call_command("generar_config_caddy", "--nombre", "x", "--cert", str(tmp_path / "s.crt"), "--clave", str(tmp_path / "s.key"), "--salida", "relativo/caddy.json")
     with pytest.raises(CommandError):
@@ -215,14 +229,16 @@ def test_servir_se_niega_a_escuchar_en_la_red_con_https(settings):
             call_command("servir", "--host", host)
 
 
-def test_conectar_otra_computadora_y_certificado(personas, tmp_path, settings):
-    url = reverse("conectar")
+def test_conectar_otra_computadora_entrega_el_archivo_de_conexion(personas, tmp_path, settings, monkeypatch):
+    monkeypatch.setattr(equipo, "direcciones_locales", lambda: ["192.168.10.5"])
+    settings.ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1", "Caja-01", "caja-01"]
+    url, archivo = reverse("conectar"), reverse("conectar_archivo")
     assert cliente(personas["op"]).get(url).status_code == 403
-    assert cliente(personas["op"]).get(reverse("conectar_certificado")).status_code == 403
+    assert cliente(personas["op"]).post(archivo, {"direccion": "caja-01"}).status_code == 403
     c = cliente(personas["sup"])
     settings.CERTIFICADO_SERVIDOR = ""
-    assert "todavía no tiene publicado el certificado" in c.get(url).content.decode()
-    assert c.get(reverse("conectar_certificado")).status_code == 404 and c.get(reverse("conectar_instalador")).status_code == 404
+    assert "todavía no tiene el certificado" in c.get(url).content.decode()
+    assert c.post(archivo, {"direccion": "caja-01"}).status_code == 302 and not Evento.objects.filter(accion="archivo_conexion_generado").exists()
     carpeta = tmp_path / "caddy"
     publico = tmp_path / "certificado" / "ariasmos-servidor.crt"
     objeto = certificado.generar("Caja-01", carpeta / "servidor.crt", carpeta / "servidor.key")
@@ -230,39 +246,32 @@ def test_conectar_otra_computadora_y_certificado(personas, tmp_path, settings):
     publico.write_bytes((carpeta / "servidor.crt").read_bytes())
     PEM = publico.read_text(encoding="ascii")
     settings.CERTIFICADO_SERVIDOR = str(publico)
+    settings.PUERTO_HTTPS = 8443
     pagina = c.get(url).content.decode()
-    assert "instalar-certificado.cmd" in pagina and "ariasmos-servidor.crt" in pagina and "vence en 10 años" in pagina
-    assert certificado.huella_legible(objeto) in pagina and re.search(r"[0-9A-F]{2}(:[0-9A-F]{2}){31}", pagina)
-    assert timezone.localtime(certificado.vence(objeto)).strftime("%d/%m/%Y") in pagina and "caja-01" in pagina and "vence pronto" not in pagina
-    respuesta = c.get(reverse("conectar_certificado"))
-    assert respuesta.status_code == 200 and respuesta.content.decode() == PEM and "ariasmos-servidor.crt" in respuesta["Content-Disposition"]
-    for manipulada in ("?ruta=../caddy/servidor.key", "?archivo=servidor.key"):
-        assert c.get(reverse("conectar_certificado") + manipulada).content.decode() == PEM
-    assert c.get("/cuentas/conectar/servidor.key").status_code == 404
-    assert c.get("/cuentas/conectar/..%2Fcaddy%2Fservidor.key").status_code == 404
-    instalador = c.get(reverse("conectar_instalador")).content.decode("ascii")
-    secreto = (carpeta / "servidor.key").read_text(encoding="ascii").splitlines()[1]
-    assert "certutil -addstore -f Root" in instalador and "\r\n" in instalador and secreto not in instalador and "PRIVATE" not in instalador
-    assert all(l.split(" echo ", 1)[1] in PEM for l in instalador.splitlines() if " echo " in l and '"%CERT%"' in l)
-    assert personas["sup"].usuario not in instalador and "Negocio de prueba" not in instalador
-    clave_privada = (carpeta / "servidor.key").read_text(encoding="ascii")
-    falsos = {
-        "clave": clave_privada,
-        "certificado-y-clave": PEM + clave_privada,
-        "dos": PEM + PEM,
-        "texto": "no soy un certificado",
-        "base64-roto": PEM.replace(PEM.splitlines()[1][:4], "MI&B", 1),
-        "autoridad": pem_de(autoridad()).decode("ascii"),
-        "truncado": "\n".join(PEM.splitlines()[:3] + PEM.splitlines()[-1:]) + "\n",
-    }
-    for nombre, falso in falsos.items():
+    assert certificado.huella_legible(objeto) in pagina and "8443" in pagina and "Computadora adicional" in pagina
+    assert "caja-01" in pagina and "192.168.10.5" in pagina and "127.0.0.1" not in pagina and "testserver" not in pagina
+    assert "navegador" not in pagina.lower() and "certutil" not in pagina and "instalar-certificado" not in pagina
+    assert c.get(archivo).status_code == 405
+    respuesta = c.post(archivo, {"direccion": "Caja-01"})
+    assert respuesta.status_code == 200 and respuesta["Content-Type"] == "application/json" and "ariasmos-conexion.json" in respuesta["Content-Disposition"]
+    assert respuesta["X-Content-Type-Options"] == "nosniff"
+    datos = json.loads(respuesta.content)
+    assert datos == {"producto": "ariasmos", "formato": 1, "direccion": "caja-01", "puerto": 8443, "huella": certificado.huella(objeto)}
+    assert re.fullmatch(r"[0-9A-F]{64}", datos["huella"]) and len(respuesta.content) < 2048 and respuesta.content.isascii()
+    evento = Evento.objects.get(accion="archivo_conexion_generado")
+    assert evento.datos["direccion"] == "caja-01" and evento.datos["puerto"] == 8443
+    assert json.loads(c.post(archivo, {"direccion": "192.168.10.5"}).content)["direccion"] == "192.168.10.5"
+    secreto = (carpeta / "servidor.key").read_text(encoding="ascii")
+    for malo in ("otro-servidor", "localhost", "127.0.0.1", "caja-01;x", "", "evil.example"):
+        assert c.post(archivo, {"direccion": malo}).status_code == 302, malo
+    assert Evento.objects.filter(accion="archivo_conexion_generado").count() == 2
+    assert secreto.splitlines()[1] not in respuesta.content.decode() and "PRIVATE" not in respuesta.content.decode()
+    for nombre, falso in {"clave": secreto, "dos": PEM + PEM, "autoridad": pem_de(autoridad()).decode("ascii"), "texto": "no"}.items():
         publico.write_text(falso, encoding="ascii")
-        assert c.get(reverse("conectar_certificado")).status_code == 404, nombre
-        assert conectar.datos() is None and "todavía no tiene publicado" in c.get(url).content.decode(), nombre
-    settings.CERTIFICADO_SERVIDOR = str(carpeta / "servidor.key")
-    assert c.get(reverse("conectar_certificado")).status_code == 404
-    settings.CERTIFICADO_SERVIDOR = "relativo.crt"
-    assert conectar.certificado() is None
+        assert conectar.datos() is None and conectar.archivo("caja-01") is None, nombre
+        assert c.post(archivo, {"direccion": "caja-01"}).status_code == 302, nombre
+    for viejo in ("/cuentas/conectar/ariasmos-servidor.crt", "/cuentas/conectar/instalar-certificado.cmd"):
+        assert c.get(viejo).status_code == 404
 
 
 def test_aviso_en_inicio_cuando_el_certificado_esta_por_vencer(personas, tmp_path, settings):
@@ -311,7 +320,9 @@ def test_destino_sin_permiso_menciona_la_utilidad(personas, tmp_path, monkeypatc
 
 def test_dependencias_json():
     datos = json.loads((INSTALACION / "dependencias.json").read_text(encoding="utf-8"))
-    assert set(datos) == {"python", "winsw", "caddy"}
+    assert set(datos) == {"python", "winsw", "caddy", "webview2"}
+    webview2 = datos.pop("webview2")
+    assert webview2["url"].startswith("https://go.microsoft.com/fwlink/") and webview2["firmante"] == "Microsoft Corporation" and webview2["archivo"] == "MicrosoftEdgeWebview2Setup.exe"
     for nombre, dependencia in datos.items():
         assert {"version", "url", "sha256"} <= set(dependencia), nombre
         partes = urlparse(dependencia["url"])
@@ -325,6 +336,7 @@ def test_dependencias_json():
     assert all(re.fullmatch(r"[0-9a-f]{32}", datos[n].get("md5_oficial", "")) for n in vacios)
     construir = (INSTALACION / "construir.ps1").read_text(encoding="utf-8-sig")
     assert "no trae el SHA-256" in construir and "no coincide" in construir
+    assert "Get-AuthenticodeSignature" in construir and "$firma.Status -ne 'Valid'" in construir and "CN=Microsoft Corporation" in construir
 
 
 def test_requisitos_de_windows_coinciden_con_requirements():
@@ -413,12 +425,27 @@ def test_instalador_inno():
         assert necesario in texto, necesario
     assert "SaveStringToFile(ArchivoClave" in texto and "DeleteFile(ArchivoClave)" in texto
     assert "Token" not in re.sub(r"(?s)\[Code\].*", "", texto)
+    secciones = re.sub(r"(?s)\[Code\].*", "", texto)
+    assert "https://" not in secciones and "shellexec" not in secciones and "navegador" not in texto.lower()
+    assert re.search(r'Name: "\{commondesktop\}\\Ariasmos"; Filename: "\{app\}\\Ariasmos\.exe"', texto)
+    assert re.search(r'Name: "\{group\}\\Ariasmos"; Filename: "\{app\}\\Ariasmos\.exe"', texto)
+    assert re.search(r'Filename: "\{app\}\\Ariasmos\.exe";[^\n]*Flags: postinstall[^\n]*runasoriginaluser', texto)
+    for necesario in ("{param:MODO|}", "{param:PUERTO|}", "{param:CONEXION|}", "CreateInputFilePage", "CreateInputOptionPage", "Check: EsPrincipal", "-Accion Validar", "-Accion Instalar", "WebView2Instalado", "MicrosoftEdgeWebview2Setup.exe", "F3017226-FE2A-4295-8BDF-00C3A9A7E4C5", "Ariasmos.url", "SOFTWARE\\Ariasmos", "no se puede instalar como adicional"):
+        assert necesario in texto, necesario
     instalar = (INSTALACION / "herramientas" / "instalar.ps1").read_text(encoding="utf-8-sig")
     assert "TOKEN-ASISTENTE" in instalar and "Escribir-Registro \"    $renglon\"" in instalar
     comun = (INSTALACION / "herramientas" / "comun.ps1").read_text(encoding="utf-8-sig")
-    for necesario in ("S-1-5-19", "/inheritance:r", "LocalSubnet", "-LocalPort 443", "'Root', 'LocalMachine'", "PRIVATE KEY", "NT AUTHORITY\\LocalService"):
+    for necesario in ("S-1-5-19", "/inheritance:r", "LocalSubnet", "-LocalPort $Puerto", "'Root', 'LocalMachine'", "PRIVATE KEY", "NT AUTHORITY\\LocalService"):
         assert necesario in comun, necesario
     assert "Start-Transcript" not in comun + instalar
+    assert "$almacen.Add(" not in comun and "certutil" not in comun + instalar and "Quitar-De-Raices" in comun
+    assert "'--puerto', \"$Puerto\"" in instalar and "-Accion', 'Generar'" in instalar and "Instalar-Firewall -Puerto $Puerto" in instalar
+    conexion = (INSTALACION / "herramientas" / "conexion.ps1").read_text(encoding="utf-8-sig")
+    for necesario in ("$TamanoMaximo = 2048", "'*S-1-5-32-545:R'", "/inheritance:r", "UTF8Encoding($false, $true)", '"huella"\\s*:\\s*"([0-9A-F]{64})"'):
+        assert necesario in conexion, necesario
+    permiso = (INSTALACION / "herramientas" / "permiso-carpeta.ps1").read_text(encoding="utf-8-sig")
+    for necesario in ("[string]$Carpeta = ''", "ReparsePoint", "'Fixed', 'Removable'", "GetFullPath($Texto)", "'..'", "CON|PRN|AUX|NUL", "unidad completa", "${env:ProgramFiles}"):
+        assert necesario in permiso, necesario
 
 
 def pwsh():

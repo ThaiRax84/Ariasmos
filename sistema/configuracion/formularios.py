@@ -10,6 +10,7 @@ from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
 from proyecto.captura import CampoContrasena, CampoGuiadoTexto, CampoUsuario
+from proyecto.carpetas import con_carpetas
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
@@ -457,6 +458,7 @@ def guardar_caja(valores):
 TOPES_CARPETA = ("tope_pago_carpeta",)
 
 
+@con_carpetas("carpeta_banco")
 class FormularioCarpetaBanco(forms.Form):
     carpeta_banco = forms.CharField(label="Carpeta vigilada del banco (opcional; ruta absoluta donde se deja el archivo descargado del banco)", max_length=400, required=False)
     tope_pago_carpeta = CampoImporte(label="Importe máximo de un pago que se aplica solo desde un archivo editable (0 sin tope individual)", required=False, maximo=10 ** 11)
@@ -476,6 +478,7 @@ class FormularioCarpetaBanco(forms.Form):
             raise forms.ValidationError(str(error))
 
 
+@con_carpetas("carpeta_entrega", "carpeta_respaldo")
 class FormularioAsistenteCortes(FormularioCarpetaBanco):
     carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
     carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)

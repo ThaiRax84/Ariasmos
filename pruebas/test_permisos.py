@@ -46,14 +46,14 @@ MATRIZ = {
     "solicitudes:politica_editar": ("administrar_politicas",),
     "usuarios": ("administrar_usuarios",),
     "usuario_nuevo": ("administrar_usuarios",),
+    "usuario_codigo": ("administrar_usuarios",),
     "usuario_editar": ("administrar_usuarios",),
     "roles": ("administrar_roles",),
     "rol_nuevo": ("administrar_roles",),
     "rol_editar": ("administrar_roles",),
     "dispositivos": ("aprobar_dispositivos",),
     "conectar": ("aprobar_dispositivos",),
-    "conectar_certificado": ("aprobar_dispositivos",),
-    "conectar_instalador": ("aprobar_dispositivos",),
+    "conectar_archivo": ("aprobar_dispositivos",),
     "dispositivos_descartar": ("aprobar_dispositivos",),
     "dispositivo_aprobar": ("aprobar_dispositivos",),
     "dispositivo_revocar": ("aprobar_dispositivos",),
@@ -188,7 +188,7 @@ MATRIZ = {
     "inventario:conteo_detalle": ("subir_conteo_inventario", "revisar_inventario", "aprobar_solicitudes"),
 }
 
-CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar", "conectar_certificado", "conectar_instalador"}
+CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
 
 OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 

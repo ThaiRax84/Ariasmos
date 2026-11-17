@@ -379,22 +379,10 @@ code.uri { word-break: break-all; font-size: 13px; }
 .acceso-marca { display: flex; align-items: center; gap: 12px; justify-content: center; }
 .acceso-caja h1 { font-size: 26px; }
 
-.splash { position: fixed; inset: 0; z-index: 90; background: #0B0907; display: flex; align-items: center; justify-content: center; cursor: pointer; animation: splash-sale 500ms ease 1900ms forwards; }
-.splash.saliendo { animation: splash-sale 400ms ease forwards; }
-.splash-ventana { width: 720px; height: 450px; max-width: 100vw; overflow: hidden; background: #14100D; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); border-radius: 6px; }
-.splash-escena { width: 1280px; height: 800px; transform: scale(.5625); transform-origin: 0 0; background: #14100D; display: flex; flex-direction: column; align-items: center; justify-content: space-between; font-family: var(--letra-marca); }
-.splash-centro { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.splash-imagen { display: block; width: 760px; height: 375px; }
-.splash-nombre { font-size: 112px; font-weight: 700; letter-spacing: 12px; color: #D9813F; line-height: 1; filter: url(#temblor); }
-.splash-raya { width: 760px; height: 4px; background: #C4662E; filter: url(#temblor); }
-.splash-texto { font-family: var(--letra); font-size: 17px; color: #D9C7A6; margin-top: 6px; }
-.splash-version { font-family: var(--letra); font-size: 20px; color: #A8977D; letter-spacing: .5px; }
-.splash-greca { display: block; }
 
 @keyframes entra-suave { from { opacity: 0; } to { opacity: 1; } }
 @keyframes entra-dialogo { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes entra-aviso { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-@keyframes splash-sale { to { opacity: 0; visibility: hidden; pointer-events: none; } }
 
 @media (max-width: 960px) {
   .columnas, .columnas.mitades, .columnas.principal, .recibo-pantalla, .asistente { grid-template-columns: minmax(0, 1fr); }
@@ -416,12 +404,11 @@ code.uri { word-break: break-all; font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::backdrop { animation: none !important; transition: none !important; }
-  .splash { display: none; }
 }
 
 @media print {
   body { background: #fff; }
-  .no-imprimir, .barra, .franja, .pie-pagina, .avisos-breves, .mensajes, .saltar, .splash { display: none !important; }
+  .no-imprimir, .barra, .franja, .pie-pagina, .avisos-breves, .mensajes, .saltar { display: none !important; }
   .contenido { padding: 0; max-width: none; }
   .recibo-pantalla { display: block; }
   .hoja { box-shadow: none; border: 0; margin: 0 auto; padding: 0; }

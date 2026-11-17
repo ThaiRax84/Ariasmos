@@ -1,9 +1,12 @@
 from django import forms
 
+from proyecto.carpetas import con_carpetas
+
 from . import entrega
 from .models import NIVELES, TIPOS, Destino, ReglaDestino
 
 
+@con_carpetas("ruta")
 class FormularioDestino(forms.Form):
     nombre = forms.CharField(label="Nombre del destino", max_length=60, initial="Carpeta de cortes")
     ruta = forms.CharField(label="Carpeta (ruta absoluta; puede ser una carpeta sincronizada con la nube)", max_length=400)
