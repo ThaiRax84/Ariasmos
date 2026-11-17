@@ -161,9 +161,12 @@ def proponer(contenido):
     lista = grupos(vivos)
     primero = lista[0]
     segundo = next((g for g in lista[1:] if _diferencia_tono(g["tono"], primero["tono"]) >= DIFERENCIA_TONO), None)
+    principal_rgb = primero["color"]
     if segundo is not None:
         acento_rgb = segundo["color"]
+        if marca.luminancia(_hex(acento_rgb)) < marca.luminancia(_hex(principal_rgb)):
+            principal_rgb, acento_rgb = acento_rgb, principal_rgb
     else:
         acento_rgb = _rgb(primero["tono"] / 360, LUZ_ACENTO, max(primero["saturacion"], SATURACION_ACENTO))
-    principal, acento = ajustar(primero["color"], acento_rgb)
+    principal, acento = ajustar(principal_rgb, acento_rgb)
     return {"principal": principal, "acento": acento, "origen": "logo"}

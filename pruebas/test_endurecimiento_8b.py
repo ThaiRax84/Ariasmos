@@ -64,3 +64,24 @@ def test_el_lote_de_una_hoja_solo_lo_ve_quien_lo_subio_o_quien_importa_o_aprueba
     assert c.get(reverse("configuracion:padron_lote", args=[propio.pk])).status_code == 200
     for clave in ("dir", "sup"):
         assert cliente(personas[clave]).get(reverse("configuracion:padron_lote", args=[lote.pk])).status_code == 200, clave
+
+
+def test_del_logo_el_color_mas_oscuro_es_el_principal():
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    from configuracion import colores_logo, marca
+
+    lienzo = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
+    dibujo = ImageDraw.Draw(lienzo)
+    dibujo.rectangle((0, 0, 299, 199), fill=(245, 134, 52, 255))
+    dibujo.rectangle((0, 200, 299, 299), fill=(31, 26, 78, 255))
+    salida = BytesIO()
+    lienzo.save(salida, format="PNG")
+    propuesta = colores_logo.proponer(salida.getvalue())
+    assert propuesta["origen"] == "logo"
+    assert marca.luminancia(propuesta["principal"]) < marca.luminancia(propuesta["acento"])
+    rojo, verde, azul = marca.componentes(propuesta["principal"])
+    assert azul > rojo and azul > verde
+    assert colores_logo.proponer(salida.getvalue()) == propuesta

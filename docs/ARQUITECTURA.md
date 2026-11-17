@@ -881,7 +881,7 @@ Hoy se pueden elegir pero nunca generan cargos. Pasan a funcionar:
   2. Se descartan los píxeles transparentes. Si no hay transparencia, se descarta el color de fondo: el que domina el borde de la imagen cuando ocupa más del 60 % de ese borde.
   3. Se apartan los neutros: saturación menor a 0.15, o luminosidad mayor a 0.93 o menor a 0.07.
   4. Los demás se agrupan en hasta 8 colores (corte por mediana). El peso de cada grupo es su fracción de píxeles por (0.5 + saturación).
-  5. **Color principal:** el grupo de mayor peso. **Color de acento:** el grupo de mayor peso cuyo tono difiera al menos 25° del principal; si no hay, el mismo tono del principal con luminosidad 0.55 y saturación de al menos 0.6.
+  5. Se toman el grupo de mayor peso y el siguiente de mayor peso cuyo tono difiera al menos 25° del primero. De los dos, el **más oscuro** es el **color principal** (es el de los botones y el texto, y así conserva el tono de la marca) y el otro es el **color de acento**. Si no hay segundo, el principal es el primero y el acento es su mismo tono con luminosidad 0.55 y saturación de al menos 0.6.
   6. Se ajustan con las reglas de contraste que ya usa la marca: el principal se oscurece por pasos hasta leerse sobre el fondo y con texto blanco encima; el acento hasta distinguirse del fondo.
   7. Si todo el logo es neutro (blanco y negro), el principal es el neutro más oscuro ya ajustado y el acento es el de fábrica.
 - El cálculo no ejecuta nada del archivo: trabaja sobre los píxeles ya reconstruidos.
