@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Venta {{ venta }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Venta {{ venta }}</h1>
+  </div>
+</div>
 <dl class="datos">
   <dt>{{ voc.titular }}</dt><dd>{% if venta.titular.interno %}Público en general{% else %}<a href="{% url 'titulares:detalle' venta.titular.pk %}">{{ venta.titular.nombre_completo }}</a> · {{ venta.titular.matricula_formateada }}{% endif %}</dd>
   <dt>Fecha</dt><dd>{{ venta.creada|date:"d/m/Y H:i" }} · vendió {{ venta.usuario }}</dd>

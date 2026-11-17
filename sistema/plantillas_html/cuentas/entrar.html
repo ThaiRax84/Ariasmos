@@ -1,10 +1,23 @@
 {% extends "base.html" %}
+{% load static %}
+{% block barra %}{% endblock %}
+{% block pie %}{% endblock %}
 {% block contenido %}
-<h1>Iniciar sesión</h1>
-<form method="post" class="formulario angosto">
-  {% csrf_token %}
-  {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Entrar</button></div>
-</form>
-<p><a href="{% url 'activar' %}">Tengo un código de activación</a></p>
+{% if splash %}{% include "comun/_splash.html" %}{% endif %}
+<div class="acceso-pantalla">
+  <div class="acceso-caja">
+    <div class="acceso-marca"><img class="medallon" src="{% static 'marca/grifo-medallon.jpg' %}" alt="" width="46" height="46"><span class="nombre-ariasmos">ARIASMOS</span></div>
+    <div>
+      {% if negocio %}<span class="antetitulo">{{ negocio.nombre }}</span>{% endif %}
+      <h1>Iniciar sesión</h1>
+    </div>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include "comun/_campos.html" %}
+      <div class="acciones"><button class="boton grande ancho" type="submit">Entrar</button></div>
+    </form>
+    <p class="ayuda"><a href="{% url 'activar' %}">Tengo un código de activación</a></p>
+  </div>
+  <p class="ayuda">Ariasmos {{ version }}</p>
+</div>
 {% endblock %}

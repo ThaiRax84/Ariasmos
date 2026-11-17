@@ -4,45 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block titulo %}{% if negocio %}{{ negocio.nombre }}{% else %}Sistema de cobro{% endif %}{% endblock %}</title>
+<link rel="icon" type="image/png" href="{% static 'marca/favicon.png' %}">
 <link rel="stylesheet" href="{% static 'css/sistema.css' %}">
+{% block transicion %}<link rel="stylesheet" href="{% static 'css/transiciones.css' %}">{% endblock %}
+{% if user.is_authenticated and marca.con_colores %}<link rel="stylesheet" href="{% url 'marca_css' %}?v={{ marca.version }}">{% endif %}
 <script src="{% static 'js/sistema.js' %}" defer></script>
 <script src="{% static 'js/captura.js' %}" defer></script>
+{% block cabeza %}{% endblock %}
 </head>
-<body>
+<body{% block clase_cuerpo %}{% endblock %}>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="franja"></div>
+{% block barra %}
 <header class="barra">
-  <a class="marca" href="{% if user.is_authenticated %}{% url 'inicio' %}{% else %}#{% endif %}">{% if negocio %}{{ negocio.nombre }}{% else %}Sistema de cobro{% endif %}</a>
+  <a class="marcas" href="{% if user.is_authenticated %}{% url 'inicio' %}{% else %}{% url 'entrar' %}{% endif %}">
+    <span class="marca-ariasmos"><img class="medallon" src="{% static 'marca/grifo-medallon.jpg' %}" alt="" width="46" height="46"><span class="nombre-ariasmos">ARIASMOS</span></span>
+    {% if negocio %}<span class="separador-marcas"></span>
+    <span class="marca-negocio">{% if user.is_authenticated and marca.logo %}<img class="logo-negocio" src="{% url 'marca_logo' %}?v={{ marca.version }}" alt="Logotipo de {{ negocio.nombre }}" width="56" height="56">{% endif %}<span class="nombre-negocio">{{ negocio.nombre }}</span></span>{% endif %}
+  </a>
   {% if user.is_authenticated %}
-  <nav class="menu">
-    <a href="{% url 'inicio' %}">Inicio</a>
-    {% if "ver_titulares" in permisos %}<a href="{% url 'titulares:lista' %}">{{ voc.titulares }}</a><a href="{% url 'titulares:familias' %}">{{ voc.familias }}</a>{% endif %}
-    {% if "registrar_pago_efectivo" in permisos %}<a href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
-    {% if "turno_caja" in permisos %}<a href="{% url 'caja:inicio' %}">Mi caja</a>{% endif %}
-    {% if inventario_activo %}{% if "vender_articulos" in permisos or "registrar_movimientos_inventario" in permisos or "subir_conteo_inventario" in permisos or "devolver_articulos" in permisos or "revisar_inventario" in permisos or "administrar_articulos" in permisos %}<a href="{% url 'inventario:indice' %}">Inventario</a>{% endif %}{% endif %}
-    {% if "recibir_efectivo" in permisos %}<a href="{% url 'caja:custodia' %}">Efectivo</a>{% endif %}
-    {% if "conciliar_banco" in permisos or "sugerir_conciliacion" in permisos %}<a href="{% url 'conciliacion:cola' %}">Banco</a>{% endif %}
-    {% if "solicitar_alta_baja" in permisos or "aprob_solicitudes" in permisos or "alta_baja_directa" in permisos %}<a href="{% url 'solicitudes:bandeja' %}">Solicitudes</a>{% endif %}
-    {% if "administrar_conceptos" in permisos %}<a href="{% url 'cobros:conceptos' %}">Conceptos</a>{% endif %}
-    {% if "otorgar_delegaciones" in permisos %}<a href="{% url 'delegaciones' %}">Delegaciones</a>{% endif %}
-    {% if "aprobar_dispositivos" in permisos %}<a href="{% url 'dispositivos' %}">Equipos</a>{% endif %}
-    {% if "administrar_usuarios" in permisos %}<a href="{% url 'usuarios' %}">Usuarios</a>{% endif %}
-    {% if "administrar_roles" in permisos %}<a href="{% url 'roles' %}">Roles</a>{% endif %}
-    {% if "administrar_politicas" in permisos %}<a href="{% url 'solicitudes:politicas' %}">Políticas</a>{% endif %}
-    {% if "administrar_configuracion" in permisos %}<a href="{% url 'configuracion:indice' %}">Configuración</a>{% endif %}
-    {% if "turno_caja" in permisos or "ver_cortes" in permisos %}<a href="{% url 'cortes:lista' %}">Cortes</a>{% endif %}
-    {% if "administrar_respaldos" in permisos %}<a href="{% url 'respaldos:panel' %}">Respaldos</a>{% endif %}
-    {% if "ver_auditoria" in permisos %}<a href="{% url 'auditoria:lista' %}">Auditoría</a>{% endif %}
+  {% if menu %}
+  <nav class="menu" aria-label="Principal">
+    {% for entrada in menu.visibles %}<a href="{{ entrada.url }}"{% if entrada.activa %} aria-current="page"{% endif %}>{{ entrada.texto }}</a>{% endfor %}
+    {% if menu.mas %}<details class="menu-mas{% if menu.mas_activa %} activo{% endif %}" data-menu-mas>
+      <summary>Más</summary>
+      <div class="menu-mas-panel">{% for entrada in menu.mas %}<a href="{{ entrada.url }}"{% if entrada.activa %} aria-current="page"{% endif %}>{{ entrada.texto }}</a>{% endfor %}</div>
+    </details>{% endif %}
   </nav>
+  {% endif %}
   <div class="sesion">
-    <span>{{ user.nombre }}{% if user.rol %} · {{ user.rol }}{% endif %}</span>
+    <span>{{ user.nombre }}{% if user.rol %} · {{ user.rol }}{% endif %}{% if turno_sesion %} · {{ turno_sesion.caja }} · Turno abierto {{ turno_sesion.abierto_en|time:"H:i" }}{% endif %}</span>
     <a href="{% url 'contrasena' %}">Contraseña</a>
-    <form method="post" action="{% url 'salir' %}">{% csrf_token %}<button class="boton secundario" type="submit">Salir</button></form>
+    <form method="post" action="{% url 'salir' %}">{% csrf_token %}<button class="enlace" type="submit">Salir</button></form>
   </div>
   {% endif %}
 </header>
-<main class="contenido">
-  {% if messages %}<ul class="mensajes">{% for m in messages %}<li class="mensaje {{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+{% endblock %}
+<main class="contenido" id="contenido">
+  {% if messages %}
+  <ul class="mensajes">{% for m in messages %}{% if m.tags != "success" %}<li class="mensaje {{ m.tags }}">{{ m }}</li>{% endif %}{% endfor %}</ul>
+  <ul class="avisos-breves" role="status">{% for m in messages %}{% if m.tags == "success" %}<li class="aviso-breve" data-aviso-breve><span>{{ m }}</span></li>{% endif %}{% endfor %}</ul>
+  {% endif %}
   {% block contenido %}{% endblock %}
 </main>
-<footer class="pie-pagina">Ariasmos {{ version }}</footer>
+{% block pie %}<footer class="pie-pagina">Ariasmos {{ version }}</footer>{% endblock %}
 </body>
 </html>

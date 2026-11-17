@@ -24,6 +24,7 @@ HTTPS_ACTIVO = False
 CERTIFICADO_SERVIDOR = ""
 RUTA_ANCLA_AUDITORIA = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-ancla-{os.getpid()}.json")
 RUTA_COMPROBANTES = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-comprobantes-{os.getpid()}")
+RUTA_ACTUALIZACIONES = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-actualizaciones-{os.getpid()}")
 TOKEN_ASISTENTE = "token-de-pruebas"
 TOKEN_ASISTENTE_HASH = hashlib.sha256(TOKEN_ASISTENTE.encode()).hexdigest()
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]

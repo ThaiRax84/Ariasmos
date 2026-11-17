@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load static %}
+{% block clase_cuerpo %} class="instalacion"{% endblock %}
+{% block barra %}
+<header class="barra">
+  <span class="marcas"><span class="marca-ariasmos"><img class="medallon" src="{% static 'marca/grifo-medallon.jpg' %}" alt="" width="46" height="46"><span class="nombre-ariasmos">ARIASMOS</span></span><span class="separador-marcas"></span><span class="instalacion-titulo">Instalación</span></span>
+  <span class="instalacion-paso">Instalación · paso {{ paso }} de {{ total }}</span>
+</header>
+{% endblock %}
+{% block contenido %}
+<div class="asistente">
+  <ol class="pasos" aria-label="Pasos de la instalación">
+    {% for nombre in nombres_pasos %}<li class="{% if forloop.counter < paso %}hecho{% elif forloop.counter == paso %}actual{% endif %}"{% if forloop.counter == paso %} aria-current="step"{% endif %}><span class="numero">{% if forloop.counter < paso %}✓{% else %}{{ forloop.counter }}{% endif %}</span>{{ nombre }}</li>{% endfor %}
+  </ol>
+  <div class="asistente-cuerpo">
+    <h1>{{ titulo }}</h1>
+    {% block asistente %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

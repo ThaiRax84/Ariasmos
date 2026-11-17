@@ -63,7 +63,8 @@
         "subir_conteo_inventario",
         "devolver_articulos",
         "revisar_inventario",
-        "administrar_articulos"
+        "administrar_articulos",
+        "configurar_topes_banco"
       ]
     },
     {
@@ -103,7 +104,8 @@
         "subir_conteo_inventario",
         "devolver_articulos",
         "revisar_inventario",
-        "administrar_articulos"
+        "administrar_articulos",
+        "configurar_topes_banco"
       ]
     }
   ],

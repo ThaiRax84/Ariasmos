@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Delegaciones temporales</h1>
-<p><a class="boton" href="{% url 'delegacion_nueva' %}">Nueva delegación</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Delegaciones</span>
+    <h1>Delegaciones temporales</h1>
+  </div>
+  <div class="encabezado-lado"><a class="boton" href="{% url 'delegacion_nueva' %}">Nueva delegación</a></div>
+</div>
 <table class="tabla">
 <thead><tr><th>Para</th><th>Permiso</th><th>Otorgó</th><th>Vence</th><th>Usos</th><th>Estado</th><th></th></tr></thead>
 <tbody>

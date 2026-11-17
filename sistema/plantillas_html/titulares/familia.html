@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>{{ voc.familia }} {{ familia }}</h1>
-<p><a class="boton secundario" href="{% url 'titulares:familia_estado_pdf' familia.pk %}">Estado de cuenta (PDF)</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">{{ voc.familias }}</span>
+    <h1>{{ voc.familia }} {{ familia }}</h1>
+  </div>
+  <div class="encabezado-lado"><a class="boton secundario" href="{% url 'titulares:familia_estado_pdf' familia.pk %}">Estado de cuenta (PDF)</a></div>
+</div>
 <section class="panel">
   <h2>{{ voc.titulares }}</h2>
   <ul class="lista">{% for t in miembros %}<li><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a> <span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span>{% if "registrar_pago_efectivo" in permisos %} · <a href="{% url 'cobros:cobrar' t.pk %}">Cobrar</a>{% endif %}</li>{% endfor %}</ul>

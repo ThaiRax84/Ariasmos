@@ -31,6 +31,7 @@ PERMISOS = {
     "devolver_articulos": "Registrar devoluciones de artículos",
     "revisar_inventario": "Revisar movimientos de inventario",
     "administrar_articulos": "Administrar artículos del inventario",
+    "configurar_topes_banco": "Configurar los topes del banco para aplicar pagos solos",
 }
 
 OPCIONES = list(PERMISOS.items())

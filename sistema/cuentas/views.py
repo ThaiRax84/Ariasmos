@@ -36,6 +36,7 @@ from .formularios import (
 from .models import CodigoActivacion, CodigoUsado, Delegacion, Dispositivo, PermisoRol, Rol, Usuario
 from .permisos import PERMISOS
 
+COOKIE_SPLASH = "splash_visto"
 MENSAJE_FALLO = "Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente."
 SEGUNDOS_PASO_CODIGO = 300
 
@@ -90,7 +91,11 @@ def entrar(request):
             else:
                 return _completar_inicio(request, usuario)
             messages.error(request, MENSAJE_FALLO)
-    return render(request, "cuentas/entrar.html", {"formulario": formulario})
+    splash = request.method == "GET" and request.COOKIES.get(COOKIE_SPLASH) != "1"
+    respuesta = render(request, "cuentas/entrar.html", {"formulario": formulario, "splash": splash})
+    if splash:
+        respuesta.set_cookie(COOKIE_SPLASH, "1", secure=settings.SESSION_COOKIE_SECURE, httponly=True, samesite="Strict")
+    return respuesta
 
 
 def entrar_codigo(request):

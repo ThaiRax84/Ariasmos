@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Cortes</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Cortes</h1>
+  </div>
+</div>
 {% if ve_todos %}
 <div class="atajos">
   <form method="post" action="{% url 'cortes:cobranza' %}">{% csrf_token %}<button class="boton" type="submit">Generar lista de cobranza ahora</button></form>

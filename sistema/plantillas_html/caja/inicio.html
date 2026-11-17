@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Mi caja</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Mi caja</h1>
+  </div>
+</div>
 {% if turno %}
 <section class="panel">
   <h2>Turno abierto en {{ turno.caja }}</h2>

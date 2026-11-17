@@ -2,7 +2,7 @@
 <section class="panel">
   <h2>Estado de cuenta</h2>
   <p class="matricula-grande">Adeudo: <strong>{{ estado.adeudo|dinero }}</strong>{% if estado.a_favor %} · A favor: <strong>{{ estado.a_favor|dinero }}</strong>{% endif %}</p>
-  <table class="tabla compacta">
+  <div class="desplazable"><table class="tabla compacta">
     <thead><tr>{% if varios %}<th>{{ voc.titular }}</th>{% endif %}<th>Cargo</th><th>Vence</th><th>Original</th><th>Beca</th><th>Importe</th><th>Cancelado</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th></tr></thead>
     <tbody>
     {% for fila in estado.cargos %}{% with c=fila.cargo %}
@@ -21,9 +21,9 @@
     </tr>
     {% endwith %}{% empty %}<tr><td colspan="11">Sin cargos.</td></tr>{% endfor %}
     </tbody>
-  </table>
+  </table></div>
   <h3>Pagos</h3>
-  <table class="tabla compacta">
+  <div class="desplazable"><table class="tabla compacta">
     <thead><tr><th>Recibo</th><th>Fecha</th>{% if varios %}<th>Pagó con</th>{% endif %}<th>Importe</th><th>Aplicado a</th><th>A favor</th><th></th></tr></thead>
     <tbody>
     {% for p in estado.pagos %}
@@ -38,5 +38,5 @@
     </tr>
     {% empty %}<tr><td colspan="7">Sin pagos.</td></tr>{% endfor %}
     </tbody>
-  </table>
+  </table></div>
 </section>

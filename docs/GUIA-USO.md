@@ -2,6 +2,23 @@
 
 El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada persona entra con su usuario, su contraseña y, si su rol lo pide, el código de 6 dígitos de su autenticador. Lo que cada quien ve depende de su rol; esta guía sigue los tres roles de las plantillas: **Operación**, **Supervisión** y **Dirección**. Los nombres de los menús («titulares», «matrícula», «familias») pueden cambiar según cómo se configuró el vocabulario.
 
+## La pantalla
+
+- Al abrir el programa aparece una vez la presentación de Ariasmos con su versión («ver. 0.8.0»); se quita sola en un par de segundos o con un clic o cualquier tecla, y no vuelve a salir hasta que cierres el navegador. Si tu equipo tiene activado «reducir movimiento», no aparece.
+- Arriba está la marca de Ariasmos y, a su lado, el logo y el nombre del negocio. Las entradas más usadas del menú se ven siempre (Inicio, Cobrar, el padrón, Inventario, Mi caja, Banco, Efectivo, Solicitudes y Cortes, según tu rol); las demás (familias, conceptos, usuarios, roles, configuración, respaldos, bitácora y otras) están en **Más**. **Más** se abre con un clic o con Enter y se recorre con las flechas; Esc lo cierra.
+- A la derecha ves tu nombre, tu rol y, si tienes turno abierto, la caja y la hora en que lo abriste.
+- Las acciones que mueven dinero o no se deshacen piden confirmación en un recuadro propio del programa; los avisos de que algo salió bien aparecen abajo unos segundos.
+
+## El Inicio
+
+Cada rol ve un Inicio distinto:
+
+- **Operación**: tu turno abierto con el **número** de cobros (nunca importes ni el efectivo esperado), el buscador del padrón, el aviso de la hora límite de tu corte, los accesos rápidos y tus solicitudes en espera.
+- **Supervisión**: cuatro cuadros (cobrado hoy, efectivo sin entregar, banco por identificar y corte diario pendiente), la lista **Por autorizar** y la lista **Por revisar** con los avisos de control.
+- **Dirección**: cuatro cuadros (cobrado en el mes con su reparto entre efectivo y banco, por cobrar vencido, efectivo en custodia y retiros de la semana), **Salud del sistema** (bitácora, respaldo, prueba de restauración, certificado y equipos por aprobar) y **Avisos de control**.
+- Cada cuadro aparece solo si tu rol tiene el permiso correspondiente. Si tienes un turno de caja abierto, los cuadros de cobrado y de efectivo dicen «Se muestra al cerrar tu turno»: el arqueo sigue siendo ciego.
+- Cada aviso lleva una etiqueta (**Revisar**, **Por hacer**, **Por revisar**, **Bien**…) y un enlace a donde se atiende.
+
 ## Operación
 
 ### Dar de alta a un titular
@@ -16,9 +33,9 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 1. Abre tu turno en **Mi caja** (el fondo inicial es opcional). Si el negocio captura piezas por denominación, escribe cuántos billetes y monedas de cada valor hay en el fondo.
 2. Menú **Cobrar** → busca al titular por nombre o matrícula.
-3. Escribe el importe recibido. El sistema muestra cómo se reparte entre los cargos pendientes (y los de su familia).
-4. Si se capturan piezas: escribe los billetes y monedas que te entregan y elige **Calcular el cambio**. El sistema propone las piezas del cambio con las que debería haber en tu caja; entrega exactamente esas o corrígelas en pantalla antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
-5. Confirma. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
+3. A la izquierda ves los cargos pendientes y arriba a la derecha el adeudo. Escribe el importe (solo el número: el signo y la moneda ya vienen puestos). El sistema muestra en **Así se va a aplicar** cómo se reparte entre los cargos pendientes (y los de su familia).
+4. Si se capturan piezas: toca cada billete o moneda que te entregan (con **−** quitas una; también puedes escribir el número) y elige **Calcular el cambio**. Mientras tocas, **Recibido** suma lo que capturaste. El recuadro **Entrega exactamente estas piezas** dice qué piezas dar de cambio para que tu caja cuadre en el corte; si entregas otras, ábrelas con **Di el cambio con otras piezas** y corrígelas antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
+5. Elige **Confirmar y dar recibo**. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
 
 ### Retirar efectivo para un gasto
 
@@ -32,7 +49,7 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 ### Corte diario
 
 1. Al terminar el día, en **Mi caja** elige **Cerrar turno**.
-2. Cuenta el efectivo por billete y moneda y guarda el conteo. No verás lo esperado hasta que el turno quede cerrado, y el conteo guardado ya no se puede cambiar.
+2. Cuenta el efectivo por billete y moneda; mientras escribes, el recuadro **Contado** suma lo que capturaste (solo lo tuyo, nunca lo esperado). Guarda el conteo. No verás lo esperado hasta que el turno quede cerrado, y el conteo guardado ya no se puede cambiar.
 3. Si coincide con lo que debe haber, el turno se cierra. Si no coincide, el sistema solo dice que **no coincide** (sin decir cuánto ni si sobra o falta) y te deja **recontar una sola vez** o cerrar con el primer conteo; en los dos casos escribe una nota.
 4. Al cerrar ves lo esperado, lo contado y la diferencia, en total y, si se capturan piezas, por denominación. Se genera tu **corte diario**: recibos, devoluciones, retiros, lo contado y la diferencia. Lo ves en **Cortes**.
 5. Cada negocio decide qué días hay corte y a qué hora. Un turno abierto en un día con corte debe cerrarse antes de la hora de ese día; si se abrió en un día sin corte, antes de la hora del siguiente día que sí tenga. Si cierras después, el corte queda marcado como **tardío**; no pasa nada más.
@@ -42,10 +59,11 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [guía de inventario](GUIA-INVENTARIO.md).
 
-1. **Inventario** → **Vender a un titular** (o **Vender artículos** desde su ficha): elige artículos y cantidades. El precio lo pone cada artículo.
-2. Elige cómo se paga: **Lo paga ahora** pasa al cobro, que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás.
-3. **Vender sin matrícula** es para quien no es titular: se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
-4. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
+1. **Inventario** → **Vender** (o **Vender artículos** desde su ficha) y elige al titular. Verás todos los artículos activos; filtra escribiendo parte del nombre o la clave y usa **+** y **−** en cada uno (o escribe la cantidad). El precio lo pone cada artículo; el **Resumen** de la derecha suma lo elegido, y el sistema lo vuelve a calcular al continuar.
+2. Elige cómo se paga: **Lo paga ahora** pasa al cobro (**Continuar al cobro**), que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás (**Registrar la venta**).
+3. **Sin matrícula** (arriba a la derecha) es para quien no es titular: mismo catálogo; se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
+4. Junto a cada artículo ves cuántas piezas quedan; si no queda ninguna no se muestra número. Cuando quedan pocas (20 % o menos de lo que había tras la última entrada o conteo, o en su mínimo) aparece **pocas**.
+5. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
 
 ### Devoluciones, entradas, mermas y conteo
 
@@ -75,6 +93,16 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 5. Lo que llega por la carpeta vigilada se aplica solo, salvo los movimientos **retenidos**: un estado en PDF que no continúa al anterior, o los movimientos de un Excel o CSV con una señal de sospecha (o todo el archivo si sus saldos no cuadran o rebasaría el tope de pagos sin respaldo). En el Inicio aparece la importación; ábrela, compara cada movimiento retenido con el banco (se ve su motivo), marca los que existen y elige **Liberar los marcados** o **Liberar todos**. Quien libera no puede marcar la importación como revisada.
 6. **Pagos sin respaldo en el estado**: al importar el estado en PDF del mes, cada pago aplicado desde un Excel o CSV que no aparezca en él sale en el Inicio con un enlace para **solicitar su reversión**. El sistema no lo revierte solo. También avisa si un pago así lleva más de 45 días sin un estado que lo cubra.
 
+### Topes del banco
+
+**Banco → Topes** (con el permiso «Configurar los topes del banco», que traen Supervisión y Dirección; pide tu contraseña otra vez) fija cuánto puede aplicarse **solo** desde los Excel o CSV que llegan por la carpeta vigilada:
+
+- **Tope del día**, uno por cada día de la semana: lo máximo que se aplica solo ese día. Se cuenta pago por pago, en el orden del archivo, sobre el día en que se aplica (no la fecha del movimiento). El pago que no cabe queda **retenido** con el motivo «Tope del día» y se sigue con el siguiente, que sí puede caber. Un día en 0 retiene todo lo de ese día.
+- **Tope acumulado**: lo máximo aplicado desde Excel o CSV que todavía no confirma un estado de cuenta en PDF. Si un archivo lo rebasaría, se retiene completo. Baja cuando llega el estado del mes.
+- Lo que tú liberas a mano no gasta el tope del día (sí cuenta en el acumulado) y liberar nunca se bloquea por un tope.
+- La pantalla muestra cuánto se ha aplicado hoy contra el tope del día y cuánto hay acumulado contra el tope acumulado. Al instalar todo está en 0: aplicar solo es una decisión del negocio.
+- Cada cambio queda en la bitácora con los valores de antes y de después, y Dirección lo ve en su Inicio durante 7 días.
+
 ### Efectivo
 
 - **Efectivo** muestra quién tiene dinero en custodia, las entregas por confirmar y los depósitos por conciliar. Si tú mismo tienes un turno abierto, tu efectivo no se muestra hasta que lo cierres.
@@ -103,6 +131,14 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 - Cada lunes se genera la lista de adeudos vencidos; en **Cortes** puedes generarla en cualquier momento.
 
+## Todas las personas: versión nueva
+
+- Cuando hay una versión nueva, el Inicio de todos muestra **«Hay una versión nueva: X.Y.Z»** con la lista de cambios.
+- **Descargar** la pide al servicio; cualquiera puede pedirla. Se baja una a la vez y como máximo tres intentos por hora. El servicio comprueba que el instalador sea exactamente el del aviso firmado; si no, lo borra y avisa a Dirección.
+- Cuando termina, el aviso cambia a **«Lista para instalar»**. La instalación se hace a mano en la computadora del servidor: menú Inicio → Ariasmos → **Instalar actualización** (pide permiso de administrador). Vuelve a comprobar la firma y la huella antes de abrir el instalador y se niega si no coinciden. Antes, haz un respaldo y cierra los turnos de caja abiertos: el aviso dice si hay alguno.
+- Si el aviso dice que antes hay que instalar otra versión, pide ese instalador al dueño del programa.
+- Sin internet no pasa nada: el aviso simplemente no aparece.
+
 ## Dirección
 
 ### Usuarios y roles
@@ -113,8 +149,17 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope de pagos sin respaldo y el tope por pago), **Inventario** (encenderlo, devoluciones y plazos) e importación inicial del padrón.
+- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
+
+### Marca del negocio
+
+**Más → Configuración → Marca del negocio** (pide tu contraseña otra vez):
+
+1. **Colores**: escribe el color principal y el de acento como `#` y seis dígitos hexadecimales (por ejemplo `#1F1A4E` y `#F58634`) y guarda. El principal pinta los botones y el menú activo; el acento, la franja de arriba, los subrayados y los fondos suaves. Si el principal es demasiado claro para leer texto blanco encima, los botones usan un tono oscuro y la pantalla te lo indica en **Lectura**. **Usar los colores de Ariasmos** quita los del negocio.
+2. **Logo**: sube una imagen JPEG o PNG de hasta 1 MB. El programa revisa el contenido real del archivo y lo vuelve a dibujar solo con sus píxeles; cualquier otra cosa se rechaza. **Quitar logo** deja solo el nombre del negocio.
+3. El logo y el nombre aparecen en la barra y en el recibo (en pantalla, impreso y en PDF); Ariasmos queda solo en la línea del pie del recibo. Cada cambio queda en la bitácora.
+4. Sin colores se usan los de Ariasmos; sin logo, solo el nombre. El asistente de instalación siempre usa los colores de Ariasmos.
 
 ### Respaldos
 
@@ -127,6 +172,16 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - Cuando alguien importa un archivo de banco que no se puede comprobar contra el estado de cuenta anterior y con él se aplicaron pagos, aparece en tu Inicio como **importación por revisar**.
 - Ábrela, compárala con el banco y elige **Marcar como revisada**. Quien la importó, o quien liberó alguno de sus movimientos si llegó por la carpeta vigilada, no puede marcarla.
 - Si el negocio lleva inventario, el Inicio te avisa cuando un conteo lleva más días de los configurados sin aprobarse.
+
+### Cambios en los topes del banco
+
+Quien tiene «Ver auditoría» ve en su Inicio los cambios de topes del banco de los últimos 7 días que hizo **otra** persona: quién, cuándo y de cuánto a cuánto. Quien concilia también libera pagos, así que conviene revisar que los topes sean los acordados.
+
+### Actualizaciones del programa
+
+- **Configuración → Actualizaciones del programa** (pide tu contraseña otra vez): actívalas, escribe el repositorio del canal (`propietario/nombre`) y la clave de solo lectura que te dio el dueño del programa. La clave se guarda cifrada y no se vuelve a mostrar; para cambiarla escribe otra. Si la pantalla dice que esta copia no trae llaves de actualización, no se pueden activar: se actualiza a mano con un instalador nuevo.
+- El servicio busca una versión nueva al arrancar y una vez al día. **Buscar ahora** pide una búsqueda en el siguiente ciclo del servicio (como máximo una cada 10 minutos).
+- Tu Inicio te avisa cuando se descargó una versión, cuando una descarga no coincidió con el aviso firmado (se borra sola) y cuando cambió la llave de uso de las actualizaciones. Si no esperabas un cambio de llave, apaga las actualizaciones y avisa al dueño del programa.
 
 ### Bitácora
 

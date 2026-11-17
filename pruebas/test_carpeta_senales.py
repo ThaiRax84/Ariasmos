@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from auditoria.models import Evento
 from banco import carpeta, conciliacion, lectura
-from banco.models import Importacion, MovimientoBancario
+from banco.models import Importacion, MovimientoBancario, TopeDiarioBanco
 from cobros import libro
 from cobros.models import Cargo, ConceptoCobro, Pago, ReversionPago
 from configuracion.models import Negocio, Parametro, hoy_negocio
@@ -21,6 +21,12 @@ from .libro_ayudas import preparar_conceptos, titular_activo
 
 def fijar(clave, valor):
     Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+
+
+def topes(acumulado, diario=10000000):
+    fijar("tope_aplicado_sin_respaldo", acumulado)
+    for numero in range(7):
+        TopeDiarioBanco.objects.update_or_create(dia=numero, defaults={"importe": diario})
 
 
 def aprender(con_saldo=False):
@@ -71,7 +77,7 @@ def test_con_tope_cero_todo_archivo_editable_queda_retenido(base):
 
 def test_con_tope_suficiente_aplica_de_inmediato(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     importacion = importar("movs.csv", hoja([[dia(), ana.matricula, "300.00"]]))
     assert not importacion.retenida and importacion.aplicados == 1
     pago = pagos_banco().get()
@@ -121,7 +127,7 @@ def test_confirmar_un_retenido_desde_la_cola_cuenta_como_liberarlo(base):
 
 def test_segundo_pago_sin_adeudo_que_cubrir_se_retiene(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     familia = Familia.objects.create(nombre="Familia Señales")
     Titular.objects.filter(pk=ana.pk).update(familia=familia)
     beto = titular_activo(personas["op"], personas["sup"], "Beto", familia=familia)
@@ -134,14 +140,14 @@ def test_segundo_pago_sin_adeudo_que_cubrir_se_retiene(base):
 
 def test_pago_mayor_que_el_adeudo_se_retiene(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     importacion = importar("movs.csv", hoja([[dia(), ana.matricula, "1000.01"]]))
     assert conciliacion.retenidos(importacion).get().retencion == "excede_adeudo" and not pagos_banco().exists()
 
 
 def test_misma_matricula_dos_veces_retiene_la_segunda(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     importacion = importar("movs.csv", hoja([[dia(), ana.matricula, "300.00"], [dia(), ana.matricula, "200.00"]]))
     assert importacion.aplicados == 1 and pagos_banco().get().importe == 30000
     assert conciliacion.retenidos(importacion).get().retencion == "matricula_repetida"
@@ -149,7 +155,7 @@ def test_misma_matricula_dos_veces_retiene_la_segunda(base):
 
 def test_tope_individual_fecha_futura_y_titular_inactivo(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     fijar("tope_pago_carpeta", 50000)
     beto = titular_activo(personas["op"], personas["sup"], "Beto")
     Titular.objects.filter(pk=beto.pk).update(estado=Titular.BAJA)
@@ -162,7 +168,7 @@ def test_tope_individual_fecha_futura_y_titular_inactivo(base):
 
 def test_movimiento_en_periodo_de_un_estado_que_no_lo_trae_se_retiene(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     importar_pdf(personas["sup"], [spei(5, 1000)])
     importacion = importar("movs.csv", hoja([["2026-08-12", ana.matricula, "300.00"]]))
     assert conciliacion.retenidos(importacion).get().retencion == "fuera_de_estado"
@@ -176,7 +182,7 @@ def importar_pdf(usuario, movimientos, **opciones):
 
 def test_saldos_que_no_cuadran_retienen_todo_el_archivo_sin_rechazarlo(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     aprender(con_saldo=True)
     importacion = importar("movs.csv", hoja([[dia(2), ana.matricula, "300.00", "1300.00"], [dia(), ana.matricula, "100.00", "1500.00"]], con_saldo=True))
     assert importacion.retenida and not pagos_banco().exists()
@@ -185,7 +191,7 @@ def test_saldos_que_no_cuadran_retienen_todo_el_archivo_sin_rechazarlo(base):
 
 def test_saldo_que_no_continua_retiene_y_el_que_continua_aplica(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     agosto = [spei(5, 1000)]
     importar_pdf(personas["sup"], agosto)
     conocido = saldo_final(agosto)
@@ -198,7 +204,7 @@ def test_saldo_que_no_continua_retiene_y_el_que_continua_aplica(base):
 
 def test_tope_de_exposicion_suma_lo_ya_aplicado_sin_respaldo(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 150000)
+    topes(150000)
     otro = ConceptoCobro.objects.get(nombre="Libros")
     libro.crear_cargo(ana, otro, 500000, hoy_negocio(), Cargo.MANUAL, usuario=personas["op"])
     primero = importar("uno.csv", hoja([[dia(), ana.matricula, "1000.00"]]))
@@ -220,7 +226,7 @@ def test_dos_archivos_a_la_vez_no_rebasan_juntos_el_tope():
     ana = titular_activo(op, sup, "Ana")
     libro.crear_cargo(ana, ConceptoCobro.objects.get(nombre="Libros"), 900000, hoy_negocio(), Cargo.MANUAL, usuario=op)
     aprender()
-    fijar("tope_aplicado_sin_respaldo", 150000)
+    topes(150000)
     contenidos = [hoja([[dia(), ana.matricula, "1000.00"]]), hoja([[dia(2), ana.matricula, "1000.00"]])]
     barrera = threading.Barrier(2)
     errores = []
@@ -246,7 +252,7 @@ def test_dos_archivos_a_la_vez_no_rebasan_juntos_el_tope():
 
 def test_estado_sin_el_pago_lo_marca_sin_respaldo_y_no_lo_revierte(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     importar("movs.csv", hoja([["2026-08-12", ana.matricula, "300.00"]]))
     pago = pagos_banco().get()
     importar_pdf(personas["sup"], [spei(5, 1000)])
@@ -261,7 +267,7 @@ def test_estado_sin_el_pago_lo_marca_sin_respaldo_y_no_lo_revierte(base):
 
 def test_alerta_de_antiguedad_sin_estado(base):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     importar("movs.csv", hoja([[dia(50), ana.matricula, "300.00"]]))
     assert list(conciliacion.antiguos_sin_respaldo()) == list(MovimientoBancario.objects.filter(estado=MovimientoBancario.APLICADO))
     assert "Pagos sin un estado que los respalde" in cliente(personas["sup"]).get(reverse("inicio")).content.decode()
@@ -271,7 +277,7 @@ def test_alerta_de_antiguedad_sin_estado(base):
 
 def test_la_carpeta_aplica_por_el_camino_vigilado(base, tmp_path):
     personas, ana = base
-    fijar("tope_aplicado_sin_respaldo", 10000000)
+    topes(10000000)
     vigilada = tmp_path / "banco"
     Negocio.objects.filter(pk=1).update(carpeta_banco=carpeta.validar_carpeta(str(vigilada)))
     (vigilada / "hoy.csv").write_bytes(hoja([[dia(), ana.matricula, "300.00"]]))
@@ -292,15 +298,15 @@ def test_importacion_manual_de_archivo_no_cambia(base):
     assert not importacion.retenida and importacion.aplicados == 1 and not conciliacion.retenidos(importacion).exists()
 
 
-def test_configuracion_y_asistente_piden_los_dos_topes(base, tmp_path):
+def test_configuracion_pide_el_tope_por_pago_y_los_topes_viven_en_su_pantalla(base, tmp_path):
     personas, ana = base
     c = cliente(personas["dir"])
     pagina = c.get(reverse("configuracion:carpeta_banco")).content.decode()
-    assert "tope_aplicado_sin_respaldo" in pagina and "tope_pago_carpeta" in pagina
+    assert "tope_aplicado_sin_respaldo" not in pagina and "tope_pago_carpeta" in pagina
     respuesta = c.post(reverse("configuracion:carpeta_banco"), {"carpeta_banco": str(tmp_path / "v"), "tope_aplicado_sin_respaldo": "5000.00", "tope_pago_carpeta": "1500.00"})
     assert respuesta.status_code == 302
     from configuracion.models import parametro
 
-    assert parametro("tope_aplicado_sin_respaldo") == 500000 and parametro("tope_pago_carpeta") == 150000
+    assert parametro("tope_aplicado_sin_respaldo") == 0 and parametro("tope_pago_carpeta") == 150000
     evento = Evento.objects.filter(accion="carpeta_banco_cambiada").latest("numero")
-    assert evento.datos["cambios"]["tope_aplicado_sin_respaldo"] == [0, 500000]
+    assert evento.datos["cambios"]["tope_pago_carpeta"] == [0, 150000] and "tope_aplicado_sin_respaldo" not in evento.datos["cambios"]

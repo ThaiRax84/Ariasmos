@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Revisión de inventario</h1>
-<p>Nadie revisa lo que registró: los renglones propios aparecen sin botón.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Revisión de inventario</h1>
+    <p class="subtitulo">Nadie revisa lo que registró: los renglones propios aparecen sin botón.</p>
+  </div>
+</div>
 {% if bajo_minimo %}
 <section class="panel alerta"><h2>Artículos en o bajo su mínimo</h2><ul class="lista">{% for a, e in bajo_minimo %}<li>{{ a }} · existencia {{ e }} · mínimo {{ a.minimo }}</li>{% endfor %}</ul></section>
 {% endif %}

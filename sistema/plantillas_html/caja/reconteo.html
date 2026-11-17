@@ -1,23 +1,32 @@
 {% extends "base.html" %}
+{% load formato %}
 {% block contenido %}
-<h1>El conteo no coincide</h1>
-<p>Lo que contaste en {{ turno.caja }} no coincide con lo que debe haber. Puedes recontar una sola vez o cerrar con el primer conteo. En los dos casos escribe una nota; al cerrar verás lo esperado, lo contado y la diferencia.</p>
-<section class="panel">
-  <h2>Recontar</h2>
-  <form method="post" class="formulario angosto" novalidate>
+<section class="panel centrada">
+  <span class="icono-aviso" aria-hidden="true">!</span>
+  <h1>El conteo no coincide</h1>
+  <p class="subtitulo">Lo que contaste en {{ turno.caja }} no coincide con lo que debe haber. Por seguridad todavía no se dice cuánto ni hacia dónde. Puedes recontar una sola vez o cerrar con el primer conteo. En los dos casos escribe una nota; al cerrar verás lo esperado, lo contado y la diferencia.</p>
+</section>
+<details class="panel desplegable"{% if recontar.is_bound %} open{% endif %}>
+  <summary class="boton grande">Volver a contar (solo una vez)</summary>
+  <form method="post" class="columnas principal" novalidate>
     {% csrf_token %}
     <input type="hidden" name="accion" value="reconteo">
-    {% include "comun/_campos.html" with formulario=recontar %}
-    <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Cerrar el turno con este reconteo?">Cerrar con el reconteo</button></div>
+    <div>{% include "caja/_conteo.html" with formulario=recontar %}</div>
+    <div class="pila junta">
+      <span class="etiqueta-campo">Contado</span>
+      <p class="cifra-importe grande" data-contado aria-live="polite"></p>
+      <div class="campo{% if recontar.nota.errors %} con-error{% endif %}">{{ recontar.nota.label_tag }} {{ recontar.nota }}{% for e in recontar.nota.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>
+      <button class="boton grande ancho" type="submit" data-confirmar="¿Cerrar el turno con este reconteo?" data-confirmar-boton="Cerrar con el reconteo">Cerrar con el reconteo</button>
+    </div>
   </form>
-</section>
-<section class="panel">
-  <h2>Cerrar con el primer conteo</h2>
+</details>
+<details class="panel desplegable"{% if con_primero.is_bound %} open{% endif %}>
+  <summary class="boton grande secundario">Cerrar con el primer conteo</summary>
   <form method="post" class="formulario angosto" novalidate>
     {% csrf_token %}
     <input type="hidden" name="accion" value="primero">
     {% include "comun/_campos.html" with formulario=con_primero %}
-    <div class="acciones"><button class="boton secundario" type="submit" data-confirmar="¿Cerrar el turno con el primer conteo?">Cerrar con el primer conteo</button></div>
+    <div class="acciones"><button class="boton secundario" type="submit" data-confirmar="¿Cerrar el turno con el primer conteo?" data-confirmar-boton="Cerrar con el primer conteo">Cerrar con el primer conteo</button></div>
   </form>
-</section>
+</details>
 {% endblock %}

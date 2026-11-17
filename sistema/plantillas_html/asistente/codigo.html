@@ -1,8 +1,6 @@
-{% extends "base.html" %}
-{% block contenido %}
-<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
-<h1>{{ titulo }}</h1>
-<p>Quien dirige el negocio entra con su contraseña y con un código de su teléfono. Así, aunque alguien conozca la contraseña, no puede entrar ni autorizar nada sin el teléfono.</p>
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<p class="subtitulo">Quien dirige el negocio entra con su contraseña y con un código de su teléfono. Así, aunque alguien conozca la contraseña, no puede entrar ni autorizar nada sin el teléfono.</p>
 {% include "comun/_autenticador.html" %}
 <p>Al terminar, este equipo quedará aprobado como el primero.</p>
 <form method="post" class="formulario angosto">
