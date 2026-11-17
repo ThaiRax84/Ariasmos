@@ -76,10 +76,10 @@ PARAMETROS = {
     "pedir_consentimiento": (1, "1 para pedir la constancia de consentimiento de datos al dar de alta; 0 para no pedirla"),
     "texto_consentimiento": ("Se entregó el aviso de privacidad y se obtuvo el consentimiento", "Texto de la constancia de consentimiento de datos al dar de alta"),
     "apellidos_obligatorios": (1, "1 para exigir apellidos al dar de alta; 0 para permitir altas sin apellidos (por ejemplo, empresas)"),
-    "respaldos_diarios": (30, "Respaldos diarios que se conservan"),
+    "respaldos_diarios": (30, "Respaldos diarios que se conservan (nunca menos de 7)"),
     "respaldos_mensuales": (12, "Respaldos mensuales que se conservan"),
-    "horas_alerta_respaldo": (48, "Horas sin un respaldo correcto antes de avisar"),
-    "dias_prueba_restauracion": (30, "Días entre pruebas de restauración"),
+    "horas_alerta_respaldo": (48, "Horas sin un respaldo correcto antes de avisar (a lo más 168)"),
+    "dias_prueba_restauracion": (30, "Días entre pruebas de restauración (a lo más 180)"),
     "rechazos_antes_de_autorizar": (3, "Retiros rechazados por tope en un turno antes de que el siguiente pida autorización"),
     "porcentaje_aviso_tope": (80, "Porcentaje del tope de retiros del periodo en el que se avisa que se está por alcanzar"),
     "porcentaje_existencia_baja": (20, "Porcentaje de su nivel de referencia (existencia tras su última entrada o conteo aprobado) en o bajo el cual un artículo tiene existencia baja"),
@@ -219,8 +219,17 @@ def vocabulario():
     return textos
 
 
+MARCADOR_VOCABULARIO = re.compile(r"\{([a-z_]+)\}")
+
+
 def con_vocabulario(texto, voc=None):
-    return str(texto).format_map(voc if voc is not None else vocabulario())
+    voc = voc if voc is not None else vocabulario()
+
+    def cambio(encontrado):
+        valor = voc.get(encontrado.group(1))
+        return encontrado.group(0) if valor is None else str(valor)
+
+    return MARCADOR_VOCABULARIO.sub(cambio, str(texto))
 
 
 def opciones_vocabulario(opciones, voc=None):
@@ -238,7 +247,7 @@ def con_roles(texto):
 
 
 def descripcion_parametro(clave):
-    return con_vocabulario(con_roles(PARAMETROS[clave][1]))
+    return con_roles(con_vocabulario(PARAMETROS[clave][1]))
 
 
 def parametro(clave):

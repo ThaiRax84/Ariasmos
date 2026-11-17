@@ -13,7 +13,7 @@ from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import Preformatted
 
 from configuracion import hoja
-from configuracion.models import vocabulario
+from configuracion.models import con_vocabulario, vocabulario
 from configuracion.moneda import catalogo
 from nucleo import dinero
 from nucleo.cadena import canonico
@@ -96,7 +96,7 @@ def _aplanar(fila, prefijo=""):
 
 def etiqueta(clave, voc=None):
     if clave in ETIQUETAS:
-        return ETIQUETAS[clave].format_map(voc if voc is not None else vocabulario())
+        return con_vocabulario(ETIQUETAS[clave], voc)
     final = clave.split(".")[-1]
     if TRAMO.fullmatch(final):
         from .calculo import nombre_tramo

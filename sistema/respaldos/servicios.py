@@ -29,20 +29,34 @@ from .models import Respaldo
 PREFIJO = "ariasmos-"
 EXTENSION = ".respaldo"
 PATRON = re.compile(r"^ariasmos-(\d{8})-(\d{6})\.respaldo$")
+DIARIOS_MINIMOS = 7
+HORAS_ALERTA_MAXIMAS = 168
+DIAS_PRUEBA_MAXIMOS = 180
+RESPALDOS_MAXIMOS = 3650
+
+
+def _acotado(clave, minimo, maximo):
+    try:
+        valor = int(parametro(clave))
+    except (TypeError, ValueError):
+        return minimo
+    return min(max(valor, minimo), maximo)
+
+
 def diarios():
-    return max(1, int(parametro("respaldos_diarios")))
+    return _acotado("respaldos_diarios", DIARIOS_MINIMOS, RESPALDOS_MAXIMOS)
 
 
 def mensuales():
-    return max(0, int(parametro("respaldos_mensuales")))
+    return _acotado("respaldos_mensuales", 0, RESPALDOS_MAXIMOS)
 
 
 def horas_alerta():
-    return max(1, int(parametro("horas_alerta_respaldo")))
+    return _acotado("horas_alerta_respaldo", 1, HORAS_ALERTA_MAXIMAS)
 
 
 def dias_prueba():
-    return max(1, int(parametro("dias_prueba_restauracion")))
+    return _acotado("dias_prueba_restauracion", 1, DIAS_PRUEBA_MAXIMOS)
 BASE = "base.sqlite3"
 CONFIGURACION = "configuracion.json"
 ANCLA = "ancla_auditoria.json"

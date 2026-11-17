@@ -14,11 +14,10 @@ DETALLE_NIVELES = {COMPLETO: "Completo: nombres, {matricula_min} y contacto", SO
 
 
 def niveles(voc=None):
-    if voc is None:
-        from configuracion.models import vocabulario
+    from configuracion.models import con_vocabulario, vocabulario
 
-        voc = vocabulario()
-    return [(clave, DETALLE_NIVELES[clave].format_map(voc)) for clave, _ in NIVELES]
+    voc = voc if voc is not None else vocabulario()
+    return [(clave, con_vocabulario(DETALLE_NIVELES[clave], voc)) for clave, _ in NIVELES]
 
 
 def nombre_de_tipo(tipo):

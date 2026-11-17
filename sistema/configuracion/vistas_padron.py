@@ -3,7 +3,7 @@ import secrets
 from django import forms
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicios import registrar
@@ -145,8 +145,15 @@ def revisar(request, token):
 
 @requiere_permiso(*PERMISOS, reingreso=True)
 def lote(request, pk):
-    objeto = get_object_or_404(LotePadron, pk=pk)
+    objeto = _lote_visible(request, pk)
     return render(request, "configuracion/padron_lote.html", {"lote": objeto, "titulares": padron.titulares_de(objeto), "saltados": objeto.resultado.get("saltados", [])})
+
+
+def _lote_visible(request, pk):
+    objeto = get_object_or_404(LotePadron, pk=pk)
+    if not (request.user.tiene_permiso("importar_padron") or request.user.tiene_permiso("aprobar_solicitudes")) and objeto.creado_por_id != request.user.pk:
+        raise Http404
+    return objeto
 
 
 def _descarga(contenido, tipo, nombre):
@@ -157,7 +164,7 @@ def _descarga(contenido, tipo, nombre):
 
 @requiere_permiso(*PERMISOS, reingreso=True)
 def matriculas(request, pk, formato):
-    objeto = get_object_or_404(LotePadron, pk=pk)
+    objeto = _lote_visible(request, pk)
     registrar("padron_exportado", request=request, datos={"lote": objeto.pk, "formato": formato})
     if formato == "xlsx":
         return _descarga(padron.a_xlsx(objeto), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", padron.nombre_archivo_matriculas(objeto, "xlsx"))
@@ -166,7 +173,7 @@ def matriculas(request, pk, formato):
 
 @requiere_permiso(*PERMISOS, reingreso=True)
 def fichas(request, pk):
-    objeto = get_object_or_404(LotePadron, pk=pk)
+    objeto = _lote_visible(request, pk)
     titulares = padron.titulares_de(objeto)
     for titular in titulares:
         registrar("ficha_pago_consultada", objeto=titular, request=request, datos={"lote": objeto.pk})

@@ -44,11 +44,9 @@ INDISPENSABLES = ("administrar_usuarios", "administrar_roles")
 
 
 def etiqueta(permiso, voc=None):
-    if voc is None:
-        from configuracion.models import vocabulario
+    from configuracion.models import con_vocabulario
 
-        voc = vocabulario()
-    return PERMISOS[permiso].format_map(voc)
+    return con_vocabulario(PERMISOS[permiso], voc)
 
 
 def opciones(voc=None):
