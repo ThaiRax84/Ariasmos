@@ -1,4 +1,5 @@
 from caja.servicios import turno_abierto
+from configuracion.models import vocabulario
 
 from .models import Conteo, Devolucion, Venta
 
@@ -37,7 +38,7 @@ class ConteoInventario(AccionInventario):
 
     def validar(self, titular, datos):
         if titular is not None:
-            raise ErrorAccion("Un conteo de inventario no corresponde a un registro del padrón.")
+            raise ErrorAccion(f"Un conteo de inventario no corresponde a un registro de {vocabulario()['padron_min']}.")
         if set(datos) != {"conteo"}:
             raise ErrorAccion("La solicitud trae datos no permitidos.")
         conteo = self._conteo(datos)
@@ -76,7 +77,7 @@ class DevolucionEfectivo(AccionInventario):
         from . import servicios
 
         if titular is not None:
-            raise ErrorAccion("Una devolución de artículos no corresponde a un registro del padrón.")
+            raise ErrorAccion(f"Una devolución de artículos no corresponde a un registro de {vocabulario()['padron_min']}.")
         if set(datos) - {"venta", "renglones", "motivo", "piezas"} or not {"venta", "renglones", "motivo"} <= set(datos):
             raise ErrorAccion("La solicitud trae datos no permitidos.")
         venta = self._venta(datos)

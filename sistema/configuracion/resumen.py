@@ -1,4 +1,4 @@
-from cuentas.permisos import PERMISOS
+from cuentas.permisos import PERMISOS, etiqueta
 from solicitudes.models import ACCIONES
 
 DELICADOS = (
@@ -28,7 +28,7 @@ def resumir(datos):
     roles = sorted(datos["roles"], key=lambda r: (r["nivel"], r["nombre"]))
     acciones = dict(ACCIONES)
     resumen_roles = [
-        {"nombre": r["nombre"], "nivel": r["nivel"], "delicados": [PERMISOS[p] for p in DELICADOS if p in r["permisos"]], "total": len(r["permisos"])}
+        {"nombre": r["nombre"], "nivel": r["nivel"], "delicados": [etiqueta(p) for p in DELICADOS if p in r["permisos"]], "total": len(r["permisos"])}
         for r in roles
     ]
     resumen_politicas = []
@@ -51,5 +51,5 @@ def resumir(datos):
             continue
         for permiso in RESERVADOS_A_NIVELES_ALTOS:
             if permiso in rol["permisos"]:
-                advertencias.append(f"El rol de menor nivel «{rol['nombre']}» puede {PERMISOS[permiso].lower()}.")
+                advertencias.append(f"El rol de menor nivel «{rol['nombre']}» puede {etiqueta(permiso).lower()}.")
     return {"roles": resumen_roles, "politicas": resumen_politicas, "advertencias": advertencias, "moneda": datos["moneda"], "denominaciones": len(datos["denominaciones"])}

@@ -7,11 +7,11 @@
 </div>
 {% if sin_cupo %}
 <p>Hay demasiados equipos esperando aprobación y por ahora no se pueden registrar más.</p>
-<p>Avisa a Supervisión para que revise y descarte los equipos pendientes.</p>
+<p>Avisa a {{ roles.aprobar_dispositivos }} para que revise y descarte los equipos pendientes.</p>
 {% elif dispositivo and dispositivo.estado == "revocado" %}
 <p>El acceso de este equipo fue revocado.</p>
 {% else %}
-<p>Este equipo todavía no está aprobado. Pide a Supervisión o Dirección que lo apruebe con este código:</p>
+<p>Este equipo todavía no está aprobado. Pide a {{ roles.aprobar_dispositivos }} que lo apruebe con este código:</p>
 <p class="codigo-equipo">{{ dispositivo.codigo }}</p>
 <p>Cuando lo aprueben, haz clic en «Continuar».</p>
 <p><a class="boton" href="{% url 'inicio' %}">Continuar</a></p>

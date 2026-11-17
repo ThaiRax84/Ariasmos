@@ -4,8 +4,6 @@ from django.conf import settings
 
 from .models import SOPORTES, TIPOS
 
-MEDIOS_POR_DEFECTO = ["Transferencia SPEI", "Depósito en ventanilla", "Efectivo en caja"]
-
 
 class ErrorCatalogo(ValueError):
     pass
@@ -50,10 +48,3 @@ def cargar(modelo=None):
             modelo.objects.filter(pk=existente.pk).update(**valores)
             actualizados += 1
     return creados, actualizados
-
-
-def sembrar_medios(modelo=None):
-    if modelo is None:
-        from .models import MedioPago as modelo
-    for orden, nombre in enumerate(MEDIOS_POR_DEFECTO, start=1):
-        modelo.objects.get_or_create(nombre=nombre, defaults={"orden": orden * 10})

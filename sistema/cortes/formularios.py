@@ -3,7 +3,8 @@ from django import forms
 from proyecto.carpetas import con_carpetas
 
 from . import entrega
-from .models import NIVELES, TIPOS, Destino, ReglaDestino
+from .models import TIPOS, Destino, ReglaDestino, nombre_de_tipo
+from .models import niveles as opciones_nivel
 
 
 @con_carpetas("ruta")
@@ -15,10 +16,12 @@ class FormularioDestino(forms.Form):
     def __init__(self, *args, destino=None, niveles=None, **kwargs):
         super().__init__(*args, **kwargs)
         reglas = {r.tipo: r for r in destino.reglas.all()} if destino is not None else {}
-        for tipo, nombre in TIPOS:
+        opciones = opciones_nivel()
+        for tipo, _ in TIPOS:
+            nombre = nombre_de_tipo(tipo)
             regla = reglas.get(tipo)
             self.fields[f"entregar_{tipo}"] = forms.BooleanField(label=f"Entregar: {nombre}", required=False, initial=regla.entregar if regla else True)
-            self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=NIVELES, initial=regla.nivel if regla else (niveles or {}).get(tipo, "solo_nombres"))
+            self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=opciones, initial=regla.nivel if regla else (niveles or {}).get(tipo, "solo_nombres"))
         if destino is not None:
             self.initial.setdefault("nombre", destino.nombre)
             self.initial.setdefault("ruta", destino.ruta)

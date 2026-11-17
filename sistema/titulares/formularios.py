@@ -1,6 +1,7 @@
 from django import forms
 
 from cobros.models import ConceptoCobro
+from configuracion.models import parametro, vocabulario
 
 from .contactos import FormularioContacto
 from .models import Agrupacion, Familia, MotivoBaja, Titular
@@ -19,31 +20,38 @@ class FormularioTitular(forms.ModelForm):
 
     def __init__(self, *args, voc=None, **kwargs):
         super().__init__(*args, **kwargs)
+        voc = voc or vocabulario()
         self.fields["agrupacion"].queryset = Agrupacion.objects.filter(activa=True)
         self.fields["agrupacion"].required = False
-        if voc:
-            self.fields["agrupacion"].label = voc["agrupacion"]
+        self.fields["agrupacion"].label = voc["agrupacion"]
+        self.fields["apellidos"].required = bool(parametro("apellidos_obligatorios"))
 
 
 class FormularioAlta(FormularioContacto):
     nombre = forms.CharField(label="Nombre", max_length=100)
     apellidos = forms.CharField(label="Apellidos", max_length=150)
-    agrupacion = forms.ModelChoiceField(label="Agrupación", queryset=Agrupacion.objects.none(), required=False)
+    agrupacion = forms.ModelChoiceField(label="Grupo", queryset=Agrupacion.objects.none(), required=False)
     conceptos = forms.ModelMultipleChoiceField(label="Conceptos iniciales", queryset=ConceptoCobro.objects.none(), required=False, widget=forms.CheckboxSelectMultiple)
-    familia = forms.ModelChoiceField(label="Familia (opcional)", queryset=Familia.objects.none(), required=False)
-    familia_nueva = forms.CharField(label="O crear una familia nueva con este nombre", max_length=100, required=False)
+    familia = forms.ModelChoiceField(label="Cuenta compartida (opcional)", queryset=Familia.objects.none(), required=False)
+    familia_nueva = forms.CharField(label="O crear una nueva con este nombre", max_length=100, required=False)
     notas = forms.CharField(label="Notas", max_length=MAXIMO_NOTAS, required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    constancia_consentimiento = forms.BooleanField(label="Se entregó el aviso de privacidad y se obtuvo el consentimiento", required=True)
+    constancia_consentimiento = forms.BooleanField(label="Consentimiento", required=True)
 
     def __init__(self, *args, voc=None, **kwargs):
         super().__init__(*args, exigir_obligatorios=True, **kwargs)
+        voc = voc or vocabulario()
+        self.voc = voc
         self.fields["agrupacion"].queryset = Agrupacion.objects.filter(activa=True)
         self.fields["conceptos"].queryset = ConceptoCobro.objects.filter(activo=True)
         self.fields["familia"].queryset = Familia.objects.filter(activa=True)
-        if voc:
-            self.fields["agrupacion"].label = voc["agrupacion"]
-            self.fields["familia"].label = f"{voc['familia']} (opcional)"
-            self.fields["familia_nueva"].label = f"O crear una {voc['familia'].lower()} nueva con este nombre"
+        self.fields["agrupacion"].label = voc["agrupacion"]
+        self.fields["familia"].label = f"{voc['familia']} (opcional)"
+        self.fields["familia_nueva"].label = f"O crear {voc['familia_min']} con este nombre"
+        self.fields["apellidos"].required = bool(parametro("apellidos_obligatorios"))
+        if parametro("pedir_consentimiento"):
+            self.fields["constancia_consentimiento"].label = str(parametro("texto_consentimiento")).strip() or "Consentimiento"
+        else:
+            del self.fields["constancia_consentimiento"]
         orden = ["nombre", "apellidos", "agrupacion", "familia", "familia_nueva", "contacto_nombre", "contacto_relacion"]
         orden += [c.clave for c in self.campos]
         orden += ["conceptos", "notas", "constancia_consentimiento"]
@@ -52,18 +60,18 @@ class FormularioAlta(FormularioContacto):
     def clean(self):
         datos = super().clean()
         if datos.get("familia") and (datos.get("familia_nueva") or "").strip():
-            raise forms.ValidationError("Elige una familia existente o escribe una nueva, no ambas.")
+            raise forms.ValidationError(f"{self.voc['familia']}: elige una existente o escribe una nueva, no ambas.")
         return datos
 
     def datos_titular(self):
         datos = self.cleaned_data
         return {
             "nombre": datos["nombre"],
-            "apellidos": datos["apellidos"],
+            "apellidos": datos.get("apellidos") or "",
             "agrupacion": datos.get("agrupacion"),
             "familia": datos.get("familia"),
             "notas": datos.get("notas", ""),
-            "constancia_consentimiento": datos["constancia_consentimiento"],
+            "constancia_consentimiento": bool(datos.get("constancia_consentimiento")),
         }
 
     def datos_contacto(self):
@@ -88,6 +96,7 @@ class FormularioCambioFamilia(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["familia"].queryset = Familia.objects.filter(activa=True)
+        self.fields["familia"].label = f"{vocabulario()['familia']} existente"
 
     def datos(self):
         datos = self.cleaned_data

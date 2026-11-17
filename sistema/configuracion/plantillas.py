@@ -25,13 +25,18 @@ def _archivos():
     return {ruta.stem: ruta for ruta in sorted(settings.PLANTILLAS_NEGOCIO.glob("*.json")) if ruta.stem.isidentifier()}
 
 
-def disponibles():
+PRIMERAS = ("generico", "escuela")
+
+
+def disponibles(con_descripcion=False):
     resultado = {}
-    for nombre, ruta in _archivos().items():
+    archivos = _archivos()
+    for nombre in sorted(archivos, key=lambda n: (n not in PRIMERAS, PRIMERAS.index(n) if n in PRIMERAS else 0, n)):
         try:
-            resultado[nombre] = esquema.desde_bytes(ruta.read_bytes())["nombre"]
+            datos = esquema.desde_bytes(archivos[nombre].read_bytes())
         except esquema.PlantillaInvalida:
             continue
+        resultado[nombre] = f"{datos['nombre']}: {datos['descripcion']}" if con_descripcion and datos["descripcion"] else datos["nombre"]
     return resultado
 
 

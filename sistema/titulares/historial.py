@@ -13,7 +13,7 @@ ETIQUETAS = {
     "motivo_baja": "Motivo de baja",
     "concepto": "Concepto",
     "importe_centavos": "Importe propio (centavos)",
-    "descuento_centesimas": "Descuento (centésimas de %)",
+    "descuento_centesimas": "Reducción del plan (centésimas de %)",
     "vigente_desde": "Vigente desde",
     "vigente_hasta": "Vigente hasta",
     "activo": "Activo",

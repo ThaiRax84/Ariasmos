@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.db.models import Max, Q, Sum
 
@@ -10,6 +10,9 @@ from . import libro
 from .models import Beca, Cargo, ConceptoCobro, PlanCobro, Prorroga
 
 MESES_POR_PERIODO = {"mensual": 1, "bimestral": 2, "trimestral": 3, "semestral": 6, "anual": 12}
+SEMANAL = "semanal"
+QUINCENAL = "quincenal"
+GENERADAS = tuple(MESES_POR_PERIODO) + (SEMANAL, QUINCENAL)
 
 
 def meses(desde, hasta, salto):
@@ -20,6 +23,31 @@ def meses(desde, hasta, salto):
         mes += 1
         if mes > 12:
             anio, mes = anio + 1, 1
+
+
+def _fin_de_mes(anio, mes):
+    return recargos.fecha_en_mes(anio, mes, 31)
+
+
+def periodos(concepto, desde, hoy, dia):
+    if concepto.periodicidad == SEMANAL:
+        dia_semana = concepto.dia_vencimiento if concepto.dia_vencimiento and 1 <= concepto.dia_vencimiento <= 7 else 1
+        lunes = desde - timedelta(days=desde.weekday())
+        while lunes <= hoy:
+            anio, semana, _ = lunes.isocalendar()
+            yield f"{anio:04d}-S{semana:02d}", lunes, lunes + timedelta(days=dia_semana - 1)
+            lunes += timedelta(days=7)
+        return
+    if concepto.periodicidad == QUINCENAL:
+        dia_primera = min(concepto.dia_vencimiento or dia, 15)
+        for anio, mes in meses(desde, hoy, 1):
+            primera = recargos.fecha_en_mes(anio, mes, dia_primera)
+            if date(anio, mes, 15) >= desde:
+                yield f"{anio:04d}-{mes:02d}-1", date(anio, mes, 1), primera
+            yield f"{anio:04d}-{mes:02d}-2", date(anio, mes, 16), primera + timedelta(days=15)
+        return
+    for anio, mes in meses(desde.replace(day=1), hoy, MESES_POR_PERIODO[concepto.periodicidad]):
+        yield f"{anio:04d}-{mes:02d}", recargos.fecha_en_mes(anio, mes, dia), recargos.fecha_en_mes(anio, mes, concepto.dia_vencimiento or dia)
 
 
 def beca_vigente(titular_id, concepto_id, fecha):
@@ -61,19 +89,16 @@ def _titulares_de(concepto):
 def generar_recurrentes(hoy=None, request=None):
     hoy = hoy or hoy_negocio()
     negocio = Negocio.actual()
-    inicio = (negocio.cobro_desde if negocio and negocio.cobro_desde else hoy).replace(day=1)
+    inicio = negocio.cobro_desde if negocio and negocio.cobro_desde else hoy
     dia = min(max(parametro("dia_generacion_cargos"), 1), 28)
     creados = 0
-    for concepto in ConceptoCobro.objects.filter(tipo=ConceptoCobro.RECURRENTE, activo=True, periodicidad__in=MESES_POR_PERIODO):
-        salto = MESES_POR_PERIODO[concepto.periodicidad]
+    for concepto in ConceptoCobro.objects.filter(tipo=ConceptoCobro.RECURRENTE, activo=True, periodicidad__in=GENERADAS):
         for titular in _titulares_de(concepto):
-            desde = max(inicio, (titular.activo_desde or hoy).replace(day=1))
+            desde = max(inicio, titular.activo_desde or hoy)
             hechos = set(Cargo.objects.filter(titular=titular, concepto=concepto, origen=Cargo.AUTOMATICO).values_list("periodo", flat=True))
-            for anio, mes in meses(desde, hoy, salto):
-                periodo = f"{anio:04d}-{mes:02d}"
+            for periodo, fecha, vencimiento in periodos(concepto, desde, hoy, dia):
                 if periodo in hechos:
                     continue
-                fecha = recargos.fecha_en_mes(anio, mes, dia)
                 if fecha > hoy:
                     continue
                 plan = plan_vigente(titular.pk, concepto.pk, fecha)
@@ -81,7 +106,6 @@ def generar_recurrentes(hoy=None, request=None):
                     continue
                 base = plan.importe_centavos if plan is not None and plan.importe_centavos is not None else concepto.importe_centavos
                 final, descuento, beca = importe_con_beca(titular.pk, concepto, base, fecha)
-                vencimiento = recargos.fecha_en_mes(anio, mes, concepto.dia_vencimiento or dia)
                 cargo = libro.crear_cargo(titular, concepto, base, vencimiento, Cargo.AUTOMATICO, periodo=periodo, descripcion=concepto.nombre, beca=beca, descuento=descuento, request=request)
                 if cargo is not None:
                     creados += 1

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Instalación lista · paso final (opcional)</span>
+    <h1>Trae a tus {{ voc.titulares_min }}</h1>
+    <p class="subtitulo">Si ya tienes tu lista en Excel o CSV, impórtala de una vez: el programa propone qué es cada columna, te muestra qué pasará con cada renglón y no guarda nada hasta que confirmes.</p>
+  </div>
+</div>
+<section class="panel">
+  <div class="acciones">
+    {% if puede_importar %}<a class="boton grande" href="{% url 'configuracion:padron_subir' %}">Importar desde Excel o CSV</a>{% endif %}
+    {% if puede_alta %}<a class="boton secundario" href="{% url 'titulares:nuevo' %}">Dar de alta uno por uno</a>{% endif %}
+    <a class="boton secundario" href="{% url 'inicio' %}">Ir al inicio</a>
+  </div>
+</section>
+{% if pendientes %}
+<section class="panel">
+  <h2>Lo que omitiste en la instalación</h2>
+  <p class="subtitulo">Nada de esto impide empezar a cobrar hoy. Complétalo cuando quieras.</p>
+  <ul class="lista-estado">{% for titulo, detalle, destino in pendientes %}<li><span class="renglon-texto"><span class="renglon-titulo">{{ titulo }}</span><span class="renglon-detalle">{{ detalle }}</span></span><a class="boton chico secundario" href="{% url destino %}">Completar</a></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

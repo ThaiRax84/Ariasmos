@@ -33,7 +33,7 @@ from .formularios import (
     FormularioUsuarioNuevo,
 )
 from .models import CodigoActivacion, CodigoUsado, Delegacion, Dispositivo, PermisoRol, Rol, Usuario
-from .permisos import PERMISOS
+from .permisos import PERMISOS, etiqueta
 
 MENSAJE_FALLO = "Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente."
 SEGUNDOS_PASO_CODIGO = 300
@@ -382,7 +382,7 @@ def usuario_editar(request, pk):
 @requiere_permiso("administrar_roles")
 def roles(request):
     lista = Rol.objects.prefetch_related("asignaciones").all()
-    filas = [(rol, [PERMISOS[a.permiso] for a in rol.asignaciones.all() if a.permiso in PERMISOS]) for rol in lista]
+    filas = [(rol, [etiqueta(a.permiso) for a in rol.asignaciones.all() if a.permiso in PERMISOS]) for rol in lista]
     return render(request, "cuentas/roles.html", {"filas": filas})
 
 

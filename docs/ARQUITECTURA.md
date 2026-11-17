@@ -886,9 +886,16 @@ Hoy se pueden elegir pero nunca generan cargos. Pasan a funcionar:
   7. Si todo el logo es neutro (blanco y negro), el principal es el neutro más oscuro ya ajustado y el acento es el de fábrica.
 - El cálculo no ejecuta nada del archivo: trabaja sobre los píxeles ya reconstruidos.
 
-### 22.8 Importar clientes desde Excel o CSV, a la vista
+### 22.8 Importar y actualizar clientes desde Excel o CSV, también desde los niveles bajos
 
-La importación del padrón desde Excel o CSV ya existe (§11). Pasa a ofrecerse donde hace falta: como paso opcional al final del asistente y como acción principal del padrón cuando está vacío.
+- La hoja sirve para **dar de alta** titulares nuevos y para **actualizar** los que ya existen. Un renglón actualiza a un titular solo si trae su matrícula; nunca se empareja por nombre.
+- Se puede actualizar: datos de contacto, agrupación, responsable y nombre. Nunca cambia desde la hoja: la matrícula, los saldos, los cargos, los pagos ni el estado de alta o baja.
+- **Dos permisos.** `importar_padron`: aplica la hoja directamente (el que hoy tiene la importación). `solicitar_importacion_padron` (nuevo; las plantillas lo dan al rol de operación): la hoja completa se vuelve **una sola solicitud** con su vista previa; quien aprueba ve cuántas altas y cuántos cambios trae y el detalle campo por campo, y la aprueba por cualquiera de las tres vías. Nadie aprueba la suya. Una aprobación para toda la hoja: sin cuello de botella.
+- Al aprobar se vuelve a comparar contra los datos del momento: un renglón cuyo dato «antes» ya no coincide se salta y se lista; lo demás se aplica en una sola transacción.
+- Las reglas que ya existen se respetan dentro del lote: el cambio de nombre sigue necesitando aprobación (la del lote la cubre), y cada cambio queda en la bitácora por titular, con quién lo pidió y quién lo aprobó.
+- La hoja es dato no confiable: mismas defensas de la importación actual (tamaño y renglones acotados, celdas como texto, nada se ejecuta); el archivo se guarda fuera de lo que se sirve y se borra al resolverse la solicitud.
+- La vista previa solo muestra los campos que el papel de quien sube puede ver.
+- Se ofrece como paso opcional al final del asistente, como acción principal del padrón cuando está vacío y como «Importar o actualizar desde una hoja» en el padrón para quien tenga cualquiera de los dos permisos. El archivo se elige con la ventana de Windows desde cualquier computadora.
 
 ### 22.9 Plantillas incluidas y tienda de plantillas
 

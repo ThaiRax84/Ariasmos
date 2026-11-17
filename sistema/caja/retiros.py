@@ -15,8 +15,6 @@ from . import piezas as control_piezas
 from .models import Caja, ComprobanteRetiro, MotivoRetiro, MovimientoPiezas, RetiroCaja, ReversionRetiro, Turno
 from .servicios import ErrorCaja, neto_de, recibe_movimientos, turno_abierto
 
-RECHAZOS_ANTES_DE_AUTORIZAR = 3
-AVISO_TOPE = 80
 MOTIVOS_TOPE = {
     "importe_individual": "pasa del importe máximo por retiro",
     "importe_periodo": "pasa del importe máximo del periodo",
@@ -72,7 +70,7 @@ def excede(turno, importe):
         motivos.append("importe_periodo")
     if usado["cantidad"] + 1 > limites["cantidad_periodo"]:
         motivos.append("cantidad_periodo")
-    if turno.rechazos_retiro >= RECHAZOS_ANTES_DE_AUTORIZAR:
+    if turno.rechazos_retiro >= max(1, int(parametro("rechazos_antes_de_autorizar"))):
         motivos.append("rechazos")
     return motivos
 
@@ -251,9 +249,10 @@ def avisos(quien_ve=None):
     propia = turno_abierto(quien_ve) if quien_ve is not None else None
     for caja in Caja.objects.filter(activa=True):
         usado = uso(caja)
-        if limites["importe_periodo"] and usado["importe"] * 100 >= limites["importe_periodo"] * AVISO_TOPE:
+        aviso_tope = min(100, max(1, int(parametro("porcentaje_aviso_tope"))))
+        if limites["importe_periodo"] and usado["importe"] * 100 >= limites["importe_periodo"] * aviso_tope:
             cerca.append({"caja": caja, "tope": "importe", "usado": usado["importe"], "limite": limites["importe_periodo"]})
-        if limites["cantidad_periodo"] and usado["cantidad"] * 100 >= limites["cantidad_periodo"] * AVISO_TOPE:
+        if limites["cantidad_periodo"] and usado["cantidad"] * 100 >= limites["cantidad_periodo"] * aviso_tope:
             cerca.append({"caja": caja, "tope": "cantidad", "usado": usado["cantidad"], "limite": limites["cantidad_periodo"]})
     sobre_maximo = []
     if limites["efectivo_maximo"]:

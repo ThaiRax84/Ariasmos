@@ -11,8 +11,8 @@ ACCIONES = [
     ("baja", "Baja"),
     ("reactivacion", "Reactivación"),
     ("correccion_nombre", "Corrección de nombre"),
-    ("cambio_familia", "Cambio de familia"),
-    ("beca", "Beca"),
+    ("cambio_familia", "Cambio de {familia_min}"),
+    ("beca", "{descuento}"),
     ("prorroga", "Prórroga"),
     ("cancelar_cargo", "Cancelación de cargo"),
     ("condonar_recargo", "Condonación de recargo"),
@@ -22,6 +22,7 @@ ACCIONES = [
     ("revertir_retiro", "Reversión de retiro de caja"),
     ("conteo_inventario", "Conteo de inventario"),
     ("devolucion_efectivo", "Devolución de artículos en efectivo"),
+    ("importacion_padron", "Importación o actualización desde una hoja"),
 ]
 
 
@@ -39,7 +40,13 @@ class PoliticaAccion(models.Model):
         ordering = ["accion"]
 
     def __str__(self):
-        return self.get_accion_display()
+        return self.nombre_accion
+
+    @property
+    def nombre_accion(self):
+        from configuracion.models import con_vocabulario
+
+        return con_vocabulario(self.get_accion_display())
 
 
 class Solicitud(models.Model):
@@ -71,8 +78,14 @@ class Solicitud(models.Model):
 
     def __str__(self):
         if self.titular_id is None:
-            return self.get_accion_display()
-        return f"{self.get_accion_display()} · {self.titular}"
+            return self.nombre_accion
+        return f"{self.nombre_accion} · {self.titular}"
+
+    @property
+    def nombre_accion(self):
+        from configuracion.models import con_vocabulario
+
+        return con_vocabulario(self.get_accion_display())
 
     def politica(self):
         return PoliticaAccion.objects.get(accion=self.accion)

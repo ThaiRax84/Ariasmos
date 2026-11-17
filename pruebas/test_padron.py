@@ -14,7 +14,7 @@ from solicitudes.models import Solicitud
 from titulares.models import Familia, LotePadron, Titular
 
 from .banco_ayudas import cuenta_principal
-from .conftest import cliente
+from .conftest import cliente, nuevo_usuario
 from .libro_ayudas import preparar_conceptos, titular_activo, verificar_sumas
 
 ENCABEZADO = ["Alumno", "Grupo", "Tutor", "Celular", "Correo", "Colegiatura", "Libros"]
@@ -143,7 +143,11 @@ def test_reversion_del_saldo_inicial_solo_por_flujos_normales(base):
 
 def test_padron_exige_permiso_y_reingreso(base):
     personas, _ = base
-    assert cliente(personas["sup"]).get(reverse("configuracion:padron_subir")).status_code == 403
+    from cuentas.models import Rol
+
+    sin_permiso = nuevo_usuario("sin_hoja", Rol.objects.create(nombre="Solo consulta"))
+    assert cliente(sin_permiso).get(reverse("configuracion:padron_subir")).status_code == 403
+    assert cliente(personas["sup"]).get(reverse("configuracion:padron_subir")).status_code == 200
     sin_reingreso = cliente(personas["dir"], reingreso=False).get(reverse("configuracion:padron_subir"))
     assert sin_reingreso.status_code == 302 and "confirmar" in sin_reingreso.url
 

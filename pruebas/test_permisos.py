@@ -21,9 +21,12 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {
+    "entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:marca",
+    "asistente:vista_marca", "asistente:logo", "asistente:pago", "asistente:caja", "asistente:reglas", "asistente:cortes", "asistente:usuario", "asistente:codigo",
+}
 
-SOLO_SESION = {"inicio", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
+SOLO_SESION = {"inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -37,8 +40,8 @@ MATRIZ = {
     "titulares:baja": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:reactivar": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:solicitar_alta": ("solicitar_alta_baja", "alta_baja_directa"),
-    "solicitudes:bandeja": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes"),
-    "solicitudes:detalle": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes"),
+    "solicitudes:bandeja": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes", "solicitar_importacion_padron"),
+    "solicitudes:detalle": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes", "solicitar_importacion_padron"),
     "solicitudes:aprobar": ("aprobar_solicitudes",),
     "solicitudes:rechazar": ("aprobar_solicitudes",),
     "solicitudes:codigo": ("solicitar_alta_baja",),
@@ -121,6 +124,7 @@ MATRIZ = {
     "caja:motivo_nuevo": ("administrar_motivos_retiro",),
     "caja:motivo_editar": ("administrar_motivos_retiro",),
     "configuracion:caja": ("administrar_configuracion",),
+    "configuracion:reglas": ("administrar_configuracion",),
     "configuracion:carpeta_banco": ("administrar_configuracion",),
     "conciliacion:liberar": ("conciliar_banco",),
     "auditoria:lista": ("ver_auditoria",),
@@ -154,11 +158,11 @@ MATRIZ = {
     "respaldos:probar": ("administrar_respaldos",),
     "respaldos:clave": ("administrar_respaldos",),
     "respaldos:clave_nueva": ("administrar_respaldos",),
-    "configuracion:padron_subir": ("administrar_configuracion",),
-    "configuracion:padron_revisar": ("administrar_configuracion",),
-    "configuracion:padron_lote": ("administrar_configuracion",),
-    "configuracion:padron_matriculas": ("administrar_configuracion",),
-    "configuracion:padron_fichas": ("administrar_configuracion",),
+    "configuracion:padron_subir": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_revisar": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_lote": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_matriculas": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_fichas": ("importar_padron", "solicitar_importacion_padron"),
     "configuracion:inventario": ("administrar_configuracion",),
     "inventario:indice": ("vender_articulos", "registrar_movimientos_inventario", "subir_conteo_inventario", "devolver_articulos", "revisar_inventario", "administrar_articulos"),
     "inventario:articulos": ("administrar_articulos",),

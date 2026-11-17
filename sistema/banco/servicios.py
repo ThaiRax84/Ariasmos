@@ -9,8 +9,9 @@ def foto_cuenta(cuenta):
     if cuenta is None or cuenta.pk is None:
         return {}
     return {
-        "Banco": str(cuenta.banco),
-        "CLABE": cuenta.clabe_formateada,
+        "Tipo": cuenta.get_tipo_display(),
+        "Banco": cuenta.nombre_banco,
+        "CLABE": cuenta.clabe_formateada or None,
         "Beneficiario": cuenta.beneficiario,
         "Número de cuenta": cuenta.numero_cuenta or None,
         "Convenio": cuenta.convenio or None,
@@ -27,7 +28,7 @@ def guardar_cuenta(formulario, usuario, cuenta=None, request=None, forzar_princi
     datos = formulario.cleaned_data
     with transaction.atomic():
         antes = foto_cuenta(cuenta)
-        banco = datos["banco"]
+        banco = datos.get("banco")
         if formulario.banco_nuevo is not None:
             banco, creado = Banco.objects.get_or_create(
                 clave=formulario.banco_nuevo["clave"],
@@ -48,8 +49,10 @@ def guardar_cuenta(formulario, usuario, cuenta=None, request=None, forzar_princi
                 registrar("cuenta_bancaria_cambiada", usuario=usuario, objeto=otra, datos={"cambios": {"Principal": [True, False]}}, request=request)
         nueva = cuenta is None
         cuenta = cuenta or CuentaBancaria()
-        cuenta.banco = banco
-        cuenta.clabe = datos["clabe"]
+        cuenta.tipo = datos.get("tipo", CuentaBancaria.CLABE)
+        cuenta.banco = banco if cuenta.tipo == CuentaBancaria.CLABE else None
+        cuenta.banco_nombre = "" if cuenta.tipo == CuentaBancaria.CLABE else datos.get("banco_otro", "").strip()
+        cuenta.clabe = datos.get("clabe", "") if cuenta.tipo == CuentaBancaria.CLABE else ""
         cuenta.beneficiario = datos["beneficiario"].strip()
         cuenta.numero_cuenta = datos.get("numero_cuenta", "")
         cuenta.convenio = datos.get("convenio", "")

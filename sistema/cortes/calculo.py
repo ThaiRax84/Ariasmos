@@ -12,13 +12,47 @@ from caja.servicios import custodia, devoluciones_articulos
 from cobros import libro
 from cobros.models import Aplicacion, Beca, CancelacionCargo, Cargo, ConceptoCobro, Pago, Prorroga, ReversionPago
 from configuracion import moneda
-from configuracion.models import Negocio, hoy_negocio
+from configuracion.models import Negocio, hoy_negocio, parametro, vocabulario
 from cuentas.models import Usuario
-from nucleo import telefono
 from titulares import contactos
 from titulares.models import CampoContacto, Titular
 
-TRAMOS = (("1_30", 1, 30), ("31_60", 31, 60), ("61_90", 61, 90), ("mas_90", 91, None))
+TRAMOS_FABRICA = (30, 60, 90)
+MAXIMO_TRAMOS = 8
+
+
+def limites_tramos(texto):
+    try:
+        dias = sorted({int(parte) for parte in str(texto).split(",") if parte.strip()})
+    except ValueError:
+        return None
+    if not dias or len(dias) > MAXIMO_TRAMOS or dias[0] < 1 or dias[-1] > 3650:
+        return None
+    return dias
+
+
+def tramos():
+    dias = limites_tramos(parametro("tramos_cartera")) or list(TRAMOS_FABRICA)
+    resultado = []
+    inicio = 1
+    for limite in dias:
+        resultado.append((f"{inicio}_{limite}", inicio, limite))
+        inicio = limite + 1
+    resultado.append((f"mas_{dias[-1]}", inicio, None))
+    return resultado
+
+
+def nombre_tramo(clave):
+    if clave.startswith("mas_"):
+        return f"Más de {clave[4:]} días"
+    inicio, _, fin = clave.partition("_")
+    return f"{inicio} a {fin} días"
+
+
+def nombre_corte(tipo):
+    from .models import nombre_de_tipo
+
+    return nombre_de_tipo(tipo)
 
 
 def zona():
@@ -109,7 +143,7 @@ def cifras_diario(turno, arqueo):
     retirado = sum(r["importe"] for r in retiros)
     regresado = sum(r["importe"] for r in regresos)
     devuelto_articulos = sum(d["importe"] for d in articulos)
-    datos = base("diario", "Corte diario de caja", local(turno.abierto_en).date(), local(hasta).date())
+    datos = base("diario", nombre_corte("diario"), local(turno.abierto_en).date(), local(hasta).date())
     datos["encabezado"] = {
         "caja": turno.caja.nombre,
         "persona": persona(turno.usuario),
@@ -207,10 +241,12 @@ def cifras_mayor(inicio, fin, al_dia=None):
         fila["becas"] = becas.get(persona_titular.pk, [])
         fila["prorrogas"] = prorrogas.get(persona_titular.pk, [])
         filas_titular.append(fila)
-    cartera = {clave: 0 for clave, _, _ in TRAMOS}
+    voc = vocabulario()
+    tramos_cartera = tramos()
+    cartera = {clave: 0 for clave, _, _ in tramos_cartera}
     for cargo in libro.con_saldo(Cargo.objects.filter(vencimiento__lt=al_dia, titular__interno=False)).filter(saldo__gt=0):
         dias = (al_dia - cargo.vencimiento).days
-        for clave, minimo, maximo in TRAMOS:
+        for clave, minimo, maximo in tramos_cartera:
             if dias >= minimo and (maximo is None or dias <= maximo):
                 cartera[clave] += cargo.saldo
     altas = [{"titular": titular(t), "desde": t.activo_desde.isoformat()} for t in Titular.objects.filter(activo_desde__gte=inicio, activo_desde__lte=fin).select_related("familia")]
@@ -273,7 +309,7 @@ def cifras_mayor(inicio, fin, al_dia=None):
         }
         for c in CancelacionCargo.objects.filter(creada__gte=desde, creada__lt=hasta).select_related("cargo__titular__familia", "cargo__concepto", "ejecutada_por", "autorizada_por")
     ]
-    datos = base("mayor", "Corte mayor", inicio, fin)
+    datos = base("mayor", nombre_corte("mayor"), inicio, fin)
     datos["encabezado"] = {"periodo": f"{inicio:%d/%m/%Y} a {fin:%d/%m/%Y}", "al_dia": al_dia.isoformat()}
     datos["totales"] = {
         "ingresos": sum(f["importe"] for f in por_medio),
@@ -295,8 +331,8 @@ def cifras_mayor(inicio, fin, al_dia=None):
     datos["secciones"] = [
         seccion("ingresos_por_medio", "Ingresos por medio de pago", por_medio),
         seccion("ingresos_por_concepto", "Ingresos, esperado y cobrado por concepto", filas_concepto),
-        seccion("titulares", "Estado por titular y concepto", filas_titular),
-        seccion("cartera_vencida", "Cartera vencida por antigüedad", [{"tramo": clave.replace("_", " a ").replace("mas a 90", "más de 90") + " días", "importe": cartera[clave]} for clave, _, _ in TRAMOS]),
+        seccion("titulares", f"Estado por {voc['titular_min']} y concepto", filas_titular),
+        seccion("cartera_vencida", "Cartera vencida por antigüedad", [{"tramo": nombre_tramo(clave), "importe": cartera[clave]} for clave, _, _ in tramos_cartera]),
         seccion("altas", "Altas", altas),
         seccion("bajas", "Bajas", bajas),
         seccion("diferencias_arqueo", "Diferencias de arqueo", arqueos),
@@ -377,12 +413,11 @@ def contacto_principal(objeto):
     contacto = contactos.principal(objeto)
     if contacto is None:
         return {"nombre": "", "relacion": "", "telefono": "", "correo": ""}
-    prefijo = contactos.prefijo()
     telefono_texto = correo = ""
     for campo in CampoContacto.objects.filter(activo=True).order_by("-principal", "orden"):
         valor = contacto.valor(campo)
         if campo.tipo == CampoContacto.TELEFONO and valor and not telefono_texto:
-            telefono_texto = telefono.formatear(valor, prefijo)
+            telefono_texto = contactos.formatear_telefono(valor)
         if campo.tipo == CampoContacto.CORREO and valor and not correo:
             correo = valor
     return {"nombre": contacto.nombre, "relacion": str(contacto.relacion or ""), "telefono": telefono_texto, "correo": correo}
@@ -409,14 +444,14 @@ def cifras_cobranza(fecha):
                 "contacto": contactos_cache[cargo.titular_id],
             }
         )
-    datos = base("cobranza", "Lista de cobranza", fecha, fecha)
+    datos = base("cobranza", nombre_corte("cobranza"), fecha, fecha)
     pago = datos_de_pago()
     if pago:
         cuenta = pago["cuenta"]
         datos["encabezado"] = {
             "fecha": fecha.isoformat(),
-            "banco": str(cuenta.banco or ""),
-            "clabe": cuenta.clabe_formateada,
+            "banco": cuenta.nombre_banco,
+            "clabe": cuenta.numero_formateado,
             "beneficiario": cuenta.beneficiario,
             "medios": ", ".join(str(m) for m in pago["medios"]),
             "donde_va_la_matricula": pago["lugar"],

@@ -36,7 +36,7 @@ def test_plantillas_incluidas_cumplen_el_esquema(nombre):
 def test_generico_sirve_tal_cual():
     datos = esquema.validar(base())
     nombres = {c["nombre"]: c for c in datos["conceptos"]}
-    assert set(nombres) == {"Alta o inscripción", "Mensualidad", "Producto o servicio", "Otro cargo"}
+    assert set(nombres) == {"Alta", "Mensualidad", "Producto o servicio", "Otro cargo"}
     assert nombres["Mensualidad"]["tipo"] == "recurrente" and nombres["Mensualidad"]["recargo"]
     assert not any(c["obligatorio"] for c in datos["campos_contacto"])
 

@@ -52,10 +52,11 @@ def test_limite_en_dia_con_corte_y_en_dia_sin_corte():
 
 
 @pytest.mark.django_db
-def test_parametro_vacio_o_danado_usa_todos_los_dias_a_las_18():
-    assert calendario.actual() == calendario.todos_los_dias("18:00")
+def test_parametro_vacio_o_danado_usa_el_calendario_de_fabrica_unico():
+    de_fabrica = {str(dia): "18:00" for dia in range(6)}
+    assert calendario.actual() == calendario.PROPUESTO == de_fabrica
     Parametro.objects.create(clave="calendario_corte", valor="no es json")
-    assert calendario.actual() == calendario.todos_los_dias("18:00")
+    assert calendario.actual() == de_fabrica
 
 
 @pytest.mark.django_db

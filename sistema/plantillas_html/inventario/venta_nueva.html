@@ -5,8 +5,8 @@
 <div class="encabezado">
   <div class="encabezado-texto"><span class="antetitulo">Inventario · Vender</span>
   {% if publico %}
-    <h1>Público en general</h1>
-    <p class="subtitulo">Venta sin {{ voc.matricula|lower }}: se cobra completa en efectivo en este momento y nunca queda con adeudo.</p>
+    <h1>{{ voc.publico }}</h1>
+    <p class="subtitulo">Venta sin {{ voc.matricula_min }}: se cobra completa en efectivo en este momento y nunca queda con adeudo.</p>
   {% else %}
     <h1>{{ titular.nombre_completo }}</h1>
     <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %}</p>
@@ -14,7 +14,7 @@
   </div>
   <div class="encabezado-lado">{% include "inventario/_a_quien.html" %}</div>
 </div>
-{% if publico and not turno %}<p class="mensaje warning">Abre tu turno de caja para vender sin {{ voc.matricula|lower }}. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>{% endif %}
+{% if publico and not turno %}<p class="mensaje warning">Abre tu turno de caja para vender sin {{ voc.matricula_min }}. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>{% endif %}
 {% if total %}
 <div class="columnas principal">
   <section class="panel">

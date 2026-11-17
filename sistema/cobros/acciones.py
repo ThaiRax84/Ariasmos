@@ -3,7 +3,7 @@ from datetime import date
 from django.db.models import Max, Q
 
 from caja.servicios import turno_abierto
-from configuracion.models import parametro
+from configuracion.models import parametro, vocabulario
 from configuracion.moneda import formatear
 
 from . import libro
@@ -63,24 +63,25 @@ class OtorgarBeca(AccionLibro):
         return {"datos__concepto": datos.get("concepto")}
 
     def validar(self, titular, datos):
+        nombre = vocabulario()["descuento"]
         if set(datos) - {"concepto", "puntos_base", "desde", "hasta", "motivo"}:
-            raise ErrorAccion("La beca solo admite porcentaje.")
+            raise ErrorAccion(f"{nombre}: solo admite porcentaje.")
         concepto = ConceptoCobro.objects.filter(pk=datos.get("concepto"), tipo=ConceptoCobro.RECURRENTE, activo=True).first()
         if concepto is None:
-            raise ErrorAccion("La beca aplica a un concepto recurrente activo.")
+            raise ErrorAccion(f"{nombre}: aplica a un concepto recurrente activo.")
         puntos = _entero(datos.get("puntos_base"), "El porcentaje")
         if not 1 <= puntos <= 10000:
-            raise ErrorAccion("El porcentaje de beca va de 0.01 % a 100 %.")
+            raise ErrorAccion(f"{nombre}: el porcentaje va de 0.01 % a 100 %.")
         desde = _fecha(datos.get("desde"), "vigente desde")
         hasta = _fecha(datos.get("hasta"), "vigente hasta")
         if desde is None or (hasta is not None and hasta < desde):
-            raise ErrorAccion("Revisa la vigencia de la beca.")
+            raise ErrorAccion(f"{nombre}: revisa la vigencia.")
         _motivo(datos)
         cruce = Beca.objects.filter(titular=titular, concepto=concepto).filter(Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=desde))
         if hasta is not None:
             cruce = cruce.filter(vigente_desde__lte=hasta)
         if cruce.exists():
-            raise ErrorAccion("Ya hay una beca vigente para ese concepto en esas fechas.")
+            raise ErrorAccion(f"{nombre}: ya hay una vigente para ese concepto en esas fechas.")
         return concepto
 
     def aplicar(self, titular, datos, contexto):

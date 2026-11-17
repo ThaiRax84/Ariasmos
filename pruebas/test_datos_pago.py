@@ -119,7 +119,7 @@ def test_cargar_bancos_idempotente(db):
     call_command("cargar_bancos")
     assert Banco.objects.count() == total
     assert Banco.objects.get(clave="002").nombre == "BANAMEX"
-    assert MedioPago.objects.filter(nombre="Transferencia SPEI").exists()
+    assert not MedioPago.objects.exists()
 
 
 def test_ajustes_avanzados_bloqueados_tras_primera_matricula(personas):

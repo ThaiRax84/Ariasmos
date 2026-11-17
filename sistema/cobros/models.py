@@ -55,7 +55,7 @@ class ConceptoCobro(models.Model):
     TODOS = "todos"
     AGRUPACION = "agrupacion"
     MANUAL = "manual"
-    APLICA = [(NUEVOS, "Titulares nuevos"), (TODOS, "Todos los activos"), (AGRUPACION, "Una agrupación"), (MANUAL, "Manual")]
+    APLICA = [(NUEVOS, "{titulares} nuevos"), (TODOS, "Todos los activos"), (AGRUPACION, "{agrupacion}"), (MANUAL, "Manual")]
 
     nombre = models.CharField(max_length=100, unique=True)
     tipo = models.CharField(max_length=12, choices=TIPOS)
@@ -202,7 +202,7 @@ class Cargo(Asiento):
 
     titular = models.ForeignKey("titulares.Titular", on_delete=models.PROTECT, related_name="cargos")
     concepto = models.ForeignKey(ConceptoCobro, on_delete=models.PROTECT, related_name="cargos")
-    periodo = models.CharField(max_length=7, blank=True)
+    periodo = models.CharField(max_length=10, blank=True)
     descripcion = models.CharField(max_length=200, blank=True)
     cantidad = models.PositiveIntegerField(default=1)
     importe_original = models.PositiveBigIntegerField()

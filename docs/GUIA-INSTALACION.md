@@ -55,16 +55,20 @@ Sin `/PUERTO` se usa el que ya tenía la computadora o el propuesto. Una computa
 
 ## 3. Asistente de primer uso
 
-La primera vez que abres Ariasmos en la computadora principal aparece el asistente. Te lleva paso a paso:
+La primera vez que abres Ariasmos en la computadora principal aparece el asistente. Tiene diez pasos y un paso final opcional. Los pasos marcados como opcionales se pueden omitir y completar después desde *Configuración*; los valores de fábrica sirven para empezar a trabajar el mismo día.
 
-1. **Datos del negocio**: pega el token, escribe el nombre, elige la zona horaria, la moneda y la plantilla («escuela» o «genérico»), y marca si el negocio lleva **inventario** de artículos (se puede cambiar después en *Configuración → Inventario*).
-2. **Vocabulario y conceptos**: cómo se llaman las personas a las que se cobra y qué conceptos se cobran. Se puede dejar como viene.
-3. **Importes** de cada concepto y, si aplica, el recargo por pago tardío.
-4. **Datos de pago**: la cuenta bancaria (CLABE y beneficiario) que aparece en las fichas de pago. Se puede completar después.
-5. **Caja: cortes y retiros**: qué días de la semana hay corte de caja y la hora límite de cada uno (propone lunes a sábado a las 18:00; deja vacío el día que no tenga corte), si se capturan las piezas de cada billete y moneda, y los topes de los retiros de caja (importe máximo por retiro, importe y número máximo de retiros por día o por semana y efectivo máximo en caja). Lo que pase de un tope necesita la autorización de otra persona.
-6. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** con el tope por pago y los topes del banco (ver abajo). Si esta copia del programa trae llaves de actualización, también puedes activar aquí las **actualizaciones del programa** (sección 7). Aquí aparece la **clave de recuperación** (ver abajo).
-7. **Primer usuario de Dirección**: tu usuario y contraseña.
-8. **Autenticador**: instala en tu teléfono una aplicación gratuita como Google Authenticator, Microsoft Authenticator, Authy o 2FAS, escanea el código QR y escribe el código de 6 dígitos.
+1. **Datos del negocio**: pega el token, escribe el nombre, elige la zona horaria, la moneda y la plantilla, y marca si el negocio lleva **inventario** de artículos (se puede cambiar después en *Configuración → Inventario*). Plantillas incluidas: **genérica** (sirve tal cual a la mayoría), **escuela**, **gimnasio o club**, **academia o talleres**, **rentas** y **servicios con cuota**; cada una trae su vocabulario, conceptos y periodicidades (mensual, quincenal o semanal), sin importes. También puedes importar un archivo de plantilla.
+2. **Vocabulario y conceptos**: cómo se llaman las personas a las que se cobra, su número, la lista de todos ellos, el descuento autorizado y la venta sin registro, y qué conceptos se cobran. Se puede dejar como viene.
+3. **Importes** de cada concepto y, si aplica, el recargo por pago tardío. En los conceptos semanales el día de vencimiento es el día de la semana (1 lunes a 7 domingo); en los quincenales, el día de la primera quincena (1 a 15).
+4. **Marca** (opcional): sube el logo y el programa te propone los dos colores tomados de él, con una vista previa. Acéptalos, escribe otros u omite el paso.
+5. **Datos de pago** (opcional): la cuenta del negocio que aparece en las fichas de pago: CLABE de 18 dígitos u **otra cuenta** (número y banco escritos) si no tienes CLABE.
+6. **Caja: cortes y retiros**: qué días de la semana hay corte de caja y la hora límite de cada uno (propone lunes a sábado a las 18:00; deja vacío el día que no tenga corte), si se capturan las piezas de cada billete y moneda, y los topes de los retiros de caja (importe máximo por retiro, importe y número máximo de retiros por día o por semana y efectivo máximo en caja). Lo que pase de un tope necesita la autorización de otra persona. Si elegiste una moneda distinta a la de la plantilla, aquí escribes sus billetes y monedas.
+7. **Reglas del negocio** (opcional): prefijo de país y dígitos del teléfono, tamaño de hoja de los PDF (Carta o A4), si se piden apellidos y si se pide la constancia de consentimiento de datos con su texto.
+8. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** con el tope por pago y los topes del banco (ver abajo). Si esta copia del programa trae llaves de actualización, también puedes activar aquí las **actualizaciones del programa** (sección 7). Aquí aparece la **clave de recuperación** (ver abajo).
+9. **Primer usuario**: tu usuario y contraseña; recibe el rol principal de la plantilla.
+10. **Autenticador**: instala en tu teléfono una aplicación gratuita como Google Authenticator, Microsoft Authenticator, Authy o 2FAS, escanea el código QR y escribe el código de 6 dígitos.
+
+**Paso final (opcional): tus clientes.** Al terminar, el programa ofrece importar tu lista de clientes desde Excel o CSV (propone las columnas y no guarda nada hasta que confirmas) o darlos de alta uno por uno, y lista lo que omitiste en la instalación con un botón para completarlo.
 
 ### Carpeta vigilada del banco
 

@@ -2,14 +2,15 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <span class="antetitulo">Configuración</span>
-    <h1>Importar el padrón inicial</h1>
-    <p class="subtitulo">Sube el padrón que ya tienes en Excel o CSV. No hace falta un formato fijo: propondremos qué es cada columna y no se guarda nada hasta que confirmes.</p>
+    <span class="antetitulo">{{ voc.padron }}</span>
+    <h1>Importar o actualizar desde una hoja</h1>
+    <p class="subtitulo">Sube tu lista en Excel o CSV. Los renglones sin {{ voc.matricula_min }} se dan de alta; los que traen {{ voc.matricula_min }} actualizan a ese registro (contacto, {{ voc.agrupacion_min }}, responsable y nombre). Nunca cambian desde la hoja {{ voc.matricula_min }}, los saldos ni el estado. No hace falta un formato fijo: propondremos qué es cada columna y no se guarda nada hasta que confirmes.</p>
+    {% if not directo %}<p class="subtitulo">Al confirmar, la hoja completa se vuelve una sola solicitud que aprueba {{ roles.aprobar_solicitudes }}.</p>{% endif %}
   </div>
 </div>
 <form method="post" enctype="multipart/form-data" class="formulario" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Revisar archivo</button></div>
+  <div class="acciones"><button class="boton grande" type="submit">Revisar archivo</button><a class="boton secundario" href="{% url 'titulares:lista' %}">Cancelar</a></div>
 </form>
 {% endblock %}

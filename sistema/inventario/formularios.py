@@ -86,7 +86,7 @@ class FormularioBuscarVenta(forms.Form):
 
 
 class FormularioDevolucion(forms.Form):
-    medio = forms.ChoiceField(label="¿Cómo regresa lo ya pagado?", choices=[(Devolucion.SALDO, "Saldo a favor (al momento; Supervisión lo revisa)"), (Devolucion.EFECTIVO, "Efectivo (se solicita y lo autoriza otra persona)")], widget=forms.RadioSelect, initial=Devolucion.SALDO)
+    medio = forms.ChoiceField(label="¿Cómo regresa lo ya pagado?", choices=[(Devolucion.SALDO, "Saldo a favor (al momento; se revisa después)"), (Devolucion.EFECTIVO, "Efectivo (se solicita y lo autoriza otra persona)")], widget=forms.RadioSelect, initial=Devolucion.SALDO)
     motivo = forms.CharField(label="Motivo de la devolución", max_length=300)
 
     def __init__(self, *args, renglones=(), disponibles=None, publico=False, **kwargs):
@@ -180,5 +180,5 @@ class FormularioConfiguracion(forms.Form):
     modulo_inventario = forms.BooleanField(label="Llevar inventario de artículos", required=False)
     devoluciones_inventario = forms.BooleanField(label="Aceptar devoluciones de artículos vendidos", required=False)
     dias_devolucion = forms.IntegerField(label="Días después de la venta en que se acepta una devolución", min_value=0, max_value=365)
-    dias_conteo_sin_aprobar = forms.IntegerField(label="Días que un conteo puede esperar aprobación antes de avisar a Dirección", min_value=1, max_value=60)
+    dias_conteo_sin_aprobar = forms.IntegerField(label="Días que un conteo puede esperar aprobación antes de avisar", min_value=1, max_value=60)
     porcentaje_existencia_baja = forms.IntegerField(label="Porcentaje de existencia baja: se marca «pocas» cuando quedan este porcentaje o menos de lo que había tras la última entrada o conteo", min_value=1, max_value=99, required=False)

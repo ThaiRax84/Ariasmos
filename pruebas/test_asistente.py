@@ -52,24 +52,27 @@ def test_asistente_completo_deja_instalacion_usable():
     colegiatura = ConceptoCobro.objects.get(tipo="recurrente")
     datos = {f"importe_{c_.pk}": "100" for c_ in ConceptoCobro.objects.all()}
     datos.update({f"importe_{colegiatura.pk}": "1500.50", f"dia_{colegiatura.pk}": 10, f"recargo_tipo_{colegiatura.pk}": "porcentaje", f"recargo_porcentaje_{colegiatura.pk}": "10", f"recargo_gracia_{colegiatura.pk}": 3})
-    assert c.post(reverse("asistente:conceptos"), datos).url == reverse("asistente:pago")
+    assert c.post(reverse("asistente:conceptos"), datos).url == reverse("asistente:marca")
+    assert "paso 4 de 10" in c.get(reverse("asistente:marca")).content.decode()
+    assert c.post(reverse("asistente:marca"), {"omitir": "1"}).url == reverse("asistente:pago")
     colegiatura.refresh_from_db()
     assert colegiatura.importe_centavos == 150050 and colegiatura.dia_vencimiento == 10 and colegiatura.regla_recargo.valor == 1000
     respuesta = c.post(reverse("asistente:pago"), {"clabe": "002 010 07777777777 1", "beneficiario": "Mi negocio SA", "medios": [], "referencia_en": "ambos", "contacto_dudas": "55 1234 5678"})
     assert respuesta.url == reverse("asistente:caja")
     pagina_caja = c.get(reverse("asistente:caja")).content.decode()
-    assert "paso 5 de 8" in pagina_caja and 'name="corte_0" value="18:00"' in pagina_caja and 'name="corte_6"' in pagina_caja and 'name="corte_6" value=' not in pagina_caja
+    assert "paso 6 de 10" in pagina_caja and 'name="corte_0" value="18:00"' in pagina_caja and 'name="corte_6"' in pagina_caja and 'name="corte_6" value=' not in pagina_caja
     caja = {f"corte_{dia}": "18:00" for dia in range(6)}
     caja.update({"corte_5": "14:00", "periodo_retiros": "semana", "tope_retiro_individual": "500", "tope_retiros_periodo": "2,000", "maximo_retiros_periodo": "5", "maximo_efectivo_caja": "0", "dias_retiro_sin_revisar": "3", "control_denominaciones": "on"})
-    assert c.post(reverse("asistente:caja"), caja).url == reverse("asistente:cortes")
+    assert c.post(reverse("asistente:caja"), caja).url == reverse("asistente:reglas")
+    assert c.post(reverse("asistente:reglas"), {"omitir": "1"}).url == reverse("asistente:cortes")
     assert calendario.actual() == {"0": "18:00", "1": "18:00", "2": "18:00", "3": "18:00", "4": "18:00", "5": "14:00"}
     assert (parametro("tope_retiro_individual"), parametro("tope_retiros_periodo"), parametro("maximo_retiros_periodo"), parametro("control_denominaciones"), parametro("periodo_retiros")) == (50000, 200000, 5, 1, "semana")
-    assert "paso 6 de 8" in c.get(reverse("asistente:cortes")).content.decode()
+    assert "paso 8 de 10" in c.get(reverse("asistente:cortes")).content.decode()
     assert "Clave de recuperación" in c.get(reverse("asistente:cortes")).content.decode()
     assert c.post(reverse("asistente:cortes"), {"omitir": "1"}).url == reverse("asistente:usuario")
     cuenta = CuentaBancaria.objects.get()
     assert cuenta.principal and cuenta.clabe == CLABE_PRUEBA and cuenta.banco.clave == "002"
-    assert terminar(c).url == reverse("inicio")
+    assert terminar(c).url == reverse("primeros_pasos")
     negocio.refresh_from_db()
     assert negocio.configurado
     jefa = Usuario.objects.get(usuario="jefa")
@@ -87,7 +90,7 @@ def test_pago_omitido_avisa_en_inicio():
     c = Client()
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
     assert c.get(reverse("asistente:pago")).status_code == 200
-    assert terminar(c).url == reverse("inicio")
+    assert terminar(c).url == reverse("primeros_pasos")
     assert not CuentaBancaria.objects.exists()
     assert "Faltan los datos de pago" in c.get(reverse("inicio")).content.decode()
 
@@ -126,5 +129,5 @@ def test_importar_plantilla_de_punta_a_punta():
     membresia = ConceptoCobro.objects.get(nombre="Membresía")
     pagina = c.get(reverse("asistente:conceptos")).content.decode()
     assert f'name="recargo_importe_{membresia.pk}"' in pagina
-    assert terminar(c).url == reverse("inicio")
+    assert terminar(c).url == reverse("primeros_pasos")
     assert Negocio.objects.get().configurado

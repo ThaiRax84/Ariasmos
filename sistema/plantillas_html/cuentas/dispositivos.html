@@ -9,7 +9,7 @@
 <h2>Pendientes de aprobación</h2>
 {% if pendientes %}
 <table class="tabla">
-<thead><tr><th>Código</th><th>Programa</th><th>Dirección</th><th>Desde</th><th>Aprobar como</th></tr></thead>
+<thead><tr><th>Código</th><th>Programa</th><th>IP</th><th>Desde</th><th>Aprobar como</th></tr></thead>
 <tbody>
 {% for d in pendientes %}
 <tr><td class="codigo-equipo chico">{{ d.codigo }}</td><td><small>{{ d.agente|truncatechars:60 }}</small></td><td>{{ d.ip }}</td><td>{{ d.creado|date:"d/m/Y H:i" }}</td>

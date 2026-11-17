@@ -11,7 +11,6 @@ from django.db.models import F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 from auditoria.models import Evento
@@ -21,7 +20,9 @@ from caja import piezas as control_piezas
 from caja.formularios import FormularioPiezasCobro
 from caja.models import Turno
 from caja.servicios import recibe_movimientos, turno_abierto
+from configuracion import hoja as tamano_hoja
 from configuracion.models import hoy_negocio, parametro, vocabulario
+from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from configuracion.moneda import formatear
 from nucleo.matricula import normalizar
@@ -300,8 +301,9 @@ def recibo_pdf(request, pk):
     marca_actual, *colores = _colores_recibo()
     tinta, suave, acento, tinte, borde = (HexColor(c) for c in colores)
     memoria = BytesIO()
-    hoja = canvas.Canvas(memoria, pagesize=letter)
-    ancho, alto = letter
+    tamano = tamano_hoja.tamano()
+    hoja = canvas.Canvas(memoria, pagesize=tamano)
+    ancho, alto = tamano
     izquierda, derecha = 90, ancho - 90
     y = alto - 80
     negocio = getattr(request, "negocio", None)
@@ -431,7 +433,7 @@ def verificar(request):
         bloqueo = _verificaciones_bloqueadas(request)
         if bloqueo is not None:
             registrar("verificacion_bloqueada", request=request, datos={"por": bloqueo})
-            formulario.add_error(None, "Hubo demasiadas verificaciones fallidas en la última hora. Espera un rato o pide ayuda a Supervisión.")
+            formulario.add_error(None, f"Hubo demasiadas verificaciones fallidas en la última hora. Espera un rato o pide ayuda a {quienes('recibir_efectivo')}.")
         else:
             datos = formulario.cleaned_data
             objeto = Recibo.objects.filter(serie=datos["serie"], folio=datos["numero"]).select_related("pago__titular", "pago__reversion").first()
@@ -491,7 +493,7 @@ def beca(request, pk):
         raise PermissionDenied
     if request.method == "POST" and any(campo in request.POST for campo in CAMPOS_PROHIBIDOS_BECA):
         registrar("beca_rechazada", objeto=titular, request=request, datos={"motivo": "campos_no_permitidos", "campos": sorted(c for c in CAMPOS_PROHIBIDOS_BECA if c in request.POST)})
-        return HttpResponse("Las becas solo admiten porcentaje.", status=400, content_type="text/plain; charset=utf-8")
+        return HttpResponse(f"{vocabulario()['descuentos']}: solo se admite porcentaje.", status=400, content_type="text/plain; charset=utf-8")
     formulario = FormularioBeca(request.POST if request.method == "POST" else None, initial={"desde": hoy_negocio()})
     if request.method == "POST" and formulario.is_valid():
         datos = formulario.cleaned_data
@@ -505,7 +507,7 @@ def beca(request, pk):
         respuesta = _ejecutar(request, "beca", titular, carga, "titulares:detalle")
         if respuesta is not None:
             return respuesta
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Beca para {titular}", "boton": "Enviar"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"{vocabulario()['descuento']} para {titular}", "boton": "Enviar"})
 
 
 @requiere_permiso(*AJUSTES)

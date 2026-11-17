@@ -8,12 +8,12 @@ from banco.models import Banco, CuentaBancaria
 
 from .test_lector_santander import COLUMNAS, ENCABEZADO, dinero, sub
 
-CLABE = "002010077777777771"
+CLABE = "014180655501234568"
 
 
 def cuenta_principal():
     return CuentaBancaria.objects.filter(clabe=CLABE).first() or CuentaBancaria.objects.create(
-        banco=Banco.objects.get(clave="002"), clabe=CLABE, beneficiario="Negocio de prueba", contacto_dudas="5512345678", principal=True
+        banco=Banco.objects.get(clave="014"), clabe=CLABE, beneficiario="Negocio de prueba", contacto_dudas="5512345678", principal=True
     )
 
 

@@ -162,7 +162,7 @@ def test_sin_existencia_no_bloquea_y_lo_revisa_otra_persona(base):
     c.post(reverse("inventario:vender_titular", args=[ana.pk]), {f"cantidad_{libro_a.pk}": "12", "modo": "adeudo"})
     renglon = RenglonVenta.objects.get()
     assert renglon.sin_existencia and renglon.existencia_antes == 10 and inventario.existencia(libro_a) == -2
-    assert "Supervisión la revisará" in "".join(str(m) for m in c.get(reverse("inventario:venta", args=[renglon.venta_id])).context["messages"])
+    assert "la revisará Supervisión o Dirección" in "".join(str(m) for m in c.get(reverse("inventario:venta", args=[renglon.venta_id])).context["messages"])
     assert "Libro A" in cliente(personas["sup"]).get(reverse("inventario:revision")).content.decode()
     inventario.vender(ana, [(cuaderno.pk, 25)], Venta.ADEUDO, personas["sup"])
     propio = RenglonVenta.objects.get(articulo=cuaderno)

@@ -13,7 +13,7 @@ from banco.models import MovimientoBancario
 from caja import piezas as control_piezas
 from caja.models import MovimientoPiezas, Turno
 from caja.servicios import neto_de, personas_con_efectivo, recibe_movimientos
-from configuracion.models import Negocio, parametro
+from configuracion.models import Negocio, parametro, vocabulario
 from nucleo import reparto
 from configuracion.moneda import formatear
 from titulares.models import Titular
@@ -142,7 +142,7 @@ def crear_cargo(titular, concepto, importe_original, vencimiento, origen, period
     if importe_original < 0 or descuento < 0 or descuento > importe_original:
         raise ErrorLibro("importe de cargo inválido")
     if _interno(titular) and not (permitir_interno and origen == Cargo.MANUAL):
-        raise ErrorLibro("La cuenta interna solo recibe los cargos de una venta sin matrícula.")
+        raise ErrorLibro(f"La cuenta interna solo recibe los cargos de una venta a {vocabulario()['publico_min']}.")
     try:
         with transaction.atomic():
             cargo = Cargo.objects.create(
@@ -267,7 +267,7 @@ def registrar_pago(titular, importe, medio, usuario, turno=None, ficha=None, req
     if not isinstance(importe, int) or isinstance(importe, bool) or importe <= 0:
         raise ErrorLibro("El importe debe ser mayor que cero.")
     if _interno(titular) and not (permitir_interno and medio == Pago.EFECTIVO):
-        raise ErrorLibro("La cuenta interna solo recibe el pago en efectivo de una venta sin matrícula.")
+        raise ErrorLibro(f"La cuenta interna solo recibe el pago en efectivo de una venta a {vocabulario()['publico_min']}.")
     piezas = _piezas_de_cobro(importe, medio, piezas)
     with transaction.atomic():
         if ficha:
@@ -367,7 +367,7 @@ def revertir_pago(pago, motivo, ejecutor, turno=None, autorizador=None, solicitu
                 cargo = Cargo.objects.get(pk=fila["cargo"])
                 pendiente = saldo_de(cargo)
                 if pendiente > 0:
-                    cancelar_cargo(cargo, pendiente, CancelacionCargo.CANCELACION, f"Reversión del pago de una venta sin matrícula: {motivo}"[:300], ejecutor, autorizador, solicitud, request)
+                    cancelar_cargo(cargo, pendiente, CancelacionCargo.CANCELACION, f"Reversión del pago de una venta a {vocabulario()['publico_min']}: {motivo}"[:300], ejecutor, autorizador, solicitud, request)
         recibo = getattr(pago, "recibo", None)
         registrar(
             "pago_revertido",

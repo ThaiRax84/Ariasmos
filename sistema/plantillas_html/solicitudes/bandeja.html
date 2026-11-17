@@ -18,7 +18,7 @@
       <h2>Mis solicitudes</h2>
       <div class="desplazable"><table class="tabla">
       <thead><tr><th>Solicitud</th><th>{{ voc.titular }}</th><th>Enviada</th><th>Resolvió</th><th>Estado</th></tr></thead>
-      <tbody>{% for s in propias %}<tr><td class="fuerte"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.get_accion_display }}</a></td><td>{{ s.titular|default:"—" }}</td><td>{{ s.creada|date:"d/m/Y H:i" }}</td><td>{{ s.resuelta_por|default:"—" }}{% if s.via %} ({{ s.get_via_display }}){% endif %}</td><td><span class="estado {{ s.estado }}">{{ s.get_estado_display }}</span></td></tr>{% empty %}<tr><td colspan="5">Sin solicitudes.</td></tr>{% endfor %}</tbody>
+      <tbody>{% for s in propias %}<tr><td class="fuerte"><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.nombre_accion }}</a></td><td>{{ s.titular|default:"—" }}</td><td>{{ s.creada|date:"d/m/Y H:i" }}</td><td>{{ s.resuelta_por|default:"—" }}{% if s.via %} ({{ s.get_via_display }}){% endif %}</td><td><span class="estado {{ s.estado }}">{{ s.get_estado_display }}</span></td></tr>{% empty %}<tr><td colspan="5">Sin solicitudes.</td></tr>{% endfor %}</tbody>
       </table></div>
     </section>
   </div>
