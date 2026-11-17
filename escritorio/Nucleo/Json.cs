@@ -99,7 +99,7 @@ namespace Ariasmos.Nucleo
                         salida.Append("\\t");
                         break;
                     default:
-                        if (c < 0x20 || c == '<' || c == '>' || c == '&' || c == ' ' || c == ' ')
+                        if (c < 0x20 || c == '<' || c == '>' || c == '&' || c == '\u2028' || c == '\u2029')
                         {
                             salida.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
                         }
