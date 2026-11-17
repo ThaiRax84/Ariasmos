@@ -8,8 +8,11 @@ from django.db import transaction
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_post_parameters
 
 from auditoria.servicios import diferencias, registrar
+from actualizaciones import servicios as actualizaciones
+from banco import conciliacion
 from banco.formularios import FormularioCuenta
 from banco.models import CuentaBancaria
 from banco.servicios import guardar_cuenta
@@ -246,6 +249,7 @@ def caja(request):
     return _paso(request, "asistente/paso.html", formulario, 5, "Caja: cortes y retiros")
 
 
+@sensitive_post_parameters("clave_canal")
 def cortes(request):
     negocio = _exigir_autorizado(request)
     if negocio is None:
@@ -255,7 +259,9 @@ def cortes(request):
         return redirect("asistente:usuario")
     niveles = {d.tipo: d.nivel for d in DefinicionCorte.objects.all()}
     pendiente = Negocio.objects.filter(pk=1, clave_recuperacion_pendiente=True).exists()
-    formulario = FormularioAsistenteCortes(request.POST if request.method == "POST" else None, niveles=niveles, carpeta=negocio.carpeta_respaldo, carpeta_banco=negocio.carpeta_banco, pide_clave=pendiente)
+    formulario = FormularioAsistenteCortes(
+        request.POST if request.method == "POST" else None, niveles=niveles, carpeta=negocio.carpeta_respaldo, carpeta_banco=negocio.carpeta_banco, pide_clave=pendiente, topes=conciliacion.topes_actuales()
+    )
     if request.method == "POST" and formulario.is_valid():
         datos = formulario.cleaned_data
         with transaction.atomic():
@@ -273,6 +279,10 @@ def cortes(request):
                 Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
             if antes_topes != formulario.topes():
                 registrar("carpeta_banco_topes", objeto=negocio, datos={"cambios": diferencias(antes_topes, formulario.topes()), "origen": "asistente"}, request=request)
+            conciliacion.guardar_topes(formulario.topes_banco(), request=request, origen="asistente")
+            canal = formulario.actualizaciones()
+            if canal is not None:
+                actualizaciones.guardar_configuracion(canal["activa"], canal["repositorio"], canal["clave"], request=request, origen="asistente")
             if datos["carpeta_banco"] != negocio.carpeta_banco:
                 Negocio.objects.filter(pk=1).update(carpeta_banco=datos["carpeta_banco"])
                 registrar("carpeta_banco_cambiada", objeto=negocio, datos={"cambios": {"carpeta_banco": [negocio.carpeta_banco, datos["carpeta_banco"]]}, "origen": "asistente"}, request=request)

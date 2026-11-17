@@ -44,6 +44,7 @@ Name: "{group}\Ariasmos"; Filename: "https://localhost/"; IconFilename: "{app}\a
 Name: "{commondesktop}\Ariasmos"; Filename: "https://localhost/"; IconFilename: "{app}\ariasmos.ico"
 Name: "{group}\Generar token nuevo del asistente"; Filename: "{app}\herramientas\token-nuevo.cmd"; WorkingDir: "{app}\herramientas"
 Name: "{group}\Dar permiso a una carpeta"; Filename: "{app}\herramientas\permiso-carpeta.cmd"; WorkingDir: "{app}\herramientas"
+Name: "{group}\Instalar actualización"; Filename: "{app}\herramientas\instalar-actualizacion.cmd"; WorkingDir: "{app}\herramientas"; IconFilename: "{app}\ariasmos.ico"
 Name: "{group}\Desinstalar Ariasmos"; Filename: "{uninstallexe}"
 
 [Run]

@@ -454,12 +454,11 @@ def guardar_caja(valores):
         Parametro.objects.update_or_create(clave=clave, defaults={"valor": texto})
 
 
-TOPES_CARPETA = ("tope_aplicado_sin_respaldo", "tope_pago_carpeta")
+TOPES_CARPETA = ("tope_pago_carpeta",)
 
 
 class FormularioCarpetaBanco(forms.Form):
     carpeta_banco = forms.CharField(label="Carpeta vigilada del banco (opcional; ruta absoluta donde se deja el archivo descargado del banco)", max_length=400, required=False)
-    tope_aplicado_sin_respaldo = CampoImporte(label="Tope de pagos aplicados desde archivos editables sin un estado en PDF que los respalde (en 0, todo archivo editable queda retenido hasta que alguien lo libere)", required=False, maximo=10 ** 11)
     tope_pago_carpeta = CampoImporte(label="Importe máximo de un pago que se aplica solo desde un archivo editable (0 sin tope individual)", required=False, maximo=10 ** 11)
 
     def topes(self):
@@ -480,11 +479,22 @@ class FormularioCarpetaBanco(forms.Form):
 class FormularioAsistenteCortes(FormularioCarpetaBanco):
     carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
     carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)
-    field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco", "tope_aplicado_sin_respaldo", "tope_pago_carpeta"]
+    field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco", "tope_pago_carpeta"]
 
-    def __init__(self, *args, niveles=None, carpeta="", carpeta_banco="", pide_clave=False, **kwargs):
+    def __init__(self, *args, niveles=None, carpeta="", carpeta_banco="", pide_clave=False, topes=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from banco.formularios import campos_topes, iniciales_topes
         from cortes.models import NIVELES, TIPOS
+
+        self.fields.update(campos_topes())
+        for nombre, valor in iniciales_topes(topes or {}).items():
+            self.initial.setdefault(nombre, valor)
+        from actualizaciones import llaves
+
+        if llaves.disponibles():
+            self.fields["actualizaciones_activas"] = forms.BooleanField(label="Buscar actualizaciones del programa (opcional; se puede activar después en Configuración)", required=False)
+            self.fields["repositorio_canal"] = forms.CharField(label="Repositorio del canal de versiones (propietario/nombre)", max_length=140, required=False)
+            self.fields["clave_canal"] = forms.CharField(label="Clave de solo lectura del canal (se guarda cifrada y no se vuelve a mostrar)", max_length=300, required=False, widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password"}))
 
         for tipo, nombre in TIPOS:
             self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=NIVELES, initial=(niveles or {}).get(tipo, "solo_nombres"))
@@ -507,6 +517,36 @@ class FormularioAsistenteCortes(FormularioCarpetaBanco):
             return validar_ruta(valor)
         except ErrorEntrega as error:
             raise forms.ValidationError(str(error))
+
+    def clean(self):
+        from actualizaciones.canales.github import clave_valida, repositorio_valido
+
+        datos = super().clean()
+        if "actualizaciones_activas" not in self.fields:
+            return datos
+        repositorio = (datos.get("repositorio_canal") or "").strip()
+        clave = (datos.get("clave_canal") or "").strip()
+        if repositorio and not repositorio_valido(repositorio):
+            self.add_error("repositorio_canal", "Escribe el repositorio como propietario/nombre.")
+        if clave and not clave_valida(clave):
+            self.add_error("clave_canal", "No tiene el formato de una clave de GitHub.")
+        if datos.get("actualizaciones_activas") and not (repositorio and clave):
+            self.add_error("actualizaciones_activas", "Para activarlas escribe el repositorio y la clave del canal.")
+        datos["repositorio_canal"], datos["clave_canal"] = repositorio, clave
+        return datos
+
+    def actualizaciones(self):
+        if "actualizaciones_activas" not in self.fields:
+            return None
+        datos = self.cleaned_data
+        if not (datos.get("actualizaciones_activas") or datos.get("repositorio_canal") or datos.get("clave_canal")):
+            return None
+        return {"activa": bool(datos.get("actualizaciones_activas")), "repositorio": datos.get("repositorio_canal", ""), "clave": datos.get("clave_canal", "")}
+
+    def topes_banco(self):
+        from banco.formularios import topes_de
+
+        return topes_de(self.cleaned_data)
 
     def clean_carpeta_entrega(self):
         return self._ruta("carpeta_entrega")

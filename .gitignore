@@ -13,3 +13,9 @@ staticfiles/
 media/
 *.log
 .env
+*.llave-privada
+*.pem
+*.key
+*.p8
+*.firma
+/herramientas/firma/salida/

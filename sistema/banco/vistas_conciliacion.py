@@ -19,6 +19,7 @@ from proyecto.captura import CampoGuiadoTexto
 from titulares.models import Titular
 
 from . import conciliacion, lectura
+from .formularios import NOMBRES_DIAS
 from .models import HORAS_CARGA, CargaTemporal, CuentaBancaria, Importacion, MovimientoBancario, depurar_cargas
 
 CONCILIA = "conciliar_banco"
@@ -281,3 +282,28 @@ def no_cobro(request, pk):
 def emparejar(request, pk):
     traslado = get_object_or_404(Traslado, pk=request.POST.get("traslado") or 0, tipo=Traslado.DEPOSITO)
     return _resolver(request, pk, lambda m: conciliacion.conciliar_deposito(m, traslado, request.user, request))
+
+
+TOPES = "configurar_topes_banco"
+
+
+@requiere_permiso(TOPES, reingreso=True)
+def topes(request):
+    from .formularios import FormularioTopes
+
+    valores = conciliacion.topes_actuales()
+    formulario = FormularioTopes(request.POST if request.method == "POST" else None, valores=valores)
+    if request.method == "POST" and formulario.is_valid():
+        try:
+            cambiaron = conciliacion.guardar_topes(formulario.topes(), usuario=request.user, request=request)
+        except conciliacion.ErrorConciliacion as error:
+            formulario.add_error(None, str(error))
+        else:
+            messages.success(request, "Topes guardados." if cambiaron else "Los topes no cambiaron.")
+            return redirect("conciliacion:topes")
+    uso = conciliacion.uso_de_topes()
+    renglones = [{"nombre": nombre, "campo": formulario[f"tope_{clave}"]} for nombre, clave in zip(NOMBRES_DIAS, conciliacion.DIAS_SEMANA)]
+    contexto = {"formulario": formulario, "renglones": renglones, "acumulado": formulario[f"tope_{conciliacion.ACUMULADO}"], "uso": uso, "nombre_hoy": NOMBRES_DIAS[uso["dia"].weekday()]}
+    respuesta = render(request, "banco/topes.html", contexto)
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta

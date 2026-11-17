@@ -110,3 +110,42 @@ class FormularioCuenta(forms.Form):
         if datos.get("principal") and "activa" in self.fields and not datos.get("activa"):
             self.add_error("principal", "La cuenta principal debe estar activa.")
         return datos
+
+
+NOMBRES_DIAS = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+MAXIMO_TOPE = 10 ** 11
+
+
+def campos_topes():
+    from cobros.formularios import CampoImporte
+
+    from .conciliacion import ACUMULADO, DIAS_SEMANA
+
+    campos = {}
+    for numero, clave in enumerate(DIAS_SEMANA):
+        campos[f"tope_{clave}"] = CampoImporte(label=f"{NOMBRES_DIAS[numero]}: lo máximo que se aplica solo en el día (en 0 se retiene todo ese día)", required=False, maximo=MAXIMO_TOPE)
+    campos[f"tope_{ACUMULADO}"] = CampoImporte(
+        label="Tope acumulado: lo máximo aplicado desde archivos editables que todavía no respalda un estado en PDF (en 0 se retiene todo archivo editable)", required=False, maximo=MAXIMO_TOPE
+    )
+    return campos
+
+
+def topes_de(datos):
+    from .conciliacion import CLAVES_TOPES
+
+    return {clave: int(datos.get(f"tope_{clave}") or 0) for clave in CLAVES_TOPES}
+
+
+def iniciales_topes(valores):
+    return {f"tope_{clave}": valor for clave, valor in valores.items()}
+
+
+class FormularioTopes(forms.Form):
+    def __init__(self, *args, valores=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.update(campos_topes())
+        for nombre, valor in iniciales_topes(valores or {}).items():
+            self.initial.setdefault(nombre, valor)
+
+    def topes(self):
+        return topes_de(self.cleaned_data)

@@ -4,7 +4,7 @@ El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada per
 
 ## La pantalla
 
-- Al abrir el programa aparece una vez la presentación de Ariasmos con su versión («ver. 0.7.0»); se quita sola en un par de segundos o con un clic o cualquier tecla, y no vuelve a salir hasta que cierres el navegador. Si tu equipo tiene activado «reducir movimiento», no aparece.
+- Al abrir el programa aparece una vez la presentación de Ariasmos con su versión («ver. 0.8.0»); se quita sola en un par de segundos o con un clic o cualquier tecla, y no vuelve a salir hasta que cierres el navegador. Si tu equipo tiene activado «reducir movimiento», no aparece.
 - Arriba está la marca de Ariasmos y, a su lado, el logo y el nombre del negocio. Las entradas más usadas del menú se ven siempre (Inicio, Cobrar, el padrón, Inventario, Mi caja, Banco, Efectivo, Solicitudes y Cortes, según tu rol); las demás (familias, conceptos, usuarios, roles, configuración, respaldos, bitácora y otras) están en **Más**. **Más** se abre con un clic o con Enter y se recorre con las flechas; Esc lo cierra.
 - A la derecha ves tu nombre, tu rol y, si tienes turno abierto, la caja y la hora en que lo abriste.
 - Las acciones que mueven dinero o no se deshacen piden confirmación en un recuadro propio del programa; los avisos de que algo salió bien aparecen abajo unos segundos.
@@ -93,6 +93,16 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 5. Lo que llega por la carpeta vigilada se aplica solo, salvo los movimientos **retenidos**: un estado en PDF que no continúa al anterior, o los movimientos de un Excel o CSV con una señal de sospecha (o todo el archivo si sus saldos no cuadran o rebasaría el tope de pagos sin respaldo). En el Inicio aparece la importación; ábrela, compara cada movimiento retenido con el banco (se ve su motivo), marca los que existen y elige **Liberar los marcados** o **Liberar todos**. Quien libera no puede marcar la importación como revisada.
 6. **Pagos sin respaldo en el estado**: al importar el estado en PDF del mes, cada pago aplicado desde un Excel o CSV que no aparezca en él sale en el Inicio con un enlace para **solicitar su reversión**. El sistema no lo revierte solo. También avisa si un pago así lleva más de 45 días sin un estado que lo cubra.
 
+### Topes del banco
+
+**Banco → Topes** (con el permiso «Configurar los topes del banco», que traen Supervisión y Dirección; pide tu contraseña otra vez) fija cuánto puede aplicarse **solo** desde los Excel o CSV que llegan por la carpeta vigilada:
+
+- **Tope del día**, uno por cada día de la semana: lo máximo que se aplica solo ese día. Se cuenta pago por pago, en el orden del archivo, sobre el día en que se aplica (no la fecha del movimiento). El pago que no cabe queda **retenido** con el motivo «Tope del día» y se sigue con el siguiente, que sí puede caber. Un día en 0 retiene todo lo de ese día.
+- **Tope acumulado**: lo máximo aplicado desde Excel o CSV que todavía no confirma un estado de cuenta en PDF. Si un archivo lo rebasaría, se retiene completo. Baja cuando llega el estado del mes.
+- Lo que tú liberas a mano no gasta el tope del día (sí cuenta en el acumulado) y liberar nunca se bloquea por un tope.
+- La pantalla muestra cuánto se ha aplicado hoy contra el tope del día y cuánto hay acumulado contra el tope acumulado. Al instalar todo está en 0: aplicar solo es una decisión del negocio.
+- Cada cambio queda en la bitácora con los valores de antes y de después, y Dirección lo ve en su Inicio durante 7 días.
+
 ### Efectivo
 
 - **Efectivo** muestra quién tiene dinero en custodia, las entregas por confirmar y los depósitos por conciliar. Si tú mismo tienes un turno abierto, tu efectivo no se muestra hasta que lo cierres.
@@ -121,6 +131,14 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 - Cada lunes se genera la lista de adeudos vencidos; en **Cortes** puedes generarla en cualquier momento.
 
+## Todas las personas: versión nueva
+
+- Cuando hay una versión nueva, el Inicio de todos muestra **«Hay una versión nueva: X.Y.Z»** con la lista de cambios.
+- **Descargar** la pide al servicio; cualquiera puede pedirla. Se baja una a la vez y como máximo tres intentos por hora. El servicio comprueba que el instalador sea exactamente el del aviso firmado; si no, lo borra y avisa a Dirección.
+- Cuando termina, el aviso cambia a **«Lista para instalar»**. La instalación se hace a mano en la computadora del servidor: menú Inicio → Ariasmos → **Instalar actualización** (pide permiso de administrador). Vuelve a comprobar la firma y la huella antes de abrir el instalador y se niega si no coinciden. Antes, haz un respaldo y cierra los turnos de caja abiertos: el aviso dice si hay alguno.
+- Si el aviso dice que antes hay que instalar otra versión, pide ese instalador al dueño del programa.
+- Sin internet no pasa nada: el aviso simplemente no aparece.
+
 ## Dirección
 
 ### Usuarios y roles
@@ -131,7 +149,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope de pagos sin respaldo y el tope por pago), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
+- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
 
 ### Marca del negocio
@@ -154,6 +172,16 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - Cuando alguien importa un archivo de banco que no se puede comprobar contra el estado de cuenta anterior y con él se aplicaron pagos, aparece en tu Inicio como **importación por revisar**.
 - Ábrela, compárala con el banco y elige **Marcar como revisada**. Quien la importó, o quien liberó alguno de sus movimientos si llegó por la carpeta vigilada, no puede marcarla.
 - Si el negocio lleva inventario, el Inicio te avisa cuando un conteo lleva más días de los configurados sin aprobarse.
+
+### Cambios en los topes del banco
+
+Quien tiene «Ver auditoría» ve en su Inicio los cambios de topes del banco de los últimos 7 días que hizo **otra** persona: quién, cuándo y de cuánto a cuánto. Quien concilia también libera pagos, así que conviene revisar que los topes sean los acordados.
+
+### Actualizaciones del programa
+
+- **Configuración → Actualizaciones del programa** (pide tu contraseña otra vez): actívalas, escribe el repositorio del canal (`propietario/nombre`) y la clave de solo lectura que te dio el dueño del programa. La clave se guarda cifrada y no se vuelve a mostrar; para cambiarla escribe otra. Si la pantalla dice que esta copia no trae llaves de actualización, no se pueden activar: se actualiza a mano con un instalador nuevo.
+- El servicio busca una versión nueva al arrancar y una vez al día. **Buscar ahora** pide una búsqueda en el siguiente ciclo del servicio (como máximo una cada 10 minutos).
+- Tu Inicio te avisa cuando se descargó una versión, cuando una descarga no coincidió con el aviso firmado (se borra sola) y cuando cambió la llave de uso de las actualizaciones. Si no esperabas un cambio de llave, apaga las actualizaciones y avisa al dueño del programa.
 
 ### Bitácora
 

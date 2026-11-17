@@ -23,7 +23,7 @@ ROLES = ("Operación", "Supervisión", "Dirección")
 
 PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
 
-SOLO_SESION = {"inicio", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado"}
+SOLO_SESION = {"inicio", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -178,6 +178,9 @@ MATRIZ = {
     "inventario:registro_revisar": ("revisar_inventario",),
     "inventario:devolucion_revisar": ("revisar_inventario",),
     "inventario:renglon_revisar": ("revisar_inventario",),
+    "conciliacion:topes": ("configurar_topes_banco",),
+    "actualizaciones:configurar": ("administrar_configuracion",),
+    "actualizaciones:buscar": ("administrar_configuracion",),
     "inventario:revision": ("revisar_inventario",),
     "inventario:existencias_csv": ("revisar_inventario", "administrar_articulos"),
     "inventario:conteo": ("subir_conteo_inventario",),

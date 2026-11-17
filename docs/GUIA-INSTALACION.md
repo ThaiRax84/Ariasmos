@@ -15,7 +15,7 @@ Esta guía es para la persona que instala el sistema en el equipo que hará de s
 2. Comprueba que el instalador no se dañó ni fue cambiado. Abre **PowerShell** (menú Inicio → escribe «PowerShell») y escribe, cambiando la ruta por la de tu carpeta de descargas:
 
    ```
-   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.7.0-instalador.exe" -Algorithm SHA256
+   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.8.0-instalador.exe" -Algorithm SHA256
    ```
 
 3. El texto largo que aparece en la columna **Hash** debe ser **igual** al que viene en `SHA256SUMS.txt` (no importan mayúsculas o minúsculas). Si no es igual, **no instales**: vuelve a descargarlo.
@@ -44,7 +44,7 @@ El navegador se abre en `https://localhost/`. El asistente te lleva paso a paso:
 3. **Importes** de cada concepto y, si aplica, el recargo por pago tardío.
 4. **Datos de pago**: la cuenta bancaria (CLABE y beneficiario) que aparece en las fichas de pago. Se puede completar después.
 5. **Caja: cortes y retiros**: qué días de la semana hay corte de caja y la hora límite de cada uno (propone lunes a sábado a las 18:00; deja vacío el día que no tenga corte), si se capturan las piezas de cada billete y moneda, y los topes de los retiros de caja (importe máximo por retiro, importe y número máximo de retiros por día o por semana y efectivo máximo en caja). Lo que pase de un tope necesita la autorización de otra persona.
-6. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** con sus dos topes (ver abajo). Aquí aparece la **clave de recuperación** (ver abajo).
+6. **Entrega y respaldo**: la carpeta donde se dejan los cortes, la carpeta del respaldo diario y, si quieres, la **carpeta vigilada del banco** con el tope por pago y los topes del banco (ver abajo). Si esta copia del programa trae llaves de actualización, también puedes activar aquí las **actualizaciones del programa** (sección 7). Aquí aparece la **clave de recuperación** (ver abajo).
 7. **Primer usuario de Dirección**: tu usuario y contraseña.
 8. **Autenticador**: instala en tu teléfono una aplicación gratuita como Google Authenticator, Microsoft Authenticator, Authy o 2FAS, escanea el código QR y escribe el código de 6 dígitos.
 
@@ -56,8 +56,8 @@ Es una carpeta donde alguien deja el archivo descargado de la banca en línea (e
 - Lo importado pasa a la subcarpeta `procesados`; lo rechazado, a `rechazados`, junto con un archivo `.motivo.txt` que dice por qué.
 - Un Excel o CSV solo se reconoce si antes se importó a mano uno con las mismas columnas.
 - Un **estado de cuenta en PDF que continúa al anterior** aplica sus pagos de inmediato. Si no continúa (por ejemplo, el primero), sus pagos **no se aplican** hasta que alguien con permiso de conciliar los revise contra el banco y los libere.
-- Un **Excel o CSV** aplica sus pagos de inmediato, salvo los movimientos con alguna señal de sospecha, que quedan **retenidos uno por uno** con su motivo: importe mayor que lo que debe la familia, mayor que el **tope por pago**, fecha futura o ya cubierta por un estado en PDF que no lo trae, titular que no está activo o segundo pago de la misma matrícula en el archivo. Todo el archivo queda retenido si sus saldos no cuadran, si no continúan el último saldo conocido, o si con él se rebasaría el **tope de pagos sin respaldo** (la suma de lo aplicado desde Excel o CSV que todavía no confirma un estado en PDF).
-- Los dos topes se piden en este paso y en *Configuración → Carpeta vigilada del banco*. Empiezan en **0**: con el tope de pagos sin respaldo en 0, todo Excel o CSV queda retenido como antes. Aplicar de inmediato es una decisión del negocio al subir ese tope.
+- Un **Excel o CSV** aplica sus pagos de inmediato, salvo los movimientos con alguna señal de sospecha, que quedan **retenidos uno por uno** con su motivo: importe mayor que lo que debe la familia, mayor que el **tope por pago**, fecha futura o ya cubierta por un estado en PDF que no lo trae, titular que no está activo o segundo pago de la misma matrícula en el archivo. Todo el archivo queda retenido si sus saldos no cuadran, si no continúan el último saldo conocido, o si con él se rebasaría el **tope acumulado** (la suma de lo aplicado desde Excel o CSV que todavía no confirma un estado en PDF). Además, cada pago se aplica solo mientras quepa en el **tope del día** (uno por día de la semana); el que no cabe queda retenido y se sigue con el siguiente.
+- El tope por pago se pide en este paso y en *Configuración → Carpeta vigilada del banco*. Los topes del día y el acumulado se piden en este paso y después viven en **Banco → Topes** (Supervisión y Dirección, con contraseña). Todos empiezan en **0**: con un tope en 0 todo Excel o CSV queda retenido. Aplicar de inmediato es una decisión del negocio al subir los topes. Al actualizar desde una versión anterior los topes del día quedan en 0, así que hay que fijarlos en **Banco → Topes** para que se siga aplicando solo.
 - Cuando llega el estado en PDF del mes, cada pago que se aplicó desde un Excel o CSV y no aparece en él queda marcado **«sin respaldo en el estado»** y se avisa a Supervisión y Dirección. No se revierte solo.
 - La carpeta no puede estar dentro de la carpeta del programa ni de la de datos. Si es una carpeta de tu usuario, dale permiso como se explica en la sección 6.
 
@@ -99,6 +99,19 @@ El sistema corre con una cuenta de Windows limitada que, por seguridad, no puede
 Si la pantalla dice que el servicio no tiene permiso para escribir en la carpeta, es este paso el que falta.
 
 ## 7. Actualizar
+
+### Con el aviso del programa
+
+Si Dirección activó las **actualizaciones del programa** (*Configuración → Actualizaciones del programa*, con el repositorio del canal y la clave de solo lectura que da el dueño), el servicio busca versiones nuevas y las avisa en el Inicio. Solo acepta versiones firmadas con la llave del dueño.
+
+1. Alguien elige **Descargar** en el aviso. El servicio baja el instalador a `C:\ProgramData\Ariasmos\instancia\actualizaciones\` (no se sirve por la red) y comprueba su tamaño y su huella contra el aviso firmado.
+2. Cuando el aviso dice **«Lista para instalar»**, haz un respaldo (menú **Respaldos**) y pide que se cierren los turnos de caja.
+3. En el servidor: menú Inicio → **Ariasmos** → **Instalar actualización**. Acepta el permiso de administrador. La herramienta vuelve a comprobar la firma y la huella, copia el instalador a una carpeta propia, te pide escribir `SI` y abre el instalador. Si algo no coincide, no ejecuta nada.
+4. Sigue los pasos del instalador como en la actualización a mano (abajo, desde el paso 2).
+
+Si esta copia del programa no trae llaves de actualización, la opción no se puede activar y se actualiza a mano.
+
+### A mano
 
 1. Descarga el instalador nuevo y comprueba su hash (paso 1).
 2. Ejecútalo en el servidor. Detecta la instalación existente, detiene el sistema, guarda una copia de la carpeta de datos en `C:\ProgramData\Ariasmos\antes-de-actualizar\` y, si hay carpeta de respaldo configurada, hace un respaldo cifrado.

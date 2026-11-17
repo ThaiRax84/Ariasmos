@@ -7,6 +7,7 @@
     <h1>Movimientos por identificar</h1>
   </div>
 </div>
+{% if "conciliar_banco" in permisos or "configurar_topes_banco" in permisos %}<div class="atajos">{% if "conciliar_banco" in permisos %}<a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones</a>{% endif %}{% if "configurar_topes_banco" in permisos %}<a class="boton secundario" href="{% url 'conciliacion:topes' %}">Topes</a>{% endif %}</div>{% endif %}
 <table class="tabla">
 <thead><tr><th>Fecha</th><th>Importe</th><th>Referencia</th><th>Concepto</th><th>Pagador</th><th>Sugerencia</th><th>Propuesta</th></tr></thead>
 <tbody>{% for m in movimientos %}<tr><td><a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a></td><td>{{ m.importe|dinero }}</td><td>{{ m.referencia }}</td><td>{{ m.concepto|default:m.descripcion }}</td><td>{{ m.nombre_pagador }}</td><td>{{ m.sugerencia }}{% if m.posible_duplicado %} · posible duplicado{% endif %}</td><td>{% if m.propuesta %}{{ m.propuesta.matricula_formateada }}{% endif %}</td></tr>{% empty %}<tr><td colspan="7">No hay movimientos por identificar.</td></tr>{% endfor %}</tbody>

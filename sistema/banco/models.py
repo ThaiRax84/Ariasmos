@@ -180,6 +180,7 @@ class MovimientoBancario(models.Model):
     MUTABLES = {
         "estado", "pago", "traslado", "sugerencia", "alternativas", "motivo", "coincide_importe", "propuesta", "propuesta_por", "propuesta_en", "nota",
         "resuelto_por", "resuelto_en", "confirmado_por", "posible_duplicado", "retencion", "liberado_por", "liberado_en", "sin_respaldo", "sin_respaldo_en",
+        "dia_aplicado_solo",
     } | COMPLETABLES
     RETENCIONES = {
         "excede_adeudo": "El importe es mayor que el adeudo vigente de la familia: dejaría saldo a favor",
@@ -190,7 +191,8 @@ class MovimientoBancario(models.Model):
         "matricula_repetida": "La misma matrícula ya recibió otro pago en este archivo",
         "saldos_no_cuadran": "Los saldos del archivo no cuadran renglón a renglón con los importes",
         "saldo_no_continua": "El saldo del archivo no continúa el último saldo conocido de la cuenta",
-        "tope_exposicion": "Rebasaría el tope de pagos aplicados sin respaldo de un estado en PDF",
+        "tope_exposicion": "Rebasaría el tope acumulado de pagos aplicados sin respaldo de un estado en PDF",
+        "tope_dia": "Tope del día: con este pago se rebasaría lo que se aplica solo en un día",
         "sin_continuidad": "Estado en PDF que no continúa al anterior",
     }
 
@@ -232,6 +234,7 @@ class MovimientoBancario(models.Model):
     liberado_en = models.DateTimeField(null=True, blank=True)
     sin_respaldo = models.BooleanField(default=False)
     sin_respaldo_en = models.DateTimeField(null=True, blank=True)
+    dia_aplicado_solo = models.DateField(null=True, blank=True, db_index=True)
 
     objects = ConsultaMovimientos.as_manager()
 
@@ -316,3 +319,15 @@ class ArchivoVigilado(models.Model):
 
     class Meta:
         ordering = ["nombre"]
+
+
+class TopeDiarioBanco(models.Model):
+    dia = models.PositiveSmallIntegerField(unique=True)
+    importe = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        ordering = ["dia"]
+        constraints = [models.CheckConstraint(condition=Q(dia__lte=6), name="tope_diario_dia_de_la_semana")]
+
+    def __str__(self):
+        return f"{self.dia}: {self.importe}"
