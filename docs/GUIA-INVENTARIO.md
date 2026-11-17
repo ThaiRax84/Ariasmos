@@ -32,7 +32,7 @@ La primera vez se hace un conteo (ver abajo). Cuando otra persona lo aprueba, ca
 
 1. **Inventario → Vender**, busca a la persona y elige su nombre. Arriba a la derecha cambias entre **A un titular** y **Sin matrícula**.
 2. La pantalla muestra todos los artículos activos con su precio y lo que queda. Escribe arriba parte del nombre o de la clave para filtrar la lista. En cada artículo usa **+** y **−** (o escribe la cantidad) para decir cuántos se lleva; los que quedan en 0 no entran en la venta. El precio lo pone el artículo; no se teclea. **+** no se detiene en la existencia: si el sistema cree que no alcanza, la venta sigue y queda para revisión.
-3. A la derecha, **Resumen** suma lo elegido y el **Total**. Es solo una ayuda en pantalla: al continuar, el sistema vuelve a calcular todo con los precios guardados. Si el navegador no ejecuta el programa de la pantalla, el resumen dice que el total se calcula al continuar.
+3. A la derecha, **Resumen** suma lo elegido y el **Total**. Es solo una ayuda en pantalla: al continuar, el sistema vuelve a calcular todo con los precios guardados. Si la pantalla no puede ejecutar su programa, el resumen dice que el total se calcula al continuar.
 4. Elige **¿Cómo se paga?**:
    - **Lo paga ahora**: se crean los cargos y pasas al cobro (**Continuar al cobro**). El pago se aplica primero a los artículos de esta venta y lo que sobre, al adeudo normal.
    - **Se va a su adeudo**: los cargos quedan pendientes y se cobran después junto con lo demás (**Registrar la venta**).

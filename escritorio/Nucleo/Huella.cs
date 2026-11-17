@@ -147,6 +147,40 @@ namespace Ariasmos.Nucleo
             return resultado;
         }
 
+        public static bool CoincideEstadoSeguridad(string evento, byte[] esperada)
+        {
+            try
+            {
+                var raiz = Json.Analizar(evento) as Dictionary<string, object>;
+                object visible;
+                object estado;
+                object lista;
+                if (raiz == null || !raiz.TryGetValue("visibleSecurityState", out visible) || !(visible is Dictionary<string, object>))
+                {
+                    return false;
+                }
+                if (!((Dictionary<string, object>)visible).TryGetValue("certificateSecurityState", out estado) || !(estado is Dictionary<string, object>))
+                {
+                    return false;
+                }
+                if (!((Dictionary<string, object>)estado).TryGetValue("certificate", out lista) || !(lista is List<object>))
+                {
+                    return false;
+                }
+                var certificados = (List<object>)lista;
+                var primero = certificados.Count > 0 ? certificados[0] as string : null;
+                return !string.IsNullOrEmpty(primero) && Coincide(Convert.FromBase64String(primero), esperada);
+            }
+            catch (ErrorFormato)
+            {
+                return false;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
         public static bool CoincideCdp(string respuesta, byte[] esperada)
         {
             try

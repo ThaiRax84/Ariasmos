@@ -201,6 +201,17 @@ namespace Ariasmos.Pruebas
             Assert.False(Huella.CoincideCdp("no es json", Huella.DesdeTexto(HuellaAbc)));
             Assert.False(Huella.CoincideCdp("{\"tableNames\":[\"" + Convert.ToBase64String(new byte[] { 9 }) + "\"]}", Huella.DesdeTexto(HuellaAbc)));
         }
+
+        [Fact]
+        public void LeeElEstadoDeSeguridad()
+        {
+            string evento = "{\"visibleSecurityState\":{\"securityState\":\"insecure\",\"certificateSecurityState\":{\"protocol\":\"TLS 1.3\",\"certificate\":[\"" + Convert.ToBase64String(Abc) + "\"]}}}";
+            Assert.True(Huella.CoincideEstadoSeguridad(evento, Huella.DesdeTexto(HuellaAbc)));
+            Assert.False(Huella.CoincideEstadoSeguridad(evento.Replace(Convert.ToBase64String(Abc), Convert.ToBase64String(new byte[] { 7 })), Huella.DesdeTexto(HuellaAbc)));
+            Assert.False(Huella.CoincideEstadoSeguridad("{\"visibleSecurityState\":{\"securityState\":\"secure\"}}", Huella.DesdeTexto(HuellaAbc)));
+            Assert.False(Huella.CoincideEstadoSeguridad("{\"visibleSecurityState\":{\"certificateSecurityState\":{\"certificate\":[\"!!\"]}}}", Huella.DesdeTexto(HuellaAbc)));
+            Assert.False(Huella.CoincideEstadoSeguridad("x", Huella.DesdeTexto(HuellaAbc)));
+        }
     }
 
     public class PruebasDirecciones

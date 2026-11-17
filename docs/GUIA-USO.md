@@ -1,10 +1,15 @@
 # Guía de uso de Ariasmos
 
-El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada persona entra con su usuario, su contraseña y, si su rol lo pide, el código de 6 dígitos de su autenticador. Lo que cada quien ve depende de su rol; esta guía sigue los tres roles de las plantillas: **Operación**, **Supervisión** y **Dirección**. Los nombres de los menús («titulares», «matrícula», «familias») pueden cambiar según cómo se configuró el vocabulario.
+El sistema se usa con el programa **Ariasmos**, que se abre desde su acceso directo en el escritorio o en el menú Inicio, en la computadora principal o en cualquier computadora adicional (ver la guía de instalación). Cada persona entra con su usuario, su contraseña y, si su rol lo pide, el código de 6 dígitos de su autenticador. Lo que cada quien ve depende de su rol; esta guía sigue los tres roles de las plantillas: **Operación**, **Supervisión** y **Dirección**. Los nombres de los menús («titulares», «matrícula», «familias») pueden cambiar según cómo se configuró el vocabulario.
 
 ## La pantalla
 
-- Al abrir el programa aparece una vez la presentación de Ariasmos con su versión («ver. 0.8.0»); se quita sola en un par de segundos o con un clic o cualquier tecla, y no vuelve a salir hasta que cierres el navegador. Si tu equipo tiene activado «reducir movimiento», no aparece.
+- Al abrir el programa aparece la presentación de Ariasmos con su versión («ver. X.Y.Z») mientras arranca; se desvanece cuando carga la primera pantalla. Si la computadora principal no responde, la ventana lo dice y ofrece **Reintentar**.
+- Ariasmos abre una sola ventana por usuario de Windows: si lo abres otra vez, trae al frente la que ya está. Recuerda su tamaño y su posición.
+- A la izquierda de la marca están las flechas **Atrás** y **Adelante**. También sirven **Alt + ←**, **Alt + →** y los botones laterales del ratón. Ir atrás, adelante o volver a cargar nunca repite un cobro ni ninguna otra operación: si vuelves a una operación ya hecha, ves su resultado (por ejemplo, el recibo) y el aviso «Esa operación ya se había enviado; no se repitió».
+- **Ctrl + rueda del ratón**, **Ctrl + +** y **Ctrl + −** cambian el tamaño de la letra; **Ctrl + 0** lo regresa.
+- Las **descargas** (recibos en PDF, cortes, exportaciones) siempre preguntan dónde guardar con la ventana «Guardar como» de Windows; nunca se abren solas. Los recibos se imprimen con el botón **Imprimir** dentro de la ventana.
+- Los campos que piden una **carpeta** (destinos de cortes, respaldo, carpeta vigilada del banco) tienen **Examinar…** en la computadora principal, que abre la ventana de Windows para elegirla. En una computadora adicional se escribe la ruta o se elige desde la principal, porque las carpetas son del disco de la principal.
 - Arriba está la marca de Ariasmos y, a su lado, el logo y el nombre del negocio. Las entradas más usadas del menú se ven siempre (Inicio, Cobrar, el padrón, Inventario, Mi caja, Banco, Efectivo, Solicitudes y Cortes, según tu rol); las demás (familias, conceptos, usuarios, roles, configuración, respaldos, bitácora y otras) están en **Más**. **Más** se abre con un clic o con Enter y se recorre con las flechas; Esc lo cierra.
 - A la derecha ves tu nombre, tu rol y, si tienes turno abierto, la caja y la hora en que lo abriste.
 - Las acciones que mueven dinero o no se deshacen piden confirmación en un recuadro propio del programa; los avisos de que algo salió bien aparecen abajo unos segundos.

@@ -1,6 +1,6 @@
 # Ariasmos
 
-Sistema local y multiusuario de cobro y control de titulares: padrón con matrícula única como referencia de pago, cobro en efectivo y por banco con conciliación, inventario opcional, aprobaciones, cortes diario y mensual, bitácora sellada y respaldos cifrados. Se instala en un equipo con Windows y las demás computadoras entran con el navegador. El repositorio no trae datos de ningún negocio.
+Sistema local y multiusuario de cobro y control de titulares: padrón con matrícula única como referencia de pago, cobro en efectivo y por banco con conciliación, inventario opcional, aprobaciones, cortes diario y mensual, bitácora sellada y respaldos cifrados. Se instala en Windows como programa con su propia ventana (`Ariasmos.exe`): una computadora principal guarda los datos y las adicionales se conectan a ella con un archivo de conexión. El repositorio no trae datos de ningún negocio.
 
 ## Guías
 
@@ -32,9 +32,10 @@ Pruebas, desde la raíz: `python -m pytest`. No necesitan instancia. Las pruebas
 
 ### Instalador de Windows
 
-- `instalacion/construir.ps1` arma `build\Ariasmos` con Python embebido, las dependencias (solo ruedas binarias, verificadas con `instalacion/requisitos-windows.txt`), WinSW y Caddy; cada descarga se verifica con el SHA-256 de `instalacion/dependencias.json`.
-- `instalacion/ariasmos.iss` (Inno Setup 6.3 o posterior) genera el instalador.
-- `.github/workflows/instalador.yml` corre las pruebas en Linux y en Windows, construye, compila y hace una prueba de humo de instalación, actualización y desinstalación.
+- `escritorio/` es el programa `Ariasmos.exe` (C#, .NET Framework 4.8, WinForms y WebView2): `dotnet test escritorio/Pruebas/Ariasmos.Pruebas.csproj` y `dotnet build escritorio/Ariasmos/Ariasmos.csproj -c Release -o build/escritorio`.
+- `instalacion/construir.ps1` arma `build\Ariasmos` con Python embebido, las dependencias (solo ruedas binarias, verificadas con `instalacion/requisitos-windows.txt`), WinSW y Caddy; cada descarga se verifica con el SHA-256 de `instalacion/dependencias.json`, y el instalador oficial de WebView2 con su firma Authenticode de Microsoft. Comprueba que `build\escritorio\Ariasmos.exe` sea de la misma versión.
+- `instalacion/ariasmos.iss` (Inno Setup 6.3 o posterior) genera el instalador, con dos formas de instalar: computadora principal o adicional.
+- `.github/workflows/instalador.yml` corre las pruebas en Linux y en Windows, compila y prueba `Ariasmos.exe`, construye el instalador y hace una prueba de humo de instalación principal, actualización, `Ariasmos.exe --verificar`, instalación adicional contra ese servidor y desinstalación.
 
 La versión está en `VERSION` y se ve en el pie de página y con `python manage.py version`.
 

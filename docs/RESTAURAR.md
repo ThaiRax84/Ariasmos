@@ -19,8 +19,8 @@ Sin la clave de recuperación el respaldo **no se puede abrir**; nadie puede rec
    - comprueba que la clave corresponde al respaldo y que el archivo no está dañado ni alterado;
    - verifica la base de datos, los conteos y la bitácora;
    - deja la información y las claves en `C:\ProgramData\Ariasmos\instancia`.
-5. Abre `https://localhost/` y entra con tus usuarios de siempre, con su contraseña y su autenticador.
-6. Vuelve a conectar las demás computadoras (sección 5 de la guía de instalación): el certificado del servidor nuevo es distinto (tiene otra huella), así que hay que instalarlo otra vez en cada una.
+5. Abre **Ariasmos** desde el escritorio y entra con tus usuarios de siempre, con su contraseña y su autenticador.
+6. Vuelve a conectar las computadoras adicionales (sección 5 de la guía de instalación): el certificado del servidor nuevo es distinto (tiene otra huella), así que cada una necesita un archivo de conexión nuevo; vuelve a ejecutar ahí el instalador y elígelo.
 7. Revisa en **Respaldos** que la carpeta de respaldo siga siendo válida en este equipo y, si hace falta, dale permiso con **Dar permiso a una carpeta**.
 
 ## Si la restauración falla
