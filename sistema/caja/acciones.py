@@ -1,3 +1,5 @@
+from configuracion.models import vocabulario
+
 from .models import RetiroCaja, Turno
 from .servicios import ErrorCaja, neto_de, recibe_movimientos, turno_abierto
 
@@ -37,7 +39,7 @@ class RetiroSobreTope(AccionCaja):
         from . import retiros
 
         if titular is not None:
-            raise ErrorAccion("Un retiro de caja no corresponde a un registro del padrón.")
+            raise ErrorAccion(f"Un retiro de caja no corresponde a un registro de {vocabulario()['padron_min']}.")
         if set(datos) - {"turno", "importe", "motivo", "nota", "piezas", "ficha", "excede"}:
             raise ErrorAccion("La solicitud de retiro trae datos no permitidos.")
         importe = _entero(datos.get("importe"), "El importe")
@@ -84,7 +86,7 @@ class RevertirRetiro(AccionCaja):
 
     def validar(self, titular, datos):
         if titular is not None:
-            raise ErrorAccion("Un retiro de caja no corresponde a un registro del padrón.")
+            raise ErrorAccion(f"Un retiro de caja no corresponde a un registro de {vocabulario()['padron_min']}.")
         if set(datos) - {"retiro", "motivo", "piezas"}:
             raise ErrorAccion("La solicitud trae datos no permitidos.")
         retiro = self._retiro(datos)

@@ -5,5 +5,5 @@
     <h1>{{ voc.familias }}</h1>
   </div>
 </div>
-<ul class="lista">{% for f in familias %}<li><a href="{% url 'titulares:familia' f.pk %}">{{ f }}</a> · {{ f.total }} {% if f.total == 1 %}{{ voc.titular|lower }}{% else %}{{ voc.titulares|lower }}{% endif %}{% if not f.activa %} · inactiva{% endif %}</li>{% empty %}<li>Sin registros.</li>{% endfor %}</ul>
+<ul class="lista">{% for f in familias %}<li><a href="{% url 'titulares:familia' f.pk %}">{{ f }}</a> · {{ f.total }} {% if f.total == 1 %}{{ voc.titular_min }}{% else %}{{ voc.titulares_min }}{% endif %}{% if not f.activa %} · inactiva{% endif %}</li>{% empty %}<li>Sin registros.</li>{% endfor %}</ul>
 {% endblock %}

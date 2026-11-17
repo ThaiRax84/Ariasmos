@@ -16,7 +16,7 @@ from . import motor
 from .formularios import FormularioCodigoTelefono, FormularioPolitica, FormularioRechazo
 from .models import PoliticaAccion, Solicitud
 
-VEN_BANDEJA = ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes")
+VEN_BANDEJA = ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes", "solicitar_importacion_padron")
 
 
 def describir(solicitud):
@@ -67,6 +67,8 @@ def describir(solicitud):
             filas.append(("Venta", f"{venta} · {venta.titular.nombre_completo}"))
             renglones = {str(r.pk): r for r in RenglonVenta.objects.filter(venta=venta).select_related("articulo")}
             filas.append(("Artículos", "; ".join(f"{renglones[k].articulo.nombre} × {v[0]}{'' if v[1] else ' (mal estado)'}" for k, v in (datos.get("renglones") or {}).items() if k in renglones)))
+    elif solicitud.accion == "importacion_padron":
+        filas += [("Archivo", datos.get("nombre_archivo", "")), ("Altas", str(datos.get("altas", 0))), ("Cambios", str(datos.get("cambios", 0))), ("Con cambio de nombre", str(datos.get("nombres", 0)))]
     elif solicitud.accion == "cambio_familia":
         modo = {"ligar": "Ligar a", "crear": "Crear y ligar a", "desligar": "Desligar de"}.get(datos.get("modo"), "")
         familia = Familia.objects.filter(pk=datos.get("familia")).first()
@@ -113,8 +115,23 @@ def detalle(request, pk):
         "formulario_rechazo": FormularioRechazo(),
         "resaltada": solicitud.resaltada(politica),
         "descripcion": describir(solicitud),
+        "hoja": _hoja(request, solicitud),
     }
     return render(request, "solicitudes/detalle.html", contexto)
+
+
+def _hoja(request, solicitud):
+    if solicitud.accion != "importacion_padron" or solicitud.estado != Solicitud.PENDIENTE:
+        return None
+    from configuracion.vistas_padron import _previa
+    from titulares import padron
+
+    try:
+        analisis = padron.leer_hoja(solicitud.datos.get("hoja", ""), solicitud.datos.get("huella", ""))
+    except padron.ErrorPadron as error:
+        return {"error": str(error)}
+    filas = [f for f in _previa(analisis, request.user.tiene_permiso("ver_titulares")) if not f["errores"] and not f["duplicado"]]
+    return {"filas": filas, "ve_datos": request.user.tiene_permiso("ver_titulares")}
 
 
 @requiere_permiso("aprobar_solicitudes")

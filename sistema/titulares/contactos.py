@@ -15,6 +15,17 @@ def prefijo():
     return str(parametro("prefijo_pais_telefono"))
 
 
+def formatear_telefono(valor):
+    actual = prefijo()
+    digitos = parametro("digitos_telefono_nacional")
+    if digitos == 10 or not (valor.startswith(actual) and len(valor) == len(actual) + digitos):
+        return telefono.formatear(valor, actual)
+    nacional = valor[len(actual):]
+    primero = len(nacional) % 4 or 4
+    grupos = [nacional[:primero]] + [nacional[i:i + 4] for i in range(primero, len(nacional), 4)]
+    return f"+{actual} " + " ".join(grupos)
+
+
 def normalizar_telefono(texto):
     try:
         return telefono.normalizar(texto, prefijo(), parametro("digitos_telefono_nacional"))
@@ -78,7 +89,7 @@ def mostrar_valor(campo, valor):
     if not valor:
         return ""
     if campo.tipo == CampoContacto.TELEFONO:
-        return telefono.formatear(valor, prefijo())
+        return formatear_telefono(valor)
     return valor
 
 

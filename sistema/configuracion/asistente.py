@@ -167,7 +167,7 @@ def personalizar(request):
         recargos = dict(_estado(request).get("recargos") or {})
         with transaction.atomic():
             for clave in VOCABULARIO_BASE:
-                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": datos[clave].strip()})
+                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": datos[clave].strip() or antes[clave]})
             cambios = diferencias(antes, vocabulario())
             if cambios:
                 registrar("vocabulario_cambiado", datos={"cambios": cambios, "origen": "asistente"}, request=request)

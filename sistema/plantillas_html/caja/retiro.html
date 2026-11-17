@@ -33,7 +33,7 @@
   <form method="post" action="{% url 'caja:retiro_sin_comprobante' retiro.pk %}" class="formulario angosto" novalidate>
     {% csrf_token %}
     {% include "comun/_campos.html" with formulario=formulario_sin %}
-    <div class="acciones"><button class="boton secundario" type="submit" data-confirmar="¿Declarar el retiro sin comprobante? Supervisión recibirá el aviso.">Declarar sin comprobante</button></div>
+    <div class="acciones"><button class="boton secundario" type="submit" data-confirmar="¿Declarar el retiro sin comprobante? Recibirá el aviso {{ roles.revisar_retiros }}.">Declarar sin comprobante</button></div>
   </form>
 </section>
 {% endif %}

@@ -2,16 +2,19 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <span class="antetitulo">Configuración</span>
-    <h1>Padrón importado</h1>
-    <p class="subtitulo">{{ lote.nombre_archivo }} · {{ lote.creado|date:"d/m/Y H:i" }} · {{ lote.creados }} altas · {{ lote.familias }} {{ voc.familias|lower }} · {{ lote.cargos }} saldos deudores · {{ lote.a_favor }} saldos a favor · {{ lote.duplicados }} duplicados · {{ lote.con_error }} con error</p>
+    <span class="antetitulo">{{ voc.padron }}</span>
+    <h1>Hoja aplicada</h1>
+    <p class="subtitulo">{{ lote.nombre_archivo }} · {{ lote.creado|date:"d/m/Y H:i" }} · {{ lote.creados }} altas · {{ lote.actualizados }} actualizados · {{ lote.saltados }} saltados · {{ lote.familias }} {{ voc.familias_min }} · {{ lote.cargos }} saldos deudores · {{ lote.a_favor }} saldos a favor · {{ lote.duplicados }} sin aplicar · {{ lote.con_error }} con error{% if lote.autorizado_por %} · aprobó {{ lote.autorizado_por }}{% endif %}</p>
   </div>
 </div>
+{% if saltados %}<section class="panel"><h2>Renglones saltados</h2><ul class="lista">{% for s in saltados %}<li>{{ s }}</li>{% endfor %}</ul></section>{% endif %}
+{% if titulares %}
 <div class="atajos">
-  <a class="boton" href="{% url 'configuracion:padron_matriculas' lote.pk 'xlsx' %}">Matrículas en Excel</a>
-  <a class="boton secundario" href="{% url 'configuracion:padron_matriculas' lote.pk 'csv' %}">Matrículas en CSV</a>
+  <a class="boton" href="{% url 'configuracion:padron_matriculas' lote.pk 'xlsx' %}">{{ voc.matriculas }} en Excel</a>
+  <a class="boton secundario" href="{% url 'configuracion:padron_matriculas' lote.pk 'csv' %}">{{ voc.matriculas }} en CSV</a>
   <a class="boton secundario" href="{% url 'configuracion:padron_fichas' lote.pk %}">Fichas de pago (PDF)</a>
 </div>
 <table class="tabla compacta"><thead><tr><th>{{ voc.matricula }}</th><th>Nombre</th><th>{{ voc.familia }}</th></tr></thead>
 <tbody>{% for t in titulares %}<tr><td><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }}</a></td><td>{{ t.nombre_completo }}</td><td>{{ t.familia|default:"—" }}</td></tr>{% endfor %}</tbody></table>
+{% endif %}
 {% endblock %}

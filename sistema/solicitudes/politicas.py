@@ -3,6 +3,7 @@ AJUSTES = ("aplicar_ajustes", "solicitar_ajustes", "aprobar_solicitudes")
 RETIROS = ("aprobar_solicitudes", "retirar_efectivo", "aprobar_solicitudes")
 CONTEO = ("aprobar_solicitudes", "subir_conteo_inventario", "aprobar_solicitudes")
 DEVOLUCION = ("aprobar_solicitudes", "devolver_articulos", "aprobar_solicitudes")
+IMPORTACION = ("importar_padron", "solicitar_importacion_padron", "aprobar_solicitudes")
 
 POR_DEFECTO = {
     "correccion_nombre": ALTAS,
@@ -17,6 +18,7 @@ POR_DEFECTO = {
     "revertir_retiro": RETIROS,
     "conteo_inventario": CONTEO,
     "devolucion_efectivo": DEVOLUCION,
+    "importacion_padron": IMPORTACION,
 }
 
 

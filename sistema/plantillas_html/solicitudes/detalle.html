@@ -19,6 +19,16 @@
     {% if solicitud.nota_resolucion %}<dt>Nota de resolución</dt><dd>{{ solicitud.nota_resolucion }}</dd>{% endif %}
   </dl>
 </section>
+{% if hoja %}
+<section class="panel">
+  <h2>Detalle de la hoja</h2>
+  {% if hoja.error %}<p class="mensaje warning">{{ hoja.error }}</p>{% else %}
+  <table class="tabla compacta">
+  <thead><tr><th>Renglón</th><th>Qué pasa</th><th>Detalle</th></tr></thead>
+  <tbody>{% for f in hoja.filas %}<tr><td>{{ f.numero }}</td><td>{% if f.tipo == "cambio" %}Actualiza {{ f.matricula }}{% else %}Alta{% endif %}</td><td>{% if f.tipo == "cambio" %}{% for etiqueta, antes, despues in f.detalle %}{{ etiqueta }}: {% if hoja.ve_datos %}{{ antes|default:"—" }} → {% endif %}<strong>{{ despues }}</strong>{% if not forloop.last %} · {% endif %}{% endfor %}{% else %}{{ f.nombre }} {{ f.apellidos }}{% if f.agrupacion %} · {{ f.agrupacion }}{% endif %}{% if f.responsable %} · {{ f.responsable }}{% endif %}{% endif %}</td></tr>{% endfor %}</tbody>
+  </table>{% endif %}
+</section>
+{% endif %}
 {% if puede_resolver %}
 <div class="acciones">
   <form method="post" action="{% url 'solicitudes:aprobar' solicitud.pk %}" class="en-linea">{% csrf_token %}<button class="boton grande" type="submit">Aprobar</button></form>

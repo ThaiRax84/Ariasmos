@@ -29,10 +29,20 @@ from .models import Respaldo
 PREFIJO = "ariasmos-"
 EXTENSION = ".respaldo"
 PATRON = re.compile(r"^ariasmos-(\d{8})-(\d{6})\.respaldo$")
-DIARIOS = 30
-MENSUALES = 12
-HORAS_ALERTA = 48
-DIAS_PRUEBA = 30
+def diarios():
+    return max(1, int(parametro("respaldos_diarios")))
+
+
+def mensuales():
+    return max(0, int(parametro("respaldos_mensuales")))
+
+
+def horas_alerta():
+    return max(1, int(parametro("horas_alerta_respaldo")))
+
+
+def dias_prueba():
+    return max(1, int(parametro("dias_prueba_restauracion")))
 BASE = "base.sqlite3"
 CONFIGURACION = "configuracion.json"
 ANCLA = "ancla_auditoria.json"
@@ -234,18 +244,19 @@ def _fecha_de(nombre):
 def retener(destino):
     archivos = sorted(((f, _fecha_de(f.name)) for f in Path(destino).iterdir() if f.is_file() and _fecha_de(f.name)), key=lambda par: par[1], reverse=True)
     conservar = set()
+    limite_dias, limite_meses = diarios(), mensuales()
     dias = []
     for archivo, momento in archivos:
         if momento.date() not in dias:
             dias.append(momento.date())
-            if len(dias) <= DIARIOS:
+            if len(dias) <= limite_dias:
                 conservar.add(archivo)
     meses = []
     for archivo, momento in archivos:
         mes = (momento.year, momento.month)
         if mes not in meses:
             meses.append(mes)
-            if len(meses) <= MENSUALES:
+            if len(meses) <= limite_meses:
                 conservar.add(archivo)
     borrados = 0
     for archivo, _ in archivos:
@@ -385,7 +396,7 @@ def toca_prueba():
     ultima = Respaldo.objects.filter(tipo=Respaldo.PRUEBA).exclude(resultado=Respaldo.EN_CURSO).first()
     if ultima is None:
         return Respaldo.objects.filter(tipo=Respaldo.RESPALDO, resultado=Respaldo.CORRECTO).exists()
-    return (timezone.now() - ultima.creado).days >= DIAS_PRUEBA
+    return (timezone.now() - ultima.creado).days >= dias_prueba()
 
 
 def alertas():
@@ -393,8 +404,9 @@ def alertas():
     if not carpeta():
         avisos.append("No hay carpeta de respaldo configurada: no se están haciendo respaldos.")
     ultimo = Respaldo.objects.filter(tipo=Respaldo.RESPALDO, resultado=Respaldo.CORRECTO).first()
-    if ultimo is None or (timezone.now() - ultimo.creado).total_seconds() > HORAS_ALERTA * 3600:
-        avisos.append(f"El último respaldo correcto tiene más de {HORAS_ALERTA} horas." if ultimo else "Todavía no hay ningún respaldo correcto.")
+    horas = horas_alerta()
+    if ultimo is None or (timezone.now() - ultimo.creado).total_seconds() > horas * 3600:
+        avisos.append(f"El último respaldo correcto tiene más de {horas} horas." if ultimo else "Todavía no hay ningún respaldo correcto.")
     prueba = Respaldo.objects.filter(tipo=Respaldo.PRUEBA).exclude(resultado=Respaldo.EN_CURSO).first()
     if prueba is not None and prueba.resultado == Respaldo.FALLO:
         avisos.append(f"La última prueba de restauración falló: {prueba.mensaje}")

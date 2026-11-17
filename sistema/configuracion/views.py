@@ -35,7 +35,7 @@ from .formularios import (
     guardar_caja,
     valores_caja,
 )
-from .models import PARAMETROS, VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, parametro, vocabulario
+from .models import PARAMETROS, VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, con_vocabulario, parametro, vocabulario
 
 PERMISO = "administrar_configuracion"
 
@@ -66,13 +66,13 @@ def avanzado(request):
     if request.method == "POST":
         if actual.matriculas_emitidas:
             registrar("ajustes_avanzados_rechazados", usuario=request.user, objeto=actual, datos={"motivo": "matriculas_emitidas"}, request=request)
-            messages.error(request, "Ya se emitieron matrículas: estos ajustes no se pueden cambiar.")
+            messages.error(request, f"Ya se emitieron {vocabulario()['matriculas_min']}: estos ajustes no se pueden cambiar.")
             return redirect("configuracion:avanzado")
         if formulario.is_valid():
             with transaction.atomic():
                 bloqueado = Negocio.objects.filter(pk=1, contador_matricula=0).exists()
                 if not bloqueado:
-                    messages.error(request, "Ya se emitieron matrículas: estos ajustes no se pueden cambiar.")
+                    messages.error(request, f"Ya se emitieron {vocabulario()['matriculas_min']}: estos ajustes no se pueden cambiar.")
                     return redirect("configuracion:avanzado")
                 guardado = formulario.save()
                 registrar("configuracion_cambiada", usuario=request.user, objeto=guardado, datos={"cambios": diferencias(antes, model_to_dict(guardado, fields=list(antes)))}, request=request)
@@ -135,7 +135,7 @@ def textos(request):
     if request.method == "POST" and formulario.is_valid():
         with transaction.atomic():
             for clave in VOCABULARIO_BASE:
-                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": formulario.cleaned_data[clave]})
+                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": formulario.cleaned_data[clave].strip() or antes[clave]})
             registrar("vocabulario_cambiado", usuario=request.user, datos={"cambios": diferencias(antes, vocabulario())}, request=request)
         messages.success(request, "Vocabulario guardado.")
         return redirect("configuracion:indice")
@@ -237,7 +237,7 @@ CATALOGOS = {
 }
 
 TITULOS = {
-    "agrupaciones": "Agrupaciones",
+    "agrupaciones": "{agrupaciones}",
     "motivos": "Motivos de baja",
     "relaciones": "Relaciones de contacto",
     "campos": "Campos de contacto",
@@ -252,7 +252,7 @@ def catalogo(request, catalogo):
     if catalogo not in CATALOGOS:
         return redirect("configuracion:indice")
     modelo = CATALOGOS[catalogo][0]
-    return render(request, "configuracion/catalogo.html", {"elementos": modelo.objects.all(), "catalogo": catalogo, "titulo": TITULOS[catalogo]})
+    return render(request, "configuracion/catalogo.html", {"elementos": modelo.objects.all(), "catalogo": catalogo, "titulo": con_vocabulario(TITULOS[catalogo])})
 
 
 def _guardar_catalogo(request, catalogo, pk=None):
@@ -268,7 +268,7 @@ def _guardar_catalogo(request, catalogo, pk=None):
             registrar(f"{evento}_{'cambiado' if antes else 'creado'}", usuario=request.user, objeto=guardado, datos={"nombre": str(guardado), "cambios": diferencias(antes or {}, model_to_dict(guardado))}, request=request)
         messages.success(request, "Guardado.")
         return redirect("configuracion:catalogo", catalogo=catalogo)
-    titulo = TITULOS[catalogo] + (": nuevo" if instancia is None else f": {instancia}")
+    titulo = con_vocabulario(TITULOS[catalogo]) + (": nuevo" if instancia is None else f": {instancia}")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": titulo, "boton": "Guardar"})
 
 

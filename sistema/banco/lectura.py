@@ -10,7 +10,8 @@ from openpyxl import load_workbook
 from pypdf import PdfReader
 
 from nucleo.dinero import ErrorImporte, a_centavos
-from nucleo.lectores import santander_pyme
+
+from . import adaptadores
 
 LIMITE_PDF = 10 * 1024 * 1024
 MAXIMO_PAGINAS = 300
@@ -62,7 +63,7 @@ def lineas_de_pdf(contenido):
         lineas = []
         for pagina in lector.pages:
             lineas.extend((pagina.extract_text(extraction_mode="layout") or "").splitlines())
-            if len(lineas) > santander_pyme.MAXIMO_LINEAS:
+            if len(lineas) > adaptadores.MAXIMO_LINEAS:
                 raise ErrorLectura("El PDF tiene demasiado texto.")
     except ErrorLectura:
         raise

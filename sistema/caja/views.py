@@ -8,6 +8,7 @@ from django.views.decorators.http import require_POST
 
 from auditoria.servicios import diferencias, registrar
 from cuentas.decoradores import requiere_permiso
+from cuentas.permisos import quienes
 from solicitudes import motor
 
 from . import comprobantes, retiros, servicios
@@ -314,7 +315,7 @@ def retiro_sin_comprobante(request, pk):
         return redirect("caja:retiro", pk=pk)
     try:
         retiros.sin_comprobante(objeto, request.user, formulario.cleaned_data["motivo"], request)
-        messages.warning(request, "Se declaró sin comprobante; Supervisión recibe el aviso.")
+        messages.warning(request, f"Se declaró sin comprobante; recibe el aviso {quienes('revisar_retiros')}.")
     except servicios.ErrorCaja as error:
         messages.error(request, str(error))
     return redirect("caja:retiro", pk=pk)

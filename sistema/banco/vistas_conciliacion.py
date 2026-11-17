@@ -13,12 +13,13 @@ from django.views.decorators.http import require_POST
 
 from caja.models import Traslado
 from cuentas.decoradores import requiere_permiso
-from configuracion.models import Negocio
+from cuentas.permisos import quienes
+from configuracion.models import Negocio, vocabulario
 from nucleo.matricula import normalizar
 from proyecto.captura import CampoGuiadoTexto
 from titulares.models import Titular
 
-from . import conciliacion, lectura
+from . import adaptadores, conciliacion, lectura
 from .formularios import NOMBRES_DIAS
 from .models import HORAS_CARGA, CargaTemporal, CuentaBancaria, Importacion, MovimientoBancario, depurar_cargas
 
@@ -29,7 +30,7 @@ REVISA = "ver_auditoria"
 
 class FormularioSubida(forms.Form):
     archivo = forms.FileField(label="Estado de cuenta (PDF) o archivo de movimientos (Excel .xlsx o CSV)")
-    cuenta = forms.ModelChoiceField(label="Cuenta (solo para Excel o CSV; el PDF trae su CLABE)", queryset=CuentaBancaria.objects.none(), required=False)
+    cuenta = forms.ModelChoiceField(label="Cuenta (obligatoria con Excel o CSV; con PDF se reconoce por su CLABE)", queryset=CuentaBancaria.objects.none(), required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -57,13 +58,14 @@ class FormularioMatricula(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         negocio = Negocio.actual()
+        self.fields["matricula"].label = vocabulario()["matricula"]
         self.fields["matricula"].maximo_tecleo = (negocio.longitud_matricula if negocio else 7) + 2
 
     def clean_matricula(self):
         digitos = normalizar(self.cleaned_data["matricula"])
         titular = Titular.objects.filter(matricula=digitos).exclude(estado=Titular.RECHAZADO).first()
         if titular is None:
-            raise forms.ValidationError("No hay un registro con esa matrícula.")
+            raise forms.ValidationError(f"No hay un registro con {vocabulario()['matricula_min']} {digitos}.")
         return titular
 
 
@@ -88,7 +90,7 @@ def importar(request):
             contenido = lectura.leer_subida(archivo, lectura.LIMITE_PDF)
             nombre = lectura.nombre_saneado(archivo.name)
             if contenido.startswith(b"%PDF") or nombre.lower().endswith(".pdf"):
-                cuenta, movimientos, resumen = conciliacion.movimientos_de_pdf(lectura.lineas_de_pdf(contenido))
+                cuenta, movimientos, resumen = conciliacion.movimientos_de_pdf(lectura.lineas_de_pdf(contenido), formulario.cleaned_data.get("cuenta"))
                 datos = {"cuenta": cuenta.pk, "movimientos": movimientos, "resumen": resumen, "adaptador": Importacion.ESTADO_PDF}
                 tipo = CargaTemporal.BANCO_PDF
             else:
@@ -105,7 +107,7 @@ def importar(request):
             carga = CargaTemporal.objects.create(token=secrets.token_urlsafe(32), tipo=tipo, usuario=request.user, nombre_archivo=nombre, sha256=lectura.huella_archivo(contenido), datos=datos)
             destino = "conciliacion:previa" if tipo == CargaTemporal.BANCO_PDF else "conciliacion:columnas"
             return redirect(destino, token=carga.token)
-    return render(request, "banco/importar.html", {"formulario": formulario})
+    return render(request, "banco/importar.html", {"formulario": formulario, "lectores_pdf": adaptadores.nombres()})
 
 
 @requiere_permiso(CONCILIA)
@@ -250,10 +252,10 @@ def _resolver(request, pk, accion):
 def proponer(request, pk):
     formulario = FormularioMatricula(request.POST)
     if not formulario.is_valid():
-        messages.error(request, "; ".join(formulario.errors.get("matricula", ["Matrícula no válida."])))
+        messages.error(request, "; ".join(formulario.errors.get("matricula", [f"{vocabulario()['matricula']}: no es válida."])))
         return redirect("conciliacion:movimiento", pk=pk)
     respuesta = _resolver(request, pk, lambda m: conciliacion.proponer(m, formulario.cleaned_data["matricula"], request.user, request))
-    messages.info(request, "Propuesta registrada; Supervisión la confirmará.")
+    messages.info(request, f"Propuesta registrada; la confirmará {quienes('conciliar_banco')}.")
     return respuesta
 
 
@@ -262,7 +264,7 @@ def proponer(request, pk):
 def confirmar(request, pk):
     formulario = FormularioMatricula(request.POST)
     if not formulario.is_valid():
-        messages.error(request, "; ".join(formulario.errors.get("matricula", ["Matrícula no válida."])))
+        messages.error(request, "; ".join(formulario.errors.get("matricula", [f"{vocabulario()['matricula']}: no es válida."])))
         return redirect("conciliacion:movimiento", pk=pk)
     return _resolver(request, pk, lambda m: conciliacion.confirmar(m, formulario.cleaned_data["matricula"], request.user, request))
 

@@ -7,7 +7,7 @@
   </div>
 </div>
 <div class="atajos">
-  {% if "vender_articulos" in permisos %}<a class="boton" href="{% url 'inventario:vender' %}">Vender a un {{ voc.titular|lower }}</a> <a class="boton" href="{% url 'inventario:vender_publico' %}">Vender sin {{ voc.matricula|lower }}</a>{% endif %}
+  {% if "vender_articulos" in permisos %}<a class="boton" href="{% url 'inventario:vender' %}">Vender a un {{ voc.titular_min }}</a> <a class="boton" href="{% url 'inventario:vender_publico' %}">Vender sin {{ voc.matricula_min }}</a>{% endif %}
   {% if "devolver_articulos" in permisos %}<a class="boton secundario" href="{% url 'inventario:devolver' %}">Devolución</a>{% endif %}
   {% if "registrar_movimientos_inventario" in permisos %}<a class="boton secundario" href="{% url 'inventario:registro_nuevo' %}">Entrada o merma</a>{% endif %}
   {% if "subir_conteo_inventario" in permisos %}<a class="boton secundario" href="{% url 'inventario:conteo' %}">Conteo mensual</a>{% endif %}

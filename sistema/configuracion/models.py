@@ -1,3 +1,4 @@
+import re
 from zoneinfo import ZoneInfo
 
 from django.db import models
@@ -12,7 +13,12 @@ VOCABULARIO_BASE = {
     "agrupaciones": "Agrupaciones",
     "familia": "Familia",
     "familias": "Familias",
+    "padron": "Padrón",
+    "descuento": "Descuento",
+    "publico": "Público en general",
 }
+
+PLURALES_DERIVADOS = {"matriculas": "matricula", "descuentos": "descuento"}
 
 PARAMETROS = {
     "intentos_antes_de_bloqueo": (5, "Intentos fallidos de inicio de sesión antes de bloquear la cuenta"),
@@ -28,11 +34,11 @@ PARAMETROS = {
     "dia_generacion_cargos": (1, "Día del mes en que se generan los cargos recurrentes"),
     "orden_reparto": ("recargos,vencimiento,prioridad", "Orden en que un pago cubre los cargos (recargos, vencimiento, prioridad, separados por comas)"),
     "tope_pago_individual": (5000000, "Importe máximo en centavos de un pago individual sin autorización"),
-    "umbral_diferencia_arqueo": (1000, "Diferencia en centavos a partir de la cual el arqueo pide nota y avisa a Supervisión"),
+    "umbral_diferencia_arqueo": (1000, "Diferencia en centavos a partir de la cual el arqueo pide nota y avisa a {rol:recibir_efectivo}"),
     "dias_maximos_efectivo_sin_trasladar": (2, "Días que el efectivo puede quedarse con una persona sin entregarse ni depositarse"),
     "dias_maximos_deposito_sin_conciliar": (5, "Días que un depósito registrado puede quedar sin aparecer en el banco antes de alertar"),
     "confirmaciones_pagador_confiable": (2, "Confirmaciones de un pagador para considerarlo confiable"),
-    "aplicar_solo_por_pagador": (0, "1 para aplicar sin revisión los abonos de un pagador confiable aunque no traigan matrícula; 0 para solo sugerirlos"),
+    "aplicar_solo_por_pagador": (0, "1 para aplicar sin revisión los abonos de un pagador confiable aunque no traigan {matricula_min}; 0 para solo sugerirlos"),
     "dias_tolerancia_deposito": (3, "Días de diferencia aceptados entre un depósito de caja y su abono en el banco"),
     "serie_recibos_banco": ("B", "Serie de los recibos de pagos por banco"),
     "serie_recibos_saldo_inicial": ("S", "Serie de los recibos de saldo inicial a favor"),
@@ -53,7 +59,7 @@ PARAMETROS = {
     "tope_retiros_periodo": (0, "Importe máximo en centavos de los retiros de una caja en el periodo sin autorización"),
     "maximo_retiros_periodo": (0, "Número máximo de retiros de una caja en el periodo sin autorización"),
     "maximo_efectivo_caja": (0, "Efectivo máximo en centavos en una caja antes de avisar que se entregue (0 sin aviso)"),
-    "dias_retiro_sin_revisar": (3, "Días que un retiro puede quedar sin revisar antes de avisar a Supervisión"),
+    "dias_retiro_sin_revisar": (3, "Días que un retiro puede quedar sin revisar antes de avisar a {rol:revisar_retiros}"),
     "serie_retiros": ("R", "Serie de los folios de retiros de caja"),
     "intentos_verificar_recibo_por_hora": (20, "Verificaciones de recibo fallidas por hora, por persona y por equipo, antes de bloquear la verificación"),
     "propuestas_cambio_sin_cobro": (10, "Propuestas de cambio sin cobro registrado que se permiten por turno"),
@@ -63,8 +69,19 @@ PARAMETROS = {
     "modulo_inventario": (0, "1 para usar el inventario; 0 para ocultarlo"),
     "devoluciones_inventario": (0, "1 para aceptar devoluciones de artículos vendidos; 0 para no aceptarlas"),
     "dias_devolucion": (15, "Días después de la venta en que se acepta una devolución de artículos"),
-    "dias_conteo_sin_aprobar": (2, "Días que un conteo de inventario puede esperar aprobación antes de avisar a Dirección"),
+    "dias_conteo_sin_aprobar": (2, "Días que un conteo de inventario puede esperar aprobación antes de avisar a {rol:aprobar_solicitudes}"),
     "serie_devoluciones": ("D", "Serie de los recibos de saldo a favor por devolución de artículos"),
+    "tramos_cartera": ("30,60,90", "Días en que se parten los tramos de antigüedad de la cartera vencida, de menor a mayor y separados por comas"),
+    "tamano_hoja": ("carta", "Tamaño de hoja de los PDF (carta o a4)"),
+    "pedir_consentimiento": (1, "1 para pedir la constancia de consentimiento de datos al dar de alta; 0 para no pedirla"),
+    "texto_consentimiento": ("Se entregó el aviso de privacidad y se obtuvo el consentimiento", "Texto de la constancia de consentimiento de datos al dar de alta"),
+    "apellidos_obligatorios": (1, "1 para exigir apellidos al dar de alta; 0 para permitir altas sin apellidos (por ejemplo, empresas)"),
+    "respaldos_diarios": (30, "Respaldos diarios que se conservan"),
+    "respaldos_mensuales": (12, "Respaldos mensuales que se conservan"),
+    "horas_alerta_respaldo": (48, "Horas sin un respaldo correcto antes de avisar"),
+    "dias_prueba_restauracion": (30, "Días entre pruebas de restauración"),
+    "rechazos_antes_de_autorizar": (3, "Retiros rechazados por tope en un turno antes de que el siguiente pida autorización"),
+    "porcentaje_aviso_tope": (80, "Porcentaje del tope de retiros del periodo en el que se avisa que se está por alcanzar"),
     "porcentaje_existencia_baja": (20, "Porcentaje de su nivel de referencia (existencia tras su última entrada o conteo aprobado) en o bajo el cual un artículo tiene existencia baja"),
 }
 
@@ -142,10 +159,80 @@ class Parametro(models.Model):
         return f"{self.clave}={self.valor}"
 
 
+SIN_TILDE = str.maketrans("áéíóú", "aeiou")
+
+
+def minuscula(texto):
+    if len(texto) > 1 and texto[1].isupper():
+        return texto
+    return texto[:1].lower() + texto[1:]
+
+
+def plural(texto):
+    primera, espacio, resto = texto.partition(" ")
+    if not primera or not primera[-1].isalpha():
+        return texto
+    final = primera[-1].lower()
+    if len(primera) > 1 and primera.isupper():
+        nueva = primera
+    elif final in "aeiouáéó":
+        nueva = primera + "s"
+    elif final in "sx":
+        nueva = primera
+    elif final == "z":
+        nueva = primera[:-1] + ("C" if primera[-1].isupper() else "c") + "es"
+    else:
+        nueva = primera
+        if len(primera) > 2 and primera[-2] in "áéíóú" and final in "ns":
+            nueva = primera[:-2] + primera[-2].translate(SIN_TILDE) + primera[-1]
+        nueva += "es"
+    return nueva + espacio + resto
+
+
+class Textos(dict):
+    def __missing__(self, clave):
+        if clave.endswith("_min"):
+            return minuscula(self[clave[:-4]])
+        if clave in PLURALES_DERIVADOS:
+            return plural(self[PLURALES_DERIVADOS[clave]])
+        raise KeyError(clave)
+
+    def get(self, clave, defecto=None):
+        try:
+            return self[clave]
+        except KeyError:
+            return defecto
+
+    def __contains__(self, clave):
+        return dict.__contains__(self, clave)
+
+
 def vocabulario():
-    textos = dict(VOCABULARIO_BASE)
-    textos.update(dict(Vocabulario.objects.values_list("clave", "texto")))
+    textos = Textos(VOCABULARIO_BASE)
+    textos.update(dict(Vocabulario.objects.filter(clave__in=VOCABULARIO_BASE).values_list("clave", "texto")))
     return textos
+
+
+def con_vocabulario(texto, voc=None):
+    return str(texto).format_map(voc if voc is not None else vocabulario())
+
+
+def opciones_vocabulario(opciones, voc=None):
+    voc = voc if voc is not None else vocabulario()
+    return [(clave, con_vocabulario(texto, voc)) for clave, texto in opciones]
+
+
+ROL_EN_TEXTO = re.compile(r"\{rol:([a-z_]+)\}")
+
+
+def con_roles(texto):
+    from cuentas.permisos import quienes
+
+    return ROL_EN_TEXTO.sub(lambda encontrado: quienes(encontrado.group(1)), texto)
+
+
+def descripcion_parametro(clave):
+    return con_vocabulario(con_roles(PARAMETROS[clave][1]))
 
 
 def parametro(clave):

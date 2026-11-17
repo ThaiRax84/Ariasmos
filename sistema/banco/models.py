@@ -49,11 +49,16 @@ class CuentaBancaria(models.Model):
     CONCEPTO = "concepto"
     AMBOS = "ambos"
     REFERENCIA = [(AMBOS, "Referencia numérica y concepto"), (NUMERICA, "Solo referencia numérica"), (CONCEPTO, "Solo concepto")]
+    CLABE = "clabe"
+    OTRA = "otra"
+    TIPOS = [(CLABE, "CLABE"), (OTRA, "Otra cuenta")]
 
-    banco = models.ForeignKey(Banco, on_delete=models.PROTECT, related_name="cuentas")
-    clabe = models.CharField(max_length=18)
+    tipo = models.CharField(max_length=5, choices=TIPOS, default=CLABE)
+    banco = models.ForeignKey(Banco, null=True, blank=True, on_delete=models.PROTECT, related_name="cuentas")
+    banco_nombre = models.CharField(max_length=80, blank=True)
+    clabe = models.CharField(max_length=18, blank=True)
     beneficiario = models.CharField(max_length=150)
-    numero_cuenta = models.CharField(max_length=30, blank=True)
+    numero_cuenta = models.CharField(max_length=34, blank=True)
     convenio = models.CharField(max_length=30, blank=True)
     medios = models.ManyToManyField(MedioPago, blank=True, related_name="cuentas")
     referencia_en = models.CharField(max_length=10, choices=REFERENCIA, default=AMBOS)
@@ -67,16 +72,39 @@ class CuentaBancaria(models.Model):
         ordering = ["-principal", "banco__nombre"]
         constraints = [
             models.UniqueConstraint(fields=["principal"], condition=Q(principal=True), name="cuenta_bancaria_una_principal"),
-            models.CheckConstraint(condition=Q(clabe__regex=r"^[0-9]{18}$"), name="cuenta_bancaria_clabe_18"),
+            models.CheckConstraint(
+                condition=(Q(tipo="clabe") & Q(clabe__regex=r"^[0-9]{18}$") & Q(banco__isnull=False)) | (Q(tipo="otra") & Q(clabe="") & ~Q(numero_cuenta="") & ~Q(banco_nombre="")),
+                name="cuenta_bancaria_clabe_u_otra",
+            ),
             models.CheckConstraint(condition=Q(principal=False) | Q(activa=True), name="cuenta_bancaria_principal_activa"),
         ]
 
     def __str__(self):
-        return f"{self.banco} · {self.clabe_formateada}"
+        return f"{self.nombre_banco} · {self.numero_formateado}"
+
+    @property
+    def es_clabe(self):
+        return self.tipo == self.CLABE
+
+    @property
+    def nombre_banco(self):
+        return str(self.banco) if self.banco_id else self.banco_nombre
 
     @property
     def clabe_formateada(self):
-        return nucleo_clabe.formatear(self.clabe)
+        return nucleo_clabe.formatear(self.clabe) if self.clabe else ""
+
+    @property
+    def identificador(self):
+        return self.clabe if self.es_clabe else self.numero_cuenta
+
+    @property
+    def etiqueta_numero(self):
+        return "CLABE" if self.es_clabe else "Número de cuenta"
+
+    @property
+    def numero_formateado(self):
+        return self.clabe_formateada if self.es_clabe else self.numero_cuenta
 
     @classmethod
     def principal_activa(cls):
@@ -183,12 +211,12 @@ class MovimientoBancario(models.Model):
         "dia_aplicado_solo",
     } | COMPLETABLES
     RETENCIONES = {
-        "excede_adeudo": "El importe es mayor que el adeudo vigente de la familia: dejaría saldo a favor",
+        "excede_adeudo": "El importe es mayor que el adeudo vigente de {familia_min}: dejaría saldo a favor",
         "tope_pago": "El importe pasa del tope de un pago aplicado desde la carpeta",
         "fecha_futura": "La fecha del movimiento es futura",
         "fuera_de_estado": "Cae en un periodo que ya cubre un estado en PDF y no está en ese estado",
-        "titular_inactivo": "El titular no está activo",
-        "matricula_repetida": "La misma matrícula ya recibió otro pago en este archivo",
+        "titular_inactivo": "{titular} no está activo",
+        "matricula_repetida": "{matricula} ya recibió otro pago en este archivo",
         "saldos_no_cuadran": "Los saldos del archivo no cuadran renglón a renglón con los importes",
         "saldo_no_continua": "El saldo del archivo no continúa el último saldo conocido de la cuenta",
         "tope_exposicion": "Rebasaría el tope acumulado de pagos aplicados sin respaldo de un estado en PDF",
@@ -265,7 +293,10 @@ class MovimientoBancario(models.Model):
 
     @property
     def motivos_retencion(self):
-        return [self.RETENCIONES.get(codigo, codigo) for codigo in self.retencion.split(",") if codigo]
+        from configuracion.models import con_vocabulario, vocabulario
+
+        voc = vocabulario()
+        return [con_vocabulario(self.RETENCIONES.get(codigo, codigo), voc) for codigo in self.retencion.split(",") if codigo]
 
     @property
     def cuenta_pagador_enmascarada(self):
@@ -293,7 +324,7 @@ class CargaTemporal(models.Model):
     BANCO_PDF = "banco_pdf"
     BANCO_ARCHIVO = "banco_archivo"
     PADRON = "padron"
-    TIPOS = [(BANCO_PDF, "Estado de cuenta"), (BANCO_ARCHIVO, "Archivo de movimientos"), (PADRON, "Padrón")]
+    TIPOS = [(BANCO_PDF, "Estado de cuenta"), (BANCO_ARCHIVO, "Archivo de movimientos"), (PADRON, "Importación de registros")]
 
     token = models.CharField(max_length=43, unique=True)
     tipo = models.CharField(max_length=14, choices=TIPOS)

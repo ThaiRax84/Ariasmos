@@ -1,6 +1,6 @@
 from django import template
 
-from cuentas.permisos import PERMISOS
+from cuentas.permisos import PERMISOS, etiqueta
 from configuracion.moneda import formatear
 
 register = template.Library()
@@ -15,7 +15,14 @@ def dinero(centavos):
 
 @register.filter
 def nombre_permiso(codigo):
-    return PERMISOS.get(codigo, codigo)
+    return etiqueta(codigo) if codigo in PERMISOS else codigo
+
+
+@register.filter
+def voc(texto):
+    from configuracion.models import con_vocabulario
+
+    return con_vocabulario(texto)
 
 
 @register.filter

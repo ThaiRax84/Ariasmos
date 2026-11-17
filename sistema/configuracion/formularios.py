@@ -14,18 +14,23 @@ from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
 from . import moneda
-from .models import ESPECIALES, PARAMETROS, VOCABULARIO_BASE, Negocio
+from .models import ESPECIALES, PARAMETROS, VOCABULARIO_BASE, Negocio, con_vocabulario, descripcion_parametro, opciones_vocabulario, vocabulario
 
 
 ETIQUETAS_VOCABULARIO = {
-    "titular": "Cómo se llama a cada titular (singular)",
+    "titular": "Cómo se llama a cada quien se le cobra (singular)",
     "titulares": "Plural",
-    "matricula": "Cómo se llama la matrícula",
-    "agrupacion": "Cómo se llama una agrupación (singular)",
+    "matricula": "Cómo se llama el número único de cada uno, el que se escribe al pagar en el banco",
+    "agrupacion": "Cómo se llama un grupo de ellos (singular)",
     "agrupaciones": "Plural",
     "familia": "Cómo se llama a quienes paga la misma persona (singular)",
     "familias": "Plural",
+    "padron": "Cómo se llama la lista de todos ellos",
+    "descuento": "Cómo se llama una reducción en porcentaje autorizada a alguien",
+    "publico": "Cómo se llama a quien compra sin estar registrado",
 }
+
+OPCIONALES_VOCABULARIO = ("padron", "descuento", "publico")
 
 
 def validar_zona(valor):
@@ -73,10 +78,11 @@ class FormularioAjustesAvanzados(forms.ModelForm):
     class Meta:
         model = Negocio
         fields = ["longitud_matricula", "sede", "ranuras"]
-        labels = {"longitud_matricula": "Longitud de la matrícula", "sede": "Número de sede", "ranuras": "Ranuras (sedes posibles)"}
+        labels = {"sede": "Número de sede", "ranuras": "Ranuras (sedes posibles)"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["longitud_matricula"].label = f"Dígitos de {vocabulario()['matricula_min']}"
         if self.instance.pk and self.instance.matriculas_emitidas:
             for campo in self.fields.values():
                 campo.disabled = True
@@ -98,15 +104,16 @@ class FormularioVocabulario(forms.Form):
         super().__init__(*args, **kwargs)
         etiquetas = ETIQUETAS_VOCABULARIO
         for clave in VOCABULARIO_BASE:
-            self.fields[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave])
+            self.fields[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave], required=clave not in OPCIONALES_VOCABULARIO)
 
 
 class FormularioParametros(forms.Form):
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
-        for clave, (defecto, descripcion) in PARAMETROS.items():
+        for clave, (defecto, _) in PARAMETROS.items():
             if clave in ESPECIALES:
                 continue
+            descripcion = descripcion_parametro(clave)
             inicial = (valores or {}).get(clave, defecto)
             if isinstance(defecto, str):
                 self.fields[clave] = forms.CharField(label=descripcion, max_length=200, initial=inicial)
@@ -310,16 +317,17 @@ class FormularioPersonalizar(forms.Form):
     nuevo_nombre = forms.CharField(label="Agregar concepto: nombre", max_length=100, required=False)
     nuevo_tipo = forms.ChoiceField(label="Tipo", choices=ConceptoCobro.TIPOS, required=False)
     nuevo_periodicidad = forms.ChoiceField(label="Periodicidad (solo recurrentes)", choices=[("", "—")] + ConceptoCobro.PERIODICIDADES, required=False)
-    nuevo_aplica_a = forms.ChoiceField(label="Aplica a", choices=[c for c in ConceptoCobro.APLICA if c[0] != ConceptoCobro.AGRUPACION], required=False)
+    nuevo_aplica_a = forms.ChoiceField(label="Aplica a", choices=[], required=False)
     nuevo_recargo = forms.BooleanField(label="Con recargo por pago tardío", required=False)
 
     def __init__(self, *args, textos=None, conceptos=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.conceptos = list(conceptos)
+        self.fields["nuevo_aplica_a"].choices = [c for c in opciones_vocabulario(ConceptoCobro.APLICA) if c[0] != ConceptoCobro.AGRUPACION]
         etiquetas = ETIQUETAS_VOCABULARIO
         campos = {}
         for clave in VOCABULARIO_BASE:
-            campos[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave])
+            campos[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave], required=clave not in OPCIONALES_VOCABULARIO)
         for concepto in self.conceptos:
             campos[f"quitar_{concepto.pk}"] = forms.BooleanField(label=f"Quitar «{concepto.nombre}» ({concepto.get_tipo_display().lower()})", required=False)
         campos.update(self.fields)
@@ -346,7 +354,9 @@ class FormularioAsistenteConceptos(forms.Form):
         for concepto in self.conceptos:
             self.fields[f"importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe", required=False)
             if concepto.tipo == "recurrente":
-                self.fields[f"dia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: día de vencimiento (1 a 28)", min_value=1, max_value=28, required=False)
+                maximo = {"semanal": 7, "quincenal": 15}.get(concepto.periodicidad, 28)
+                ayuda = {"semanal": "día de la semana en que vence (1 lunes a 7 domingo)", "quincenal": "día en que vence la primera quincena (1 a 15); la segunda, quince días después"}.get(concepto.periodicidad, "día de vencimiento (1 a 28)")
+                self.fields[f"dia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: {ayuda}", min_value=1, max_value=maximo, required=False)
             if concepto.nombre in (con_recargo or {}):
                 sugerido = (con_recargo or {})[concepto.nombre] or {}
                 self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: tipo de recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"), required=False)
@@ -484,7 +494,8 @@ class FormularioAsistenteCortes(FormularioCarpetaBanco):
     def __init__(self, *args, niveles=None, carpeta="", carpeta_banco="", pide_clave=False, topes=None, **kwargs):
         super().__init__(*args, **kwargs)
         from banco.formularios import campos_topes, iniciales_topes
-        from cortes.models import NIVELES, TIPOS
+        from cortes.models import TIPOS, nombre_de_tipo
+        from cortes.models import niveles as opciones_nivel
 
         self.fields.update(campos_topes())
         for nombre, valor in iniciales_topes(topes or {}).items():
@@ -496,8 +507,9 @@ class FormularioAsistenteCortes(FormularioCarpetaBanco):
             self.fields["repositorio_canal"] = forms.CharField(label="Repositorio del canal de versiones (propietario/nombre)", max_length=140, required=False)
             self.fields["clave_canal"] = forms.CharField(label="Clave de solo lectura del canal (se guarda cifrada y no se vuelve a mostrar)", max_length=300, required=False, widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password"}))
 
-        for tipo, nombre in TIPOS:
-            self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre}", choices=NIVELES, initial=(niveles or {}).get(tipo, "solo_nombres"))
+        opciones = opciones_nivel()
+        for tipo, _ in TIPOS:
+            self.fields[f"nivel_{tipo}"] = forms.ChoiceField(label=f"Nivel de detalle: {nombre_de_tipo(tipo)}", choices=opciones, initial=(niveles or {}).get(tipo, "solo_nombres"))
         self.initial.setdefault("carpeta_respaldo", carpeta)
         self.initial.setdefault("carpeta_banco", carpeta_banco)
         from .models import parametro

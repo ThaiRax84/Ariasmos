@@ -10,7 +10,7 @@
 <div class="atajos"><a class="boton" href="{% url 'cortes:destino_nuevo' %}">Agregar carpeta</a></div>
 <table class="tabla">
 <thead><tr><th>Nombre</th><th>Carpeta</th><th>Activo</th><th>Qué recibe</th></tr></thead>
-<tbody>{% for d in destinos %}<tr><td><a href="{% url 'cortes:destino_editar' d.pk %}">{{ d.nombre }}</a></td><td><code>{{ d.ruta }}</code></td><td>{{ d.activo|yesno:"sí,no" }}</td><td>{% for r in d.reglas.all %}{% if r.entregar %}{{ r.get_tipo_display }} ({{ r.get_nivel_display|truncatewords:2 }}){% if not forloop.last %}; {% endif %}{% endif %}{% endfor %}</td></tr>{% empty %}<tr><td colspan="4">No hay destinos: los cortes no se entregan a ninguna carpeta.</td></tr>{% endfor %}</tbody>
+<tbody>{% for d in destinos %}<tr><td><a href="{% url 'cortes:destino_editar' d.pk %}">{{ d.nombre }}</a></td><td><code>{{ d.ruta }}</code></td><td>{{ d.activo|yesno:"sí,no" }}</td><td>{% for r in d.reglas.all %}{% if r.entregar %}{{ r.nombre_tipo }} ({{ r.get_nivel_display|truncatewords:2 }}){% if not forloop.last %}; {% endif %}{% endif %}{% endfor %}</td></tr>{% empty %}<tr><td colspan="4">No hay destinos: los cortes no se entregan a ninguna carpeta.</td></tr>{% endfor %}</tbody>
 </table>
 {% if problemas %}
 <section class="panel alerta">

@@ -9,7 +9,7 @@
 {% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
 <form method="get" class="buscador" role="search">
   <label class="solo-lectores" for="buscar-cobro">Buscar</label>
-  <input id="buscar-cobro" type="search" name="q" value="{{ q }}" placeholder="Buscar {{ voc.titular|lower }} por {{ voc.matricula|lower }} o nombre" aria-label="Buscar" autofocus>
+  <input id="buscar-cobro" type="search" name="q" value="{{ q }}" placeholder="Buscar {{ voc.titular_min }} por {{ voc.matricula_min }} o nombre" aria-label="Buscar" autofocus>
   <button class="boton chico" type="submit">Buscar</button>
 </form>
 {% if resultados or q %}

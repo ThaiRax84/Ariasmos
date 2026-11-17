@@ -13,18 +13,17 @@ from cobros.models import Pago
 from configuracion.models import Negocio, hoy_negocio, parametro
 from nucleo import identificacion, reparto
 from configuracion.moneda import formatear
-from nucleo.lectores import santander_pyme
 from titulares.models import Titular
 
-from . import lectura
+from . import adaptadores, lectura
 from .models import CuentaBancaria, Importacion, MapeoColumnas, MovimientoBancario, ReglaPagador, TopeDiarioBanco
 
 CLASES_PDF = {
-    santander_pyme.SPEI: MovimientoBancario.SPEI,
-    santander_pyme.MISMO_BANCO: MovimientoBancario.MISMO_BANCO,
-    santander_pyme.EFECTIVO: MovimientoBancario.EFECTIVO,
-    santander_pyme.DEVOLUCION: MovimientoBancario.DEVOLUCION,
-    santander_pyme.OTRO: MovimientoBancario.OTRO,
+    "spei": MovimientoBancario.SPEI,
+    "mismo_banco": MovimientoBancario.MISMO_BANCO,
+    "efectivo": MovimientoBancario.EFECTIVO,
+    "devolucion": MovimientoBancario.DEVOLUCION,
+    "otro": MovimientoBancario.OTRO,
 }
 COBRABLES = (MovimientoBancario.SPEI, MovimientoBancario.MISMO_BANCO, MovimientoBancario.ARCHIVO)
 SINONIMOS = {
@@ -56,14 +55,36 @@ def _ordinales(movimientos, llave):
         vistos[clave] += 1
 
 
-def movimientos_de_pdf(lineas):
-    try:
-        estado = santander_pyme.leer(lineas)
-    except santander_pyme.ErrorEstado as error:
-        raise ErrorConciliacion(str(error))
-    cuenta = CuentaBancaria.objects.filter(clabe=estado.clabe).first()
-    if cuenta is None:
+def _leer_pdf(lineas, cuenta):
+    if cuenta is not None:
+        adaptador = adaptadores.para_cuenta(cuenta)
+        if adaptador is None:
+            raise ErrorConciliacion(adaptadores.sin_lector(cuenta))
+        candidatos = [adaptador]
+    else:
+        registrados = [a for a in adaptadores.REGISTRO if CuentaBancaria.objects.filter(activa=True, tipo=CuentaBancaria.CLABE, banco__clave__in=a.bancos).exists()]
+        candidatos = registrados + [a for a in adaptadores.REGISTRO if a not in registrados]
+    errores = []
+    for adaptador in candidatos:
+        try:
+            return adaptador, adaptador.leer(lineas)
+        except adaptador.error as error:
+            errores.append(str(error))
+    if len(candidatos) == 1:
+        raise ErrorConciliacion(errores[0])
+    raise ErrorConciliacion(adaptadores.formato_desconocido())
+
+
+def movimientos_de_pdf(lineas, cuenta=None):
+    adaptador, estado = _leer_pdf(lineas, cuenta)
+    encontrada = CuentaBancaria.objects.filter(tipo=CuentaBancaria.CLABE, clabe=estado.clabe).select_related("banco").first()
+    if encontrada is None:
         raise ErrorConciliacion("El estado de cuenta no es de una cuenta bancaria registrada del negocio (la CLABE no coincide).")
+    if cuenta is not None and encontrada.pk != cuenta.pk:
+        raise ErrorConciliacion(f"El estado de cuenta es de la cuenta {encontrada}, no de la que elegiste.")
+    if adaptadores.para_cuenta(encontrada) != adaptador:
+        raise ErrorConciliacion(adaptadores.sin_lector(encontrada))
+    cuenta = encontrada
     vistos = Counter()
     movimientos = []
     for movimiento in estado.movimientos:
@@ -86,7 +107,7 @@ def movimientos_de_pdf(lineas):
                 "rastreo": _texto(movimiento.rastreo, 40),
                 "referencia": _texto(movimiento.referencia, 40),
                 "concepto": _texto(movimiento.concepto, 200),
-                "huella": santander_pyme.huella(estado.clabe, movimiento, ordinal)[:400],
+                "huella": adaptador.huella(estado.clabe, movimiento, ordinal)[:400],
             }
         )
     resumen = {
@@ -194,7 +215,7 @@ def movimientos_de_filas(filas, encabezado, columnas, cuenta, exigir_cuadre=True
 
     _ordinales(movimientos, llave)
     for m in movimientos:
-        m["huella"] = "|".join([cuenta.clabe, m["fecha"], str(m["importe"]), m["sentido"], m["referencia"], lectura.normal(m["descripcion"])[:200], str(m.pop("ordinal"))])
+        m["huella"] = "|".join([cuenta.identificador, m["fecha"], str(m["importe"]), m["sentido"], m["referencia"], lectura.normal(m["descripcion"])[:200], str(m.pop("ordinal"))])
     return movimientos
 
 

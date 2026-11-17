@@ -8,11 +8,13 @@ from django.utils import timezone
 from auditoria.servicios import diferencias, registrar
 from caja import acciones as retiros_acciones
 from cobros import acciones, generacion, libro
-from configuracion.models import hoy_negocio, parametro
+from configuracion.models import hoy_negocio, parametro, vocabulario
 from cuentas.models import CodigoUsado
 from cuentas.servicios import consumir_codigo, usar_delegacion
 from inventario import acciones as inventario_acciones
 from inventario.servicios import ErrorInventario
+from titulares import padron
+from titulares.importacion import ImportacionPadron
 from titulares.models import Familia, MotivoBaja, Titular
 from titulares.servicios import foto_titular
 
@@ -106,7 +108,7 @@ class CorreccionNombre(Manejador):
         if titular.estado not in (Titular.ACTIVO, Titular.BAJA):
             raise ErrorSolicitud("La corrección de nombre aplica a registros activos o dados de baja.")
         nombre, apellidos = (datos.get("nombre") or "").strip(), (datos.get("apellidos") or "").strip()
-        if not nombre or not apellidos:
+        if not nombre or (not apellidos and parametro("apellidos_obligatorios")):
             raise ErrorSolicitud("Indica el nombre y los apellidos propuestos.")
         if nombre == titular.nombre and apellidos == titular.apellidos:
             raise ErrorSolicitud("El nombre propuesto es igual al actual.")
@@ -121,25 +123,26 @@ class CambioFamilia(Manejador):
     MODOS = ("ligar", "crear", "desligar")
 
     def validar(self, titular, datos):
+        nombre_familia = vocabulario()["familia"]
         modo = datos.get("modo")
         if modo not in self.MODOS:
-            raise ErrorSolicitud("Indica si se liga, se crea o se desliga la familia.")
+            raise ErrorSolicitud(f"{nombre_familia}: indica si se liga, se crea o se desliga.")
         if titular.estado == Titular.RECHAZADO:
-            raise ErrorSolicitud("Un registro rechazado no se liga a una familia.")
+            raise ErrorSolicitud(f"{nombre_familia}: un registro rechazado no se liga.")
         if modo == "ligar":
             familia = Familia.objects.filter(pk=datos.get("familia"), activa=True).first()
             if familia is None:
-                raise ErrorSolicitud("La familia elegida no existe o no está activa.")
+                raise ErrorSolicitud(f"{nombre_familia}: la elegida no existe o no está activa.")
             if familia.pk == titular.familia_id:
-                raise ErrorSolicitud("Ya pertenece a esa familia.")
+                raise ErrorSolicitud(f"{nombre_familia}: ya pertenece a esa.")
             return familia
         if modo == "crear":
             nombre = (datos.get("nombre") or "").strip()
             if not 0 < len(nombre) <= 100:
-                raise ErrorSolicitud("Escribe el nombre de la familia nueva.")
+                raise ErrorSolicitud(f"{nombre_familia}: escribe el nombre de la nueva.")
             return None
         if titular.familia_id is None:
-            raise ErrorSolicitud("No pertenece a ninguna familia.")
+            raise ErrorSolicitud(f"{nombre_familia}: no pertenece a ninguna.")
         return None
 
     def aplicar(self, titular, datos, contexto):
@@ -169,9 +172,10 @@ MANEJADORES = {
     "revertir_retiro": retiros_acciones.RevertirRetiro(),
     "conteo_inventario": inventario_acciones.ConteoInventario(),
     "devolucion_efectivo": inventario_acciones.DevolucionEfectivo(),
+    "importacion_padron": ImportacionPadron(),
 }
 
-ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion, inventario_acciones.ErrorAccion, ErrorInventario)
+ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion, inventario_acciones.ErrorAccion, ErrorInventario, padron.ErrorPadron)
 
 
 def _validar(manejador, titular, datos):
@@ -219,6 +223,9 @@ def caducar_vencidas():
             )
             if actualizadas:
                 registrar("solicitud_caducada", objeto=solicitud, datos={"accion": solicitud.accion, "titular": solicitud.titular_id})
+                caducar = getattr(MANEJADORES.get(solicitud.accion), "caducar", None)
+                if caducar is not None:
+                    transaction.on_commit(lambda datos=solicitud.datos, funcion=caducar: funcion(datos))
 
 
 def puede_ejecutar_o_solicitar(usuario, accion):
@@ -252,7 +259,7 @@ def ejecutar(accion, usuario, titular, datos=None, request=None):
             registrar(f"{accion}_aplicada", usuario=usuario, objeto=titular or contexto.resultado, datos={"via": "directa", **datos, **detalle, "cambios": cambios}, request=request)
             return Resultado("directa", objeto=contexto.resultado)
         if politica.permite_delegacion and not forzada:
-            delegacion = usar_delegacion(usuario, politica.permiso_directo, request=request, contexto={"accion": accion, "titular": titular.pk})
+            delegacion = usar_delegacion(usuario, politica.permiso_directo, request=request, contexto={"accion": accion, "titular": titular.pk if titular is not None else None})
             if delegacion is not None:
                 contexto.autorizador = delegacion.otorgante
                 cambios, detalle = _aplicar(manejador, titular, datos, contexto)

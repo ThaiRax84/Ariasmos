@@ -6,12 +6,14 @@ import unicodedata
 from io import BytesIO, StringIO
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.pagesizes import landscape
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import Preformatted
 
+from configuracion import hoja
+from configuracion.models import vocabulario
 from configuracion.moneda import catalogo
 from nucleo import dinero
 from nucleo.cadena import canonico
@@ -23,14 +25,18 @@ TEXTO_LIBRE = {"motivo", "nota", "referencia", "concepto_banco", "descripcion", 
 DINERO = {
     "importe", "importe_pendiente", "ingresos", "esperado", "cobrado_de_lo_esperado", "total_cobrado", "total_devuelto", "fondo_inicial", "contado",
     "diferencia", "efectivo_cobrado_neto", "efectivo_en_custodia", "efectivo_depositado", "efectivo_del_mes", "aplicado_por_banco", "abonos_del_estado_oficial",
-    "aplicado_confirmado_por_estado_oficial", "aplicado_sin_confirmar", "importe_por_identificar", "1_30", "31_60", "61_90", "mas_90",
+    "aplicado_confirmado_por_estado_oficial", "aplicado_sin_confirmar", "importe_por_identificar",
     "total_retirado", "total_regresado", "primer_contado", "efectivo_retirado_neto", "retiros_del_mes",
     "total_devuelto_articulos", "devoluciones_articulos_efectivo",
 }
+TRAMO = re.compile(r"(\d+_\d+|mas_\d+)")
 ETIQUETAS = {
-    "titular.nombre": "Titular",
-    "titular.matricula": "Matrícula",
-    "titular.familia": "Familia",
+    "titular.nombre": "{titular}",
+    "titular.matricula": "{matricula}",
+    "titular.familia": "{familia}",
+    "becas": "{descuentos}",
+    "donde_va_la_matricula": "Dónde va {matricula_min}",
+    "titulares": "{titulares}",
     "contacto.nombre": "Contacto",
     "contacto.relacion": "Relación",
     "contacto.telefono": "Teléfono",
@@ -88,15 +94,21 @@ def _aplanar(fila, prefijo=""):
     return plano
 
 
-def etiqueta(clave):
+def etiqueta(clave, voc=None):
     if clave in ETIQUETAS:
-        return ETIQUETAS[clave]
-    texto = clave.split(".")[-1].replace("_", " ")
+        return ETIQUETAS[clave].format_map(voc if voc is not None else vocabulario())
+    final = clave.split(".")[-1]
+    if TRAMO.fullmatch(final):
+        from .calculo import nombre_tramo
+
+        return nombre_tramo(final)
+    texto = final.replace("_", " ")
     return texto[:1].upper() + texto[1:]
 
 
 def _es_dinero(clave, valor):
-    return isinstance(valor, int) and not isinstance(valor, bool) and clave.split(".")[-1] in DINERO
+    final = clave.split(".")[-1]
+    return isinstance(valor, int) and not isinstance(valor, bool) and (final in DINERO or bool(TRAMO.fullmatch(final)))
 
 
 def texto_celda(clave, valor, codigo, pdf=False):
@@ -143,15 +155,16 @@ def a_json(datos):
 
 def a_csv(datos):
     codigo = datos.get("moneda", "")
+    voc = vocabulario()
     salida = StringIO()
     escritor = csv.writer(salida)
     escritor.writerow([neutralizar(datos.get("titulo", "")), neutralizar(f"Moneda: {codigo}"), neutralizar(f"Nivel: {datos.get('nivel', '')}")])
     for clave, valor in resumen(datos).items():
-        escritor.writerow([neutralizar(etiqueta(clave)), neutralizar(texto_celda(clave, valor, codigo))])
+        escritor.writerow([neutralizar(etiqueta(clave, voc)), neutralizar(texto_celda(clave, valor, codigo))])
     for tabla in tablas(datos):
         escritor.writerow([])
         escritor.writerow([neutralizar(tabla["titulo"])])
-        escritor.writerow([neutralizar(etiqueta(c)) for c in tabla["columnas"]])
+        escritor.writerow([neutralizar(etiqueta(c, voc)) for c in tabla["columnas"]])
         for fila in tabla["filas"]:
             escritor.writerow([neutralizar(texto_celda(c, fila.get(c), codigo)) for c in tabla["columnas"]])
     return salida.getvalue().encode("utf-8-sig")
@@ -164,15 +177,16 @@ def _corto(texto, largo):
 
 def a_pdf(datos, negocio=""):
     codigo = datos.get("moneda", "")
+    voc = vocabulario()
     memoria = BytesIO()
-    documento = SimpleDocTemplate(memoria, pagesize=landscape(letter), leftMargin=10 * mm, rightMargin=10 * mm, topMargin=10 * mm, bottomMargin=10 * mm, title="Corte")
+    documento = SimpleDocTemplate(memoria, pagesize=landscape(hoja.tamano()), leftMargin=10 * mm, rightMargin=10 * mm, topMargin=10 * mm, bottomMargin=10 * mm, title=_corto(datos.get("titulo", ""), 80))
     estilos = getSampleStyleSheet()
     estilo_titulo = estilos["Heading2"]
     estilo_texto = estilos["Code"]
     estilo_texto.fontName = "Helvetica"
     estilo_texto.fontSize = 8
     elementos = [Preformatted(_corto(negocio, 120), estilos["Heading1"]), Preformatted(_corto(f"{datos.get('titulo', '')} · nivel {datos.get('nivel', '')}", 140), estilo_titulo)]
-    filas_resumen = [[_corto(etiqueta(k), 60), _corto(texto_celda(k, v, codigo, pdf=True), 90)] for k, v in resumen(datos).items()]
+    filas_resumen = [[_corto(etiqueta(k, voc), 60), _corto(texto_celda(k, v, codigo, pdf=True), 90)] for k, v in resumen(datos).items()]
     if filas_resumen:
         tabla = Table(filas_resumen, hAlign="LEFT")
         tabla.setStyle(TableStyle([("FONT", (0, 0), (-1, -1), "Helvetica", 8), ("GRID", (0, 0), (-1, -1), 0.25, colors.grey)]))
@@ -184,7 +198,7 @@ def a_pdf(datos, negocio=""):
             continue
         columnas = seccion["columnas"]
         largo = max(8, 200 // max(len(columnas), 1))
-        cuerpo = [[_corto(etiqueta(c), largo) for c in columnas]] + [[_corto(texto_celda(c, f.get(c), codigo, pdf=True), largo) for c in columnas] for f in seccion["filas"]]
+        cuerpo = [[_corto(etiqueta(c, voc), largo) for c in columnas]] + [[_corto(texto_celda(c, f.get(c), codigo, pdf=True), largo) for c in columnas] for f in seccion["filas"]]
         tabla = Table(cuerpo, repeatRows=1, hAlign="LEFT")
         tabla.setStyle(
             TableStyle(
@@ -211,11 +225,19 @@ def saneado(texto, largo=30):
     return plano[:largo].strip("-")
 
 
+ARCHIVOS_DE_FABRICA = {"diario": "corte-diario", "mayor": "corte-mensual", "cobranza": "cobranza"}
+
+
 def nombre_base(corte):
+    from .calculo import nombre_corte
+    from .models import TIPOS
+
+    elegido = nombre_corte(corte.tipo)
+    nombre = ARCHIVOS_DE_FABRICA[corte.tipo] if elegido == dict(TIPOS).get(corte.tipo) else (saneado(elegido, 40) or corte.tipo)
     if corte.tipo == "diario":
         caja = saneado(corte.caja.nombre) if corte.caja_id else ""
-        return f"corte-diario-{corte.fecha:%Y-%m-%d}-{caja or 'caja'}-{corte.numero}"
+        return f"{nombre}-{corte.fecha:%Y-%m-%d}-{caja or 'caja'}-{corte.numero}"
     if corte.tipo == "mayor":
-        return f"corte-mensual-{corte.fecha:%Y-%m}"
+        return f"{nombre}-{corte.fecha:%Y-%m}"
     sufijo = f"-{corte.numero}" if corte.numero > 1 else ""
-    return f"cobranza-{corte.fecha:%Y-%m-%d}{sufijo}"
+    return f"{nombre}-{corte.fecha:%Y-%m-%d}{sufijo}"

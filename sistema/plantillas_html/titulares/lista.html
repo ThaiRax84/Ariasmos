@@ -2,15 +2,23 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <span class="antetitulo">Padrón</span>
+    <span class="antetitulo">{{ voc.padron }}</span>
     <h1>{{ voc.titulares }}</h1>
   </div>
-  <div class="encabezado-lado">{% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}</div>
+  <div class="encabezado-lado">{% if puede_importar and not vacio %}<a class="boton secundario" href="{% url 'configuracion:padron_subir' %}">Importar o actualizar desde una hoja</a>{% endif %}{% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton grande" href="{% url 'titulares:nuevo' %}">Nueva alta</a>{% endif %}</div>
 </div>
+{% if vacio %}
+<section class="panel vacio">
+  <h2>Todavía no hay {{ voc.titulares_min }}</h2>
+  {% if puede_importar %}<p>Si ya tienes tu lista en Excel o CSV, impórtala de una vez: el programa propone qué es cada columna y no guarda nada hasta que confirmes.</p>
+  <div class="acciones"><a class="boton grande" href="{% url 'configuracion:padron_subir' %}">Importar desde Excel o CSV</a>{% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="boton secundario" href="{% url 'titulares:nuevo' %}">Dar de alta uno por uno</a>{% endif %}</div>
+  {% elif "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<div class="acciones"><a class="boton grande" href="{% url 'titulares:nuevo' %}">Dar de alta el primero</a></div>{% endif %}
+</section>
+{% else %}
 <div class="fila">
   <form method="get" class="buscador" role="search">
     <label class="solo-lectores" for="buscar-padron">Buscar</label>
-    <input id="buscar-padron" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre o {{ voc.matricula|lower }}" aria-label="Buscar">
+    <input id="buscar-padron" type="search" name="q" value="{{ q }}" placeholder="Buscar por nombre o {{ voc.matricula_min }}" aria-label="Buscar">
     {% if estado %}<input type="hidden" name="estado" value="{{ estado }}">{% endif %}
     <button class="boton chico" type="submit">Buscar</button>
   </form>
@@ -30,4 +38,5 @@
 </tbody></table>
 <div class="pie-tabla"><span>Mostrando {{ titulares|length }}{% if titulares|length == 200 %} (los primeros 200; usa la búsqueda){% endif %}</span></div>
 </section>
+{% endif %}
 {% endblock %}

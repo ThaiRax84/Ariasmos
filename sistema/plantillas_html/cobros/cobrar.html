@@ -11,7 +11,7 @@
     <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %}{% if titular.familia %} · {{ voc.familia }} <a href="{% url 'titulares:familia' titular.familia.pk %}">{{ titular.familia }}</a>{% endif %}</p>
   </div>
   <div class="encabezado-lado">
-    <div class="recuadro-cifra"><span class="etiqueta">Adeudo{% if titular.familia %} de la {{ voc.familia|lower }}{% endif %}</span><span class="valor grande cifra-importe" aria-label="{{ estado.adeudo|dinero }}">{{ estado.adeudo|cifra }}</span></div>
+    <div class="recuadro-cifra"><span class="etiqueta">Adeudo{% if titular.familia %} de la {{ voc.familia_min }}{% endif %}</span><span class="valor grande cifra-importe" aria-label="{{ estado.adeudo|dinero }}">{{ estado.adeudo|cifra }}</span></div>
   </div>
 </div>
 {% if venta %}<p class="mensaje">Cobro de la venta {{ venta }} por {{ venta.total|dinero }}: el pago se aplica primero a los artículos de esa venta y lo que sobre, al adeudo normal.</p>{% endif %}
@@ -86,7 +86,7 @@
       <button class="boton grande ancho" type="submit">Confirmar y dar recibo</button>
     </form>
     {% endif %}
-    <p class="acciones"><a class="enlace" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir el importe</a> · <a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular|lower }}</a></p>
+    <p class="acciones"><a class="enlace" href="{% url 'cobros:cobrar' titular.pk %}{% if venta %}?venta={{ venta.pk }}{% endif %}">Corregir el importe</a> · <a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular_min }}</a></p>
     {% elif turno %}
     <h2>1 · Importe a cobrar</h2>
     <form method="post" class="importe-principal" novalidate>
@@ -96,7 +96,7 @@
       <p class="ayuda">Escribe solo el número; el signo y la moneda ya vienen puestos.</p>
       <div class="acciones columna"><button class="boton grande ancho" type="submit">Ver cómo se aplica</button></div>
     </form>
-    <p class="acciones"><a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular|lower }}</a></p>
+    <p class="acciones"><a class="enlace" href="{% url 'cobros:buscar' %}">Cambiar de {{ voc.titular_min }}</a></p>
     {% else %}
     <h2>Sin turno abierto</h2>
     <p>Para cobrar en efectivo abre primero tu turno de caja.</p>

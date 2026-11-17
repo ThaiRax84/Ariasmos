@@ -3,8 +3,8 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <span class="antetitulo">Configuración</span>
-    <h1>Importar padrón: {{ carga.nombre_archivo }}</h1>
+    <span class="antetitulo">{{ voc.padron }}</span>
+    <h1>Importar o actualizar: {{ carga.nombre_archivo }}</h1>
   </div>
 </div>
 <table class="tabla compacta"><tbody>{% for fila in muestra %}<tr>{% for celda in fila %}<td>{{ celda }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
@@ -16,17 +16,21 @@
 </form>
 {% if analisis %}
 <section class="panel">
-  <h2>Vista previa: {{ validos }} se darán de alta</h2>
+  <h2>Vista previa: {{ resumen.altas }} altas y {{ resumen.cambios }} con cambios</h2>
+  {% if resumen.errores or resumen.omitidas %}<p class="subtitulo">{{ resumen.errores }} con error y {{ resumen.omitidas }} que no se aplican (duplicados o sin cambios).</p>{% endif %}
   <table class="tabla compacta">
-  <thead><tr><th>Renglón</th><th>Nombre</th><th>Apellidos</th><th>{{ voc.agrupacion }}</th><th>Responsable</th><th>Teléfono</th><th>Saldos</th><th>Situación</th></tr></thead>
-  <tbody>{% for f in analisis.filas %}<tr class="{% if f.errores or f.duplicado %}resaltada{% endif %}"><td>{{ f.numero }}</td><td>{{ f.nombre }}</td><td>{{ f.apellidos }}</td><td>{{ f.agrupacion }}</td><td>{{ f.responsable }}</td><td>{{ f.telefono }}</td><td>{% for s in f.saldos %}{{ s.1|dinero }} {% endfor %}</td><td>{% if f.errores %}Error: {{ f.errores|join:"; " }}{% elif f.duplicado %}Duplicado: {{ f.duplicado }}{% else %}Se dará de alta{% endif %}</td></tr>{% endfor %}</tbody>
+  <thead><tr><th>Renglón</th><th>Qué pasa</th><th>Nombre</th><th>{{ voc.agrupacion }}</th><th>Responsable</th><th>Teléfono</th>{% if ve_datos %}<th>Saldos</th>{% endif %}<th>Situación</th></tr></thead>
+  <tbody>{% for f in filas_previa %}<tr class="{% if f.errores or f.duplicado %}resaltada{% endif %}"><td>{{ f.numero }}</td><td>{% if f.tipo == "cambio" %}Actualiza {{ f.matricula }}{% else %}Alta{% endif %}</td>
+  {% if f.tipo == "cambio" %}<td colspan="{% if ve_datos %}4{% else %}3{% endif %}">{% for etiqueta, antes, despues in f.detalle %}{{ etiqueta }}: {% if ve_datos %}{{ antes|default:"—" }} → {% endif %}<strong>{{ despues }}</strong>{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}</td>
+  {% else %}<td>{{ f.nombre }} {{ f.apellidos }}</td><td>{{ f.agrupacion }}</td><td>{{ f.responsable }}</td><td>{{ f.telefono }}</td>{% if ve_datos %}<td>{% for s in f.saldos %}{{ s.1|dinero }} {% endfor %}</td>{% endif %}{% endif %}
+  <td>{% if f.errores %}Error: {{ f.errores|join:"; " }}{% elif f.duplicado %}No se aplica: {{ f.duplicado }}{% elif f.tipo == "cambio" %}Se actualizará{% else %}Se dará de alta{% endif %}{% if f.avisos %} · {{ f.avisos|join:"; " }}{% endif %}</td></tr>{% endfor %}</tbody>
   </table>
   <form method="post" class="formulario">
     {% csrf_token %}
     <input type="hidden" name="paso" value="confirmar">
     {% if analisis.familias %}<h3>{{ voc.familias }} propuestas (mismo responsable y teléfono)</h3>
     {% for fam in analisis.familias %}<div class="campo casilla"><input type="checkbox" name="familia" value="{{ forloop.counter0 }}" id="familia-{{ forloop.counter0 }}" checked><label for="familia-{{ forloop.counter0 }}">{{ fam.responsable }} · {{ fam.telefono }}: {{ fam.miembros|join:", " }}</label></div>{% endfor %}{% endif %}
-    <div class="acciones"><button class="boton grande" type="submit" data-confirmar="¿Dar de alta {{ validos }} registros?">Confirmar importación</button></div>
+    <div class="acciones"><button class="boton grande" type="submit" data-confirmar="{% if directo %}¿Aplicar {{ validos }} renglones?{% else %}¿Enviar la hoja como solicitud?{% endif %}">{% if directo %}Confirmar importación{% else %}Enviar para aprobación{% endif %}</button></div>
   </form>
 </section>
 {% endif %}
