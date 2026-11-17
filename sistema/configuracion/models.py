@@ -48,7 +48,7 @@ PARAMETROS = {
     "maximo_altas_pendientes_por_capturista": (30, "Altas pendientes que una persona puede tener al mismo tiempo"),
     "prefijo_pais_telefono": (52, "Prefijo de país que se antepone a los teléfonos"),
     "digitos_telefono_nacional": (10, "Dígitos de un teléfono nacional sin prefijo de país"),
-    "calendario_corte": ('{"0":"18:00","1":"18:00","2":"18:00","3":"18:00","4":"18:00","5":"18:00","6":"18:00"}', "Días con corte de caja y hora límite de cada uno"),
+    "calendario_corte": ('{"0":"18:00","1":"18:00","2":"18:00","3":"18:00","4":"18:00","5":"18:00"}', "Días con corte de caja y hora límite de cada uno"),
     "dia_corte_mayor": (1, "Día del mes en que se genera el corte mayor del mes anterior (1 a 28)"),
     "dias_plazo_corte_mayor": (5, "Días para cerrar el corte mayor antes de que se cierre solo marcado sin revisar"),
     "dia_semana_cobranza": (1, "Día de la semana de la lista de cobranza automática (1 lunes a 7 domingo; 0 para no generarla)"),
@@ -101,6 +101,12 @@ ESPECIALES = (
     "dias_devolucion",
     "dias_conteo_sin_aprobar",
     "porcentaje_existencia_baja",
+    "prefijo_pais_telefono",
+    "digitos_telefono_nacional",
+    "tamano_hoja",
+    "apellidos_obligatorios",
+    "pedir_consentimiento",
+    "texto_consentimiento",
 )
 
 

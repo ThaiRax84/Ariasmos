@@ -3,6 +3,7 @@
 <form method="post" class="formulario" novalidate{% if formulario.is_multipart %} enctype="multipart/form-data"{% endif %}>
   {% csrf_token %}
   {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Continuar</button></div>
+  <div class="acciones"><button class="boton grande" type="submit">Continuar</button>{% if omitir == True %}<button class="boton secundario" type="submit" name="omitir" value="1" formnovalidate>Omitir por ahora</button>{% elif omitir %}<a class="boton secundario" href="{% url omitir %}">Omitir por ahora</a>{% endif %}</div>
+  {% if omitir %}<p class="ayuda">Todo lo que omitas se completa después desde Configuración; los valores de fábrica sirven para empezar a trabajar hoy.</p>{% endif %}
 </form>
 {% endblock %}

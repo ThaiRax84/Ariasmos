@@ -11,6 +11,6 @@
 <tbody>{% for e in elementos %}<tr><td>{{ e }}</td>
 <td>{% if catalogo == "campos" %}{{ e.get_tipo_display }}{% if e.obligatorio %} · obligatorio{% endif %}{% if e.principal %} · principal{% endif %}{% endif %}</td>
 <td>{% if e.activa is False or e.activo is False %}Inactivo{% else %}Activo{% endif %}</td>
-<td><a href="{% url 'configuracion:catalogo_editar' catalogo e.pk %}">Editar</a></td></tr>{% empty %}<tr><td>Sin elementos.</td></tr>{% endfor %}</tbody>
+<td><a href="{% url 'configuracion:catalogo_editar' catalogo e.pk %}">Editar</a></td></tr>{% empty %}<tr><td>Todavía no hay ninguno. <a class="boton chico" href="{% url 'configuracion:catalogo_nuevo' catalogo %}">Agregar el primero</a></td></tr>{% endfor %}</tbody>
 </table>
 {% endblock %}

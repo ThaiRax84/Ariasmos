@@ -19,6 +19,6 @@
 {% if en_espera %}<p class="mensaje">Hay un conteo en espera de aprobación desde el {{ en_espera.creado|date:"d/m/Y H:i" }}.</p>{% endif %}
 <table class="tabla">
 <thead><tr><th>Clave</th><th>Artículo</th><th>Precio</th><th>Concepto</th>{% if ve_existencias %}<th>Existencia</th><th>Mínimo</th>{% endif %}</tr></thead>
-<tbody>{% for f in filas %}<tr><td>{{ f.articulo.clave }}</td><td>{{ f.articulo.nombre }}</td><td>{{ f.articulo.precio|dinero }}</td><td>{{ f.articulo.concepto }}</td>{% if ve_existencias %}<td>{% if f.bajo %}<strong>{{ f.existencia }}</strong>{% else %}{{ f.existencia }}{% endif %}</td><td>{{ f.articulo.minimo }}</td>{% endif %}</tr>{% empty %}<tr><td colspan="6">Todavía no hay artículos.</td></tr>{% endfor %}</tbody>
+<tbody>{% for f in filas %}<tr><td>{{ f.articulo.clave }}</td><td>{{ f.articulo.nombre }}</td><td>{{ f.articulo.precio|dinero }}</td><td>{{ f.articulo.concepto }}</td>{% if ve_existencias %}<td>{% if f.bajo %}<strong>{{ f.existencia }}</strong>{% else %}{{ f.existencia }}{% endif %}</td><td>{{ f.articulo.minimo }}</td>{% endif %}</tr>{% empty %}<tr><td colspan="6">Todavía no hay artículos.{% if "administrar_articulos" in permisos %} <a class="boton chico" href="{% url 'inventario:articulo_nuevo' %}">Agregar el primero</a>{% endif %}</td></tr>{% endfor %}</tbody>
 </table>
 {% endblock %}

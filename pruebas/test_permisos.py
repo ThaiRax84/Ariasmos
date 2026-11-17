@@ -21,9 +21,12 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {
+    "entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:marca",
+    "asistente:vista_marca", "asistente:logo", "asistente:pago", "asistente:caja", "asistente:reglas", "asistente:cortes", "asistente:usuario", "asistente:codigo",
+}
 
-SOLO_SESION = {"inicio", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
+SOLO_SESION = {"inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -121,6 +124,7 @@ MATRIZ = {
     "caja:motivo_nuevo": ("administrar_motivos_retiro",),
     "caja:motivo_editar": ("administrar_motivos_retiro",),
     "configuracion:caja": ("administrar_configuracion",),
+    "configuracion:reglas": ("administrar_configuracion",),
     "configuracion:carpeta_banco": ("administrar_configuracion",),
     "conciliacion:liberar": ("conciliar_banco",),
     "auditoria:lista": ("ver_auditoria",),

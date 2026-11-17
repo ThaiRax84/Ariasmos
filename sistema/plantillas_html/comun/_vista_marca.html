@@ -1,0 +1,11 @@
+<div class="vista-previa" role="img" aria-label="Vista previa del programa con el color principal {{ vista.principal }} y el de acento {{ vista.acento }}">
+  <div class="vp-franja"></div>
+  <div class="vp-barra"><span class="vp-nombre">{{ nombre_vista|default:"Tu negocio" }}</span><span class="vp-menu"><span class="vp-pastilla activa">Inicio</span><span class="vp-pastilla">Cobrar</span><span class="vp-pastilla">{{ voc.titulares }}</span></span></div>
+  <div class="vp-cuerpo">
+    <p class="vp-antetitulo">Vista previa</p>
+    <p class="vp-titulo">Así se verá el programa</p>
+    <p class="vp-texto">Texto secundario sobre el fondo de la pantalla.</p>
+    <div class="vp-acciones"><span class="vp-boton">Cobrar</span><span class="vp-etiqueta">Detalle con el acento</span></div>
+  </div>
+</div>
+<ul class="muestras-color"><li>Principal: {{ vista.principal }}</li><li>Acento: {{ vista.acento }}</li></ul>

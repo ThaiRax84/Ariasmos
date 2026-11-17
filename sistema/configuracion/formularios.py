@@ -9,6 +9,7 @@ from cobros.formularios import CampoImporte, CampoPorcentaje, valor_de_recargo
 from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
+from nucleo.dinero import ErrorImporte, a_centavos
 from proyecto.captura import CampoContrasena, CampoGuiadoTexto, CampoUsuario
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
@@ -119,6 +120,38 @@ class FormularioParametros(forms.Form):
                 self.fields[clave] = forms.CharField(label=descripcion, max_length=200, initial=inicial)
             else:
                 self.fields[clave] = forms.IntegerField(label=descripcion, min_value=0, max_value=10 ** 11, initial=inicial)
+
+    def clean_tramos_cartera(self):
+        from cortes.calculo import MAXIMO_TRAMOS, limites_tramos
+
+        dias = limites_tramos(self.cleaned_data["tramos_cartera"])
+        if dias is None:
+            raise forms.ValidationError(f"Escribe de 1 a {MAXIMO_TRAMOS} números de días entre 1 y 3650, separados por comas, por ejemplo 30,60,90.")
+        return ",".join(str(d) for d in dias)
+
+    def _entre(self, clave, minimo, maximo):
+        valor = self.cleaned_data[clave]
+        if not minimo <= valor <= maximo:
+            raise forms.ValidationError(f"Escribe un número entre {minimo} y {maximo}.")
+        return valor
+
+    def clean_porcentaje_aviso_tope(self):
+        return self._entre("porcentaje_aviso_tope", 1, 100)
+
+    def clean_rechazos_antes_de_autorizar(self):
+        return self._entre("rechazos_antes_de_autorizar", 1, 100)
+
+    def clean_respaldos_diarios(self):
+        return self._entre("respaldos_diarios", 1, 3650)
+
+    def clean_respaldos_mensuales(self):
+        return self._entre("respaldos_mensuales", 0, 1200)
+
+    def clean_horas_alerta_respaldo(self):
+        return self._entre("horas_alerta_respaldo", 1, 8760)
+
+    def clean_dias_prueba_restauracion(self):
+        return self._entre("dias_prueba_restauracion", 1, 365)
 
     def clean_orden_reparto(self):
         try:
@@ -274,7 +307,7 @@ class FormularioAsistenteInicio(forms.Form):
     moneda = forms.ChoiceField(label="Moneda", initial=moneda.POR_DEFECTO, required=False)
     plantilla = forms.ChoiceField(label="Plantilla inicial", widget=forms.RadioSelect)
     archivo = forms.FileField(label="Archivo de plantilla (solo si eliges importar; JSON de hasta 256 KB)", required=False)
-    inventario = forms.BooleanField(label="Llevar inventario de artículos (libros, útiles, uniformes u otros que se venden); se puede cambiar después en Configuración", required=False)
+    inventario = forms.BooleanField(label="Llevar inventario de los artículos que vende el negocio; se puede cambiar después en Configuración", required=False)
 
     def __init__(self, *args, plantillas=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -462,6 +495,83 @@ def guardar_caja(valores):
     for clave, valor in valores.items():
         texto = calendario.a_texto(valor) if clave == "calendario_corte" else str(valor)
         Parametro.objects.update_or_create(clave=clave, defaults={"valor": texto})
+
+
+def denominaciones_de_texto(texto):
+    valores = []
+    for parte in str(texto or "").replace(";", ",").split(","):
+        parte = parte.strip()
+        if not parte:
+            continue
+        try:
+            valor = a_centavos(parte)
+        except (ErrorImporte, ValueError):
+            raise forms.ValidationError(f"«{parte[:20]}» no es una denominación válida.")
+        if valor <= 0 or valor > 100000000:
+            raise forms.ValidationError(f"«{parte[:20]}» no es una denominación válida.")
+        valores.append(valor)
+    if len(set(valores)) != len(valores):
+        raise forms.ValidationError("Hay denominaciones repetidas.")
+    if len(valores) > 30:
+        raise forms.ValidationError("Escribe a lo más 30 denominaciones.")
+    return sorted(valores, reverse=True)
+
+
+class FormularioDenominacionesMoneda(forms.Form):
+    denominaciones = forms.CharField(label="Billetes y monedas de tu moneda, separados por comas (por ejemplo: 100, 50, 20, 10, 5, 1, 0.50)", max_length=300)
+
+    def __init__(self, *args, codigo="", **kwargs):
+        super().__init__(*args, **kwargs)
+        if codigo:
+            self.fields["denominaciones"].label = f"Billetes y monedas de {codigo}, separados por comas (por ejemplo: 100, 50, 20, 10, 5, 1, 0.50)"
+
+    def clean_denominaciones(self):
+        valores = denominaciones_de_texto(self.cleaned_data["denominaciones"])
+        if not valores:
+            raise forms.ValidationError("Escribe al menos una denominación.")
+        return valores
+
+
+TAMANOS_HOJA = (("carta", "Carta"), ("a4", "A4"))
+CLAVES_REGLAS = ("prefijo_pais_telefono", "digitos_telefono_nacional", "tamano_hoja", "apellidos_obligatorios", "pedir_consentimiento", "texto_consentimiento")
+
+
+class FormularioReglas(forms.Form):
+    prefijo_pais_telefono = forms.IntegerField(label="Prefijo de país de los teléfonos (52 en México)", min_value=1, max_value=999)
+    digitos_telefono_nacional = forms.IntegerField(label="Dígitos de un teléfono nacional sin el prefijo (10 en México)", min_value=4, max_value=15)
+    tamano_hoja = forms.ChoiceField(label="Tamaño de hoja de los PDF", choices=TAMANOS_HOJA)
+    apellidos_obligatorios = forms.BooleanField(label="Pedir apellidos al dar de alta (quítalo si a veces das de alta empresas)", required=False)
+    pedir_consentimiento = forms.BooleanField(label="Pedir la constancia de consentimiento de datos al dar de alta", required=False)
+    texto_consentimiento = forms.CharField(label="Texto de la constancia de consentimiento", max_length=200, required=False)
+
+    def __init__(self, *args, valores=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        for clave, valor in (valores or {}).items():
+            if clave in self.fields:
+                self.fields[clave].initial = bool(valor) if isinstance(self.fields[clave], forms.BooleanField) else valor
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get("pedir_consentimiento") and not (datos.get("texto_consentimiento") or "").strip():
+            self.add_error("texto_consentimiento", "Escribe el texto de la constancia o deja de pedirla.")
+        return datos
+
+    def valores(self):
+        datos = self.cleaned_data
+        return {
+            "prefijo_pais_telefono": datos["prefijo_pais_telefono"],
+            "digitos_telefono_nacional": datos["digitos_telefono_nacional"],
+            "tamano_hoja": datos["tamano_hoja"],
+            "apellidos_obligatorios": 1 if datos.get("apellidos_obligatorios") else 0,
+            "pedir_consentimiento": 1 if datos.get("pedir_consentimiento") else 0,
+            "texto_consentimiento": (datos.get("texto_consentimiento") or "").strip() or PARAMETROS["texto_consentimiento"][0],
+        }
+
+
+def valores_reglas():
+    from .models import parametro
+
+    return {clave: parametro(clave) for clave in CLAVES_REGLAS}
 
 
 TOPES_CARPETA = ("tope_pago_carpeta",)

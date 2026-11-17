@@ -1,6 +1,7 @@
 from django.db import migrations, models
 
 
+CALENDARIO_ANTERIOR = '{"0":"18:00","1":"18:00","2":"18:00","3":"18:00","4":"18:00","5":"18:00","6":"18:00"}'
 CONSERVADOS = {"descuento": "Beca", "padron": "Padrón", "publico": "Público en general"}
 
 
@@ -11,6 +12,8 @@ def conservar(apps, schema_editor):
         return
     for clave, texto in CONSERVADOS.items():
         Vocabulario.objects.get_or_create(clave=clave, defaults={"texto": texto})
+    Parametro = apps.get_model("configuracion", "Parametro")
+    Parametro.objects.get_or_create(clave="calendario_corte", defaults={"valor": CALENDARIO_ANTERIOR})
 
 
 class Migration(migrations.Migration):

@@ -182,7 +182,7 @@ def analizar(filas, encabezado, columnas, concepto_saldo_total=None):
                 tel = telefono.normalizar(crudo, prefijo, digitos)
             except telefono.TelefonoInvalido:
                 errores.append(f"teléfono no válido ({crudo})")
-        elif obligatorio_tel:
+        elif obligatorio_tel and not clave_matricula:
             errores.append("falta el teléfono, que es obligatorio")
         correo = valor("correo", 150).lower()
         if correo:
