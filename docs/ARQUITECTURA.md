@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.19 · 13/11/2026 · Estado: fases 1 a 6a y 5b construidas; fase 7a (topes del banco §19 y actualizaciones §20) en construcción; fase 6b (facturación, §17) diseñada.
+Versión 0.20 · 17/11/2026 · Estado: fases 1 a 7a construidas; fase 8a (programa de escritorio, §21) y fase 8b (nada fijo de un negocio, §22) en diseño; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -496,6 +496,8 @@ instancia/         (ignorada) claves, base, configuración local
 | 6a | Carpeta del banco que aplica de inmediato salvo sospecha (§15.5); inventario opcional, venta a titular o sin matrícula, devoluciones y conteo mensual (§16) |
 | 6b | Facturación electrónica opcional con proveedor intercambiable (§17) |
 | 7a | Topes del banco por día y acumulado, configurables por quien concilia y por Dirección (§19); actualizaciones del programa: buscar, avisar y descargar con firma (§20) |
+| 8a | Programa de escritorio: `Ariasmos.exe` con ventana propia en la computadora principal y en las adicionales (§21) |
+| 8b | Nada fijo de un negocio: vocabulario completo, reportes, banco, reglas configurables y cobros semanales y quincenales (§22) |
 
 ## 14. Pendientes de decisión
 
@@ -736,3 +738,118 @@ Se ejecutan en la computadora del dueño, no en la del negocio.
 - `firmar-version`: recibe el instalador, la versión, el contador y el archivo de cambios; escribe `version.json` y `version.json.firma`.
 - `cambiar-llave`: con la llave de recuperación, escribe `cambio-de-llave.json` y su firma para una llave de uso nueva.
 - `.gitignore` excluye los archivos de llaves privadas por extensión.
+
+## 21. Versión 0.20: programa de escritorio (fase 8a)
+
+Corrige un error de las fases 4b y 5: el programa se abría en el navegador. El requisito del dueño es un programa que corra en la computadora, con su propia ventana. Esta sección **sustituye** en §11 todo lo que diga «navegador», el acceso directo a `https://localhost/` y la instalación del certificado en Windows.
+
+El servidor no cambia: los tres servicios (web, trabajador, TLS) siguen en la computadora principal, porque varias personas en varias computadoras comparten una sola base y el trabajador corre aunque nadie tenga el programa abierto. Cambia cómo se abre y se ve.
+
+### 21.1 `Ariasmos.exe`
+
+- Programa nativo de Windows, pequeño, en `escritorio/` (C#, .NET Framework 4.8, que ya trae Windows 10 y 11; ventana WinForms con el componente WebView2 de Windows). Se compila en la integración continua y va dentro del instalador. No contiene lógica del negocio: es la ventana del programa.
+- Se ve como programa propio: `Ariasmos.exe` en el administrador de tareas, ícono del medallón del jinete en la ventana y en la barra de tareas, sin barra de dirección, pestañas ni menús de navegador.
+- Una sola ventana por usuario de Windows; abrirlo de nuevo trae al frente la que ya está. Recuerda tamaño y posición.
+- No escribe datos del negocio en la computadora: solo su perfil (`%LOCALAPPDATA%\Ariasmos\`), donde vive la credencial del equipo aprobado, por usuario de Windows.
+- Lleva la versión en su nombre de agente (`Ariasmos/X.Y.Z`) para que el servidor pueda avisar si esa computadora necesita actualizar el programa.
+
+### 21.2 Splash
+
+- Ventana real, sin marco, de 720 × 450, centrada: la escena aprobada, «ARIASMOS», «Iniciando el sistema…» y «ver. X.Y.Z». Se dibuja con los recursos del propio programa (imagen y letras incluidas), sin depender del servidor.
+- Se muestra mientras arranca la ventana principal y hasta que carga la primera pantalla; después se desvanece. Si el servidor no responde, la ventana principal muestra el problema y «Reintentar».
+- El splash que hoy vive dentro de la pantalla de inicio de sesión se elimina.
+
+### 21.3 Dos formas de instalar, el mismo instalador
+
+El instalador pregunta qué es esa computadora. Sirve para cualquier negocio, con una computadora o con muchas.
+
+- **Computadora principal:** guarda los datos y da servicio a las demás. Instala los servicios y `Ariasmos.exe`.
+- **Computadora adicional:** solo instala `Ariasmos.exe` y se conecta a la principal. No instala Python, servicios ni reglas de firewall. Pide el **archivo de conexión**.
+- El **puerto** deja de ser fijo: se propone 443 y, si está ocupado, otro; se puede elegir. Queda en la configuración del servicio TLS, en la regla de firewall y en el archivo de conexión.
+- Si falta el componente WebView2 (Windows 10 antiguos), el instalador lo instala con el instalador oficial de Microsoft, cuya firma se comprueba al compilar.
+
+### 21.4 Archivo de conexión
+
+- Lo genera la computadora principal en «Conectar otra computadora» (mismo permiso que hoy): dirección del servidor (nombre o IP), puerto y **huella SHA-256 del certificado** del servidor. No es secreto, pero debe llegar por un medio de confianza (USB o en persona): quien lo altere podría apuntar una computadora a otro servidor. Evento en bitácora al generarlo.
+- Formato estricto y tamaño acotado; el programa rechaza cualquier campo de más o de menos.
+- El instalador lo guarda en `%ProgramData%\Ariasmos\conexion.json`, que solo un administrador puede cambiar. En la computadora principal lo escribe el propio instalador.
+- Si el certificado del servidor cambia (cambio de nombre del equipo o vencimiento), hace falta un archivo de conexión nuevo en las adicionales.
+- La aprobación de equipos no cambia: una computadora nueva sigue quedando «pendiente» hasta que alguien con permiso la aprueba.
+
+### 21.5 Identidad del servidor
+
+- **Ya no se instala ningún certificado en Windows**, ni en la principal ni en las adicionales. El programa acepta únicamente el certificado cuya huella coincide con la del archivo de conexión, y solo para la dirección configurada. La huella se comprueba siempre, también si Windows confiara en el certificado; si no se puede comprobar, no se conecta.
+- Conectarse por IP funciona aunque el certificado sea para el nombre del equipo, porque se compara el certificado exacto.
+- Sin certificado instalado, un navegador común muestra advertencia: el camino soportado es el programa.
+
+### 21.6 Ventana cerrada a todo lo que no sea el programa
+
+- Solo navega a la dirección configurada. Enlaces a otros sitios, ventanas nuevas hacia fuera y protocolos externos se bloquean.
+- Apagados: herramientas de desarrollador, menú contextual del navegador, teclas de navegador (recargar, abrir, ver código), barra de estado, guardado de contraseñas, autocompletado, gestos de navegación, y los puentes entre la página y el programa (objetos del anfitrión y mensajes). Siguen las teclas de edición y el zoom.
+- Permisos de cámara, micrófono, ubicación, notificaciones y portapapeles: negados.
+- **Descargas** (recibos, cortes, exportaciones, respaldos): siempre con «Guardar como»; nunca se abren solas.
+- **Impresión** de recibos y subida de archivos funcionan dentro de la ventana.
+- Si el componente falla, la ventana se recupera sola o lo dice; nunca cae a un navegador.
+- Corre sin permisos de administrador.
+
+### 21.7 Pruebas y compilación
+
+- La integración continua compila `Ariasmos.exe`, corre sus pruebas (huella, formato del archivo de conexión, lista de direcciones permitidas) y la prueba de humo instala en modo principal y ejecuta `Ariasmos.exe --verificar`, que carga la primera pantalla comprobando la huella y termina con un código de resultado. También prueba la instalación en modo adicional.
+- La prueba de humo deja de depender de que Windows confíe en el certificado.
+
+### 21.8 Lo que queda para después
+
+- **Firma de código.** `Ariasmos.exe` y el instalador van sin firma: Windows muestra una advertencia al instalar y, en equipos con Smart App Control activo, puede bloquearlo. Comprar un certificado de firma es una decisión del dueño.
+- Las computadoras adicionales se actualizan a mano con el mismo instalador; el aviso de §20 les indica cuándo.
+
+## 22. Versión 0.20: nada fijo de un negocio (fase 8b)
+
+El programa es para cualquier negocio que cobra a clientes recurrentes. Una auditoría del código (17/11/2026) encontró textos y reglas que suponen un tipo de negocio. Esta fase los quita. Regla general: **lo que depende del negocio viene de la configuración** (asistente, plantilla, parámetros, vocabulario, marca) y nunca del código ni de las plantillas de pantalla.
+
+### 22.1 Vocabulario completo
+
+- Todo texto que nombre al titular, la matrícula, la agrupación o la familia usa el vocabulario del negocio: mensajes, etiquetas de formularios, PDF, exportaciones, encabezados de cortes y nombres de archivos. No queda ninguno escrito a mano.
+- Claves nuevas: **padrón** (la lista de titulares), **descuento** (lo que la escuela llama «beca») y **público** (la venta sin matrícula). La plantilla de escuela conserva «Beca»; la genérica dice «Descuento».
+- Formas en singular, plural y minúsculas se derivan en un solo lugar.
+- Los sinónimos de la importación inicial incluyen el vocabulario configurado.
+- Una prueba recorre todas las pantallas con un vocabulario inventado y falla si aparece una palabra del vocabulario de fábrica.
+
+### 22.2 Roles por permiso, también en los textos
+
+- Ningún texto nombra un rol fijo («Supervisión», «Dirección»). Donde hay que decir quién puede hacer algo, se muestran los nombres de los roles que hoy tienen ese permiso.
+- Se corrige el permiso mal escrito que oculta el menú «Solicitudes» a quien solo aprueba.
+
+### 22.3 Cortes y reportes
+
+- Cada corte usa el **nombre** que le dio el negocio; los encabezados salen del vocabulario.
+- Los tramos de antigüedad de la cartera son configurables (de fábrica 30, 60 y 90 días).
+- Tamaño de hoja de los PDF configurable (Carta o A4).
+
+### 22.4 Banco
+
+- El lector de estados en PDF se elige por **adaptador** según el banco de la cuenta. Hoy existe uno (Santander PyME). Con otro banco el programa lo dice con claridad y ofrece el camino que sirve para cualquiera: Excel o CSV con correspondencia de columnas.
+- La cuenta de depósito admite **CLABE** (con su dígito verificador) u **otra cuenta** (número y banco escritos), para negocios o países sin CLABE.
+- Los medios de pago iniciales vienen de la plantilla, no del código.
+
+### 22.5 Reglas que pasan a configuración
+
+- Consentimiento de datos al dar de alta: se puede apagar y su texto es del negocio.
+- Apellidos obligatorios o no (un cliente puede ser una empresa).
+- Retención de respaldos (diarios y mensuales), horas para la alerta de respaldo y días entre pruebas de restauración.
+- Avisos de retiros de caja (rechazos antes de pedir autorización, porcentaje de aviso del tope).
+- El asistente pregunta lo que hoy solo está en parámetros: prefijo y dígitos del teléfono, tamaño de hoja y consentimiento. El formato del teléfono usa esos valores.
+- Si la moneda elegida no es la de la plantilla, el asistente pide las denominaciones en lugar de dejar la caja sin ellas.
+- Se unifican los valores de fábrica del calendario de cortes.
+
+### 22.6 Cobros semanales y quincenales
+
+Hoy se pueden elegir pero nunca generan cargos. Pasan a funcionar:
+
+- **Semanal:** un cargo por semana. El periodo es la semana ISO (`AAAA-Sww`); vence el día de la semana que fije el concepto.
+- **Quincenal:** dos cargos por mes (`AAAA-MM-1` y `AAAA-MM-2`, del 1 al 15 y del 16 al fin de mes); la primera vence el día que fije el concepto (1 a 15) y la segunda quince días después.
+- Las reglas de unicidad, becas o descuentos, prórrogas, recargos y cierre de periodo aplican igual que en los mensuales. Las pruebas cubren cambio de año, semana 53, febrero y altas a mitad de periodo.
+
+### 22.7 Lo que no cambia en esta fase
+
+- El idioma (español), el formato de fechas y de números, y el catálogo de bancos de México. Otro país es una fase aparte.
+- La marca «Ariasmos» del programa.
