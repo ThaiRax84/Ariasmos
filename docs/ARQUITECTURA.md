@@ -785,7 +785,7 @@ El instalador pregunta qué es esa computadora. Sirve para cualquier negocio, co
 ### 21.6 Ventana cerrada a todo lo que no sea el programa
 
 - Solo navega a la dirección configurada. Enlaces a otros sitios, ventanas nuevas hacia fuera y protocolos externos se bloquean.
-- Apagados: herramientas de desarrollador, menú contextual del navegador, teclas de navegador (recargar, abrir, ver código), barra de estado, guardado de contraseñas, autocompletado, gestos de navegación, y los puentes entre la página y el programa (objetos del anfitrión y mensajes). Siguen las teclas de edición y el zoom.
+- Apagados: herramientas de desarrollador, menú contextual del navegador, teclas de navegador (recargar, abrir, ver código), barra de estado, guardado de contraseñas, autocompletado, gestos de navegación y los objetos del anfitrión. Entre la página y el programa solo existen los dos mensajes de §21.10. Siguen las teclas de edición y el zoom.
 - Permisos de cámara, micrófono, ubicación, notificaciones y portapapeles: negados.
 - **Descargas** (recibos, cortes, exportaciones, respaldos): siempre con «Guardar como»; nunca se abren solas.
 - **Impresión** de recibos y subida de archivos funcionan dentro de la ventana.
@@ -797,7 +797,30 @@ El instalador pregunta qué es esa computadora. Sirve para cualquier negocio, co
 - La integración continua compila `Ariasmos.exe`, corre sus pruebas (huella, formato del archivo de conexión, lista de direcciones permitidas) y la prueba de humo instala en modo principal y ejecuta `Ariasmos.exe --verificar`, que carga la primera pantalla comprobando la huella y termina con un código de resultado. También prueba la instalación en modo adicional.
 - La prueba de humo deja de depender de que Windows confíe en el certificado.
 
-### 21.8 Lo que queda para después
+### 21.8 Atrás y adelante
+
+- Dos botones de flecha en la barra del programa, a la izquierda de la marca, con el estilo del sistema (pastilla, estado apagado cuando no hay a dónde ir). También Alt+← y Alt+→ y los botones laterales del ratón.
+- Viven en la página (historial de la ventana), no en un marco aparte, para que se vean igual en todas las pantallas.
+- **Regla de seguridad: atrás, adelante o recargar nunca repiten una operación.** Toda operación que mueve dinero o cambia datos se envía con una ficha de un solo uso y termina en redirección; volver a un paso ya terminado muestra su resultado (por ejemplo el recibo), no lo vuelve a ejecutar. Las pantallas con datos no se guardan en la memoria del historial (`no-store`): al volver se piden de nuevo.
+- Una prueba recorre los flujos de cobro, venta, retiro, corte, devolución y conciliación reenviando cada paso y comprueba que nada se duplica.
+
+### 21.9 Elegir carpetas y archivos con la ventana de Windows
+
+- **Archivos** (importar clientes, logo, comprobantes, respaldos por restaurar): el botón abre la ventana normal de Windows para buscar el archivo.
+- **Carpetas** (carpeta vigilada del banco, destino de los cortes, carpeta de respaldo): cada campo de ruta lleva «Examinar…», que abre la ventana de Windows para elegir la carpeta y llena el campo. Escribir la ruta a mano sigue siendo posible.
+- Las carpetas son del disco de la **computadora principal**. «Examinar…» solo aparece ahí; en una adicional el campo explica que la carpeta se elige desde la principal.
+- Si el servicio no tiene permiso sobre la carpeta elegida, la pantalla ofrece «Dar permiso»: Windows pide la confirmación de administrador y se concede sobre esa carpeta únicamente. Sustituye al paso manual de hoy.
+
+### 21.10 Puente mínimo entre la página y el programa
+
+Solo para §21.9, y solo estos dos mensajes, con formato estricto:
+
+- `elegir_carpeta`: el programa abre la ventana de Windows y devuelve la ruta elegida, o nada si se cancela.
+- `dar_permiso`: el programa muestra qué carpeta es, pide confirmación y lanza la herramienta elevada (control de cuentas de Windows). La herramienta valida la ruta por su cuenta.
+
+Reglas: el programa acepta mensajes únicamente del documento principal de la dirección configurada y solo en la computadora principal; cualquier otro mensaje se descarta y se registra. La página nunca recibe más que la ruta que la persona eligió. No hay objetos del anfitrión ni ejecución de código pedida por la página.
+
+### 21.11 Lo que queda para después
 
 - **Firma de código.** `Ariasmos.exe` y el instalador van sin firma: Windows muestra una advertencia al instalar y, en equipos con Smart App Control activo, puede bloquearlo. Comprar un certificado de firma es una decisión del dueño.
 - Las computadoras adicionales se actualizan a mano con el mismo instalador; el aviso de §20 les indica cuándo.
@@ -849,7 +872,39 @@ Hoy se pueden elegir pero nunca generan cargos. Pasan a funcionar:
 - **Quincenal:** dos cargos por mes (`AAAA-MM-1` y `AAAA-MM-2`, del 1 al 15 y del 16 al fin de mes); la primera vence el día que fije el concepto (1 a 15) y la segunda quince días después.
 - Las reglas de unicidad, becas o descuentos, prórrogas, recargos y cierre de periodo aplican igual que en los mensuales. Las pruebas cubren cambio de año, semana 53, febrero y altas a mitad de periodo.
 
-### 22.7 Lo que no cambia en esta fase
+### 22.7 Marca del negocio desde la instalación, con colores tomados del logo
+
+- El asistente tiene un paso de **marca**: subir el logo (opcional) y elegir los dos colores. Lo mismo sigue en Configuración → Marca del negocio.
+- Al subir el logo, el programa **propone** los dos colores a partir de él y los muestra en una vista previa del programa. La persona puede aceptarlos o elegir los suyos; con o sin logo, los colores siempre se pueden cambiar. «Usar los colores del logo» queda disponible después.
+- Cómo se calculan (determinista: el mismo logo da siempre los mismos colores):
+  1. Se parte del logo ya saneado (§15, solo píxeles, 512 px como máximo) y se reduce a 96 px de lado mayor.
+  2. Se descartan los píxeles transparentes. Si no hay transparencia, se descarta el color de fondo: el que domina el borde de la imagen cuando ocupa más del 60 % de ese borde.
+  3. Se apartan los neutros: saturación menor a 0.15, o luminosidad mayor a 0.93 o menor a 0.07.
+  4. Los demás se agrupan en hasta 8 colores (corte por mediana). El peso de cada grupo es su fracción de píxeles por (0.5 + saturación).
+  5. **Color principal:** el grupo de mayor peso. **Color de acento:** el grupo de mayor peso cuyo tono difiera al menos 25° del principal; si no hay, el mismo tono del principal con luminosidad 0.55 y saturación de al menos 0.6.
+  6. Se ajustan con las reglas de contraste que ya usa la marca: el principal se oscurece por pasos hasta leerse sobre el fondo y con texto blanco encima; el acento hasta distinguirse del fondo.
+  7. Si todo el logo es neutro (blanco y negro), el principal es el neutro más oscuro ya ajustado y el acento es el de fábrica.
+- El cálculo no ejecuta nada del archivo: trabaja sobre los píxeles ya reconstruidos.
+
+### 22.8 Importar clientes desde Excel o CSV, a la vista
+
+La importación del padrón desde Excel o CSV ya existe (§11). Pasa a ofrecerse donde hace falta: como paso opcional al final del asistente y como acción principal del padrón cuando está vacío.
+
+### 22.9 Plantillas incluidas y tienda de plantillas
+
+- Además de la genérica y la de escuela se incluyen plantillas de arranque para: **gimnasio o club** (membresías), **academia o talleres**, **rentas** y **servicios con cuota**. Cada una trae su vocabulario, conceptos y periodicidades; todo se puede cambiar en el asistente.
+- **Tienda de plantillas (fase futura; no construir):** un sitio web aparte donde se publican plantillas para descargar e importar con lo que ya existe. Las plantillas de la tienda irán firmadas como las versiones (§20) y se seguirán tratando como dato no confiable al importarlas.
+
+### 22.10 Menos fricción
+
+Regla de diseño para esta fase y las siguientes: el programa no pide lo que puede deducir ni obliga a lo que puede esperar.
+
+- Todo paso opcional del asistente se puede saltar y completar después desde Configuración.
+- Los valores de fábrica sirven para empezar a trabajar el mismo día.
+- Una pantalla vacía dice cuál es el siguiente paso y lo ofrece con un botón.
+- Las rutas se eligen con la ventana de Windows (§21.9); los colores salen del logo (§22.7); los clientes se importan de una hoja (§22.8).
+
+### 22.11 Lo que no cambia en esta fase
 
 - El idioma (español), el formato de fechas y de números, y el catálogo de bancos de México. Otro país es una fase aparte.
 - La marca «Ariasmos» del programa.
