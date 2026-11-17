@@ -193,3 +193,33 @@ def test_ninguna_plantilla_de_pantalla_trae_vocabulario_ni_roles_escritos_a_mano
         if palabras:
             hallazgos[archivo.name] = palabras
     assert hallazgos == {}
+
+
+PERMITIDOS_EN_CODIGO = {
+    ("configuracion/models.py", "Público en general"),
+    ("titulares/padron.py", "nombre del alumno"),
+}
+ARCHIVOS_DE_DATOS = ("urls.py", "/migrations/", "/management/commands/demostracion.py")
+
+
+def test_ningun_texto_del_codigo_escribe_a_mano_el_vocabulario_o_un_rol():
+    import ast
+    from pathlib import Path
+
+    from django.conf import settings
+
+    raiz = Path(settings.SISTEMA)
+    hallazgos = []
+    for archivo in sorted(raiz.rglob("*.py")):
+        relativo = archivo.relative_to(raiz).as_posix()
+        if any(parte in "/" + relativo for parte in ARCHIVOS_DE_DATOS):
+            continue
+        for nodo in ast.walk(ast.parse(archivo.read_text(encoding="utf-8"))):
+            if not (isinstance(nodo, ast.Constant) and isinstance(nodo.value, str)):
+                continue
+            texto = nodo.value
+            if re.fullmatch(r"[\w:./%<>?()|\\^$-]*", texto) or texto.startswith("SELECT ") or (relativo, texto) in PERMITIDOS_EN_CODIGO:
+                continue
+            if encontradas(re.sub(r"\{[a-z_]+\}", " ", texto)):
+                hallazgos.append(f"{relativo}:{nodo.lineno}: {texto[:80]}")
+    assert hallazgos == []

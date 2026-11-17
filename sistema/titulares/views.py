@@ -10,6 +10,7 @@ from banco.ficha import datos_de_pago
 from cobros import estado_pdf
 from cobros.estado import estado_cuenta
 from configuracion.models import parametro, vocabulario
+from cortes.salida import saneado
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
 from solicitudes import motor
@@ -174,7 +175,7 @@ def estado_familia_pdf(request, pk):
     miembros = list(objeto.miembros.order_by("apellidos", "nombre"))
     if not miembros:
         raise Http404
-    return _pdf_estado(request, miembros, f"{vocabulario()['familia']} {objeto}", f"familia-{objeto.pk}")
+    return _pdf_estado(request, miembros, f"{vocabulario()['familia']} {objeto}", f"{saneado(vocabulario()['familia']) or 'grupo'}-{objeto.pk}")
 
 
 @requiere_permiso("ver_titulares")
