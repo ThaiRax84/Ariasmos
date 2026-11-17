@@ -101,4 +101,4 @@ def test_cambiar_llave_con_la_de_recuperacion(llaves_generadas, tmp_path):
 def test_las_herramientas_del_dueno_no_van_en_el_paquete():
     construir = (RAIZ / "instalacion" / "construir.ps1").read_text(encoding="utf-8-sig")
     assert "Join-Path $Raiz 'herramientas'" not in construir and "'herramientas', " not in construir
-    assert json.loads((RAIZ / "sistema" / "actualizaciones" / "llaves.json").read_text(encoding="utf-8")) == {"uso": "", "recuperacion": ""}
+    assert set(json.loads((RAIZ / "sistema" / "actualizaciones" / "llaves.json").read_text(encoding="utf-8"))) == {"uso", "recuperacion"}

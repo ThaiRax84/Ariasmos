@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import os
@@ -64,9 +65,18 @@ def eventos(accion):
     return Evento.objects.filter(accion=accion)
 
 
-def test_llaves_del_repositorio_vacias_y_sin_ellas_no_se_activa(personas):
+def test_llaves_del_repositorio_validas_y_distintas():
     contenido = json.loads((RAIZ / "sistema" / "actualizaciones" / "llaves.json").read_text(encoding="utf-8"))
-    assert contenido == {"uso": "", "recuperacion": ""}
+    assert set(contenido) == {"uso", "recuperacion"}
+    publicas = llaves.del_programa()
+    assert publicas is not None and publicas["uso"] != publicas["recuperacion"]
+    assert all(len(base64.b64decode(contenido[nombre], validate=True)) == 32 for nombre in contenido)
+
+
+def test_sin_llaves_no_se_activa(personas, monkeypatch, tmp_path):
+    vacias = tmp_path / "llaves.json"
+    vacias.write_text(json.dumps({"uso": "", "recuperacion": ""}), encoding="utf-8")
+    monkeypatch.setattr(llaves, "RUTA", vacias)
     assert llaves.del_programa() is None and not llaves.disponibles() and llaves.de_uso() is None
     with pytest.raises(servicios.ErrorActualizacion):
         servicios.guardar_configuracion(True, "propietario/canal", CLAVE, usuario=personas["dir"])
