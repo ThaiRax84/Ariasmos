@@ -39,7 +39,7 @@ class FichaDeEnvio:
         return self._insertar(respuesta)
 
     def process_view(self, request, vista, args, kwargs):
-        if request.method != "POST":
+        if request.method != "POST" or not getattr(request, "user", None) or not request.user.is_authenticated:
             return None
         valor = request.POST.get(CAMPO, "")
         if not PATRON.match(valor):

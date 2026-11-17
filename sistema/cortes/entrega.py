@@ -44,6 +44,8 @@ def validar_ruta(texto, crear=True):
     texto = str(texto or "").strip()
     if not texto or "\x00" in texto:
         raise ErrorEntrega("Escribe la ruta de una carpeta.")
+    if texto.startswith(("\\\\", "//")):
+        raise ErrorEntrega("La carpeta debe estar en un disco de esta computadora; las carpetas de red no sirven porque el servicio no puede entrar a ellas.")
     ruta = Path(texto)
     if not ruta.is_absolute():
         raise ErrorEntrega("La ruta debe ser absoluta (por ejemplo D:\\Respaldos o /srv/cortes).")
