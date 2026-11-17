@@ -38,7 +38,7 @@ Ariasmos es un programa de Windows con su propia ventana. Se instala con el mism
 9. Al terminar, el instalador muestra el **token del asistente**. Haz clic en **Copiar**. Ese token se pide una sola vez y no se guarda en ningún lado.
 10. Deja marcada la casilla «Abrir Ariasmos» y haz clic en **Finalizar**.
 
-El instalador deja un acceso directo **Ariasmos** en el escritorio y en el menú Inicio, con el medallón negro del jinete. Abre la ventana del programa: primero aparece la presentación de Ariasmos con su versión mientras arranca y después la primera pantalla. El asistente de los ocho pasos muestra a la izquierda la lista de pasos y en cuál vas.
+El instalador deja un acceso directo **Ariasmos** en el escritorio y en el menú Inicio, con el medallón negro del jinete. Abre la ventana del programa: primero aparece la presentación de Ariasmos con su versión mientras arranca y después la primera pantalla. El asistente de los diez pasos muestra a la izquierda la lista de pasos y en cuál vas.
 
 Si perdiste el token antes de terminar el asistente: menú Inicio → **Ariasmos** → **Generar token nuevo del asistente**. Pide permiso de administrador y muestra un token nuevo; el anterior deja de servir.
 

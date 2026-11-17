@@ -193,6 +193,7 @@ MATRIZ = {
 }
 
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
+LOTE_DE_OTRO = {"configuracion:padron_lote", "configuracion:padron_matriculas", "configuracion:padron_fichas"}
 
 OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
@@ -361,6 +362,8 @@ def test_matriz_url_por_rol(escenario, nombre):
         respuesta = cliente(usuario).get(url)
         if permitido(usuario.rol, nombre):
             esperados = (404,) if nombre in CARGA_DE_OTRO else (200, 302, 405)
+            if nombre in LOTE_DE_OTRO and not (usuario.tiene_permiso("importar_padron") or usuario.tiene_permiso("aprobar_solicitudes")):
+                esperados = (404,)
             assert respuesta.status_code in esperados, (nombre, nombre_rol, respuesta.status_code)
             if respuesta.status_code == 302:
                 assert reverse("entrar") not in respuesta.url

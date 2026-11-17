@@ -19,7 +19,7 @@
 <form method="post" action="{% url 'conectar_archivo' %}" class="tarjeta">
   {% csrf_token %}
   <fieldset>
-    <legend>Dirección con la que la otra computadora encuentra a esta</legend>
+    <legend>Nombre o IP con que la otra computadora encuentra a esta</legend>
     {% for d in direcciones %}<label class="opcion"><input type="radio" name="direccion" value="{{ d }}"{% if forloop.first %} checked{% endif %}> <code>{{ d }}</code></label>{% endfor %}
     <p class="ayuda">De preferencia, el nombre del equipo. Una IP solo sirve mientras no cambie.</p>
   </fieldset>

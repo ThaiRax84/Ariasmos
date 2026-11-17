@@ -237,13 +237,16 @@ def test_telefono_con_otro_largo_se_formatea_con_los_parametros(db):
 def test_respaldos_y_retiros_configurables(personas, tmp_path):
     from datetime import datetime, timedelta
 
-    fijar("respaldos_diarios", 3)
+    fijar("respaldos_diarios", 9)
     fijar("respaldos_mensuales", 0)
     inicio = datetime(2026, 11, 12, 2, 0)
-    for dias in range(10):
+    for dias in range(15):
         (tmp_path / respaldos.nombre_archivo(inicio - timedelta(days=dias))).write_bytes(b"x")
     respaldos.retener(tmp_path)
-    assert len(list(tmp_path.iterdir())) == 3
+    assert len(list(tmp_path.iterdir())) == 9
+    fijar("respaldos_diarios", 3)
+    respaldos.retener(tmp_path)
+    assert len(list(tmp_path.iterdir())) == respaldos.DIARIOS_MINIMOS == 7
     fijar("horas_alerta_respaldo", 12)
     assert respaldos.horas_alerta() == 12 and respaldos.dias_prueba() == 30
     from .libro_ayudas import turno_de
