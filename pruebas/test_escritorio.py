@@ -27,7 +27,7 @@ def test_botones_atras_y_adelante_en_la_barra(personas):
     assert 'data-navegacion hidden' in barra and 'aria-label="Atrás' in barra and 'aria-label="Adelante' in barra
     assert "js/escritorio.js" in pagina and "css/escritorio.css" in pagina
     codigo = (ESTATICOS / "js" / "escritorio.js").read_text(encoding="utf-8")
-    for necesario in ("history.back()", "history.forward()", "canGoBack", "canGoForward", "currententrychange", "ArrowLeft", "ArrowRight", "evento.altKey", "evento.button === 3", "evento.button === 4", "preventDefault"):
+    for necesario in ("history.back()", "history.forward()", "canGoBack", "canGoForward", "currententrychange", "ArrowLeft", "ArrowRight", "evento.altKey", "evento.button === 3", "evento.button === 4", "irSiNadieMas", '"navigate"'):
         assert necesario in codigo, necesario
     hoja = (ESTATICOS / "css" / "escritorio.css").read_text(encoding="utf-8")
     assert ".flecha:disabled" in hoja and "border-radius: 999px" in hoja and ".flecha:focus-visible" in hoja

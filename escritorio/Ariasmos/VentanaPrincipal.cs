@@ -247,17 +247,6 @@ namespace Ariasmos
         {
             documentoVerificado = false;
             MostrarCubierta("Conectando con el servidor…", false);
-            if (vista.CoreWebView2 != null)
-            {
-                try
-                {
-                    await vista.CoreWebView2.CallDevToolsProtocolMethodAsync("Security.enable", "{}");
-                }
-                catch (Exception error) when (error is COMException || error is ArgumentException || error is InvalidOperationException)
-                {
-                    Registro.Escribir("No se pudo activar el estado de seguridad: " + error.Message);
-                }
-            }
             var resultado = await Task.Run(() => Identidad.Comprobar(conexion));
             if (resultado == ResultadoIdentidad.SinRespuesta)
             {
@@ -348,30 +337,25 @@ namespace Ariasmos
 
         private async Task<bool> CertificadoCorrectoAsync(CoreWebView2 nucleo)
         {
-            string fuente = nucleo.Source;
-            if (!Direcciones.Permitida(fuente, conexion))
+            if (!Direcciones.Permitida(nucleo.Source, conexion))
             {
                 return false;
             }
             try
             {
-                await nucleo.CallDevToolsProtocolMethodAsync("Network.enable", "{}");
-                foreach (string origen in new[] { conexion.Origen, conexion.Origen + "/", fuente })
+                estadoSeguridad = null;
+                await nucleo.CallDevToolsProtocolMethodAsync("Security.disable", "{}");
+                await nucleo.CallDevToolsProtocolMethodAsync("Security.enable", "{}");
+                for (int intento = 0; intento < 40 && estadoSeguridad == null; intento++)
                 {
-                    string respuesta = await nucleo.CallDevToolsProtocolMethodAsync("Network.getCertificate", "{\"origin\":" + Json.Texto(origen) + "}");
-                    if (Huella.CoincideCdp(respuesta, conexion.Huella))
-                    {
-                        return true;
-                    }
-                    Registro.Escribir("Network.getCertificate(" + Recortar(origen) + ") no coincide: " + Recortar(respuesta));
+                    await Task.Delay(50);
                 }
                 string estado = estadoSeguridad;
-                if (estado != null && Huella.CoincideEstadoSeguridad(estado, conexion.Huella))
+                if (estado != null && Huella.CoincideEstadoSeguridad(estado, conexion.Huella) && Direcciones.Permitida(nucleo.Source, conexion))
                 {
-                    Registro.Escribir("Huella comprobada con el estado de seguridad de la página.");
                     return true;
                 }
-                Registro.Escribir("Estado de seguridad: " + Recortar(estado));
+                Registro.Escribir("El certificado de la página no coincide con la huella o no se pudo leer: " + Recortar(estado));
                 return false;
             }
             catch (Exception error) when (error is COMException || error is ArgumentException || error is InvalidOperationException)

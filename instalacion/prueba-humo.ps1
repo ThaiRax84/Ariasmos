@@ -383,7 +383,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $Programa $parte) -Destination (Join-Path $copia $parte) -Recurse -Force
     }
     $paraAdicional = Join-Path $env:TEMP ('ariasmos-conexion-' + [guid]::NewGuid().ToString('N'))
-    $salida = & (Join-Path $PSHOME 'powershell.exe') -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'herramientas\conexion.ps1') -Accion Generar -Direccion $Equipo -Puerto $Puerto -Certificado (Join-Path $Datos 'caddy\servidor.crt') -Datos $paraAdicional
+    $salida = & (Get-Process -Id $PID).Path -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'herramientas\conexion.ps1') -Accion Generar -Direccion $Equipo -Puerto $Puerto -Certificado (Join-Path $Datos 'caddy\servidor.crt') -Datos $paraAdicional
     if ($LASTEXITCODE -ne 0) { Fallar "No se pudo generar el archivo de conexión para la adicional: $salida" }
 
     Desinstalar -Nombre 'principal'

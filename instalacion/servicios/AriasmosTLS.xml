@@ -1,7 +1,7 @@
 <service>
   <id>AriasmosTLS</id>
   <name>Ariasmos TLS</name>
-  <description>Atiende la red local por HTTPS (puerto 443) con una autoridad de certificados interna y reenvía a la aplicación en 127.0.0.1:8000.</description>
+  <description>Atiende la red local por HTTPS, en el puerto elegido al instalar, con el certificado único del servidor y reenvía a la aplicación en 127.0.0.1:8000.</description>
   <executable>%BASE%\..\caddy\caddy.exe</executable>
   <arguments>run --config "%ProgramData%\Ariasmos\caddy\caddy.json"</arguments>
   <workingdirectory>%ProgramData%\Ariasmos\caddy</workingdirectory>

@@ -18,6 +18,21 @@
     if (direccion < 0) { window.history.back(); } else { window.history.forward(); }
   }
 
+  function irSiNadieMas(direccion) {
+    var navegacion = window.navigation;
+    if (!navegacion || typeof navegacion.addEventListener !== "function") {
+      ir(direccion);
+      return;
+    }
+    var hecho = false;
+    var marcar = function () { hecho = true; };
+    navegacion.addEventListener("navigate", marcar);
+    window.setTimeout(function () {
+      navegacion.removeEventListener("navigate", marcar);
+      if (!hecho) { ir(direccion); }
+    }, 150);
+  }
+
   function prepararNavegacion() {
     var grupo = document.querySelector("[data-navegacion]");
     var atras = document.querySelector("[data-ir-atras]");
@@ -38,14 +53,12 @@
     }
     document.addEventListener("keydown", function (evento) {
       if (evento.altKey && !evento.ctrlKey && !evento.shiftKey && !evento.metaKey && (evento.key === "ArrowLeft" || evento.key === "ArrowRight")) {
-        evento.preventDefault();
-        ir(evento.key === "ArrowLeft" ? -1 : 1);
+        irSiNadieMas(evento.key === "ArrowLeft" ? -1 : 1);
       }
     });
     document.addEventListener("mouseup", function (evento) {
       if (evento.button === 3 || evento.button === 4) {
-        evento.preventDefault();
-        ir(evento.button === 3 ? -1 : 1);
+        irSiNadieMas(evento.button === 3 ? -1 : 1);
       }
     });
   }
