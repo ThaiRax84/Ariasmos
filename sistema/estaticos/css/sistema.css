@@ -481,3 +481,5 @@ a.cifra.aviso:hover { color: var(--aviso-texto); }
 .pieza.con-mosaico input { grid-column: 2; grid-row: 2; min-height: 44px; }
 .piezas-entrega .cuales, .piezas-entrega .ayuda { display: block; }
 .piezas-entrega .ayuda { margin-top: 4px; }
+.selector-color { inline-size: 56px; block-size: 44px; margin-block-start: 8px; padding: 4px; border: 2px solid var(--borde); border-radius: 12px; background: var(--blanco, #fff); cursor: pointer; }
+.selector-color:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }

@@ -159,11 +159,31 @@
     if (imprimir) { imprimir.addEventListener("click", function () { window.print(); }); }
   }
 
+  function prepararColores() {
+    var patron = /^#[0-9A-Fa-f]{6}$/;
+    Array.prototype.forEach.call(document.querySelectorAll('input[data-acepta="color"]'), function (campo) {
+      var selector = document.createElement("input");
+      selector.type = "color";
+      selector.className = "selector-color";
+      selector.setAttribute("aria-label", "Elegir el color");
+      selector.value = patron.test(campo.value) ? campo.value : "#888888";
+      selector.addEventListener("input", function () {
+        campo.value = selector.value.toUpperCase();
+        campo.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      campo.addEventListener("input", function () {
+        if (patron.test(campo.value)) { selector.value = campo.value; }
+      });
+      campo.insertAdjacentElement("afterend", selector);
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     prepararImprimir();
     prepararConfirmaciones();
     prepararMenuMas();
     prepararAvisosBreves();
     prepararConteos();
+    prepararColores();
   });
 }());
