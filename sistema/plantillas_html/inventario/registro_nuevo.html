@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Entrada o merma</h1>
-<p>Una entrada suma piezas (compras); una merma las resta (daño, pérdida). No piden permiso previo: nacen por revisar y las revisa otra persona.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Entrada o merma</h1>
+    <p class="subtitulo">Una entrada suma piezas (compras); una merma las resta (daño, pérdida). No piden permiso previo: nacen por revisar y las revisa otra persona.</p>
+  </div>
+</div>
 <form method="post" class="formulario angosto" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

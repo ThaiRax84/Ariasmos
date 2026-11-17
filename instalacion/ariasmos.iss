@@ -29,15 +29,19 @@ UninstallDisplayName=Ariasmos
 SetupLogging=yes
 CloseApplications=no
 LicenseFile={#Raiz}\LICENSE
+SetupIconFile={#Raiz}\instalacion\ariasmos.ico
+UninstallDisplayIcon={app}\ariasmos.ico
 
 [Languages]
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
 Source: "{#Paquete}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#Raiz}\instalacion\ariasmos.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Ariasmos"; Filename: "https://localhost/"
+Name: "{group}\Ariasmos"; Filename: "https://localhost/"; IconFilename: "{app}\ariasmos.ico"
+Name: "{commondesktop}\Ariasmos"; Filename: "https://localhost/"; IconFilename: "{app}\ariasmos.ico"
 Name: "{group}\Generar token nuevo del asistente"; Filename: "{app}\herramientas\token-nuevo.cmd"; WorkingDir: "{app}\herramientas"
 Name: "{group}\Dar permiso a una carpeta"; Filename: "{app}\herramientas\permiso-carpeta.cmd"; WorkingDir: "{app}\herramientas"
 Name: "{group}\Desinstalar Ariasmos"; Filename: "{uninstallexe}"

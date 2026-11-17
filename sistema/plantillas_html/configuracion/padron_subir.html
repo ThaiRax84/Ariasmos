@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Importar el padrón inicial</h1>
-<p>Sube el padrón que ya tienes en Excel o CSV. No hace falta un formato fijo: propondremos qué es cada columna y no se guarda nada hasta que confirmes.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración</span>
+    <h1>Importar el padrón inicial</h1>
+    <p class="subtitulo">Sube el padrón que ya tienes en Excel o CSV. No hace falta un formato fijo: propondremos qué es cada columna y no se guarda nada hasta que confirmes.</p>
+  </div>
+</div>
 <form method="post" enctype="multipart/form-data" class="formulario" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

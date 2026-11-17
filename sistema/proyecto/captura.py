@@ -14,6 +14,7 @@ ENTRADA = {
     "recibo": "text",
     "folio": "text",
     "hora": "text",
+    "color": "text",
 }
 
 

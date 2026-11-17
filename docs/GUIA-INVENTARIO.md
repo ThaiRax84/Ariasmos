@@ -10,6 +10,7 @@ El inventario es opcional y está pensado para inventarios pequeños (libros, ú
 | Registrar devoluciones | ✓ | ✓ | ✓ |
 | Registrar entradas y mermas | ✓ | ✓ | ✓ |
 | Subir el conteo | ✓ | ✓ | ✓ |
+| Ver cuántas piezas quedan al vender | ✓ | ✓ | ✓ |
 | Ver existencias y revisar movimientos | — | ✓ | ✓ |
 | Administrar artículos | — | ✓ | ✓ |
 | Aprobar conteos y devoluciones en efectivo | — | ✓ | ✓ |
@@ -29,12 +30,16 @@ La primera vez se hace un conteo (ver abajo). Cuando otra persona lo aprueba, ca
 
 ## Vender
 
-1. **Inventario → Vender a un titular**, busca a la persona y elige artículos y cantidades. El precio lo pone el artículo; no se teclea.
-2. Elige cómo se paga:
-   - **Lo paga ahora**: se crean los cargos y pasas al cobro. El pago se aplica primero a los artículos de esta venta y lo que sobre, al adeudo normal.
-   - **Se va a su adeudo**: los cargos quedan pendientes y se cobran después junto con lo demás.
-3. **Vender sin matrícula** es para quien no es titular. Necesita tu turno de caja abierto; se cobra completa en efectivo en ese momento y se registra contra la cuenta interna «Público en general», que nunca queda con adeudo. Si se capturan piezas por denominación, el cambio se calcula igual que en un cobro.
-4. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
+1. **Inventario → Vender**, busca a la persona y elige su nombre. Arriba a la derecha cambias entre **A un titular** y **Sin matrícula**.
+2. La pantalla muestra todos los artículos activos con su precio y lo que queda. Escribe arriba parte del nombre o de la clave para filtrar la lista. En cada artículo usa **+** y **−** (o escribe la cantidad) para decir cuántos se lleva; los que quedan en 0 no entran en la venta. El precio lo pone el artículo; no se teclea. **+** no se detiene en la existencia: si el sistema cree que no alcanza, la venta sigue y queda para revisión.
+3. A la derecha, **Resumen** suma lo elegido y el **Total**. Es solo una ayuda en pantalla: al continuar, el sistema vuelve a calcular todo con los precios guardados. Si el navegador no ejecuta el programa de la pantalla, el resumen dice que el total se calcula al continuar.
+4. Elige **¿Cómo se paga?**:
+   - **Lo paga ahora**: se crean los cargos y pasas al cobro (**Continuar al cobro**). El pago se aplica primero a los artículos de esta venta y lo que sobre, al adeudo normal.
+   - **Se va a su adeudo**: los cargos quedan pendientes y se cobran después junto con lo demás (**Registrar la venta**).
+5. **Sin matrícula** es para quien no es titular: mismo catálogo con **+** y **−**. Necesita tu turno de caja abierto; al continuar ves lo que se lleva y el total, y se cobra completa en efectivo en ese momento contra la cuenta interna «Público en general», que nunca queda con adeudo. Si se capturan piezas por denominación, el cambio se calcula igual que en un cobro.
+6. Al vender ves cuántas piezas quedan de cada artículo; cuando no queda ninguna no se muestra número. Si la existencia está en 20 % o menos de su nivel de referencia (lo que había justo después de su última entrada o de su último conteo aprobado), o en su mínimo si se le fijó uno, el artículo se marca **pocas** y Supervisión ve el aviso de **existencia baja** en su inicio. El porcentaje se cambia en **Configuración → Inventario**.
+7. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
+8. Si algo no es válido (una cantidad negativa o un artículo que ya no está activo), la pantalla lo dice y conserva las cantidades que habías puesto.
 
 ## Devolver
 

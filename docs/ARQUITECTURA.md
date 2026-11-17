@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.17 · 13/11/2026 · Estado: fases 1 a 5a construidas; fase 6a (carpeta del banco con señales de sospecha e inventario, §15.5 y §16) en construcción; fase 6b (facturación, §17) diseñada; fase 5b (interfaz) en diseño.
+Versión 0.18 · 13/11/2026 · Estado: fases 1 a 6a construidas; fase 5b (interfaz, `docs/DISENO.md`) en construcción; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -492,7 +492,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 4a | Cortes (diario, mayor, lista de cobranza), destinos, cierre de periodo, respaldo y cifrado de secretos |
 | 4b | Instalador `.exe`, HTTPS en la red local, compilación automática y guías |
 | 5a | Calendario de cortes, piezas por denominación, retiros de caja, QR en recibos, carpeta vigilada del banco (§15) |
-| 5b | Interfaz nueva: marca Ariasmos y marca del negocio, pantallas rediseñadas, transiciones |
+| 5b | Interfaz nueva según `docs/DISENO.md`: marca Ariasmos y marca del negocio configurable, todas las pantallas con el nuevo sistema de diseño, splash y transiciones |
 | 6a | Carpeta del banco que aplica de inmediato salvo sospecha (§15.5); inventario opcional, venta a titular o sin matrícula, devoluciones y conteo mensual (§16) |
 | 6b | Facturación electrónica opcional con proveedor intercambiable (§17) |
 
@@ -641,7 +641,8 @@ Pensado para inventarios pequeños. Se enciende con el parámetro `modulo_invent
 
 ### 16.6 Avisos, reportes y permisos
 
-- Aviso de artículos en o bajo su mínimo. Resumen de existencias, ventas, devoluciones, mermas y ajustes del periodo en el corte mayor, en los tres niveles de detalle.
+- **Quien vende ve el número de existencias** de cada artículo; cuando es cero no se muestra nada. La lista para contar sigue sin traer existencias.
+- **Existencia baja:** un artículo está bajo cuando su existencia es de 20 % o menos (`porcentaje_existencia_baja`) de su nivel de referencia, que es la existencia que tenía justo después de su última entrada o de su último conteo aprobado; también cuando está en o bajo su mínimo, si se le fijó uno. Avisa a quien vende (marca «pocas» en la venta) y a Supervisión en su inicio. Resumen de existencias, ventas, devoluciones, mermas y ajustes del periodo en el corte mayor, en los tres niveles de detalle.
 - Permisos: `vender_articulos`, `registrar_movimientos_inventario`, `subir_conteo_inventario`, `devolver_articulos` (Operación); `revisar_inventario`, `administrar_articulos` (Supervisión). Aprobar el conteo y las devoluciones en efectivo se define en las políticas, como las demás solicitudes.
 - Todo queda en bitácora. Las plantillas llevan permisos, políticas y parámetros sin importes; no llevan artículos.
 

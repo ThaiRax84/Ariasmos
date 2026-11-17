@@ -96,7 +96,7 @@ def test_administrar_articulos_solo_supervision_y_con_bitacora(base):
 def test_venta_al_adeudo_con_precio_del_articulo_nunca_del_formulario(base):
     personas, ana, libro_a, cuaderno = base
     c = cliente(personas["op"])
-    respuesta = c.post(reverse("inventario:vender_titular", args=[ana.pk]), {"articulo_0": libro_a.pk, "cantidad_0": "2", "articulo_1": cuaderno.pk, "cantidad_1": "3", "modo": "adeudo", "precio": "1", "precio_0": "1", "total": "1"})
+    respuesta = c.post(reverse("inventario:vender_titular", args=[ana.pk]), {f"cantidad_{libro_a.pk}": "2", f"cantidad_{cuaderno.pk}": "3", "modo": "adeudo", "precio": "1", "precio_0": "1", "total": "1"})
     venta = Venta.objects.get()
     assert respuesta.url == reverse("inventario:venta", args=[venta.pk])
     filas = renglones(venta)
@@ -109,7 +109,7 @@ def test_venta_al_adeudo_con_precio_del_articulo_nunca_del_formulario(base):
 @pytest.mark.parametrize("cantidad", ["0", "-1", "10001", "1.5", "abc", "99999999999999999999"])
 def test_cantidades_enteras_positivas_con_tope(base, cantidad):
     personas, ana, libro_a, cuaderno = base
-    respuesta = cliente(personas["op"]).post(reverse("inventario:vender_titular", args=[ana.pk]), {"articulo_0": libro_a.pk, "cantidad_0": cantidad, "modo": "adeudo"})
+    respuesta = cliente(personas["op"]).post(reverse("inventario:vender_titular", args=[ana.pk]), {f"cantidad_{libro_a.pk}": cantidad, "modo": "adeudo"})
     assert respuesta.status_code == 200 and not Venta.objects.exists()
 
 
@@ -129,7 +129,7 @@ def test_lo_paga_ahora_aplica_primero_a_la_venta(base):
     inscripcion = Cargo.objects.get(titular=ana, concepto__nombre="Inscripción")
     turno_de(personas["op"])
     c = cliente(personas["op"])
-    respuesta = c.post(reverse("inventario:vender_titular", args=[ana.pk]), {"articulo_0": libro_a.pk, "cantidad_0": "1", "modo": "ahora"})
+    respuesta = c.post(reverse("inventario:vender_titular", args=[ana.pk]), {f"cantidad_{libro_a.pk}": "1", "modo": "ahora"})
     venta = Venta.objects.get()
     assert respuesta.url == reverse("cobros:cobrar", args=[ana.pk]) + f"?venta={venta.pk}"
     pantalla = c.get(respuesta.url).content.decode()
@@ -159,7 +159,7 @@ def test_lo_paga_ahora_con_mas_dinero_reparte_el_resto(base):
 def test_sin_existencia_no_bloquea_y_lo_revisa_otra_persona(base):
     personas, ana, libro_a, cuaderno = base
     c = cliente(personas["op"])
-    c.post(reverse("inventario:vender_titular", args=[ana.pk]), {"articulo_0": libro_a.pk, "cantidad_0": "12", "modo": "adeudo"})
+    c.post(reverse("inventario:vender_titular", args=[ana.pk]), {f"cantidad_{libro_a.pk}": "12", "modo": "adeudo"})
     renglon = RenglonVenta.objects.get()
     assert renglon.sin_existencia and renglon.existencia_antes == 10 and inventario.existencia(libro_a) == -2
     assert "Supervisión la revisará" in "".join(str(m) for m in c.get(reverse("inventario:venta", args=[renglon.venta_id])).context["messages"])
@@ -175,17 +175,17 @@ def test_sin_existencia_no_bloquea_y_lo_revisa_otra_persona(base):
 def test_venta_publico_en_una_transaccion_y_cuenta_oculta(base):
     personas, ana, libro_a, cuaderno = base
     c = cliente(personas["op"])
-    assert c.post(reverse("inventario:vender_publico"), {"articulo_0": cuaderno.pk, "cantidad_0": "2"}).url == reverse("caja:inicio")
+    assert c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2"}).url == reverse("caja:inicio")
     turno = turno_de(personas["op"])
-    previa = c.post(reverse("inventario:vender_publico"), {"articulo_0": cuaderno.pk, "cantidad_0": "2"})
+    previa = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2"})
     assert previa.context["total"] == 10000 and not Venta.objects.exists()
-    respuesta = c.post(reverse("inventario:vender_publico"), {"articulo_0": cuaderno.pk, "cantidad_0": "2", "paso": "confirmar", "ficha": previa.context["ficha"], "precio": "1"})
+    respuesta = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"], "precio": "1"})
     venta = Venta.objects.get()
     publico = venta.titular
     assert publico.interno and venta.pago.importe == 10000 and venta.pago.turno == turno
     assert respuesta.url == reverse("cobros:recibo", args=[venta.pago.recibo.pk])
     assert sum(p.saldo for p in libro.pendientes_de([publico.pk])) == 0
-    otra = c.post(reverse("inventario:vender_publico"), {"articulo_0": cuaderno.pk, "cantidad_0": "2", "paso": "confirmar", "ficha": previa.context["ficha"]})
+    otra = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"]})
     assert Venta.objects.count() == 1 and otra.url == respuesta.url
     assert not Titular.objects.filter(pk=publico.pk).exists() and Titular.todos.filter(pk=publico.pk).exists()
     assert "Público" not in cliente(personas["sup"]).get(reverse("titulares:lista")).content.decode()

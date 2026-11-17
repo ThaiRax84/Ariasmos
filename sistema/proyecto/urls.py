@@ -6,6 +6,8 @@ from . import vistas
 
 urlpatterns = [
     path("", vistas.inicio, name="inicio"),
+    path("marca.css", vistas.marca_css, name="marca_css"),
+    path("marca/logo", vistas.marca_logo, name="marca_logo"),
     path("asistente/", include("configuracion.urls_asistente")),
     path("dispositivo/pendiente/", cuentas_views.dispositivo_pendiente, name="dispositivo_pendiente"),
     path("cuentas/", include("cuentas.urls")),

@@ -15,7 +15,7 @@ Esta guía es para la persona que instala el sistema en el equipo que hará de s
 2. Comprueba que el instalador no se dañó ni fue cambiado. Abre **PowerShell** (menú Inicio → escribe «PowerShell») y escribe, cambiando la ruta por la de tu carpeta de descargas:
 
    ```
-   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.6.0-instalador.exe" -Algorithm SHA256
+   Get-FileHash "$env:USERPROFILE\Downloads\Ariasmos-0.7.0-instalador.exe" -Algorithm SHA256
    ```
 
 3. El texto largo que aparece en la columna **Hash** debe ser **igual** al que viene en `SHA256SUMS.txt` (no importan mayúsculas o minúsculas). Si no es igual, **no instales**: vuelve a descargarlo.
@@ -30,6 +30,8 @@ Esta guía es para la persona que instala el sistema en el equipo que hará de s
 6. Haz clic en **Instalar** y espera. Tarda unos minutos: prepara la base de datos, los tres servicios del sistema, el certificado de seguridad y la regla del cortafuegos.
 7. Al terminar, el instalador muestra el **token del asistente**. Haz clic en **Copiar**. Ese token se pide una sola vez y no se guarda en ningún lado.
 8. Deja marcada la casilla «Abrir Ariasmos en el navegador» y haz clic en **Finalizar**.
+
+El instalador deja un acceso directo **Ariasmos** en el escritorio y en el menú Inicio, con el medallón negro del jinete; abre el programa en el navegador. Al abrirlo aparece una vez la presentación de Ariasmos con su versión y después el inicio de sesión. El asistente de los ocho pasos muestra a la izquierda la lista de pasos y en cuál vas.
 
 Si perdiste el token antes de terminar el asistente: menú Inicio → **Ariasmos** → **Generar token nuevo del asistente**. Pide permiso de administrador y muestra un token nuevo; el anterior deja de servir.
 

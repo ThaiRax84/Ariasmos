@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Conteo de inventario</h1>
-<p>1. Descarga la lista para contar (no trae existencias). 2. Cuenta en físico. 3. Sube el archivo con clave y cantidad, o captúralo aquí. Al subirlo el conteo queda fijo y se muestran las diferencias; otra persona lo aprueba. Mientras tanto se sigue vendiendo.</p>
-<p><a class="boton secundario" href="{% url 'inventario:conteo_lista' %}">Descargar la lista para contar (CSV)</a></p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Inventario</span>
+    <h1>Conteo de inventario</h1>
+    <p class="subtitulo">1. Descarga la lista para contar (no trae existencias). 2. Cuenta en físico. 3. Sube el archivo con clave y cantidad, o captúralo aquí. Al subirlo el conteo queda fijo y se muestran las diferencias; otra persona lo aprueba. Mientras tanto se sigue vendiendo.</p>
+  </div>
+  <div class="encabezado-lado"><a class="boton secundario" href="{% url 'inventario:conteo_lista' %}">Descargar la lista para contar (CSV)</a></div>
+</div>
 {% if en_espera %}
 <p class="mensaje warning">Ya hay un conteo en espera de aprobación (<a href="{% url 'inventario:conteo_detalle' en_espera.pk %}">conteo {{ en_espera.pk }}</a>, de {{ en_espera.usuario }}). Solo puede haber uno a la vez.</p>
 {% else %}

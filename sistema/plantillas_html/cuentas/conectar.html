@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Conectar otra computadora</h1>
-<p>Las demás computadoras no instalan el programa: entran con el navegador. Antes, cada una debe confiar en el certificado de este equipo, una sola vez.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Equipos</span>
+    <h1>Conectar otra computadora</h1>
+    <p class="subtitulo">Las demás computadoras no instalan el programa: entran con el navegador. Antes, cada una debe confiar en el certificado de este equipo, una sola vez.</p>
+  </div>
+</div>
 {% if certificado %}
 <p>El archivo solo sirve para que las demás computadoras reconozcan a este servidor. No contiene contraseñas ni datos, no permite reconocer a ningún otro sitio y vence en 10 años.</p>
 <dl class="ficha">

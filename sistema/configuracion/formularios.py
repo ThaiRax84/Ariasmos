@@ -519,3 +519,27 @@ class FormularioAsistenteUsuario(ContrasenaNueva):
     usuario = CampoUsuario(label="Usuario")
     nombre = forms.CharField(label="Nombre completo", max_length=150)
     field_order = ["usuario", "nombre", "contrasena1", "contrasena2"]
+
+
+class FormularioMarca(forms.Form):
+    color_principal = CampoGuiadoTexto(label="Color principal", max_length=7, required=False, acepta="color", maximo_tecleo=7, help_text="Botones, menú activo y, si es oscuro, el texto. Ejemplo: #1F1A4E")
+    color_acento = CampoGuiadoTexto(label="Color de acento", max_length=7, required=False, acepta="color", maximo_tecleo=7, help_text="Franja superior, subrayados y fondos suaves. Ejemplo: #F58634")
+
+    def clean(self):
+        from .marca import MarcaInvalida, validar_color
+
+        datos = super().clean()
+        principal, acento = datos.get("color_principal") or "", datos.get("color_acento") or ""
+        if bool(principal) != bool(acento):
+            raise forms.ValidationError("Escribe los dos colores o deja los dos vacíos.")
+        for campo, valor in (("color_principal", principal), ("color_acento", acento)):
+            if valor:
+                try:
+                    datos[campo] = validar_color(valor)
+                except MarcaInvalida as error:
+                    self.add_error(campo, str(error))
+        return datos
+
+
+class FormularioLogo(forms.Form):
+    archivo = forms.FileField(label="Logo: imagen JPEG o PNG, hasta 1 MB", widget=forms.ClearableFileInput(attrs={"accept": "image/png,image/jpeg"}))

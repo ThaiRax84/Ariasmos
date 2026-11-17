@@ -1,0 +1,1 @@
+<nav class="segmentado" aria-label="A quién se le vende"><a href="{% url 'inventario:vender' %}"{% if not publico %} aria-current="page"{% endif %}>A un {{ voc.titular|lower }}</a><a href="{% url 'inventario:vender_publico' %}"{% if publico %} aria-current="page"{% endif %}>Sin {{ voc.matricula|lower }}</a></nav>

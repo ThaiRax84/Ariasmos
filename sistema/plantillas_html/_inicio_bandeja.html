@@ -1,0 +1,10 @@
+<section class="panel">
+  <h2>{{ titulo }} · {{ pendientes|length }}</h2>
+  {% if pendientes %}
+  <ul class="lista-estado">
+    {% for s, resaltada in pendientes %}
+    <li><span class="renglon-texto"><span class="renglon-titulo">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}{% if resaltada %} <span class="estado aviso">Lleva tiempo esperando</span>{% endif %}</span><span class="renglon-detalle">de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</span></span><a class="boton chico secundario" href="{% url 'solicitudes:detalle' s.pk %}">Ver<span class="solo-lectores"> {{ s }}</span></a></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p>No hay solicitudes pendientes.</p>{% endif %}
+</section>

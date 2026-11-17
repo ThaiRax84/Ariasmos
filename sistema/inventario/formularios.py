@@ -9,7 +9,7 @@ from proyecto.captura import CampoGuiadoTexto
 from .models import MAXIMO_CANTIDAD, MAXIMO_CONTEO, OBSERVADO, REVISADO, Articulo, Devolucion, RegistroInventario, Venta
 from .servicios import CLAVE, LIMITE_CONTEO
 
-RENGLONES_VENTA = 8
+PREFIJO_CANTIDAD = "cantidad_"
 
 
 class FormularioArticulo(forms.ModelForm):
@@ -40,26 +40,40 @@ class FormularioArticulo(forms.ModelForm):
 class FormularioVenta(forms.Form):
     def __init__(self, *args, con_modo=True, **kwargs):
         super().__init__(*args, **kwargs)
-        articulos = Articulo.objects.filter(activo=True).order_by("nombre")
-        self.lineas = []
-        for numero in range(RENGLONES_VENTA):
-            self.fields[f"articulo_{numero}"] = forms.ModelChoiceField(label=f"Artículo {numero + 1}", queryset=articulos, required=False)
-            self.fields[f"cantidad_{numero}"] = forms.IntegerField(label="Cantidad", min_value=1, max_value=MAXIMO_CANTIDAD, required=False)
-            self.lineas.append((f"articulo_{numero}", f"cantidad_{numero}"))
+        self.articulos = list(Articulo.objects.filter(activo=True).order_by("nombre", "clave"))
+        for articulo in self.articulos:
+            self.fields[f"{PREFIJO_CANTIDAD}{articulo.pk}"] = forms.IntegerField(
+                label=f"Cantidad de {articulo.nombre}",
+                min_value=0,
+                max_value=MAXIMO_CANTIDAD,
+                required=False,
+                initial=0,
+                widget=forms.NumberInput(attrs={"min": 0, "max": MAXIMO_CANTIDAD, "step": 1, "inputmode": "numeric", "class": "cantidad", "data-cantidad": ""}),
+            )
         if con_modo:
             self.fields["modo"] = forms.ChoiceField(label="¿Cómo se paga?", choices=Venta.MODOS, widget=forms.RadioSelect, initial=Venta.AHORA)
 
+    def campo_de(self, articulo):
+        nombre = f"{PREFIJO_CANTIDAD}{articulo.pk}"
+        return self[nombre] if nombre in self.fields else None
+
+    def capturadas(self):
+        return [(nombre, self.data.get(nombre, "")) for nombre in self.fields if nombre.startswith(PREFIJO_CANTIDAD) and self.data.get(nombre, "").strip() not in ("", "0")]
+
     def clean(self):
         datos = super().clean()
-        renglones = []
-        for campo_articulo, campo_cantidad in self.lineas:
-            articulo, cantidad = datos.get(campo_articulo), datos.get(campo_cantidad)
-            if articulo is None and cantidad is None:
+        for nombre in self.data:
+            if not nombre.startswith(PREFIJO_CANTIDAD) or nombre in self.fields:
                 continue
-            if articulo is None or cantidad is None:
-                raise forms.ValidationError("Cada renglón lleva artículo y cantidad.")
-            renglones.append((articulo.pk, cantidad))
-        if not renglones:
+            valores = self.data.getlist(nombre) if hasattr(self.data, "getlist") else [self.data.get(nombre)]
+            if any(str(valor or "").strip() not in ("", "0") for valor in valores):
+                raise forms.ValidationError("Uno de los artículos no existe o no está activo.")
+        renglones = []
+        for articulo in self.articulos:
+            cantidad = datos.get(f"{PREFIJO_CANTIDAD}{articulo.pk}")
+            if cantidad:
+                renglones.append((articulo.pk, cantidad))
+        if not renglones and not self.errors:
             raise forms.ValidationError("Agrega al menos un artículo.")
         datos["renglones"] = renglones
         return datos
@@ -167,3 +181,4 @@ class FormularioConfiguracion(forms.Form):
     devoluciones_inventario = forms.BooleanField(label="Aceptar devoluciones de artículos vendidos", required=False)
     dias_devolucion = forms.IntegerField(label="Días después de la venta en que se acepta una devolución", min_value=0, max_value=365)
     dias_conteo_sin_aprobar = forms.IntegerField(label="Días que un conteo puede esperar aprobación antes de avisar a Dirección", min_value=1, max_value=60)
+    porcentaje_existencia_baja = forms.IntegerField(label="Porcentaje de existencia baja: se marca «pocas» cuando quedan este porcentaje o menos de lo que había tras la última entrada o conteo", min_value=1, max_value=99, required=False)

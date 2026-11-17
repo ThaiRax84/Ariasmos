@@ -4,7 +4,7 @@ import re
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Max, OuterRef, Subquery, Sum
 from django.utils import timezone
 
 from auditoria.servicios import registrar
@@ -605,12 +605,69 @@ def bajo_minimo():
     return [(a, actuales.get(a.pk, 0)) for a in Articulo.objects.filter(activo=True).order_by("clave") if actuales.get(a.pk, 0) <= a.minimo]
 
 
+def niveles_referencia(articulos):
+    claves = [articulo.pk for articulo in articulos]
+    niveles = dict.fromkeys(claves, 0)
+    if not claves:
+        return niveles
+    ultima_entrada = MovimientoInventario.objects.filter(articulo=OuterRef("articulo"), tipo=MovimientoInventario.ENTRADA).order_by("-id").values("id")[:1]
+    hasta_entrada = MovimientoInventario.objects.filter(articulo__in=claves, id__lte=Subquery(ultima_entrada))
+    candidatos = {}
+    for fila in hasta_entrada.values("articulo").annotate(total=Sum("cantidad"), momento=Max("creado")).order_by():
+        candidatos[fila["articulo"]] = (fila["momento"], fila["total"] or 0)
+    ultimo_conteo = RenglonConteo.objects.filter(articulo=OuterRef("articulo"), conteo__aplicado_en__isnull=False).order_by("-conteo__aplicado_en", "-id").values("id")[:1]
+    contados = RenglonConteo.objects.filter(articulo__in=claves, conteo__aplicado_en__isnull=False, id=Subquery(ultimo_conteo))
+    for articulo, momento, contado in contados.values_list("articulo", "conteo__aplicado_en", "contado"):
+        previo = candidatos.get(articulo)
+        if previo is None or momento > previo[0]:
+            candidatos[articulo] = (momento, contado)
+    for articulo, (_, nivel) in candidatos.items():
+        niveles[articulo] = nivel
+    return niveles
+
+
+def es_baja(existencia, referencia, minimo, porcentaje):
+    if minimo and existencia <= minimo:
+        return True
+    return referencia > 0 and existencia * 100 <= referencia * porcentaje
+
+
+def porcentaje_baja():
+    return min(max(int(parametro("porcentaje_existencia_baja")), 1), 99)
+
+
+def para_vender():
+    articulos = list(Articulo.objects.filter(activo=True).order_by("nombre", "clave"))
+    actuales = existencias([a.pk for a in articulos])
+    niveles = niveles_referencia(articulos)
+    porcentaje = porcentaje_baja()
+    catalogo = []
+    for articulo in articulos:
+        existencia = actuales.get(articulo.pk, 0)
+        catalogo.append({"articulo": articulo, "existencia": existencia if existencia > 0 else None, "pocas": existencia > 0 and es_baja(existencia, niveles[articulo.pk], articulo.minimo, porcentaje)})
+    return catalogo
+
+
+def existencia_baja():
+    articulos = list(Articulo.objects.filter(activo=True).order_by("clave"))
+    actuales = existencias([a.pk for a in articulos])
+    niveles = niveles_referencia(articulos)
+    porcentaje = porcentaje_baja()
+    resultado = []
+    for articulo in articulos:
+        existencia = actuales.get(articulo.pk, 0)
+        if existencia > articulo.minimo and es_baja(existencia, niveles[articulo.pk], articulo.minimo, porcentaje):
+            resultado.append((articulo, existencia, niveles[articulo.pk]))
+    return resultado
+
+
 def avisos(usuario):
     if not activo():
         return {}
     resultado = {}
     if usuario.tiene_permiso("revisar_inventario") or usuario.tiene_permiso("administrar_articulos"):
         resultado["bajo_minimo"] = bajo_minimo()
+        resultado["existencia_baja"] = existencia_baja()
     if usuario.tiene_permiso("revisar_inventario"):
         resultado["por_revisar"] = (
             RegistroInventario.objects.filter(revision=POR_REVISAR).exclude(usuario=usuario).count()

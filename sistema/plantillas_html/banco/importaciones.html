@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Importaciones</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Banco</span>
+    <h1>Importaciones</h1>
+  </div>
+</div>
 <div class="atajos"><a class="boton" href="{% url 'conciliacion:importar' %}">Importar archivo</a><a class="boton secundario" href="{% url 'conciliacion:cola' %}">Por identificar</a></div>
 <table class="tabla">
 <thead><tr><th>Fecha</th><th>Archivo</th><th>Cuenta</th><th>Periodo</th><th>Nuevos</th><th>Aplicados</th><th>Por identificar</th><th>Repetidos</th><th>Importó</th><th>Clasificación</th><th>Revisión</th></tr></thead>

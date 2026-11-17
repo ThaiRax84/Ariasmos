@@ -1,7 +1,5 @@
-{% extends "base.html" %}
-{% block contenido %}
-<p class="paso">Instalación · paso {{ paso }} de {{ total }}</p>
-<h1>{{ titulo }}</h1>
+{% extends "asistente/_base.html" %}
+{% block asistente %}
 <form method="post" class="formulario" novalidate{% if formulario.is_multipart %} enctype="multipart/form-data"{% endif %}>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

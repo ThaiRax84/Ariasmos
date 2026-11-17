@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Autorizar con código</h1>
-<p>{{ solicitud }}. Pide a quien autoriza que te dicte el código de 6 dígitos de su autenticador. Cada código sirve una sola vez.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Solicitudes</span>
+    <h1>Autorizar con código</h1>
+    <p class="subtitulo">{{ solicitud }}. Pide a quien autoriza que te dicte el código de 6 dígitos de su autenticador. Cada código sirve una sola vez.</p>
+  </div>
+</div>
 {% if formulario.fields.autorizador.choices %}
 <form method="post" class="formulario angosto">
   {% csrf_token %}

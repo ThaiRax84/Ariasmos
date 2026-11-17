@@ -1,0 +1,10 @@
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+  ::view-transition-group(root) { animation-duration: 200ms; }
+  ::view-transition-old(contenido) { animation: 90ms ease both vista-sale; }
+  ::view-transition-new(contenido) { animation: 200ms cubic-bezier(.2, .7, .2, 1) both vista-entra; }
+  ::view-transition-old(barra), ::view-transition-new(barra) { animation: none; }
+  ::view-transition-group(pastilla-activa) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2, .7, .2, 1); }
+}
+@keyframes vista-sale { to { opacity: 0; transform: translateY(-4px); } }
+@keyframes vista-entra { from { opacity: 0; transform: translateY(10px); } }

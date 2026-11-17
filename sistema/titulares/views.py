@@ -46,7 +46,9 @@ def lista(request):
         titulares = titulares.filter(filtro)
     if estado in dict(Titular.ESTADOS):
         titulares = titulares.filter(estado=estado)
-    return render(request, "titulares/lista.html", {"titulares": titulares[:200], "q": consulta, "estado": estado, "estados": Titular.ESTADOS})
+    conteos = dict(Titular.objects.values_list("estado").annotate(total=Count("id")).order_by())
+    filtros = [(valor, nombre, conteos.get(valor, 0)) for valor, nombre in Titular.ESTADOS]
+    return render(request, "titulares/lista.html", {"titulares": titulares.select_related("familia")[:200], "q": consulta, "estado": estado, "estados": Titular.ESTADOS, "filtros": filtros})
 
 
 @requiere_permiso(*CAPTURA)

@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% load formato %}
 {% block contenido %}
-<h1>Movimiento del {{ movimiento.fecha|date:"d/m/Y" }} por {{ movimiento.importe|dinero }}</h1>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Banco</span>
+    <h1>Movimiento del {{ movimiento.fecha|date:"d/m/Y" }} por {{ movimiento.importe|dinero }}</h1>
+  </div>
+</div>
 <section class="panel">
   <dl class="datos">
     <dt>Estado</dt><dd>{{ movimiento.get_estado_display }}{% if movimiento.posible_duplicado %} · <strong>posible duplicado</strong>: se parece a varios movimientos que llegaron por otra vía; revisa antes de aplicarlo{% endif %}{% if movimiento.mismo_que_id %} · es el mismo que el movimiento <a href="{% url 'conciliacion:movimiento' movimiento.mismo_que_id %}">{{ movimiento.mismo_que_id }}</a>{% endif %}{% if movimiento.confirmado_por_id %} · confirmado por el estado oficial{% endif %}</dd>

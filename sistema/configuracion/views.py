@@ -12,6 +12,7 @@ from caja.models import Caja, Denominacion
 from cobros.models import Cargo, Pago
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
+from . import marca as marca_negocio
 from . import plantillas
 from .formularios import (
     FormularioAgrupacion,
@@ -19,6 +20,8 @@ from .formularios import (
     FormularioCaja,
     FormularioCajaCortes,
     FormularioCarpetaBanco,
+    FormularioMarca,
+    FormularioLogo,
     FormularioCampoContacto,
     FormularioDenominacion,
     FormularioMedioPago,
@@ -192,7 +195,7 @@ def carpeta_banco(request):
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
-CLAVES_INVENTARIO = ("modulo_inventario", "devoluciones_inventario", "dias_devolucion", "dias_conteo_sin_aprobar")
+CLAVES_INVENTARIO = ("modulo_inventario", "devoluciones_inventario", "dias_devolucion", "dias_conteo_sin_aprobar", "porcentaje_existencia_baja")
 
 
 def valores_inventario():
@@ -212,6 +215,8 @@ def inventario(request):
         with transaction.atomic():
             for clave in CLAVES_INVENTARIO:
                 valor = formulario.cleaned_data[clave]
+                if valor is None:
+                    valor = antes[clave]
                 Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(int(valor))})
             cambios = diferencias(antes, valores_inventario())
             if cambios:
@@ -279,3 +284,52 @@ def catalogo_editar(request, catalogo, pk):
     if catalogo not in CATALOGOS:
         return redirect("configuracion:indice")
     return _guardar_catalogo(request, catalogo, pk)
+
+
+def _contrastes(actual):
+    if actual is None or not actual.con_colores:
+        return None
+    valores = marca_negocio.variables(actual.color_principal, actual.color_acento)
+    blanco = marca_negocio.contraste(marca_negocio.BLANCO, actual.color_principal)
+    return {
+        "blanco_sobre_principal": round(blanco, 1),
+        "botones_con_tinta": valores["--boton-fondo"] != actual.color_principal,
+        "tinta_es_principal": valores["--tinta"] == actual.color_principal,
+    }
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def marca(request):
+    actual = marca_negocio.actual()
+    inicial = {"color_principal": actual.color_principal if actual else "", "color_acento": actual.color_acento if actual else ""}
+    colores = FormularioMarca(initial=inicial)
+    logo = FormularioLogo()
+    if request.method == "POST":
+        accion = request.POST.get("accion", "")
+        try:
+            if accion == "colores":
+                colores = FormularioMarca(request.POST)
+                if colores.is_valid():
+                    marca_negocio.guardar_colores(colores.cleaned_data["color_principal"], colores.cleaned_data["color_acento"], request.user, request)
+                    messages.success(request, "Colores del negocio guardados.")
+                    return redirect("configuracion:marca")
+            elif accion == "sin_colores":
+                marca_negocio.guardar_colores("", "", request.user, request)
+                messages.success(request, "Se usan otra vez los colores de Ariasmos.")
+                return redirect("configuracion:marca")
+            elif accion == "logo":
+                logo = FormularioLogo(request.POST, request.FILES)
+                if logo.is_valid():
+                    marca_negocio.guardar_logo(marca_negocio.leer_subida(logo.cleaned_data["archivo"]), request.user, request)
+                    messages.success(request, "Logo del negocio guardado.")
+                    return redirect("configuracion:marca")
+            elif accion == "quitar_logo":
+                marca_negocio.quitar_logo(request.user, request)
+                messages.success(request, "Logo quitado: se muestra solo el nombre del negocio.")
+                return redirect("configuracion:marca")
+            else:
+                messages.error(request, "Acción no válida.")
+        except marca_negocio.MarcaInvalida as error:
+            registrar("marca_rechazada", usuario=request.user, datos={"accion": accion[:20], "motivo": str(error)}, request=request)
+            (logo if accion == "logo" else colores).add_error(None, str(error))
+    return render(request, "configuracion/marca.html", {"colores": colores, "logo": logo, "actual": actual, "contrastes": _contrastes(actual)})

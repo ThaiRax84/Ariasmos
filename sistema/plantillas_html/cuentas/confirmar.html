@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block contenido %}
-<h1>Confirma tu contraseña</h1>
-<p>Esta acción es delicada. Escribe otra vez tu contraseña para continuar.</p>
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <h1>Confirma tu contraseña</h1>
+    <p class="subtitulo">Esta acción es delicada. Escribe otra vez tu contraseña para continuar.</p>
+  </div>
+</div>
 <form method="post" class="formulario angosto">
   {% csrf_token %}
   <input type="hidden" name="siguiente" value="{{ siguiente }}">
