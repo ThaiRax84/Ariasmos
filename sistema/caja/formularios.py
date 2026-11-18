@@ -46,6 +46,18 @@ class FormularioAbrir(ConPiezas, forms.Form):
         if self.nombres_piezas:
             del self.fields["fondo_inicial"]
 
+    def clean(self):
+        datos = super().clean()
+        if datos.get("apertura") == self.CERO:
+            return datos
+        if self.nombres_piezas:
+            contado = any(datos.get(nombre) for nombre, _ in self.nombres_piezas)
+        else:
+            contado = bool(datos.get("fondo_inicial"))
+        if not contado and not self.errors:
+            raise forms.ValidationError("Cuenta el efectivo que hay en la caja o elige abrir en cero.")
+        return datos
+
     def en_cero(self):
         return self.cleaned_data.get("apertura") == self.CERO
 
