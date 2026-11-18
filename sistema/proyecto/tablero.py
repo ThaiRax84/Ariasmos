@@ -372,6 +372,9 @@ def _avisos_inventario(usuario):
     if datos.get("por_revisar"):
         cuantos = datos["por_revisar"]
         filas.append(renglon("inventario_por_revisar", "Movimientos de inventario", f"{_plural(cuantos, 'movimiento')} de inventario por revisar.", "por_revisar", [("Revisar", reverse("inventario:revision"))]))
+    if datos.get("ventas_sin_cobrar"):
+        cuantas = datos["ventas_sin_cobrar"]
+        filas.append(renglon("ventas_sin_cobrar", "Ventas sin cobrar", f"{_plural(cuantas, 'venta')} que se iba{'n' if cuantas != 1 else ''} a pagar en el momento sigue{'n' if cuantas != 1 else ''} sin cobro.", "revisar", [("Ver ventas", reverse("inventario:ventas"))]))
     if datos.get("conteo_viejo"):
         conteo = datos["conteo_viejo"]
         filas.append(renglon("inventario_conteo_viejo", f"Conteo de inventario {conteo.pk}", f"El conteo {conteo.pk} espera aprobación desde el {_fecha(conteo.creado)}.", "revisar", [("Ver conteo", reverse("inventario:conteo_detalle", args=[conteo.pk]))]))

@@ -53,7 +53,7 @@ class FormularioAbrir(ConPiezas, forms.Form):
         if self.nombres_piezas:
             contado = any(datos.get(nombre) for nombre, _ in self.nombres_piezas)
         else:
-            contado = bool(datos.get("fondo_inicial"))
+            contado = datos.get("fondo_inicial") is not None
         if not contado and not self.errors:
             raise forms.ValidationError("Cuenta el efectivo que hay en la caja o elige abrir en cero.")
         return datos

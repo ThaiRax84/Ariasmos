@@ -661,6 +661,9 @@ def existencia_baja():
     return resultado
 
 
+MINUTOS_VENTA_SIN_COBRAR = 30
+
+
 def avisos(usuario):
     if not activo():
         return {}
@@ -673,6 +676,12 @@ def avisos(usuario):
             RegistroInventario.objects.filter(revision=POR_REVISAR).exclude(usuario=usuario).count()
             + Devolucion.objects.filter(revision=POR_REVISAR).exclude(usuario=usuario).count()
             + RenglonVenta.objects.filter(sin_existencia=True, revisado_por__isnull=True).exclude(venta__usuario=usuario).count()
+        )
+    if usuario.tiene_permiso("revisar_inventario"):
+        resultado["ventas_sin_cobrar"] = (
+            Venta.objects.filter(modo=Venta.AHORA, pago__isnull=True, titular__interno=False, creada__lt=timezone.now() - timedelta(minutes=MINUTOS_VENTA_SIN_COBRAR))
+            .exclude(usuario=usuario)
+            .count()
         )
     if usuario.tiene_permiso("ver_auditoria"):
         espera = conteo_en_espera()

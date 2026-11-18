@@ -353,7 +353,15 @@ def test_sin_credito_la_venta_al_adeudo_pasa_a_solicitud_y_la_de_contado_no(base
     motor.aprobar(solicitud, base["sup"])
     venta = Venta.objects.get()
     assert venta.modo == Venta.ADEUDO and venta.total == 10000 and venta.usuario == base["op"]
-    assert op.post(ruta, {f"cantidad_{cuaderno.pk}": "1", "modo": Venta.AHORA}).status_code == 302
+    sin_turno = op.post(ruta, {f"cantidad_{cuaderno.pk}": "1", "modo": Venta.AHORA})
+    assert sin_turno.status_code == 302 and not Venta.objects.filter(modo=Venta.AHORA).exists()
+    assert Solicitud.objects.filter(accion="venta_sin_credito").count() == 2
+    from caja import servicios as servicios_caja
+    from caja.models import Caja
+
+    servicios_caja.abrir_turno(base["op"], Caja.objects.get_or_create(nombre="Caja de ventas")[0], 0)
+    con_turno = op.post(ruta, {f"cantidad_{cuaderno.pk}": "1", "modo": Venta.AHORA})
+    assert con_turno.status_code == 302 and "/cobr" in con_turno.url
     assert Venta.objects.filter(modo=Venta.AHORA).count() == 1
 
 

@@ -120,6 +120,12 @@ def vender(request):
     return render(request, "inventario/vender.html", {"q": consulta, "resultados": resultados, "orden": orden})
 
 
+def _puede_cobrar_ya(usuario):
+    from caja import servicios as caja
+
+    return usuario.tiene_permiso("registrar_pago_efectivo") and caja.turno_abierto(usuario) is not None
+
+
 @requiere_permiso("vender_articulos")
 @encendido
 def vender_titular(request, pk):
@@ -127,7 +133,7 @@ def vender_titular(request, pk):
     if titular.estado not in (Titular.ACTIVO, Titular.PENDIENTE):
         raise PermissionDenied
     formulario = FormularioVenta(request.POST if request.method == "POST" else None)
-    if request.method == "POST" and formulario.is_valid() and formulario.cleaned_data["modo"] == Venta.ADEUDO and sin_credito(titular):
+    if request.method == "POST" and formulario.is_valid() and sin_credito(titular) and (formulario.cleaned_data["modo"] == Venta.ADEUDO or not _puede_cobrar_ya(request.user)):
         respuesta, error = solicitar_venta(request, titular, formulario.cleaned_data["renglones"])
         if respuesta is not None:
             return respuesta
