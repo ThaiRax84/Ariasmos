@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.20 · 17/11/2026 · Estado: fases 1 a 7a construidas; fase 8a (programa de escritorio, §21) y fase 8b (nada fijo de un negocio, §22) en diseño; fase 6b (facturación, §17) diseñada.
+Versión 0.21 · 18/11/2026 · Estado: fases 1 a 8b construidas (0.9.0); fase 9a (configurador y caja más cómodos, §23) en construcción; fase 9b (tarifas por agrupación, límites de adeudo y rezagados) en diseño; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -498,6 +498,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 7a | Topes del banco por día y acumulado, configurables por quien concilia y por Dirección (§19); actualizaciones del programa: buscar, avisar y descargar con firma (§20) |
 | 8a | Programa de escritorio: `Ariasmos.exe` con ventana propia en la computadora principal y en las adicionales (§21) |
 | 8b | Nada fijo de un negocio: vocabulario completo, reportes, banco, reglas configurables y cobros semanales y quincenales (§22) |
+| 9a | Configurador y caja más cómodos: zona horaria en lista, signo según el tipo, apertura de turno con piezas, orden en los buscadores, pantallas de caja como el diseño aprobado (§23) |
 
 ## 14. Pendientes de decisión
 
@@ -915,3 +916,41 @@ Regla de diseño para esta fase y las siguientes: el programa no pide lo que pue
 
 - El idioma (español), el formato de fechas y de números, y el catálogo de bancos de México. Otro país es una fase aparte.
 - La marca «Ariasmos» del programa.
+
+## 23. Versión 0.21: configurador y caja más cómodos (fase 9a)
+
+Regla de la fase: quien configura o cobra no escribe lo que puede elegir, y no ve lo que no aplica.
+
+### 23.1 Zona horaria en lista
+
+- La zona horaria se **elige de una lista con buscador**, nunca se escribe. La lista sale de la base de zonas horarias IANA que ya trae el programa (`zoneinfo` con `tzdata`), solo las zonas canónicas con región (`América/…`, `Europa/…`), agrupadas por región y mostradas como «Ciudad (UTC−06:00)» con el desfase vigente.
+- El asistente propone la zona de la computadora principal si se reconoce; si no, ninguna.
+- El servidor valida contra la misma lista.
+
+### 23.2 El signo sigue al tipo
+
+- Donde se elige entre **porcentaje** e **importe fijo** (recargos, descuentos y cualquier otro), el campo del valor muestra solo el signo que corresponde (`%` o el símbolo de la moneda) y cambia al cambiar el tipo, con sus límites y su captura guiada. Sin JavaScript se ven los dos campos con su etiqueta.
+- El servidor sigue validando el valor según el tipo recibido.
+
+### 23.3 Abrir turno contando las piezas
+
+- Con el control de piezas activo, abrir turno con efectivo **pide cuántas piezas hay de cada denominación**, con los mismos mosaicos del cobro; el fondo inicial es la suma y no se escribe aparte. Abrir en cero sigue siendo un solo paso.
+- Sin control de piezas se pide solo el importe.
+- Las piezas de apertura entran al registro de piezas de la caja, para que el cambio propuesto las tome en cuenta. La apertura es declaración de quien abre; el arqueo ciego no cambia.
+
+### 23.4 Orden en los buscadores y listas
+
+- Toda lista o buscador de titulares (padrón, buscar para cobrar, vender, conciliar) ofrece **ordenar por**: nombre, apellidos, matrícula, agrupación o familia, ascendente o descendente. Las demás listas largas (artículos, usuarios, solicitudes, cortes) ofrecen los órdenes que les sean naturales.
+- El orden elegido se recuerda por persona y por lista.
+- El servidor solo acepta claves de una lista cerrada por pantalla; nunca un campo recibido tal cual.
+
+### 23.5 Pantallas de caja como el diseño aprobado
+
+- «Mi caja» (abrir turno, turno abierto, cerrar con conteo, reconteo, resultado) y el retiro siguen las referencias aprobadas `docs/diseno/referencia/` de corte, reconteo, resultado y retiro: mosaicos de piezas, suma en vivo, pasos claros y una sola acción principal por pantalla. Las reglas del arqueo ciego (§15.2) no cambian.
+
+### 23.6 Configurador más amable
+
+- Cada paso del asistente: una idea por pantalla, texto breve que dice para qué sirve, valores de fábrica ya puestos, elegir en lugar de escribir (listas, interruptores, mosaicos), ejemplos junto al campo, errores junto al campo que los causa y en palabras llanas, y «Atrás» sin perder lo capturado.
+- Lo avanzado va plegado bajo «Más opciones».
+- El paso de caja del asistente usa los mismos componentes que las pantallas de caja.
+- Las mismas reglas aplican a las pantallas de Configuración.
