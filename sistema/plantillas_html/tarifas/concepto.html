@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo"><a href="{% url 'tarifas:indice' %}">Tarifas</a> · {{ concepto.get_tipo_display }}</span>
+    <h1>{{ concepto.nombre }}</h1>
+    <p class="subtitulo">Importe general: {{ concepto.importe_texto }}{% if concepto.periodicidad %} · {{ concepto.get_periodicidad_display }}{% endif %}{% if concepto.dia_vencimiento %} · vence el día {{ concepto.dia_vencimiento }}{% endif %}</p>
+  </div>
+  <div class="encabezado-lado"><a class="boton" href="{% url 'tarifas:nueva' concepto.pk %}">Nueva tarifa</a></div>
+</div>
+<div class="columnas mitades">
+<section class="panel">
+  <h2>Tarifas por {{ voc.agrupacion_min }}</h2>
+  {% if tarifas %}
+  <table class="tabla">
+  <thead><tr><th>{{ voc.agrupacion }}</th><th>Importe</th>{% if concepto.tipo == "recurrente" %}<th>Periodicidad</th><th>Vence</th>{% endif %}<th>Activa</th><th></th></tr></thead>
+  <tbody>{% for t in tarifas %}<tr><td class="fuerte">{{ t.agrupacion }}</td><td>{{ t.importe_texto }}</td>{% if concepto.tipo == "recurrente" %}<td>{{ t.periodicidad|default:"La del concepto" }}</td><td>{{ t.dia_vencimiento|default:"El del concepto" }}</td>{% endif %}<td>{% if t.activa %}Sí{% else %}No{% endif %}</td><td><a href="{% url 'tarifas:editar' t.pk %}">Editar</a></td></tr>{% endfor %}</tbody>
+  </table>
+  {% else %}
+  <p>Sin tarifas: a todos se les cobra lo general del concepto{% if opcion.solo_con_tarifa %}, salvo que está marcado «solo con tarifa» y entonces no se le cobra a nadie{% endif %}.</p>
+  <div class="acciones"><a class="boton" href="{% url 'tarifas:nueva' concepto.pk %}">Agregar la primera tarifa</a></div>
+  {% endif %}
+</section>
+<section class="panel">
+  <h2>Cómo se cobra</h2>
+  <form method="post" class="formulario" novalidate>
+    {% csrf_token %}
+    {% include "comun/_campos.html" %}
+    <div class="acciones"><button class="boton" type="submit">Guardar opciones</button></div>
+  </form>
+</section>
+</div>
+{% endblock %}

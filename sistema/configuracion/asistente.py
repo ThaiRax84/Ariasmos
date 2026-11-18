@@ -28,6 +28,7 @@ from cortes.models import TIPOS as TIPOS_CORTE
 from cortes.models import DefinicionCorte, Destino, ReglaDestino
 from nucleo import sobre, totp
 from respaldos.servicios import clave_respaldo
+from rezagos.servicios import cargar_de_plantilla as cargar_reglas_de_rezago
 
 from . import esquema, plantillas, zonas
 from . import marca as marca_negocio
@@ -190,6 +191,7 @@ def inicio(request):
 def _aplicar_plantilla(request, datos, origen):
     with transaction.atomic():
         plantillas.cargar_datos(datos, origen, request=request)
+        cargar_reglas_de_rezago(datos, request=request)
         inventario = bool(_estado(request).get("inventario"))
         Parametro.objects.update_or_create(clave="modulo_inventario", defaults={"valor": "1" if inventario else "0"})
         registrar("asistente_inventario", datos={"modulo_inventario": inventario, "origen": "asistente"}, request=request)

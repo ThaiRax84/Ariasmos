@@ -13,6 +13,7 @@ from cuentas.models import CodigoUsado
 from cuentas.servicios import consumir_codigo, usar_delegacion
 from inventario import acciones as inventario_acciones
 from inventario.servicios import ErrorInventario
+from rezagos import acciones as rezagos_acciones
 from titulares import padron
 from titulares.importacion import ImportacionPadron
 from titulares.models import Familia, MotivoBaja, Titular
@@ -173,9 +174,11 @@ MANEJADORES = {
     "conteo_inventario": inventario_acciones.ConteoInventario(),
     "devolucion_efectivo": inventario_acciones.DevolucionEfectivo(),
     "importacion_padron": ImportacionPadron(),
+    "cargo_sin_credito": rezagos_acciones.CargoSinCredito(),
+    "venta_sin_credito": rezagos_acciones.VentaSinCredito(),
 }
 
-ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion, inventario_acciones.ErrorAccion, ErrorInventario, padron.ErrorPadron)
+ERRORES_DE_ACCION = (acciones.ErrorAccion, libro.ErrorLibro, retiros_acciones.ErrorAccion, inventario_acciones.ErrorAccion, ErrorInventario, padron.ErrorPadron, rezagos_acciones.ErrorAccion)
 
 
 def _validar(manejador, titular, datos):

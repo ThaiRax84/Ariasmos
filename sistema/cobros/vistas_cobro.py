@@ -26,7 +26,9 @@ from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from configuracion.moneda import formatear
 from nucleo.matricula import normalizar
+from rezagos import servicios as rezagos
 from solicitudes import motor
+from tarifas import servicios as tarifas
 from titulares import contactos
 from titulares.models import Titular
 
@@ -458,15 +460,24 @@ def cargo_manual(request, pk):
     if request.method == "POST" and formulario.is_valid():
         datos = formulario.cleaned_data
         concepto = datos["concepto"]
-        unitario = datos.get("importe_unitario") or concepto.importe_centavos
-        if unitario != concepto.importe_centavos and not request.user.tiene_permiso_de_rol("aplicar_ajustes"):
+        precio = tarifas.precio(concepto, titular)
+        unitario = datos.get("importe_unitario") or precio
+        error_cantidad = tarifas.error_cargo(concepto, titular, datos["cantidad"])
+        if error_cantidad:
+            formulario.add_error("cantidad", error_cantidad)
+        elif unitario != precio and not request.user.tiene_permiso_de_rol("aplicar_ajustes"):
             registrar("cargo_manual_importe_rechazado", objeto=titular, request=request, datos={"concepto": str(concepto), "importe_pedido": unitario})
             formulario.add_error("importe_unitario", "Cambiar el importe del concepto requiere el permiso de ajustes.")
         elif unitario <= 0:
             formulario.add_error("importe_unitario", "El concepto no tiene importe: escribe uno (requiere el permiso de ajustes).")
+        elif rezagos.sin_credito(titular):
+            respuesta, error = rezagos.solicitar_cargo(request, titular, concepto, datos["cantidad"], unitario)
+            if respuesta is not None:
+                return respuesta
+            formulario.add_error(None, error)
         else:
             cantidad = datos["cantidad"]
-            descripcion = f"{concepto} × {cantidad}" if cantidad > 1 else str(concepto)
+            descripcion = tarifas.descripcion_cargo(concepto, cantidad)
             libro.crear_cargo(titular, concepto, unitario * cantidad, hoy_negocio(), Cargo.MANUAL, descripcion=descripcion, cantidad=cantidad, usuario=request.user, request=request)
             messages.success(request, f"Cargo agregado: {descripcion} por {formatear(unitario * cantidad)}.")
             return redirect("titulares:detalle", pk=pk)

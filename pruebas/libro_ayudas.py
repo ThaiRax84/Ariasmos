@@ -6,7 +6,7 @@ from caja.models import Caja, Traslado
 from caja.servicios import abrir_turno, custodia
 from cobros import libro
 from cobros.models import Aplicacion, Cargo, ConceptoCobro, Pago, ReglaRecargo, ReversionPago
-from configuracion.models import Negocio
+from configuracion.models import Negocio, Parametro
 from cuentas.models import Usuario
 from solicitudes import motor
 from titulares.models import Familia, Titular
@@ -22,6 +22,10 @@ def preparar_conceptos():
     ConceptoCobro.objects.filter(nombre="Libros").update(importe_centavos=50000)
     Negocio.objects.filter(pk=1).update(cobro_desde=INICIO)
     return regla
+
+
+def recargos_desde_el_alta():
+    Parametro.objects.update_or_create(clave="recargos_tras_alta", defaults={"valor": "desde_alta"})
 
 
 def titular_activo(capturista, aprobador, nombre, familia=None, iniciales=("Inscripción",)):

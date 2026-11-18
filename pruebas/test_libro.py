@@ -5,12 +5,13 @@ import pytest
 from cobros import generacion, libro
 from cobros.models import Aplicacion, AsientoInmutable, Cargo, Pago
 
-from .libro_ayudas import cargos_de, familia_con_dos, preparar_conceptos, saldo, turno_de, verificar_sumas
+from .libro_ayudas import cargos_de, familia_con_dos, preparar_conceptos, recargos_desde_el_alta, saldo, turno_de, verificar_sumas
 
 
 @pytest.fixture
 def escenario(personas):
     preparar_conceptos()
+    recargos_desde_el_alta()
     familia, ana, beto = familia_con_dos(personas["op"], personas["sup"])
     return personas, familia, ana, beto
 

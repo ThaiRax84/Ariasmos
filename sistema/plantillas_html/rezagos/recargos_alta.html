@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo"><a href="{% url 'cobros:reglas' %}">Reglas de recargo</a></span>
+    <h1>Recargos tras el alta</h1>
+  </div>
+</div>
+<p class="ayuda">A quien se acaba de dar de alta no se le cobran recargos por atraso de lo que vence dentro del periodo de su alta (según la periodicidad de cada concepto; los conceptos que no se repiten cuentan por mes). Desde el periodo siguiente, todo normal. Reactivar una baja cuenta como alta nueva y la fecha que vale es la de activación.</p>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton" type="submit">Guardar</button></div>
+</form>
+{% endblock %}

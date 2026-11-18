@@ -23,6 +23,8 @@ ACCIONES = [
     ("conteo_inventario", "Conteo de inventario"),
     ("devolucion_efectivo", "Devolución de artículos en efectivo"),
     ("importacion_padron", "Importación o actualización desde una hoja"),
+    ("cargo_sin_credito", "Cargo manual sin crédito"),
+    ("venta_sin_credito", "Venta al adeudo sin crédito"),
 ]
 
 

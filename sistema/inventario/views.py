@@ -26,6 +26,7 @@ from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
 from proyecto.orden import elegir
+from rezagos.servicios import sin_credito, solicitar_venta
 from titulares.models import Titular
 
 from . import servicios
@@ -126,7 +127,12 @@ def vender_titular(request, pk):
     if titular.estado not in (Titular.ACTIVO, Titular.PENDIENTE):
         raise PermissionDenied
     formulario = FormularioVenta(request.POST if request.method == "POST" else None)
-    if request.method == "POST" and formulario.is_valid():
+    if request.method == "POST" and formulario.is_valid() and formulario.cleaned_data["modo"] == Venta.ADEUDO and sin_credito(titular):
+        respuesta, error = solicitar_venta(request, titular, formulario.cleaned_data["renglones"])
+        if respuesta is not None:
+            return respuesta
+        formulario.add_error(None, error)
+    elif request.method == "POST" and formulario.is_valid():
         try:
             venta = servicios.vender(titular, formulario.cleaned_data["renglones"], formulario.cleaned_data["modo"], request.user, request)
         except servicios.ErrorInventario as error:

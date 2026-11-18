@@ -35,7 +35,7 @@ from titulares.models import Titular
 
 from .banco_ayudas import estado, pdf, spei
 from .conftest import cliente, nuevo_usuario
-from .libro_ayudas import preparar_conceptos, titular_activo
+from .libro_ayudas import preparar_conceptos, recargos_desde_el_alta, titular_activo
 from .test_asistente import paso_inicio, terminar
 
 
@@ -117,6 +117,7 @@ def test_quincenal_en_febrero_y_alta_a_mitad_de_periodo(personas):
 
 def test_semanal_con_descuento_prorroga_y_recargo(personas):
     preparar_conceptos()
+    recargos_desde_el_alta()
     regla = ReglaRecargo.objects.create(nombre="Recargo semanal", tipo="fijo", valor=1500, dias_gracia=0)
     concepto = _semanal(regla_recargo=regla)
     ana = titular_activo(personas["op"], personas["sup"], "Ana")

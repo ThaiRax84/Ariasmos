@@ -1,0 +1,3 @@
+<section class="aviso-pantalla" aria-label="Atraso" data-cobro-rezago>
+  <div class="aviso-texto"><div class="aviso-titulo">{{ texto }} · {{ situacion.dias }} día{{ situacion.dias|pluralize }} de atraso</div><div>{% for m in marcas %}<span class="estado aviso">{{ m }}</span> {% endfor %}{% if situacion.sin_credito %}Sin crédito: ventas al adeudo, cargos manuales y prórrogas pasan a solicitud. El pago se recibe igual.{% endif %}</div></div>
+</section>
