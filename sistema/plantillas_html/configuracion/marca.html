@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+{% block cabeza %}<link rel="stylesheet" href="{% static 'css/vista-marca.css' %}">{% if vista %}<link rel="stylesheet" href="{% url 'marca_vista_css' %}?p={{ vista.principal|slice:'1:' }}&amp;a={{ vista.acento|slice:'1:' }}">{% endif %}{% endblock %}
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
@@ -14,8 +16,16 @@
       {% csrf_token %}
       <input type="hidden" name="accion" value="colores">
       {% include "comun/_campos.html" with formulario=colores %}
-      <div class="acciones"><button class="boton" type="submit">Guardar colores</button></div>
+      <div class="acciones"><button class="boton" type="submit">{% if propuesta %}Usar estos colores{% else %}Guardar colores{% endif %}</button></div>
     </form>
+    {% if actual.logo %}
+    <form method="post" class="acciones">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="colores_logo">
+      <button class="boton secundario" type="submit">Usar los colores del logo</button>
+    </form>
+    {% endif %}
+    {% if vista %}<h3>Vista previa</h3>{% include "comun/_vista_marca.html" with nombre_vista=negocio.nombre %}{% endif %}
     {% if actual.con_colores %}
     <form method="post" class="acciones">
       {% csrf_token %}

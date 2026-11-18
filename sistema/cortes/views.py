@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from auditoria.servicios import diferencias, registrar
+from configuracion.models import vocabulario
 from cuentas.decoradores import requiere_permiso
 
 from . import salida, servicios
@@ -39,9 +40,10 @@ def detalle(request, pk):
     corte = servicios.recalcular(corte)
     datos = salida.vista(corte.cifras, COMPLETO)
     codigo = datos.get("moneda", "")
-    resumen = [(salida.etiqueta(k), salida.texto_celda(k, v, codigo, pdf=True)) for k, v in salida.resumen(datos).items()]
+    voc = vocabulario()
+    resumen = [(salida.etiqueta(k, voc), salida.texto_celda(k, v, codigo, pdf=True)) for k, v in salida.resumen(datos).items()]
     tablas = [
-        {"titulo": t["titulo"], "columnas": [salida.etiqueta(c) for c in t["columnas"]], "filas": [[salida.texto_celda(c, f.get(c), codigo, pdf=True) for c in t["columnas"]] for f in t["filas"]]}
+        {"titulo": t["titulo"], "columnas": [salida.etiqueta(c, voc) for c in t["columnas"]], "filas": [[salida.texto_celda(c, f.get(c), codigo, pdf=True) for c in t["columnas"]] for f in t["filas"]]}
         for t in salida.tablas(datos)
     ]
     contexto = {

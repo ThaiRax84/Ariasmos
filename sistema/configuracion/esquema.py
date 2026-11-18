@@ -7,7 +7,7 @@ from . import moneda
 
 LIMITE_BYTES = 256 * 1024
 MAXIMO_LISTA = {"roles": 20, "politicas": 20, "motivos_retiro": 50, "motivos_baja": 100, "relaciones_contacto": 50, "campos_contacto": 20, "conceptos": 100, "medios_pago": 30, "cajas": 20, "denominaciones": 30, "cortes": 3}
-VOCABULARIO = ("titular", "titulares", "matricula", "agrupacion", "agrupaciones", "familia", "familias")
+VOCABULARIO = ("titular", "titulares", "matricula", "agrupacion", "agrupaciones", "familia", "familias", "padron", "descuento", "publico")
 REQUERIDAS = ("alta", "baja", "reactivacion", "correccion_nombre")
 ACCIONES = REQUERIDAS + tuple(a for a in POR_DEFECTO if a not in REQUERIDAS)
 TIPOS_CAMPO = ("telefono", "correo", "texto")

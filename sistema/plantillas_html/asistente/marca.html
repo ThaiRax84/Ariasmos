@@ -1,0 +1,27 @@
+{% extends "asistente/_base.html" %}
+{% load static %}
+{% block cabeza %}<link rel="stylesheet" href="{% static 'css/vista-marca.css' %}">{% if vista %}<link rel="stylesheet" href="{% url 'asistente:vista_marca' %}?p={{ vista.principal|slice:'1:' }}&amp;a={{ vista.acento|slice:'1:' }}">{% endif %}{% endblock %}
+{% block asistente %}
+<p class="subtitulo">Sube el logo del negocio y te proponemos los dos colores del programa tomados de él. Puedes aceptarlos, escribir los tuyos u omitir este paso: todo se cambia después en Configuración → Marca del negocio.</p>
+<section class="panel">
+  <h2>Logo</h2>
+  {% if actual.logo %}<p class="fila"><img class="logo-negocio" src="{% url 'asistente:logo' %}?v={{ actual.version }}" alt="Logotipo de {{ nombre_vista }}" width="56" height="56"> Logo guardado</p>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="formulario" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="logo">
+    {% include "comun/_campos.html" with formulario=logo %}
+    <div class="acciones"><button class="boton secundario" type="submit">{% if actual.logo %}Cambiar logo{% else %}Subir logo{% endif %}</button></div>
+  </form>
+</section>
+<section class="panel">
+  <h2>Colores</h2>
+  {% if propuesta %}<p class="mensaje info">Colores tomados del logo. Acéptalos o escribe otros.</p>{% endif %}
+  <form method="post" class="formulario" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="colores">
+    {% include "comun/_campos.html" with formulario=colores %}
+    {% if vista %}{% include "comun/_vista_marca.html" %}{% endif %}
+    <div class="acciones"><button class="boton grande" type="submit">{% if propuesta %}Usar estos colores y continuar{% else %}Continuar{% endif %}</button><button class="boton secundario" type="submit" name="omitir" value="1" formnovalidate>Omitir por ahora</button></div>
+  </form>
+</section>
+{% endblock %}

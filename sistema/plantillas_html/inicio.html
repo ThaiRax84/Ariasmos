@@ -30,8 +30,8 @@
 {% endif %}
 {% if perfil == "recepcion" and "ver_titulares" in permisos %}
 <form method="get" action="{% url 'titulares:lista' %}" class="buscador" role="search">
-  <label class="solo-lectores" for="buscar-inicio">Buscar {{ voc.titular|lower }}</label>
-  <input id="buscar-inicio" type="search" name="q" placeholder="Buscar {{ voc.titular|lower }} por nombre o {{ voc.matricula|lower }}" maxlength="60">
+  <label class="solo-lectores" for="buscar-inicio">Buscar {{ voc.titular_min }}</label>
+  <input id="buscar-inicio" type="search" name="q" placeholder="Buscar {{ voc.titular_min }} por nombre o {{ voc.matricula_min }}" maxlength="60">
   <button class="boton chico" type="submit">Buscar</button>
 </form>
 {% endif %}
@@ -44,8 +44,8 @@
 {% if perfil == "recepcion" %}
 <nav class="accesos" aria-label="Accesos rápidos">
   {% if "registrar_pago_efectivo" in permisos %}<a class="acceso principal" href="{% url 'cobros:buscar' %}"><span class="acceso-titulo">Cobrar</span><span class="acceso-detalle">Registrar un pago en efectivo</span></a>{% endif %}
-  {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="acceso" href="{% url 'titulares:nuevo' %}"><span class="acceso-titulo">Nueva alta</span><span class="acceso-detalle">Dar de alta a {{ voc.titular|lower }}</span></a>{% endif %}
-  {% if "ver_titulares" in permisos %}<a class="acceso" href="{% url 'titulares:lista' %}"><span class="acceso-titulo">Buscar {{ voc.titular|lower }}</span><span class="acceso-detalle">Ver datos, adeudo e historial</span></a><a class="acceso" href="{% url 'cobros:verificar' %}"><span class="acceso-titulo">Verificar recibo</span><span class="acceso-detalle">Comprobar un recibo con su código</span></a>{% endif %}
+  {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="acceso" href="{% url 'titulares:nuevo' %}"><span class="acceso-titulo">Nueva alta</span><span class="acceso-detalle">Dar de alta a {{ voc.titular_min }}</span></a>{% endif %}
+  {% if "ver_titulares" in permisos %}<a class="acceso" href="{% url 'titulares:lista' %}"><span class="acceso-titulo">Buscar {{ voc.titular_min }}</span><span class="acceso-detalle">Ver datos, adeudo e historial</span></a><a class="acceso" href="{% url 'cobros:verificar' %}"><span class="acceso-titulo">Verificar recibo</span><span class="acceso-detalle">Comprobar un recibo con su código</span></a>{% endif %}
 </nav>
 {% endif %}
 {% if perfil == "coordinacion" %}

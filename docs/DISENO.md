@@ -1,6 +1,6 @@
 # Ariasmos — diseño de la interfaz (fase 5b)
 
-Versión 1 · 13/11/2026. Este documento manda sobre el aspecto del programa. Las pantallas de referencia están en `docs/diseno/referencia/` (HTML estático que se abre directo en el navegador). Los datos de esas pantallas son de ejemplo.
+Versión 1 · 13/11/2026. Este documento manda sobre el aspecto del programa. Las pantallas de referencia están en `docs/diseno/referencia/` (maquetas en HTML estático). Los datos de esas pantallas son de ejemplo.
 
 ## 1. Principios
 
@@ -12,7 +12,7 @@ Versión 1 · 13/11/2026. Este documento manda sobre el aspecto del programa. La
 
 ## 2. Marca Ariasmos
 
-- **Splash:** escena de vasija griega (`estaticos/marca/escena-vasija.jpg`) sobre negro `#14100D`, grecas terracota arriba y abajo, «ARIASMOS» en Cinzel 700 del ancho de la escena y «Iniciando el sistema…». Es una **ventana de 720 × 450** centrada sobre un fondo oscuro, más chica que la ventana del programa. Aparece al abrir el programa (una vez por sesión del navegador, antes del inicio de sesión) y se desvanece hacia el inicio de sesión. Referencia: `referencia/splash.html` y `referencia/prototipo-transiciones.html`.
+- **Splash:** escena de vasija griega (`estaticos/marca/escena-vasija.jpg`) sobre negro `#14100D`, grecas terracota arriba y abajo, «ARIASMOS» en Cinzel 700 del ancho de la escena, «Iniciando el sistema…» y «ver. X.Y.Z» en Nunito. Es una **ventana real sin marco de 720 × 450**, centrada en la pantalla, que dibuja `Ariasmos.exe` con sus propios recursos (imagen y letras incluidas) mientras arranca la ventana principal; se desvanece cuando carga la primera pantalla. Ninguna página del servidor lleva splash. Referencia: `referencia/splash.html`.
 - **Ícono del menú:** medallón negro con el grifo (`grifo-medallon.jpg`), circular, con aro terracota de 2 px, 46 px.
 - **Logo del programa** (ícono del instalador, del acceso directo y favicon): medallón negro con el jinete (`jinete-medallon.png`, `favicon.png`, `instalacion/ariasmos.ico`).
 - **Nombre:** «ARIASMOS» en Cinzel 700 con espaciado amplio. En el pie del recibo, «Hecho con ARIASMOS» con el nombre en Metamorphous.
@@ -54,7 +54,8 @@ Todos los colores son variables CSS. Hay dos juegos; la estructura es la misma.
 ## 5. Estructura
 
 - **Franja** de 6 px del color `--franja` arriba de todo.
-- **Barra superior** blanca, fija: marca Ariasmos · separador · logo y nombre del negocio · menú · a la derecha, el contexto de la sesión (rol, caja y turno, o el nombre) con «Contraseña» y «Salir».
+- **Barra superior** blanca, fija: flechas **Atrás** y **Adelante** · marca Ariasmos · separador · logo y nombre del negocio · menú · a la derecha, el contexto de la sesión (rol, caja y turno, o el nombre) con «Contraseña» y «Salir».
+- **Atrás y adelante:** dos botones redondos de 44 px (pastilla, borde 2 px `--borde`, fondo blanco, flecha dibujada con CSS en `--tinta`); al pasar el cursor, borde y flecha `--primario` sobre `--tinte`; al enfocar, el anillo de 3 px `--acento`; **apagados** (35 % de opacidad, sin cursor de mano) cuando no hay a dónde ir. También Alt + ← / → y los botones laterales del ratón. Viven en la página, igual en todas las pantallas.
 - **Menú:** pastillas; la activa con fondo `--primario` y texto blanco. A lo más siete entradas visibles según permisos, en este orden de prioridad: Inicio, Cobrar, Padrón (con el vocabulario del negocio), Inventario (si está encendido), Mi caja, Banco, Efectivo, Solicitudes, Cortes. Lo demás (Familias, Conceptos, Delegaciones, Equipos, Usuarios, Roles, Políticas, Configuración, Respaldos, Auditoría) va en un menú **«Más»** desplegable, accesible con teclado. Ninguna entrada actual desaparece: solo se reordena.
 - **Contenido:** ancho máximo de 1120 px centrado, relleno de 32 px, separación de 24 px entre bloques.
 - **Encabezado de pantalla:** antetítulo de 13 px (dónde estoy), título de 34 px y, a la derecha, la cifra o la acción más importante.
@@ -72,17 +73,19 @@ Todos los colores son variables CSS. Hay dos juegos; la estructura es la misma.
 - **Pestañas:** texto de 15 px con subrayado de 3 px `--acento` en la activa.
 - **Aviso de pantalla:** bloque con fondo `--aviso-fondo`, título en 800 y la acción a la derecha.
 - **Cifra de tablero:** tarjeta pequeña con etiqueta, número grande y una línea de detalle.
-- **Diálogo de confirmación** propio (no los del navegador) para acciones que mueven dinero o no se deshacen, y **aviso breve** abajo al terminar.
+- **Diálogo de confirmación** propio (no los genéricos de la ventana) para acciones que mueven dinero o no se deshacen, y **aviso breve** abajo al terminar.
 - **Selector de piezas** (billetes y monedas): botones con la denominación y el contador.
+- **Campo de carpeta:** el campo de texto de siempre y, debajo, **Examinar…** (botón secundario de 40 px) que abre la ventana de Windows para elegir la carpeta; si el servicio no tiene permiso, a su lado **Dar permiso**. Solo en la computadora principal; en las demás, una nota de 13 px `--suave` explica que la carpeta se elige desde la principal.
+- **Aviso de versión del programa:** aviso de pantalla arriba del contenido cuando el programa de esa computadora es más viejo que el del servidor.
 - Los mensajes de Django (`messages`) se muestran como avisos con estos tonos.
 
 ## 7. Movimiento
 
-- Entre pantallas: fundido con deslizamiento leve del contenido, unos 200 ms, con las transiciones de vista del navegador entre documentos (`@view-transition { navigation: auto; }`) y, donde no existan, sin animación. La barra superior no se mueve; la pastilla activa del menú se desliza.
+- Entre pantallas: fundido con deslizamiento leve del contenido, unos 200 ms, con las transiciones de vista entre documentos del motor de la ventana (`@view-transition { navigation: auto; }`) y, donde no existan, sin animación. La barra superior no se mueve; la pastilla activa del menú se desliza.
 - Dentro de la pantalla: cambios de estado de botones, campos y pestañas en unos 150 ms; diálogos y avisos entran con fundido.
-- El splash se desvanece hacia el inicio de sesión.
+- El splash se desvanece hacia la primera pantalla.
 - **Nunca se animan importes ni se retrasa una confirmación de cobro.** Con «reducir movimiento» del sistema operativo no hay animaciones.
-- Solo CSS y funciones del navegador; ninguna librería.
+- Solo CSS y funciones estándar de la página; ninguna librería.
 
 ## 8. Pantallas de referencia
 
@@ -91,7 +94,7 @@ En `docs/diseno/referencia/`:
 - `ariasmos/` — todas las pantallas con los colores de Ariasmos: inicio de recepción, cobrar, cobrar con billetes, recibo, corte (conteo, no coincide, resultado), retiro de caja, inventario (vender, conteo), padrón, ficha, solicitudes, inicio de coordinación, inicio de dirección.
 - `negocio-ejemplo/` — las mismas ideas con una marca de negocio de ejemplo (inicio, cobrar, recibo, padrón).
 - `instalacion/` — los ocho pasos del asistente. El asistente usa siempre los colores de Ariasmos, porque todavía no hay negocio.
-- `splash.html` y `prototipo-transiciones.html` — splash y prototipo navegable con las transiciones.
+- `splash.html` — splash (lo dibuja `Ariasmos.exe`); `prototipo-transiciones.html` — prototipo navegable con las transiciones.
 
 Las referencias usan estilos en línea porque son maquetas; el programa usa clases en `estaticos/css/`. Las pantallas que no tienen referencia (configuración, banco, cortes, usuarios, auditoría y demás) se arman con los mismos componentes y la misma estructura.
 

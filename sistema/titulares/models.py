@@ -56,7 +56,7 @@ class Titular(models.Model):
 
     matricula = models.CharField(max_length=12, unique=True, editable=False)
     nombre = models.CharField(max_length=100)
-    apellidos = models.CharField(max_length=150)
+    apellidos = models.CharField(max_length=150, blank=True)
     agrupacion = models.ForeignKey(Agrupacion, null=True, blank=True, on_delete=models.PROTECT, related_name="titulares")
     familia = models.ForeignKey(Familia, null=True, blank=True, on_delete=models.PROTECT, related_name="miembros")
     activo_desde = models.DateField(null=True, blank=True)
@@ -84,11 +84,15 @@ class Titular(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.nombre} {self.apellidos}"
+        return self.nombre_completo
 
     @property
     def nombre_completo(self):
-        return f"{self.nombre} {self.apellidos}"
+        if self.interno:
+            from configuracion.models import vocabulario
+
+            return vocabulario()["publico"]
+        return f"{self.nombre} {self.apellidos}".strip()
 
     @property
     def matricula_formateada(self):
@@ -174,6 +178,10 @@ class LotePadron(models.Model):
     familias = models.PositiveIntegerField(default=0)
     cargos = models.PositiveIntegerField(default=0)
     a_favor = models.PositiveIntegerField(default=0)
+    actualizados = models.PositiveIntegerField(default=0)
+    saltados = models.PositiveIntegerField(default=0)
+    autorizado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    solicitud = models.ForeignKey("solicitudes.Solicitud", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     resultado = models.JSONField(default=dict)
 
     class Meta:

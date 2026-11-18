@@ -1,14 +1,14 @@
 from io import BytesIO
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.pagesizes import landscape
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import Preformatted
 
 from banco.ficha import datos_de_pago
-from configuracion import moneda
+from configuracion import hoja, moneda
 from configuracion.models import hoy_negocio, vocabulario
 
 from .estado import estado_cuenta
@@ -55,7 +55,7 @@ def generar(titulares, titulo, negocio):
         _parrafo(f"Adeudo: {formatear(estado['adeudo'])}    A favor: {formatear(estado['a_favor'])}", grande),
         Spacer(1, 3 * mm),
     ]
-    encabezado = ([voc["titular"]] if varios else []) + ["Cargo", "Vence", "Original", "Beca", "Importe", "Cancelado", "Pagado", "Saldo"]
+    encabezado = ([voc["titular"]] if varios else []) + ["Cargo", "Vence", "Original", voc["descuento"], "Importe", "Cancelado", "Pagado", "Saldo"]
     filas = [encabezado]
     for fila in estado["cargos"]:
         cargo = fila["cargo"]
@@ -92,24 +92,24 @@ def generar(titulares, titulo, negocio):
     piezas.append(_parrafo("Cómo pagar", grande))
     if pago:
         cuenta = pago["cuenta"]
-        lineas = [f"Banco: {cuenta.banco}", f"CLABE: {cuenta.clabe_formateada}", f"Beneficiario: {cuenta.beneficiario}"]
-        if cuenta.numero_cuenta:
+        lineas = [f"Banco: {cuenta.nombre_banco}", f"{cuenta.etiqueta_numero}: {cuenta.numero_formateado}", f"Beneficiario: {cuenta.beneficiario}"]
+        if cuenta.es_clabe and cuenta.numero_cuenta:
             lineas.append(f"Número de cuenta: {cuenta.numero_cuenta}")
         if cuenta.convenio:
             lineas.append(f"Convenio: {cuenta.convenio}")
         if pago["medios"]:
             lineas.append("Medios aceptados: " + ", ".join(str(m) for m in pago["medios"]))
         for titular in titulares:
-            lineas.append(f"Para {titular.nombre_completo}: escribe {titular.matricula} ({voc['matricula'].lower()}) {pago['lugar']}.")
+            lineas.append(f"Para {titular.nombre_completo}: escribe {titular.matricula} ({voc['matricula_min']}) {pago['lugar']}.")
         if cuenta.contacto_dudas:
             lineas.append(f"Dudas: {cuenta.contacto_dudas}")
         if cuenta.nota_adicional:
             lineas.append(cuenta.nota_adicional)
     else:
         lineas = [negocio.nota_ficha] if negocio and negocio.nota_ficha else []
-        lineas += [f"Para {t.nombre_completo}: escribe {t.matricula} ({voc['matricula'].lower()}) en referencia numérica y en concepto." for t in titulares]
+        lineas += [f"Para {t.nombre_completo}: escribe {t.matricula} ({voc['matricula_min']}) en referencia numérica y en concepto." for t in titulares]
     piezas += [_parrafo(linea, normal) for linea in lineas]
     memoria = BytesIO()
-    documento = SimpleDocTemplate(memoria, pagesize=landscape(letter), leftMargin=12 * mm, rightMargin=12 * mm, topMargin=12 * mm, bottomMargin=12 * mm, title="Estado de cuenta")
+    documento = SimpleDocTemplate(memoria, pagesize=landscape(hoja.tamano()), leftMargin=12 * mm, rightMargin=12 * mm, topMargin=12 * mm, bottomMargin=12 * mm, title="Estado de cuenta")
     documento.build(piezas)
     return memoria.getvalue()

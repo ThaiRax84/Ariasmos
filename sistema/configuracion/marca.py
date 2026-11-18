@@ -96,6 +96,25 @@ def actual():
     return MarcaNegocio.objects.filter(pk=1).first()
 
 
+def hoja_vista(principal, acento):
+    principal, acento = validar_color("#" + str(principal or "")), validar_color("#" + str(acento or ""))
+    lineas = [f"  {nombre}: {validar_color(valor)};" for nombre, valor in variables(principal, acento).items()]
+    return ".vista-previa {\n" + "\n".join(lineas) + "\n}\n"
+
+
+def respuesta_vista(request):
+    from django.http import HttpResponse
+
+    try:
+        contenido = hoja_vista(request.GET.get("p", ""), request.GET.get("a", ""))
+    except MarcaInvalida:
+        contenido = ".vista-previa {}\n"
+    respuesta = HttpResponse(contenido, content_type="text/css; charset=utf-8")
+    respuesta["Cache-Control"] = "private, max-age=3600"
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    return respuesta
+
+
 def hoja(marca):
     if marca is None or not marca.con_colores:
         return ":root {}\n"

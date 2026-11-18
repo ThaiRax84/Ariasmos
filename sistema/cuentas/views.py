@@ -1,6 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth import password_validation
@@ -8,7 +7,7 @@ from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import Http404, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -34,9 +33,8 @@ from .formularios import (
     FormularioUsuarioNuevo,
 )
 from .models import CodigoActivacion, CodigoUsado, Delegacion, Dispositivo, PermisoRol, Rol, Usuario
-from .permisos import PERMISOS
+from .permisos import PERMISOS, etiqueta
 
-COOKIE_SPLASH = "splash_visto"
 MENSAJE_FALLO = "Usuario o contraseña incorrectos, o la cuenta está bloqueada temporalmente."
 SEGUNDOS_PASO_CODIGO = 300
 
@@ -91,11 +89,7 @@ def entrar(request):
             else:
                 return _completar_inicio(request, usuario)
             messages.error(request, MENSAJE_FALLO)
-    splash = request.method == "GET" and request.COOKIES.get(COOKIE_SPLASH) != "1"
-    respuesta = render(request, "cuentas/entrar.html", {"formulario": formulario, "splash": splash})
-    if splash:
-        respuesta.set_cookie(COOKIE_SPLASH, "1", secure=settings.SESSION_COOKIE_SECURE, httponly=True, samesite="Strict")
-    return respuesta
+    return render(request, "cuentas/entrar.html", {"formulario": formulario})
 
 
 def entrar_codigo(request):
@@ -297,6 +291,25 @@ def usuarios(request):
     return render(request, "cuentas/usuarios.html", {"usuarios": lista, "ahora": timezone.now()})
 
 
+CODIGO_POR_MOSTRAR = "codigo_por_mostrar"
+
+
+def _mostrar_codigo(request, objetivo, codigo, caduca):
+    request.session[CODIGO_POR_MOSTRAR] = {"usuario": objetivo.pk, "codigo": codigo, "caduca": caduca.isoformat()}
+    return redirect("usuario_codigo")
+
+
+@requiere_permiso("administrar_usuarios", reingreso=True)
+def usuario_codigo(request):
+    pendiente = request.session.pop(CODIGO_POR_MOSTRAR, None)
+    if not isinstance(pendiente, dict):
+        messages.info(request, "El código de activación ya se mostró. Si se perdió, restablece el acceso de la persona.")
+        return redirect("usuarios")
+    objetivo = get_object_or_404(Usuario, pk=pendiente.get("usuario"))
+    caduca = datetime.fromisoformat(pendiente["caduca"])
+    return render(request, "cuentas/codigo_activacion.html", {"objetivo": objetivo, "codigo": pendiente["codigo"], "caduca": caduca})
+
+
 @requiere_permiso("administrar_usuarios", reingreso=True)
 def usuario_nuevo(request):
     formulario = FormularioUsuarioNuevo(request.POST if request.method == "POST" else None)
@@ -311,7 +324,7 @@ def usuario_nuevo(request):
             nuevo = Usuario.objects.create_user(datos["usuario"], None, nombre=datos["nombre"], rol=datos["rol"])
             registrar("usuario_creado", usuario=request.user, objeto=nuevo, datos={"usuario": nuevo.usuario, "cambios": diferencias({}, {"nombre": nuevo.nombre, "rol": str(nuevo.rol), "activo": True})}, request=request)
             codigo, caduca = servicios.generar_activacion(nuevo, request.user, request)
-        return render(request, "cuentas/codigo_activacion.html", {"objetivo": nuevo, "codigo": codigo, "caduca": caduca})
+        return _mostrar_codigo(request, nuevo, codigo, caduca)
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Nuevo usuario", "boton": "Crear usuario", "volver": "usuarios"})
 
 
@@ -360,7 +373,7 @@ def usuario_editar(request, pk):
             )
             activacion = servicios.restablecer_acceso(cambiado, request.user, request) if datos.get("restablecer_acceso") else None
         if activacion is not None:
-            return render(request, "cuentas/codigo_activacion.html", {"objetivo": cambiado, "codigo": activacion[0], "caduca": activacion[1]})
+            return _mostrar_codigo(request, cambiado, activacion[0], activacion[1])
         messages.success(request, "Usuario actualizado.")
         return redirect("usuarios")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Editar usuario {objetivo.usuario}", "boton": "Guardar", "volver": "usuarios"})
@@ -369,7 +382,7 @@ def usuario_editar(request, pk):
 @requiere_permiso("administrar_roles")
 def roles(request):
     lista = Rol.objects.prefetch_related("asignaciones").all()
-    filas = [(rol, [PERMISOS[a.permiso] for a in rol.asignaciones.all() if a.permiso in PERMISOS]) for rol in lista]
+    filas = [(rol, [etiqueta(a.permiso) for a in rol.asignaciones.all() if a.permiso in PERMISOS]) for rol in lista]
     return render(request, "cuentas/roles.html", {"filas": filas})
 
 
@@ -514,30 +527,21 @@ def delegacion_revocar(request, pk):
 
 @requiere_permiso("aprobar_dispositivos")
 def conectar(request):
-    nombres = [h for h in settings.ALLOWED_HOSTS if h not in ("localhost", "127.0.0.1", "[::1]", "testserver")]
-    return render(request, "cuentas/conectar.html", {"certificado": conectar_mod.datos(), "nombres": nombres})
+    direcciones = conectar_mod.direcciones()
+    return render(request, "cuentas/conectar.html", {"certificado": conectar_mod.datos(), "direcciones": direcciones})
 
 
-def _descarga(contenido, tipo, nombre):
-    respuesta = HttpResponse(contenido, content_type=tipo)
-    respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+@requiere_permiso("aprobar_dispositivos")
+@require_POST
+def conectar_archivo(request):
+    direccion = str(request.POST.get("direccion", "")).strip().lower()
+    contenido = conectar_mod.archivo(direccion)
+    if contenido is None:
+        messages.error(request, "Elige una de las direcciones de este servidor.")
+        return redirect("conectar")
+    informacion = conectar_mod.datos()
+    registrar("archivo_conexion_generado", request=request, datos={"direccion": direccion, "puerto": informacion["puerto"], "huella": informacion["huella_hex"]})
+    respuesta = HttpResponse(contenido, content_type="application/json")
+    respuesta["Content-Disposition"] = f'attachment; filename="{conectar_mod.NOMBRE_ARCHIVO}"'
     respuesta["X-Content-Type-Options"] = "nosniff"
     return respuesta
-
-
-@requiere_permiso("aprobar_dispositivos")
-def conectar_certificado(request):
-    pem = conectar_mod.certificado()
-    if pem is None:
-        raise Http404
-    registrar("certificado_descargado", request=request)
-    return _descarga(pem.encode("ascii"), "application/x-x509-ca-cert", conectar_mod.NOMBRE)
-
-
-@requiere_permiso("aprobar_dispositivos")
-def conectar_instalador(request):
-    pem = conectar_mod.certificado()
-    if pem is None:
-        raise Http404
-    registrar("instalador_certificado_descargado", request=request)
-    return _descarga(conectar_mod.instalador(pem).encode("ascii"), "application/octet-stream", "instalar-certificado.cmd")

@@ -3,7 +3,7 @@
   <h2>Estado de cuenta</h2>
   <p class="matricula-grande">Adeudo: <strong>{{ estado.adeudo|dinero }}</strong>{% if estado.a_favor %} · A favor: <strong>{{ estado.a_favor|dinero }}</strong>{% endif %}</p>
   <div class="desplazable"><table class="tabla compacta">
-    <thead><tr>{% if varios %}<th>{{ voc.titular }}</th>{% endif %}<th>Cargo</th><th>Vence</th><th>Original</th><th>Beca</th><th>Importe</th><th>Cancelado</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr>{% if varios %}<th>{{ voc.titular }}</th>{% endif %}<th>Cargo</th><th>Vence</th><th>Original</th><th>{{ voc.descuento }}</th><th>Importe</th><th>Cancelado</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th></tr></thead>
     <tbody>
     {% for fila in estado.cargos %}{% with c=fila.cargo %}
     <tr class="{% if c.origen == 'recargo' %}recargo{% endif %}">

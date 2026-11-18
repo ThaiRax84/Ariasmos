@@ -10,6 +10,7 @@ from banco.ficha import datos_de_pago
 from cobros import estado_pdf
 from cobros.estado import estado_cuenta
 from configuracion.models import parametro, vocabulario
+from cortes.salida import saneado
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
 from solicitudes import motor
@@ -48,7 +49,12 @@ def lista(request):
         titulares = titulares.filter(estado=estado)
     conteos = dict(Titular.objects.values_list("estado").annotate(total=Count("id")).order_by())
     filtros = [(valor, nombre, conteos.get(valor, 0)) for valor, nombre in Titular.ESTADOS]
-    return render(request, "titulares/lista.html", {"titulares": titulares.select_related("familia")[:200], "q": consulta, "estado": estado, "estados": Titular.ESTADOS, "filtros": filtros})
+    contexto = {
+        "titulares": titulares.select_related("familia")[:200], "q": consulta, "estado": estado, "estados": Titular.ESTADOS, "filtros": filtros,
+        "vacio": not consulta and not estado and not any(conteos.values()),
+        "puede_importar": request.user.tiene_permiso("importar_padron") or request.user.tiene_permiso("solicitar_importacion_padron"),
+    }
+    return render(request, "titulares/lista.html", contexto)
 
 
 @requiere_permiso(*CAPTURA)
@@ -145,7 +151,7 @@ def cambiar_familia(request, pk):
                 return redirect("solicitudes:detalle", pk=resultado.solicitud.pk)
             return redirect("titulares:detalle", pk=pk)
     actual = f" (hoy: {titular.familia})" if titular.familia_id else ""
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"Familia de {titular}{actual}", "boton": "Enviar"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": f"{vocabulario()['familia']} de {titular}{actual}", "boton": "Enviar"})
 
 
 def _pdf_estado(request, titulares, titulo, nombre):
@@ -169,7 +175,7 @@ def estado_familia_pdf(request, pk):
     miembros = list(objeto.miembros.order_by("apellidos", "nombre"))
     if not miembros:
         raise Http404
-    return _pdf_estado(request, miembros, f"{vocabulario()['familia']} {objeto}", f"familia-{objeto.pk}")
+    return _pdf_estado(request, miembros, f"{vocabulario()['familia']} {objeto}", f"{saneado(vocabulario()['familia']) or 'grupo'}-{objeto.pk}")
 
 
 @requiere_permiso("ver_titulares")

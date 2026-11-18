@@ -84,6 +84,7 @@ function Rutas {
         CertServidor = Join-Path $Datos 'caddy\servidor.crt'
         ClaveServidor = Join-Path $Datos 'caddy\servidor.key'
         Certificado = Join-Path $Datos 'certificado\ariasmos-servidor.crt'
+        Conexion    = Join-Path $Datos 'conexion.json'
         Copias      = Join-Path $Datos 'antes-de-actualizar'
     }
 }
@@ -214,9 +215,10 @@ function Puerto-Ocupado {
 }
 
 function Instalar-Firewall {
+    param([Parameter(Mandatory = $true)][int]$Puerto)
     Quitar-Firewall
-    Escribir-Registro 'Regla de firewall: HTTPS 443 solo desde la red local'
-    New-NetFirewallRule -Name $script:ReglaFirewall -DisplayName 'Ariasmos (HTTPS en la red local)' -Direction Inbound -Protocol TCP -LocalPort 443 -RemoteAddress LocalSubnet -Action Allow -Profile Any | Out-Null
+    Escribir-Registro "Regla de firewall: HTTPS $Puerto solo desde la red local"
+    New-NetFirewallRule -Name $script:ReglaFirewall -DisplayName 'Ariasmos (HTTPS en la red local)' -Direction Inbound -Protocol TCP -LocalPort $Puerto -RemoteAddress LocalSubnet -Action Allow -Profile Any | Out-Null
 }
 
 function Quitar-Firewall {
@@ -290,6 +292,18 @@ function Proteger-Clave {
     Ejecutar -Archivo 'icacls.exe' -Argumentos @($R.ClaveServidor, '/inheritance:r', '/grant:r', "*$($script:SidAdministradores):F", "*$($script:SidSistema):F", "*$($script:SidServicio):R", '/Q') -Descripcion 'Permisos de la clave privada del servidor: solo lectura para el servicio' | Out-Null
 }
 
+function Huella-Sha256 {
+    param([Parameter(Mandatory = $true)][string]$Ruta)
+    $certificado = Leer-Certificado -Ruta $Ruta
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return -join ($sha.ComputeHash($certificado.RawData) | ForEach-Object { $_.ToString('X2') })
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
 function Preparar-Certificado {
     param([Parameter(Mandatory = $true)]$R, [Parameter(Mandatory = $true)][string]$Nombre)
     $anteriores = @(@((Huella-De -Ruta $R.CertServidor), (Huella-De -Ruta $R.Certificado)) | Where-Object { $_ } | Select-Object -Unique)
@@ -297,20 +311,74 @@ function Preparar-Certificado {
     Proteger-Clave -R $R
     $certificado = Leer-Certificado -Ruta $R.CertServidor
     $nuevo = @($salida | Where-Object { $_ -match '^CERTIFICADO: nuevo ' }).Count -gt 0
-    foreach ($huella in $anteriores) {
-        if ($huella -ne $certificado.Thumbprint) {
-            Quitar-De-Raices -Huella $huella
-        }
+    foreach ($huella in @($anteriores + @($certificado.Thumbprint) | Select-Object -Unique)) {
+        Quitar-De-Raices -Huella $huella
     }
     if ($nuevo -and @($anteriores | Where-Object { $_ -ne $certificado.Thumbprint }).Count -gt 0) {
-        Escribir-Registro 'AVISO: se generó un certificado nuevo para este servidor. Hay que volver a instalarlo en las demás computadoras (Conectar otra computadora).'
+        Escribir-Registro 'AVISO: se generó un certificado nuevo para este servidor. Hay que llevar un archivo de conexión nuevo a cada computadora adicional (Conectar otra computadora).'
     }
     Copy-Item -LiteralPath $R.CertServidor -Destination $R.Certificado -Force
-    Almacen-Raiz {
-        param($almacen)
-        $almacen.Add($certificado)
+    Escribir-Registro ('Certificado del servidor en {0} (SHA-256 {1}, vence {2:yyyy-MM-dd}); no se instala en el almacén de Windows' -f $R.Certificado, (Huella-Sha256 -Ruta $R.CertServidor), $certificado.NotAfter)
+}
+
+function Estado-Https {
+    param(
+        [Parameter(Mandatory = $true)][string]$Direccion,
+        [Parameter(Mandatory = $true)][int]$Puerto,
+        [Parameter(Mandatory = $true)][string]$Huella,
+        [string]$Ruta = '/'
+    )
+    $resultado = [pscustomobject]@{ Codigo = 0; Huella = ''; Cabeceras = '' }
+    $visto = @{ Der = $null }
+    $cliente = New-Object System.Net.Sockets.TcpClient
+    try {
+        $intento = $cliente.BeginConnect($Direccion, $Puerto, $null, $null)
+        if (-not $intento.AsyncWaitHandle.WaitOne(5000) -or -not $cliente.Connected) { return $resultado }
+        $cliente.EndConnect($intento)
+        $cliente.ReceiveTimeout = 15000
+        $cliente.SendTimeout = 15000
+        $validar = [System.Net.Security.RemoteCertificateValidationCallback] {
+            param($origen, $certificadoRemoto, $cadena, $errores)
+            if ($null -ne $certificadoRemoto) { $visto.Der = $certificadoRemoto.GetRawCertData() }
+            return $true
+        }
+        $tls = New-Object System.Net.Security.SslStream($cliente.GetStream(), $false, $validar)
+        try {
+            $tls.AuthenticateAsClient($Direccion)
+            if ($null -eq $visto.Der) { return $resultado }
+            $sha = [System.Security.Cryptography.SHA256]::Create()
+            try {
+                $resultado.Huella = -join ($sha.ComputeHash($visto.Der) | ForEach-Object { $_.ToString('X2') })
+            }
+            finally {
+                $sha.Dispose()
+            }
+            if ($resultado.Huella -ne $Huella) { return $resultado }
+            $pedido = [System.Text.Encoding]::ASCII.GetBytes("GET $Ruta HTTP/1.1`r`nHost: $Direccion`r`nUser-Agent: Ariasmos-instalador`r`nConnection: close`r`n`r`n")
+            $tls.Write($pedido, 0, $pedido.Length)
+            $tls.Flush()
+            $lector = New-Object System.IO.StreamReader($tls, [System.Text.Encoding]::ASCII)
+            $lineas = @()
+            while ($true) {
+                $linea = $lector.ReadLine()
+                if ($null -eq $linea -or $linea -eq '') { break }
+                $lineas += $linea
+                if ($lineas.Count -gt 100) { break }
+            }
+            $resultado.Cabeceras = $lineas -join "`n"
+            if ($lineas.Count -gt 0 -and $lineas[0] -match '^HTTP/\d(\.\d)? (\d{3}) ') { $resultado.Codigo = [int]$Matches[2] }
+        }
+        finally {
+            $tls.Dispose()
+        }
     }
-    Escribir-Registro ('Certificado del servidor publicado en {0} e instalado en las raíces de confianza (huella {1}, vence {2:yyyy-MM-dd})' -f $R.Certificado, $certificado.Thumbprint, $certificado.NotAfter)
+    catch {
+        $resultado.Cabeceras = $_.Exception.Message
+    }
+    finally {
+        $cliente.Close()
+    }
+    return $resultado
 }
 
 function Limpiar-Autoridad-Anterior {
@@ -338,20 +406,22 @@ function Quitar-Certificado {
 }
 
 function Esperar-Aplicacion {
+    param([Parameter(Mandatory = $true)][int]$Puerto, [Parameter(Mandatory = $true)][string]$Huella)
     $limite = (Get-Date).AddSeconds(120)
     $ultimo = ''
     while ((Get-Date) -lt $limite) {
-        $anterior = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        $codigo = & curl.exe -s --ssl-revoke-best-effort -o NUL -w '%{http_code}' 'https://localhost/' 2>$null
-        $ErrorActionPreference = $anterior
-        $ultimo = "$codigo"
+        $estado = Estado-Https -Direccion 'localhost' -Puerto $Puerto -Huella $Huella
+        $ultimo = "$($estado.Codigo)"
+        if ($estado.Huella -and $estado.Huella -ne $Huella) {
+            Escribir-Registro "AVISO: en el puerto $Puerto respondió un certificado distinto al del servidor ($($estado.Huella))."
+            return $false
+        }
         if ($ultimo -match '^(200|302)$') {
-            Escribir-Registro "La aplicación responde por https://localhost/ (HTTP $ultimo)"
+            Escribir-Registro "La aplicación responde en el puerto $Puerto con el certificado del servidor (HTTP $ultimo)"
             return $true
         }
         Start-Sleep -Seconds 3
     }
-    Escribir-Registro "AVISO: la aplicación no respondió por https://localhost/ (último código: $ultimo). Revisa los registros en la carpeta registros."
+    Escribir-Registro "AVISO: la aplicación no respondió en el puerto $Puerto (último código: $ultimo). Revisa los registros en la carpeta registros."
     return $false
 }

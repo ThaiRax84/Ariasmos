@@ -22,7 +22,7 @@ def limpiar_cache():
 
 
 def crear_cuenta(admin, usuario, rol):
-    respuesta = cliente(admin).post(reverse("usuario_nuevo"), {"usuario": usuario, "nombre": f"Persona {usuario}", "rol": rol.pk})
+    respuesta = cliente(admin).post(reverse("usuario_nuevo"), {"usuario": usuario, "nombre": f"Persona {usuario}", "rol": rol.pk}, follow=True)
     assert respuesta.status_code == 200
     codigo = re.search(r'<p class="codigo-equipo">([A-Z0-9]{5}-[A-Z0-9]{5})</p>', respuesta.content.decode()).group(1)
     return Usuario.objects.get(usuario=usuario), codigo
@@ -103,7 +103,7 @@ def test_contrasena_debil_no_quema_el_codigo(personas, roles):
 def test_restablecer_acceso_cierra_sesiones(personas, roles):
     sesion_op = cliente(personas["op"])
     assert sesion_op.get(reverse("titulares:lista")).status_code == 200
-    respuesta = cliente(personas["dir"]).post(reverse("usuario_editar", args=[personas["op"].pk]), {"nombre": personas["op"].nombre, "rol": roles["Operación"].pk, "activo": "on", "restablecer_acceso": "on"})
+    respuesta = cliente(personas["dir"]).post(reverse("usuario_editar", args=[personas["op"].pk]), {"nombre": personas["op"].nombre, "rol": roles["Operación"].pk, "activo": "on", "restablecer_acceso": "on"}, follow=True)
     codigo = re.search(r'<p class="codigo-equipo">([A-Z0-9]{5}-[A-Z0-9]{5})</p>', respuesta.content.decode()).group(1)
     assert sesion_op.get(reverse("titulares:lista")).status_code == 302
     personas["op"].refresh_from_db()
@@ -120,7 +120,7 @@ def test_restablecer_invalida_codigos_anteriores(personas, roles):
 
 
 def test_con_autenticador_activo_pide_codigo_tras_activar(personas, roles):
-    respuesta = cliente(personas["dir"]).post(reverse("usuario_editar", args=[personas["sup"].pk]), {"nombre": personas["sup"].nombre, "rol": roles["Supervisión"].pk, "activo": "on", "restablecer_acceso": "on"})
+    respuesta = cliente(personas["dir"]).post(reverse("usuario_editar", args=[personas["sup"].pk]), {"nombre": personas["sup"].nombre, "rol": roles["Supervisión"].pk, "activo": "on", "restablecer_acceso": "on"}, follow=True)
     codigo = re.search(r'<p class="codigo-equipo">([A-Z0-9]{5}-[A-Z0-9]{5})</p>', respuesta.content.decode()).group(1)
     c = cliente()
     assert activar(c, "supervision", codigo).url == reverse("entrar_codigo")

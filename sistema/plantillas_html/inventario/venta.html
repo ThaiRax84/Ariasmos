@@ -8,7 +8,7 @@
   </div>
 </div>
 <dl class="datos">
-  <dt>{{ voc.titular }}</dt><dd>{% if venta.titular.interno %}Público en general{% else %}<a href="{% url 'titulares:detalle' venta.titular.pk %}">{{ venta.titular.nombre_completo }}</a> · {{ venta.titular.matricula_formateada }}{% endif %}</dd>
+  <dt>{{ voc.titular }}</dt><dd>{% if venta.titular.interno %}{{ voc.publico }}{% else %}<a href="{% url 'titulares:detalle' venta.titular.pk %}">{{ venta.titular.nombre_completo }}</a> · {{ venta.titular.matricula_formateada }}{% endif %}</dd>
   <dt>Fecha</dt><dd>{{ venta.creada|date:"d/m/Y H:i" }} · vendió {{ venta.usuario }}</dd>
   <dt>Cómo se paga</dt><dd>{{ venta.get_modo_display }}{% if venta.pago %} · recibo <a href="{% url 'cobros:recibo' venta.pago.recibo.pk %}">{{ venta.pago.recibo }}</a>{% endif %}</dd>
   <dt>Total</dt><dd>{{ venta.total|dinero }}</dd>

@@ -3,9 +3,9 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 
 from nucleo import clabe as nucleo_clabe
-from nucleo import telefono
+from configuracion.models import vocabulario
 from proyecto.captura import CampoDigitos
-from titulares.contactos import normalizar_telefono, prefijo
+from titulares.contactos import formatear_telefono, normalizar_telefono
 
 from .models import Banco, CuentaBancaria, MedioPago
 
@@ -20,18 +20,19 @@ def normalizar_contacto(valor):
         except ValidationError:
             raise ValidationError("Escribe un correo válido o un teléfono.")
         return valor.lower()
-    return telefono.formatear(normalizar_telefono(valor), prefijo())
+    return formatear_telefono(normalizar_telefono(valor))
 
 
 class FormularioCuenta(forms.Form):
-    clabe = CampoDigitos(label="CLABE (18 dígitos)", max_length=30, maximo_tecleo=18, widget=forms.TextInput(attrs={"autocomplete": "off"}))
+    tipo = forms.ChoiceField(label="Cómo se identifica la cuenta", choices=[(CuentaBancaria.CLABE, "CLABE de 18 dígitos (México)"), (CuentaBancaria.OTRA, "Otra cuenta: número y banco escritos")], initial=CuentaBancaria.CLABE, required=False, widget=forms.RadioSelect)
+    clabe = CampoDigitos(label="CLABE (18 dígitos)", max_length=30, maximo_tecleo=18, required=False, widget=forms.TextInput(attrs={"autocomplete": "off"}))
     banco = forms.ModelChoiceField(label="Banco", queryset=Banco.objects.none(), required=False, empty_label="Proponer según la CLABE")
-    banco_otro = forms.CharField(label="Otro banco (solo si el prefijo de la CLABE no está en el catálogo)", max_length=80, required=False)
+    banco_otro = forms.CharField(label="Otro banco (con otra cuenta, o si el prefijo de la CLABE no está en el catálogo)", max_length=80, required=False)
     beneficiario = forms.CharField(label="Beneficiario (como lo pide el banco)", max_length=150)
-    numero_cuenta = forms.CharField(label="Número de cuenta (opcional)", max_length=30, required=False)
+    numero_cuenta = forms.CharField(label="Número de cuenta (obligatorio con otra cuenta)", max_length=34, required=False)
     convenio = forms.CharField(label="Convenio de cobranza referenciada (opcional)", max_length=30, required=False)
     medios = forms.ModelMultipleChoiceField(label="Medios aceptados", queryset=MedioPago.objects.none(), required=False, widget=forms.CheckboxSelectMultiple)
-    referencia_en = forms.ChoiceField(label="Dónde se escribe la matrícula", choices=CuentaBancaria.REFERENCIA, initial=CuentaBancaria.AMBOS, widget=forms.RadioSelect)
+    referencia_en = forms.ChoiceField(label="Dónde se escribe el número de pago", choices=CuentaBancaria.REFERENCIA, initial=CuentaBancaria.AMBOS, widget=forms.RadioSelect)
     contacto_dudas = forms.CharField(label="Contacto para dudas (teléfono o correo)", max_length=150)
     nota_adicional = forms.CharField(label="Nota adicional (opcional)", max_length=500, required=False, widget=forms.Textarea(attrs={"rows": 3}))
     principal = forms.BooleanField(label="Cuenta principal (la que aparece en la ficha de pago)", required=False)
@@ -40,8 +41,10 @@ class FormularioCuenta(forms.Form):
     def __init__(self, *args, cuenta=None, en_asistente=False, **kwargs):
         if cuenta is not None and "initial" not in kwargs:
             kwargs["initial"] = {
+                "tipo": cuenta.tipo,
                 "clabe": cuenta.clabe,
                 "banco": cuenta.banco_id,
+                "banco_otro": cuenta.banco_nombre,
                 "beneficiario": cuenta.beneficiario,
                 "numero_cuenta": cuenta.numero_cuenta,
                 "convenio": cuenta.convenio,
@@ -59,14 +62,15 @@ class FormularioCuenta(forms.Form):
         self.fields["medios"].queryset = MedioPago.objects.filter(activo=True)
         self.banco_propuesto = None
         self.banco_nuevo = None
+        self.fields["referencia_en"].label = f"Dónde se escribe {vocabulario()['matricula_min']} al pagar"
         if en_asistente:
             del self.fields["principal"]
             del self.fields["activa"]
 
     def clean_numero_cuenta(self):
-        valor = "".join(self.cleaned_data.get("numero_cuenta", "").split()).replace("-", "")
-        if valor and not (valor.isascii() and valor.isdigit()):
-            raise ValidationError("El número de cuenta solo lleva dígitos.")
+        valor = "".join(self.cleaned_data.get("numero_cuenta", "").split()).replace("-", "").upper()
+        if valor and not (valor.isascii() and valor.isalnum()):
+            raise ValidationError("El número de cuenta solo lleva letras y dígitos.")
         return valor
 
     def clean_convenio(self):
@@ -80,7 +84,22 @@ class FormularioCuenta(forms.Form):
 
     def clean(self):
         datos = super().clean()
-        if "clabe" not in datos:
+        if datos.get("principal") and "activa" in self.fields and not datos.get("activa"):
+            self.add_error("principal", "La cuenta principal debe estar activa.")
+        datos["tipo"] = datos.get("tipo") or CuentaBancaria.CLABE
+        if datos["tipo"] == CuentaBancaria.OTRA:
+            datos["clabe"] = ""
+            datos["banco"] = None
+            if not datos.get("numero_cuenta"):
+                self.add_error("numero_cuenta", "Escribe el número de la cuenta.")
+            if not (datos.get("banco_otro") or "").strip():
+                self.add_error("banco_otro", "Escribe el nombre del banco.")
+            return datos
+        if datos.get("numero_cuenta") and not datos["numero_cuenta"].isdigit():
+            self.add_error("numero_cuenta", "El número de cuenta solo lleva dígitos.")
+        if not datos.get("clabe"):
+            if "clabe" not in self.errors:
+                self.add_error("clabe", "Escribe la CLABE de 18 dígitos o elige «Otra cuenta».")
             return datos
         try:
             analisis = nucleo_clabe.analizar(datos["clabe"])
@@ -107,8 +126,6 @@ class FormularioCuenta(forms.Form):
         else:
             self.add_error("banco_otro", f"El prefijo {clave} de la CLABE no está en el catálogo de bancos. Escribe el nombre del banco en «Otro banco».")
             return datos
-        if datos.get("principal") and "activa" in self.fields and not datos.get("activa"):
-            self.add_error("principal", "La cuenta principal debe estar activa.")
         return datos
 
 

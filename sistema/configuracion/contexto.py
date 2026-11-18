@@ -21,7 +21,7 @@ def _prioritarias(permisos, voc, inventario):
         ("Mi caja", "caja:inicio", "turno_caja" in permisos, ("/caja/",), ("/caja/custodia/", "/caja/traslados/")),
         ("Banco", "conciliacion:cola", _alguno(permisos, "conciliar_banco", "sugerir_conciliacion"), ("/banco/",), ()),
         ("Efectivo", "caja:custodia", "recibir_efectivo" in permisos, ("/caja/custodia/", "/caja/traslados/"), ()),
-        ("Solicitudes", "solicitudes:bandeja", _alguno(permisos, "solicitar_alta_baja", "aprob_solicitudes", "alta_baja_directa"), ("/solicitudes/",), ("/solicitudes/politicas/",)),
+        ("Solicitudes", "solicitudes:bandeja", _alguno(permisos, "solicitar_alta_baja", "aprobar_solicitudes", "alta_baja_directa", "solicitar_importacion_padron"), ("/solicitudes/",), ("/solicitudes/politicas/",)),
         ("Cortes", "cortes:lista", _alguno(permisos, "turno_caja", "ver_cortes"), ("/cortes/",), ()),
     ]
 
@@ -64,6 +64,20 @@ def menu(permisos, voc, inventario, ruta):
     return {"visibles": visibles, "mas": mas, "mas_activa": any(e["activa"] for e in mas)}
 
 
+class RolesPorPermiso:
+    def __init__(self):
+        self.cache = {}
+
+    def __getitem__(self, permiso):
+        from cuentas.permisos import PERMISOS, quienes
+
+        if permiso not in PERMISOS:
+            raise KeyError(permiso)
+        if permiso not in self.cache:
+            self.cache[permiso] = quienes(permiso)
+        return self.cache[permiso]
+
+
 def _turno(usuario, permisos):
     if "turno_caja" not in permisos:
         return None
@@ -89,6 +103,7 @@ def general(request):
         "inventario_activo": inventario,
         "marca": marca_actual(),
         "moneda": moneda_actual(),
+        "roles": RolesPorPermiso(),
     }
     if autenticado:
         contexto["menu"] = menu(permisos, voc, inventario, request.path)

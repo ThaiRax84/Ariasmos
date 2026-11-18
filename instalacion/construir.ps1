@@ -75,6 +75,27 @@ function Descargar {
     return $archivo
 }
 
+function Descargar-Firmado {
+    param([Parameter(Mandatory = $true)][string]$Nombre, [Parameter(Mandatory = $true)]$Dependencia)
+    $url = [string]$Dependencia.url
+    if (-not $url.StartsWith('https://go.microsoft.com/')) { throw "La URL de $Nombre no es de go.microsoft.com: $url" }
+    $archivo = Join-Path $Descargas ([string]$Dependencia.archivo)
+    if (-not (Test-Path -LiteralPath $archivo)) {
+        Paso "Descargando $Nombre de $url"
+        $temporal = "$archivo.parcial"
+        Invoke-WebRequest -Uri $url -OutFile $temporal -UseBasicParsing
+        Move-Item -LiteralPath $temporal -Destination $archivo -Force
+    }
+    $firma = Get-AuthenticodeSignature -LiteralPath $archivo
+    $sujeto = if ($null -ne $firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { '' }
+    if ($firma.Status -ne 'Valid' -or $sujeto -notmatch ('(^|, )O=' + [regex]::Escape([string]$Dependencia.firmante) + '(,|$)') -or $sujeto -notmatch '(^|, )CN=Microsoft Corporation(,|$)') {
+        Remove-Item -LiteralPath $archivo -Force
+        throw "La firma de $Nombre no es válida o no es de $($Dependencia.firmante) (estado $($firma.Status), firmante '$sujeto'). Se borró la descarga."
+    }
+    Paso "Firma Authenticode verificada de ${Nombre}: $sujeto ($(Hash-De -Ruta $archivo))"
+    return $archivo
+}
+
 function Copiar-Codigo {
     param([Parameter(Mandatory = $true)][string]$Origen, [Parameter(Mandatory = $true)][string]$Destino)
     New-Item -ItemType Directory -Path $Destino -Force | Out-Null
@@ -97,7 +118,7 @@ try {
     Paso "Construyendo Ariasmos $version"
 
     $dependencias = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'dependencias.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($nombre in @('python', 'winsw', 'caddy')) {
+    foreach ($nombre in @('python', 'winsw', 'caddy', 'webview2')) {
         if (-not ($dependencias.PSObject.Properties.Name -contains $nombre)) { throw "dependencias.json no trae $nombre." }
     }
 
@@ -107,6 +128,18 @@ try {
     $zipPython = Descargar -Nombre 'python' -Dependencia $dependencias.python
     $exeWinsw = Descargar -Nombre 'winsw' -Dependencia $dependencias.winsw
     $zipCaddy = Descargar -Nombre 'caddy' -Dependencia $dependencias.caddy
+    Descargar-Firmado -Nombre 'webview2' -Dependencia $dependencias.webview2 | Out-Null
+
+    Paso 'Programa de escritorio'
+    $escritorio = Join-Path $Salida 'escritorio'
+    $exe = Join-Path $escritorio 'Ariasmos.exe'
+    if (-not (Test-Path -LiteralPath $exe)) { throw "Falta ${exe}: compila escritorio/Ariasmos antes de construir el paquete." }
+    $info = (Get-Item -LiteralPath $exe).VersionInfo
+    if ($info.ProductName -ne 'Ariasmos' -or -not "$($info.ProductVersion)".StartsWith($version)) { throw "Ariasmos.exe no es Ariasmos $version ($($info.ProductName) $($info.ProductVersion))." }
+    foreach ($necesario in @('Ariasmos.Nucleo.dll', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $escritorio $necesario))) { throw "Falta $necesario junto a Ariasmos.exe." }
+    }
+    Paso "Ariasmos.exe $($info.ProductVersion) listo"
 
     if (Test-Path -LiteralPath $Paquete) {
         Paso 'Borrando la construcción anterior'

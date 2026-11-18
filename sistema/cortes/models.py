@@ -9,7 +9,20 @@ TIPOS = [(DIARIO, "Corte diario de caja"), (MAYOR, "Corte mayor"), (COBRANZA, "L
 COMPLETO = "completo"
 SOLO_NOMBRES = "solo_nombres"
 SIN_NOMBRES = "sin_nombres"
-NIVELES = [(COMPLETO, "Completo: nombres, matrícula y contacto"), (SOLO_NOMBRES, "Solo nombres: sin matrícula ni contacto"), (SIN_NOMBRES, "Sin nombres: solo matrícula")]
+NIVELES = [(COMPLETO, "Completo"), (SOLO_NOMBRES, "Solo nombres"), (SIN_NOMBRES, "Sin nombres")]
+DETALLE_NIVELES = {COMPLETO: "Completo: nombres, {matricula_min} y contacto", SOLO_NOMBRES: "Solo nombres: sin {matricula_min} ni contacto", SIN_NOMBRES: "Sin nombres: solo {matricula_min}"}
+
+
+def niveles(voc=None):
+    from configuracion.models import con_vocabulario, vocabulario
+
+    voc = voc if voc is not None else vocabulario()
+    return [(clave, con_vocabulario(DETALLE_NIVELES[clave], voc)) for clave, _ in NIVELES]
+
+
+def nombre_de_tipo(tipo):
+    definicion = DefinicionCorte.objects.filter(tipo=tipo).values_list("nombre", flat=True).first()
+    return definicion or dict(TIPOS).get(tipo, tipo)
 
 
 class CorteCerrado(Exception):
@@ -72,7 +85,11 @@ class Corte(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_tipo_display()} {self.fecha:%d/%m/%Y}"
+        return f"{self.nombre_tipo} {self.fecha:%d/%m/%Y}"
+
+    @property
+    def nombre_tipo(self):
+        return nombre_de_tipo(self.tipo)
 
     def save(self, *args, **kwargs):
         if not self._state.adding and type(self).objects.filter(pk=self.pk, estado=self.CERRADO).exists():
@@ -112,6 +129,10 @@ class ReglaDestino(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["destino", "tipo"], name="regla_destino_unica")]
+
+    @property
+    def nombre_tipo(self):
+        return nombre_de_tipo(self.tipo)
 
 
 class Entrega(models.Model):

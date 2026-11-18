@@ -6,6 +6,8 @@ from nucleo.dinero import ErrorImporte, a_centavos, a_texto
 from proyecto.captura import CampoGuiadoTexto, EntradaDinero, EntradaPorcentaje
 from titulares.models import Agrupacion, Titular
 
+from configuracion.models import opciones_vocabulario, vocabulario
+
 from .models import ConceptoCobro, PlanCobro, ReglaRecargo
 
 
@@ -97,7 +99,7 @@ class FormularioCargoManual(forms.Form):
 
 class FormularioBeca(forms.Form):
     concepto = forms.ModelChoiceField(label="Concepto recurrente", queryset=ConceptoCobro.objects.none())
-    porcentaje = CampoPorcentaje(label="Porcentaje de beca (de 0.01 a 100)")
+    porcentaje = CampoPorcentaje(label="Porcentaje (de 0.01 a 100)")
     desde = forms.DateField(label="Vigente desde", widget=forms.DateInput(attrs={"type": "date"}))
     hasta = forms.DateField(label="Vigente hasta (opcional)", required=False, widget=forms.DateInput(attrs={"type": "date"}))
     motivo = forms.CharField(label="Motivo", max_length=300)
@@ -105,6 +107,7 @@ class FormularioBeca(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["concepto"].queryset = ConceptoCobro.objects.filter(activo=True, tipo=ConceptoCobro.RECURRENTE)
+        self.fields["porcentaje"].label = f"Porcentaje de {vocabulario()['descuento_min']} (de 0.01 a 100)"
 
 
 class FormularioProrroga(forms.Form):
@@ -185,6 +188,10 @@ class FormularioRegla(forms.ModelForm):
         return datos
 
 
+def maximo_dia(periodicidad):
+    return {"semanal": 7, "quincenal": 15}.get(periodicidad, 28)
+
+
 class FormularioConcepto(forms.ModelForm):
     importe_centavos = CampoImporte(label="Importe por defecto")
 
@@ -193,16 +200,19 @@ class FormularioConcepto(forms.ModelForm):
         fields = ["nombre", "tipo", "importe_centavos", "periodicidad", "dia_vencimiento", "regla_recargo", "aplica_a", "agrupacion", "prioridad", "activo"]
         labels = {
             "periodicidad": "Periodicidad (solo recurrentes)",
-            "dia_vencimiento": "Día de vencimiento (1 a 28)",
+            "dia_vencimiento": "Día de vencimiento (1 a 28; semanal: 1 lunes a 7 domingo; quincenal: 1 a 15 para la primera quincena)",
             "regla_recargo": "Regla de recargo",
             "aplica_a": "Aplica a",
-            "agrupacion": "Agrupación (si aplica a una)",
+            "agrupacion": "{agrupacion} (si aplica a una)",
             "prioridad": "Prioridad de aplicación",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        voc = vocabulario()
         self.fields["agrupacion"].queryset = Agrupacion.objects.filter(activa=True)
+        self.fields["agrupacion"].label = f"{voc['agrupacion']} (si aplica a una)"
+        self.fields["aplica_a"].choices = opciones_vocabulario(ConceptoCobro.APLICA, voc)
         self.fields["regla_recargo"].queryset = ReglaRecargo.objects.filter(activa=True)
 
     def clean(self):
@@ -212,10 +222,11 @@ class FormularioConcepto(forms.ModelForm):
         if datos.get("tipo") != ConceptoCobro.RECURRENTE:
             datos["periodicidad"] = ""
         if datos.get("aplica_a") == ConceptoCobro.AGRUPACION and not datos.get("agrupacion"):
-            raise forms.ValidationError("Elige la agrupación a la que aplica.")
+            raise forms.ValidationError(f"Elige {vocabulario()['agrupacion_min']} a la que aplica.")
         dia = datos.get("dia_vencimiento")
-        if dia is not None and not 1 <= dia <= 28:
-            raise forms.ValidationError("El día de vencimiento debe estar entre 1 y 28.")
+        maximo = maximo_dia(datos.get("periodicidad"))
+        if dia is not None and not 1 <= dia <= maximo:
+            raise forms.ValidationError(f"El día de vencimiento debe estar entre 1 y {maximo}.")
         return datos
 
 
@@ -231,6 +242,7 @@ class FormularioPlan(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["concepto"].queryset = ConceptoCobro.objects.filter(tipo=ConceptoCobro.RECURRENTE)
         self.fields["titular"].queryset = Titular.objects.exclude(estado=Titular.RECHAZADO)
+        self.fields["titular"].label = vocabulario()["titular"]
 
     def clean(self):
         datos = super().clean()

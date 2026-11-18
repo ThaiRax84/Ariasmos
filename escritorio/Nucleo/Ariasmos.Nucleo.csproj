@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>Ariasmos.Nucleo</AssemblyName>
+    <RootNamespace>Ariasmos.Nucleo</RootNamespace>
+    <AssemblyTitle>Ariasmos</AssemblyTitle>
+  </PropertyGroup>
+</Project>

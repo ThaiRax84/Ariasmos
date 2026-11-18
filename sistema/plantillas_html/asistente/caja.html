@@ -1,0 +1,15 @@
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  {% if piezas %}
+  <section class="panel">
+    <h2>Billetes y monedas</h2>
+    <p class="subtitulo">Elegiste una moneda distinta a la de la plantilla: escribe las denominaciones para que la caja pueda contar piezas y proponer el cambio. Después se ajustan en Configuración.</p>
+    {% include "comun/_campos.html" with formulario=piezas %}
+  </section>
+  {% endif %}
+  <div class="acciones"><button class="boton grande" type="submit">Continuar</button></div>
+</form>
+{% endblock %}

@@ -1,10 +1,15 @@
 # Guía de uso de Ariasmos
 
-El sistema se usa desde el navegador en `https://NOMBRE-DEL-SERVIDOR/`. Cada persona entra con su usuario, su contraseña y, si su rol lo pide, el código de 6 dígitos de su autenticador. Lo que cada quien ve depende de su rol; esta guía sigue los tres roles de las plantillas: **Operación**, **Supervisión** y **Dirección**. Los nombres de los menús («titulares», «matrícula», «familias») pueden cambiar según cómo se configuró el vocabulario.
+El sistema se usa con el programa **Ariasmos**, que se abre desde su acceso directo en el escritorio o en el menú Inicio, en la computadora principal o en cualquier computadora adicional (ver la guía de instalación). Cada persona entra con su usuario, su contraseña y, si su rol lo pide, el código de 6 dígitos de su autenticador. Lo que cada quien ve depende de su rol; esta guía sigue los tres roles de las plantillas: **Operación**, **Supervisión** y **Dirección**. Cada negocio puede renombrar sus roles y moverles permisos: donde el programa dice quién puede hacer algo, muestra los nombres de los roles que hoy tienen ese permiso. Los nombres de los menús y de los textos («titulares», «matrícula», «familias», «padrón», «beca» o «descuento», «público en general») salen del vocabulario del negocio; esta guía usa los de fábrica.
 
 ## La pantalla
 
-- Al abrir el programa aparece una vez la presentación de Ariasmos con su versión («ver. 0.8.0»); se quita sola en un par de segundos o con un clic o cualquier tecla, y no vuelve a salir hasta que cierres el navegador. Si tu equipo tiene activado «reducir movimiento», no aparece.
+- Al abrir el programa aparece la presentación de Ariasmos con su versión («ver. X.Y.Z») mientras arranca; se desvanece cuando carga la primera pantalla. Si la computadora principal no responde, la ventana lo dice y ofrece **Reintentar**.
+- Ariasmos abre una sola ventana por usuario de Windows: si lo abres otra vez, trae al frente la que ya está. Recuerda su tamaño y su posición.
+- A la izquierda de la marca están las flechas **Atrás** y **Adelante**. También sirven **Alt + ←**, **Alt + →** y los botones laterales del ratón. Ir atrás, adelante o volver a cargar nunca repite un cobro ni ninguna otra operación: si vuelves a una operación ya hecha, ves su resultado (por ejemplo, el recibo) y el aviso «Esa operación ya se había enviado; no se repitió».
+- **Ctrl + rueda del ratón**, **Ctrl + +** y **Ctrl + −** cambian el tamaño de la letra; **Ctrl + 0** lo regresa.
+- Las **descargas** (recibos en PDF, cortes, exportaciones) siempre preguntan dónde guardar con la ventana «Guardar como» de Windows; nunca se abren solas. Los recibos se imprimen con el botón **Imprimir** dentro de la ventana.
+- Los campos que piden una **carpeta** (destinos de cortes, respaldo, carpeta vigilada del banco) tienen **Examinar…** en la computadora principal, que abre la ventana de Windows para elegirla. En una computadora adicional se escribe la ruta o se elige desde la principal, porque las carpetas son del disco de la principal.
 - Arriba está la marca de Ariasmos y, a su lado, el logo y el nombre del negocio. Las entradas más usadas del menú se ven siempre (Inicio, Cobrar, el padrón, Inventario, Mi caja, Banco, Efectivo, Solicitudes y Cortes, según tu rol); las demás (familias, conceptos, usuarios, roles, configuración, respaldos, bitácora y otras) están en **Más**. **Más** se abre con un clic o con Enter y se recorre con las flechas; Esc lo cierra.
 - A la derecha ves tu nombre, tu rol y, si tienes turno abierto, la caja y la hora en que lo abriste.
 - Las acciones que mueven dinero o no se deshacen piden confirmación en un recuadro propio del programa; los avisos de que algo salió bien aparecen abajo unos segundos.
@@ -24,10 +29,19 @@ Cada rol ve un Inicio distinto:
 ### Dar de alta a un titular
 
 1. Menú **Titulares** → **Nueva alta**.
-2. Escribe nombre, apellidos, agrupación y el contacto responsable con su teléfono.
+2. Escribe nombre, apellidos, agrupación y el contacto responsable con su teléfono. Si el negocio lo configuró así, los apellidos son opcionales (por ejemplo, para dar de alta empresas) y la constancia de consentimiento de datos no se pide o lleva el texto del negocio.
 3. Si paga junto con otros (hermanos, por ejemplo), elige su familia o crea una nueva.
 4. Guarda. El alta queda **pendiente** hasta que Supervisión la aprueba; al aprobarse recibe su **matrícula**, que es la referencia para pagar en el banco.
 5. Desde la ficha del titular se imprime la **ficha de pago** con los datos bancarios y la matrícula.
+
+### Importar o actualizar desde una hoja
+
+1. En el padrón elige **Importar o actualizar desde una hoja** (si el padrón está vacío es el botón principal). Sube la lista en Excel (.xlsx) o CSV, hasta 5 MB.
+2. El programa propone qué es cada columna; corrígelo si hace falta y elige **Ver vista previa**.
+3. Los renglones **sin** matrícula se dan de alta. Los renglones **con** matrícula actualizan a ese registro: contacto, agrupación, responsable y nombre. Nunca cambian desde la hoja la matrícula, los saldos, los cargos, los pagos ni el estado; una matrícula que no existe se marca como error y nunca se busca por nombre.
+4. Si tu rol solo puede **pedir** la importación, al confirmar la hoja completa se vuelve **una sola solicitud**: nada cambia hasta que otra persona la aprueba (por la bandeja, con una delegación o con su código por teléfono). Quien aprueba ve cuántas altas y cuántos cambios trae, campo por campo.
+5. Al aprobarse, cada renglón se vuelve a comparar con los datos del momento: si alguien cambió ese dato mientras tanto, el renglón se salta y aparece en la lista de **Renglones saltados**.
+6. La vista previa solo muestra los datos que tu rol puede ver.
 
 ### Cobrar en efectivo
 
@@ -42,8 +56,8 @@ Cada rol ve un Inicio distinto:
 1. Con tu turno abierto, en **Mi caja** elige **Retirar efectivo**.
 2. Escribe el importe, elige el motivo, anota en qué se gastó y adjunta la foto o el PDF del ticket (JPEG, PNG o PDF de hasta 5 MB). Puedes adjuntarlo después desde el retiro.
 3. Si el retiro cabe en los topes del negocio, queda registrado de inmediato con su folio. Si pasa de algún tope, queda como **solicitud** y se registra cuando otra persona lo autoriza (por la bandeja, con una delegación o con su código por teléfono).
-4. Solo se puede retirar efectivo cobrado en tu turno. Si no alcanza, el sistema lo dice sin decir cuánto hay; después de tres intentos así, los retiros de ese turno piden autorización.
-5. No puedes cerrar el turno con retiros sin comprobante: adjúntalo o declara que no lo hay con su motivo (Supervisión recibe el aviso).
+4. Solo se puede retirar efectivo cobrado en tu turno. Si no alcanza, el sistema lo dice sin decir cuánto hay; después de los intentos que fije el negocio (tres de fábrica), los retiros de ese turno piden autorización.
+5. No puedes cerrar el turno con retiros sin comprobante: adjúntalo o declara que no lo hay con su motivo (recibe el aviso quien revisa retiros).
 6. Un retiro no se borra. Si hubo un error, pide su **reversión**: la resuelve otra persona y el efectivo regresa a tu turno abierto.
 
 ### Corte diario
@@ -61,7 +75,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 1. **Inventario** → **Vender** (o **Vender artículos** desde su ficha) y elige al titular. Verás todos los artículos activos; filtra escribiendo parte del nombre o la clave y usa **+** y **−** en cada uno (o escribe la cantidad). El precio lo pone cada artículo; el **Resumen** de la derecha suma lo elegido, y el sistema lo vuelve a calcular al continuar.
 2. Elige cómo se paga: **Lo paga ahora** pasa al cobro (**Continuar al cobro**), que se aplica primero a esos artículos y lo que sobre al adeudo normal; **Se va a su adeudo** deja los cargos pendientes para cobrarlos con lo demás (**Registrar la venta**).
-3. **Sin matrícula** (arriba a la derecha) es para quien no es titular: mismo catálogo; se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
+3. **Sin matrícula** (arriba a la derecha) es para quien no es titular (el «público en general» del vocabulario): mismo catálogo; se cobra completa en efectivo en ese momento, con tu turno abierto, y emite su recibo.
 4. Junto a cada artículo ves cuántas piezas quedan; si no queda ninguna no se muestra número. Cuando quedan pocas (20 % o menos de lo que había tras la última entrada o conteo, o en su mínimo) aparece **pocas**.
 5. Si el sistema cree que no hay suficientes piezas, la venta no se detiene: avisa y Supervisión la revisa.
 
@@ -86,7 +100,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 ### Banco
 
-1. Menú **Banco** → **Importar**: sube el estado de cuenta en PDF o el archivo de movimientos del banco. Si hay carpeta vigilada, basta con dejar ahí el archivo descargado; el sistema lo importa solo y lo muestra en el Inicio.
+1. Menú **Banco** → **Importar**: sube el estado de cuenta en PDF o el archivo de movimientos del banco. El PDF se lee con el lector del banco de la cuenta; hoy hay uno (Santander PyME). Con otro banco el programa lo dice y pide el archivo de movimientos en Excel o CSV, que sirve para cualquier banco: propone las columnas y recuerda la correspondencia. Si hay carpeta vigilada, basta con dejar ahí el archivo descargado; el sistema lo importa solo y lo muestra en el Inicio.
 2. Revisa la vista previa: cuántos pagos se aplican solos, cuántos quedan por identificar y cuántos ya estaban.
 3. En la **cola** de movimientos por identificar, confirma a quién pertenece cada uno, o márcalo como «no es un cobro».
 4. Los depósitos de efectivo de caja se emparejan con los movimientos del banco.
@@ -111,7 +125,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 ### Retiros de caja
 
 - **Efectivo** → **Retiros de caja** lista todos los retiros con su comprobante. Cada uno nace «por revisar»: ábrelo, revisa el comprobante y márcalo **Revisado** u **Observado** con una nota. Nadie revisa un retiro propio.
-- En el **Inicio** aparecen avisos cuando una caja llega al 80 % de un tope del periodo, cuando un retiro se declara sin comprobante y cuando hay retiros sin revisar desde hace varios días.
+- En el **Inicio** aparecen avisos cuando una caja llega al porcentaje de aviso de un tope del periodo (80 % de fábrica), cuando un retiro se declara sin comprobante y cuando hay retiros sin revisar desde hace varios días.
 - **Motivos de retiro** permite agregar o desactivar motivos.
 
 ### Inventario
@@ -123,7 +137,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 ### Corte mayor
 
 1. El día 1 de cada mes el sistema prepara el **corte mayor** del mes anterior como borrador. Aparece en el **Inicio** y en **Cortes**.
-2. Revísalo: ingresos por medio y por concepto, estado de cada titular, cartera vencida, caja, banco y, si se lleva, el resumen de inventario.
+2. Revísalo: ingresos por medio y por concepto, estado de cada titular, cartera vencida por tramos de antigüedad (de fábrica 1 a 30, 31 a 60, 61 a 90 y más de 90 días; se cambian en Parámetros), caja, banco y, si se lleva, el resumen de inventario. Cada corte lleva el nombre que le dio el negocio, también en sus archivos.
 3. Elige **Cerrar el corte** (pide tu contraseña). El mes queda bloqueado: nada puede registrarse con fecha dentro de él.
 4. Si nadie lo cierra en 5 días, el sistema lo cierra solo marcado como «sin revisar».
 
@@ -145,21 +159,33 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 - **Usuarios** → **Nuevo usuario**: el sistema muestra un **código de activación** que la persona usa para elegir su contraseña (nadie teclea la contraseña de otro).
 - **Restablecer acceso** genera un código nuevo si alguien olvidó su contraseña o perdió su teléfono.
-- **Roles** permite mover permisos entre roles.
+- **Roles** permite mover permisos entre roles y renombrarlos. Dos permisos tocan la hoja del padrón: **Importar o actualizar desde una hoja, sin aprobación** (Dirección en las plantillas) y **Pedir que se importe o actualice desde una hoja** (Operación y Supervisión en las plantillas).
+
+### Datos de pago
+
+- La cuenta de depósito puede ser una **CLABE** (18 dígitos con su dígito verificador; el banco se reconoce por los tres primeros) u **otra cuenta**, para negocios o países sin CLABE: número de cuenta y banco escritos.
+- Los medios de pago iniciales vienen de la plantilla; se cambian en **Medios de pago**.
+
+### Conceptos con cobro semanal o quincenal
+
+- **Semanal**: un cargo por semana (lunes a domingo), con periodo `AAAA-Sww`. El día de vencimiento del concepto es el día de la semana (1 lunes a 7 domingo).
+- **Quincenal**: dos cargos por mes, del 1 al 15 (`AAAA-MM-1`) y del 16 al fin de mes (`AAAA-MM-2`). La primera vence el día del concepto (1 a 15) y la segunda quince días después.
+- Becas o descuentos, prórrogas, recargos y cierre de periodo funcionan igual que en los mensuales. Un alta a mitad de periodo genera el cargo del periodo en que se dio de alta. Los recargos que se repiten lo hacen cada mes, también en estos conceptos.
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario, parámetros, catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
+- **Configuración**: datos del negocio, vocabulario (incluye cómo se llama el padrón, el descuento autorizado y la venta sin registro), **Reglas del negocio** (prefijo y dígitos del teléfono, tamaño de hoja de los PDF —Carta o A4—, apellidos obligatorios o no y la constancia de consentimiento con su texto), parámetros (entre otros: tramos de la cartera vencida, cuántos respaldos diarios y mensuales se conservan, horas sin respaldo antes de avisar, días entre pruebas de restauración, intentos de retiro rechazados antes de pedir autorización y porcentaje de aviso del tope de retiros), catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
 
 ### Marca del negocio
 
 **Más → Configuración → Marca del negocio** (pide tu contraseña otra vez):
 
-1. **Colores**: escribe el color principal y el de acento como `#` y seis dígitos hexadecimales (por ejemplo `#1F1A4E` y `#F58634`) y guarda. El principal pinta los botones y el menú activo; el acento, la franja de arriba, los subrayados y los fondos suaves. Si el principal es demasiado claro para leer texto blanco encima, los botones usan un tono oscuro y la pantalla te lo indica en **Lectura**. **Usar los colores de Ariasmos** quita los del negocio.
-2. **Logo**: sube una imagen JPEG o PNG de hasta 1 MB. El programa revisa el contenido real del archivo y lo vuelve a dibujar solo con sus píxeles; cualquier otra cosa se rechaza. **Quitar logo** deja solo el nombre del negocio.
-3. El logo y el nombre aparecen en la barra y en el recibo (en pantalla, impreso y en PDF); Ariasmos queda solo en la línea del pie del recibo. Cada cambio queda en la bitácora.
-4. Sin colores se usan los de Ariasmos; sin logo, solo el nombre. El asistente de instalación siempre usa los colores de Ariasmos.
+1. **Colores tomados del logo**: al subir el logo, el programa propone el color principal y el de acento a partir de él y los muestra en una **vista previa**; elige **Usar estos colores** o escribe otros. **Usar los colores del logo** vuelve a proponerlos cuando quieras. El mismo logo da siempre los mismos colores, y ya vienen ajustados para leerse bien.
+2. **Colores**: escribe el color principal y el de acento como `#` y seis dígitos hexadecimales (por ejemplo `#1F1A4E` y `#F58634`) y guarda. El principal pinta los botones y el menú activo; el acento, la franja de arriba, los subrayados y los fondos suaves. Si el principal es demasiado claro para leer texto blanco encima, los botones usan un tono oscuro y la pantalla te lo indica en **Lectura**. **Usar los colores de Ariasmos** quita los del negocio.
+3. **Logo**: sube una imagen JPEG o PNG de hasta 1 MB. El programa revisa el contenido real del archivo y lo vuelve a dibujar solo con sus píxeles; cualquier otra cosa se rechaza. **Quitar logo** deja solo el nombre del negocio.
+4. El logo y el nombre aparecen en la barra y en el recibo (en pantalla, impreso y en PDF); Ariasmos queda solo en la línea del pie del recibo. Cada cambio queda en la bitácora.
+5. Sin colores se usan los de Ariasmos; sin logo, solo el nombre. El asistente de instalación siempre usa los colores de Ariasmos; su paso de marca muestra la vista previa con los colores del negocio.
 
 ### Respaldos
 

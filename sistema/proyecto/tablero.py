@@ -255,7 +255,7 @@ def _salud_respaldo():
     ultimo = Respaldo.objects.filter(tipo=Respaldo.RESPALDO, resultado=Respaldo.CORRECTO).first()
     if ultimo is None:
         return renglon("respaldo", "Respaldo", "Todavía no hay ningún respaldo correcto", "por_hacer", [("Ir a respaldos", reverse("respaldos:panel"))])
-    viejo = (timezone.now() - ultimo.creado).total_seconds() > respaldos.HORAS_ALERTA * 3600
+    viejo = (timezone.now() - ultimo.creado).total_seconds() > respaldos.horas_alerta() * 3600
     return renglon("respaldo", "Respaldo", f"{_fecha(ultimo.creado, 'd/m/Y H:i')} · en la carpeta de respaldo", "revisar" if viejo else "bien", [("Ir a respaldos", reverse("respaldos:panel"))])
 
 
@@ -268,9 +268,9 @@ def _salud_prueba():
     if prueba.resultado == Respaldo.FALLO:
         return renglon("prueba_restauracion", "Prueba de restauración", f"La última prueba falló ({_fecha(prueba.creado)})", "revisar", enlace)
     hace = "Hoy" if dias == 0 else f"Hace {_plural(dias, 'día')}"
-    if dias >= respaldos.DIAS_PRUEBA:
+    if dias >= respaldos.dias_prueba():
         return renglon("prueba_restauracion", "Prueba de restauración", f"{hace} · ya toca otra", "por_hacer", enlace)
-    return renglon("prueba_restauracion", "Prueba de restauración", f"{hace} · toca en {_plural(respaldos.DIAS_PRUEBA - dias, 'día')}", "bien", enlace)
+    return renglon("prueba_restauracion", "Prueba de restauración", f"{hace} · toca en {_plural(respaldos.dias_prueba() - dias, 'día')}", "bien", enlace)
 
 
 def salud(usuario, certificado=None, dispositivos=0):

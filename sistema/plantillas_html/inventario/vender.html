@@ -12,6 +12,6 @@
   <button class="boton" type="submit">Buscar</button>
 </form>
 <ul class="lista">
-{% for t in resultados %}<li><a href="{% url 'inventario:vender_titular' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a>{% if t.familia %} <small>({{ voc.familia|lower }} {{ t.familia }})</small>{% endif %} <span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span></li>{% empty %}{% if q %}<li>Sin resultados.</li>{% endif %}{% endfor %}
+{% for t in resultados %}<li><a href="{% url 'inventario:vender_titular' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a>{% if t.familia %} <small>({{ voc.familia_min }} {{ t.familia }})</small>{% endif %} <span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span></li>{% empty %}{% if q %}<li>Sin resultados.</li>{% endif %}{% endfor %}
 </ul>
 {% endblock %}

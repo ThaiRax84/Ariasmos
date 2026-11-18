@@ -1,9 +1,9 @@
 from io import BytesIO
 
-from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 from banco.ficha import datos_de_pago
+from configuracion import hoja as tamano_hoja
 from configuracion.models import vocabulario
 
 from . import contactos
@@ -19,8 +19,9 @@ def generar(titulares, negocio):
     voc = vocabulario()
     pago = datos_de_pago()
     memoria = BytesIO()
-    hoja = canvas.Canvas(memoria, pagesize=letter)
-    ancho, alto = letter
+    tamano = tamano_hoja.tamano()
+    hoja = canvas.Canvas(memoria, pagesize=tamano)
+    ancho, alto = tamano
     for titular in titulares:
         y = alto - 72
         y = _linea(hoja, 72, y, negocio.nombre if negocio else "", 16, True)
@@ -39,19 +40,19 @@ def generar(titulares, negocio):
         y = _linea(hoja, 72, y, "Cómo pagar", 13, True)
         if pago:
             cuenta = pago["cuenta"]
-            for texto in (f"Banco: {cuenta.banco}", f"CLABE: {cuenta.clabe_formateada}", f"Beneficiario: {cuenta.beneficiario}"):
+            for texto in (f"Banco: {cuenta.nombre_banco}", f"{cuenta.etiqueta_numero}: {cuenta.numero_formateado}", f"Beneficiario: {cuenta.beneficiario}"):
                 y = _linea(hoja, 72, y, texto)
             if cuenta.convenio:
                 y = _linea(hoja, 72, y, f"Convenio: {cuenta.convenio}")
             if pago["medios"]:
                 y = _linea(hoja, 72, y, "Medios aceptados: " + ", ".join(str(m) for m in pago["medios"]))
-            y = _linea(hoja, 72, y, f"Escribe {titular.matricula} ({voc['matricula'].lower()}) {pago['lugar']}.", 11, True)
+            y = _linea(hoja, 72, y, f"Escribe {titular.matricula} ({voc['matricula_min']}) {pago['lugar']}.", 11, True)
             if cuenta.contacto_dudas:
                 y = _linea(hoja, 72, y, f"Dudas: {cuenta.contacto_dudas}")
         else:
             if negocio and negocio.nota_ficha:
                 y = _linea(hoja, 72, y, negocio.nota_ficha)
-            y = _linea(hoja, 72, y, f"Escribe {titular.matricula} ({voc['matricula'].lower()}) en referencia numérica y en concepto.", 11, True)
+            y = _linea(hoja, 72, y, f"Escribe {titular.matricula} ({voc['matricula_min']}) en referencia numérica y en concepto.", 11, True)
         hoja.showPage()
     hoja.save()
     return memoria.getvalue()

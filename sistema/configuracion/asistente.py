@@ -17,6 +17,7 @@ from banco.formularios import FormularioCuenta
 from banco.models import CuentaBancaria
 from banco.servicios import guardar_cuenta
 from banco.views import avisar as avisar_banco
+from caja.models import Denominacion
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas import qr, secretos
 from cuentas import servicios as cuentas_servicios
@@ -28,6 +29,7 @@ from nucleo import sobre, totp
 from respaldos.servicios import clave_respaldo
 
 from . import esquema, plantillas
+from . import marca as marca_negocio
 from .formularios import (
     IMPORTAR,
     FormularioAsistenteConceptos,
@@ -35,11 +37,16 @@ from .formularios import (
     FormularioAsistenteInicio,
     FormularioAsistenteUsuario,
     FormularioCajaCortes,
+    FormularioDenominacionesMoneda,
+    FormularioLogo,
+    FormularioMarca,
     FormularioPersonalizar,
+    FormularioReglas,
     FormularioRevisarPlantilla,
     TOPES_CARPETA,
     guardar_caja,
     valores_caja,
+    valores_reglas,
 )
 from .resumen import resumir
 from .models import VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, hoy_negocio, parametro, vocabulario
@@ -71,8 +78,9 @@ def _token_valido(token):
     return hmac.compare_digest(hashlib.sha256(token.encode("utf-8")).hexdigest(), esperado)
 
 
-TOTAL_PASOS = 8
-NOMBRES_PASOS = ("Negocio y plantilla", "Vocabulario y conceptos", "Importes", "Datos de pago", "Caja: cortes y retiros", "Entrega y respaldo", "Usuario de Dirección", "Autenticador")
+NOMBRES_PASOS = ("Negocio y plantilla", "Vocabulario y conceptos", "Importes", "Marca", "Datos de pago", "Caja: cortes y retiros", "Reglas del negocio", "Entrega y respaldo", "Primer usuario", "Autenticador")
+TOTAL_PASOS = len(NOMBRES_PASOS)
+PASO = {nombre: numero for numero, nombre in enumerate(("inicio", "personalizar", "conceptos", "marca", "pago", "caja", "reglas", "cortes", "usuario", "codigo"), start=1)}
 
 
 def _paso(request, plantilla, formulario, numero, titulo, **extra):
@@ -93,12 +101,12 @@ def inicio(request):
     negocio = _disponible(request)
     inicial = {"nombre": negocio.nombre, "zona_horaria": negocio.zona_horaria, "moneda": negocio.moneda} if negocio else {}
     datos_post = request.POST if request.method == "POST" else None
-    formulario = FormularioAsistenteInicio(datos_post, request.FILES if request.method == "POST" else None, plantillas=plantillas.disponibles(), initial=inicial)
+    formulario = FormularioAsistenteInicio(datos_post, request.FILES if request.method == "POST" else None, plantillas=plantillas.disponibles(con_descripcion=True), initial=inicial)
     if request.method == "POST" and formulario.is_valid():
         if not _token_valido(formulario.cleaned_data["token"]):
             registrar("asistente_token_invalido", request=request)
             messages.error(request, "El token de instalación no es correcto.")
-            return _paso(request, "asistente/paso.html", formulario, 1, "Datos del negocio y plantilla")
+            return _paso(request, "asistente/paso.html", formulario, PASO["inicio"], "Datos del negocio y plantilla")
         try:
             origen, datos = _leer_plantilla(formulario)
         except esquema.PlantillaInvalida as error:
@@ -167,7 +175,7 @@ def personalizar(request):
         recargos = dict(_estado(request).get("recargos") or {})
         with transaction.atomic():
             for clave in VOCABULARIO_BASE:
-                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": datos[clave].strip()})
+                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": datos[clave].strip() or antes[clave]})
             cambios = diferencias(antes, vocabulario())
             if cambios:
                 registrar("vocabulario_cambiado", datos={"cambios": cambios, "origen": "asistente"}, request=request)
@@ -217,8 +225,85 @@ def conceptos(request):
                     concepto.regla_recargo = regla
                 concepto.save()
             registrar("asistente_conceptos", datos={"conceptos": [c.nombre for c in lista]}, request=request)
+        return redirect("asistente:marca")
+    return _paso(request, "asistente/paso.html", formulario, PASO["conceptos"], "Importes de los conceptos", omitir="asistente:marca")
+
+
+def _vista_de(formulario):
+    principal, acento = formulario["color_principal"].value() or "", formulario["color_acento"].value() or ""
+    if not (principal and acento):
+        return None
+    try:
+        return {"principal": marca_negocio.validar_color(principal), "acento": marca_negocio.validar_color(acento)}
+    except marca_negocio.MarcaInvalida:
+        return None
+
+
+def marca(request):
+    negocio = _exigir_autorizado(request)
+    if negocio is None:
+        return redirect("asistente:inicio")
+    actual = marca_negocio.actual()
+    if request.method == "POST" and request.POST.get("omitir"):
+        registrar("asistente_marca_omitida", request=request)
         return redirect("asistente:pago")
-    return _paso(request, "asistente/paso.html", formulario, 3, "Importes de los conceptos")
+    inicial = {"color_principal": actual.color_principal if actual else "", "color_acento": actual.color_acento if actual else ""}
+    propuesta = _estado(request).get("propuesta_marca")
+    if propuesta:
+        inicial = {"color_principal": propuesta["principal"], "color_acento": propuesta["acento"]}
+    colores = FormularioMarca(initial=inicial)
+    logo = FormularioLogo()
+    if request.method == "POST":
+        try:
+            if request.POST.get("accion") == "logo":
+                logo = FormularioLogo(request.POST, request.FILES)
+                if logo.is_valid():
+                    guardada = marca_negocio.guardar_logo(marca_negocio.leer_subida(logo.cleaned_data["archivo"]), None, request)
+                    from .views import propuesta_del_logo
+
+                    _guardar_estado(request, propuesta_marca=propuesta_del_logo(guardada))
+                    messages.success(request, "Logo guardado. Te proponemos los colores tomados del logo: acéptalos o elige otros.")
+                    return redirect("asistente:marca")
+            else:
+                colores = FormularioMarca(request.POST)
+                if colores.is_valid():
+                    principal, acento = colores.cleaned_data["color_principal"], colores.cleaned_data["color_acento"]
+                    if principal:
+                        marca_negocio.guardar_colores(principal, acento, None, request)
+                    _guardar_estado(request, propuesta_marca=None)
+                    return redirect("asistente:pago")
+        except marca_negocio.MarcaInvalida as error:
+            registrar("marca_rechazada", datos={"accion": "asistente", "motivo": str(error)}, request=request)
+            (logo if request.POST.get("accion") == "logo" else colores).add_error(None, str(error))
+    actual = marca_negocio.actual()
+    contexto = {"colores": colores, "logo": logo, "actual": actual, "vista": _vista_de(colores), "propuesta": bool(propuesta), "nombre_vista": negocio.nombre}
+    return render(request, "asistente/marca.html", {"paso": PASO["marca"], "total": TOTAL_PASOS, "titulo": "Marca del negocio (opcional)", "nombres_pasos": NOMBRES_PASOS, **contexto})
+
+
+def vista_marca_css(request):
+    _disponible(request)
+    return marca_negocio.respuesta_vista(request)
+
+
+def logo_asistente(request):
+    from django.http import HttpResponse
+
+    from caja import comprobantes
+
+    if _exigir_autorizado(request) is None:
+        raise Http404
+    actual = marca_negocio.actual()
+    try:
+        contenido = marca_negocio.leer_logo(actual)
+    except (OSError, comprobantes.ComprobanteInvalido, marca_negocio.MarcaInvalida):
+        contenido = None
+    if not contenido:
+        raise Http404
+    respuesta = HttpResponse(contenido, content_type=comprobantes.TIPOS_MIME[actual.logo_tipo])
+    respuesta["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    respuesta["Cache-Control"] = "no-store"
+    return respuesta
 
 
 def pago(request):
@@ -231,7 +316,7 @@ def pago(request):
         guardada = guardar_cuenta(formulario, None, cuenta=actual, request=request, forzar_principal=True)
         avisar_banco(request, formulario, guardada)
         return redirect("asistente:caja")
-    return _paso(request, "asistente/pago.html", formulario, 4, "Datos de pago")
+    return _paso(request, "asistente/pago.html", formulario, PASO["pago"], "Datos de pago (opcional)")
 
 
 def caja(request):
@@ -239,14 +324,39 @@ def caja(request):
     if negocio is None:
         return redirect("asistente:inicio")
     antes = valores_caja()
-    formulario = FormularioCajaCortes(request.POST if request.method == "POST" else None, valores=antes)
-    if request.method == "POST" and formulario.is_valid():
+    datos_post = request.POST if request.method == "POST" else None
+    formulario = FormularioCajaCortes(datos_post, valores=antes)
+    faltan = not Denominacion.objects.filter(activa=True).exists()
+    piezas = FormularioDenominacionesMoneda(datos_post, codigo=negocio.moneda, prefix="moneda") if faltan else None
+    if request.method == "POST" and formulario.is_valid() and (piezas is None or piezas.is_valid()):
         nuevos = formulario.valores()
         with transaction.atomic():
             guardar_caja(nuevos)
+            if piezas is not None:
+                for valor in piezas.cleaned_data["denominaciones"]:
+                    Denominacion.objects.get_or_create(valor=valor)
+                registrar("asistente_denominaciones", datos={"moneda": negocio.moneda, "denominaciones": piezas.cleaned_data["denominaciones"]}, request=request)
             registrar("asistente_caja", datos={"cambios": diferencias(antes, valores_caja()), "origen": "asistente"}, request=request)
+        return redirect("asistente:reglas")
+    return _paso(request, "asistente/caja.html", formulario, PASO["caja"], "Caja: cortes y retiros", piezas=piezas)
+
+
+def reglas(request):
+    negocio = _exigir_autorizado(request)
+    if negocio is None:
+        return redirect("asistente:inicio")
+    antes = valores_reglas()
+    formulario = FormularioReglas(request.POST if request.method == "POST" else None, valores=antes)
+    if request.method == "POST" and request.POST.get("omitir"):
+        registrar("asistente_reglas_omitidas", request=request)
         return redirect("asistente:cortes")
-    return _paso(request, "asistente/paso.html", formulario, 5, "Caja: cortes y retiros")
+    if request.method == "POST" and formulario.is_valid():
+        with transaction.atomic():
+            for clave, valor in formulario.valores().items():
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+            registrar("asistente_reglas", datos={"cambios": diferencias(antes, valores_reglas()), "origen": "asistente"}, request=request)
+        return redirect("asistente:cortes")
+    return _paso(request, "asistente/paso.html", formulario, PASO["reglas"], "Reglas del negocio (opcional)", omitir=True)
 
 
 @sensitive_post_parameters("clave_canal")
@@ -292,7 +402,7 @@ def cortes(request):
             registrar("asistente_cortes", datos={"entrega": bool(datos["carpeta_entrega"]), "respaldo": bool(datos["carpeta_respaldo"]), "carpeta_banco": bool(datos["carpeta_banco"])}, request=request)
         return redirect("asistente:usuario")
     contexto = {"texto_clave": sobre.clave_a_texto(clave_respaldo()) if pendiente else ""}
-    respuesta = _paso(request, "asistente/cortes.html", formulario, 6, "Entrega y respaldo", **contexto)
+    respuesta = _paso(request, "asistente/cortes.html", formulario, PASO["cortes"], "Entrega y respaldo", **contexto)
     respuesta["Cache-Control"] = "no-store"
     return respuesta
 
@@ -321,7 +431,8 @@ def usuario(request):
                 registrar("usuario_creado", objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": rol.pk, "origen": "asistente"}, request=request)
             _guardar_estado(request, usuario=nuevo.pk, secreto=totp.generar_secreto())
             return redirect("asistente:codigo")
-    return _paso(request, "asistente/paso.html", formulario, 7, "Primer usuario de Dirección")
+    rol = _estado(request).get("rol_inicial") or ""
+    return _paso(request, "asistente/paso.html", formulario, PASO["usuario"], f"Primer usuario ({rol})" if rol else "Primer usuario")
 
 
 def codigo(request):
@@ -352,11 +463,11 @@ def codigo(request):
             cuentas_servicios.marcar_reingreso(request)
             registrar("inicio_sesion", usuario=nuevo, objeto=nuevo, request=request)
             messages.success(request, "Instalación lista.")
-            return redirect("inicio")
+            return redirect("primeros_pasos")
         messages.error(request, "El código no coincide. Revisa la hora del teléfono.")
     contexto = {
         "formulario": formulario,
-        "paso": 8,
+        "paso": PASO["codigo"],
         "total": TOTAL_PASOS,
         "nombres_pasos": NOMBRES_PASOS,
         "titulo": "Autenticador del primer usuario",

@@ -17,7 +17,7 @@
   <p>Llegaron por la carpeta vigilada y tienen una señal de sospecha: no se aplican hasta que alguien que concilia los compare con el banco y los libere. Quien libera no puede marcar la importación como revisada.</p>
   {% if puede_liberar %}<form method="post" action="{% url 'conciliacion:liberar' importacion.pk %}">{% csrf_token %}{% endif %}
   <table class="tabla compacta">
-  <thead><tr>{% if puede_liberar %}<th>Liberar</th>{% endif %}<th>Fecha</th><th>Referencia y concepto</th><th>Importe</th><th>Matrícula sugerida</th><th>Motivo de la retención</th></tr></thead>
+  <thead><tr>{% if puede_liberar %}<th>Liberar</th>{% endif %}<th>Fecha</th><th>Referencia y concepto</th><th>Importe</th><th>{{ voc.matricula }} sugerida</th><th>Motivo de la retención</th></tr></thead>
   <tbody>{% for m in retenidos %}<tr>{% if puede_liberar %}<td><input type="checkbox" name="movimiento" value="{{ m.pk }}" aria-label="Liberar el movimiento del {{ m.fecha|date:'d/m/Y' }}"></td>{% endif %}<td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.referencia }} {{ m.concepto }}</td><td>{{ m.importe|dinero }}</td><td>{{ m.sugerencia }}</td><td>{% for motivo in m.motivos_retencion %}{{ motivo }}{% if not forloop.last %}; {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
   </table>
   {% if puede_liberar %}<div class="acciones">

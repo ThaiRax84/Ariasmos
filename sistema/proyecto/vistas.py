@@ -40,6 +40,37 @@ def inicio(request):
     return render(request, "inicio.html", contexto)
 
 
+def pendientes_de_configurar(usuario):
+    from banco.models import CuentaBancaria
+    from configuracion.models import Negocio
+    from cortes.models import Destino
+
+    negocio = Negocio.actual()
+    marca = marca_negocio.actual()
+    pendientes = []
+    if usuario.tiene_permiso("administrar_configuracion"):
+        if marca is None or not marca.logo or not marca.con_colores:
+            pendientes.append(("Marca del negocio", "Sube el logo y usa sus colores en el programa.", "configuracion:marca"))
+        if not CuentaBancaria.objects.filter(activa=True).exists():
+            pendientes.append(("Datos de pago", "La ficha de pago necesita la cuenta del negocio.", "banco:nueva"))
+        if not Destino.objects.filter(activo=True).exists():
+            pendientes.append(("Entrega de cortes", "Elige la carpeta a la que se entregan los cortes.", "cortes:destinos"))
+    if usuario.tiene_permiso("administrar_respaldos") and negocio is not None and not negocio.carpeta_respaldo:
+        pendientes.append(("Respaldo", "Elige la carpeta del respaldo diario cifrado.", "respaldos:panel"))
+    return pendientes
+
+
+@requiere_sesion
+def primeros_pasos(request):
+    usuario = request.user
+    contexto = {
+        "puede_importar": usuario.tiene_permiso("importar_padron") or usuario.tiene_permiso("solicitar_importacion_padron"),
+        "puede_alta": usuario.tiene_permiso("solicitar_alta_baja") or usuario.tiene_permiso("alta_baja_directa"),
+        "pendientes": pendientes_de_configurar(usuario),
+    }
+    return render(request, "primeros_pasos.html", contexto)
+
+
 def _guardable(respuesta, version, etiqueta):
     respuesta["Cache-Control"] = "private, max-age=31536000, immutable"
     respuesta["ETag"] = quote_etag(f"{etiqueta}-{version}")
@@ -57,6 +88,11 @@ def marca_css(request):
         respuesta["X-Content-Type-Options"] = "nosniff"
         return respuesta
     return _guardable(respuesta, version, "marca")
+
+
+@requiere_sesion
+def marca_vista_css(request):
+    return marca_negocio.respuesta_vista(request)
 
 
 @requiere_sesion

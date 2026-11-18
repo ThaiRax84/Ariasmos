@@ -2,10 +2,9 @@ from django.db import migrations
 
 
 def poblar(apps, schema_editor):
-    from banco.catalogo import cargar, sembrar_medios
+    from banco.catalogo import cargar
 
     cargar(apps.get_model("banco", "Banco"))
-    sembrar_medios(apps.get_model("banco", "MedioPago"))
 
 
 class Migration(migrations.Migration):

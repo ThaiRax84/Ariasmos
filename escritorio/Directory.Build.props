@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <VersionAriasmos>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../VERSION').Trim())</VersionAriasmos>
+    <Version>$(VersionAriasmos)</Version>
+    <AssemblyVersion>$(VersionAriasmos).0</AssemblyVersion>
+    <FileVersion>$(VersionAriasmos).0</FileVersion>
+    <InformationalVersion>$(VersionAriasmos)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Product>Ariasmos</Product>
+    <Company>Ariasmos</Company>
+    <Authors>Ariasmos</Authors>
+    <NeutralLanguage>es-MX</NeutralLanguage>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

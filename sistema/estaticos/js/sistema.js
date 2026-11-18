@@ -123,24 +123,6 @@
     });
   }
 
-  function prepararSplash() {
-    var splash = document.querySelector("[data-splash]");
-    if (!splash) { return; }
-    var listo = false;
-    var quitar = function () {
-      if (listo) { return; }
-      listo = true;
-      splash.classList.add("saliendo");
-      window.setTimeout(function () { splash.hidden = true; }, 420);
-      document.removeEventListener("keydown", quitar, true);
-      var primero = document.querySelector("main input:not([type=hidden])");
-      if (primero) { primero.focus(); }
-    };
-    splash.addEventListener("click", quitar);
-    document.addEventListener("keydown", quitar, true);
-    splash.addEventListener("animationend", function () { if (!listo) { listo = true; splash.hidden = true; document.removeEventListener("keydown", quitar, true); } });
-  }
-
   function formatear(centavos, simbolo) {
     var signo = centavos < 0 ? "-" : "";
     var absoluto = Math.abs(centavos);
@@ -177,12 +159,31 @@
     if (imprimir) { imprimir.addEventListener("click", function () { window.print(); }); }
   }
 
+  function prepararColores() {
+    var patron = /^#[0-9A-Fa-f]{6}$/;
+    Array.prototype.forEach.call(document.querySelectorAll('input[data-acepta="color"]'), function (campo) {
+      var selector = document.createElement("input");
+      selector.type = "color";
+      selector.className = "selector-color";
+      selector.setAttribute("aria-label", "Elegir el color");
+      selector.value = patron.test(campo.value) ? campo.value : "#888888";
+      selector.addEventListener("input", function () {
+        campo.value = selector.value.toUpperCase();
+        campo.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      campo.addEventListener("input", function () {
+        if (patron.test(campo.value)) { selector.value = campo.value; }
+      });
+      campo.insertAdjacentElement("afterend", selector);
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     prepararImprimir();
     prepararConfirmaciones();
     prepararMenuMas();
     prepararAvisosBreves();
-    prepararSplash();
     prepararConteos();
+    prepararColores();
   });
 }());

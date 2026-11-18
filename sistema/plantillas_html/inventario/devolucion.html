@@ -4,7 +4,7 @@
   <div class="encabezado-texto">
     <span class="antetitulo">Inventario</span>
     <h1>Devolver artículos de la venta {{ venta }}</h1>
-    <p class="subtitulo">Lo que todavía no se ha pagado de esos artículos se cancela. Lo ya pagado regresa como saldo a favor (al momento; Supervisión lo revisa) o en efectivo, que siempre se solicita y lo autoriza otra persona; el efectivo sale de tu turno al aprobarse. {% if venta.titular.interno %}Una venta sin {{ voc.matricula|lower }} solo se devuelve en efectivo.{% endif %}</p>
+    <p class="subtitulo">Lo que todavía no se ha pagado de esos artículos se cancela. Lo ya pagado regresa como saldo a favor (al momento; lo revisa {{ roles.revisar_inventario }}) o en efectivo, que siempre se solicita y lo autoriza otra persona; el efectivo sale de tu turno al aprobarse. {% if venta.titular.interno %}Una venta sin {{ voc.matricula_min }} solo se devuelve en efectivo.{% endif %}</p>
   </div>
 </div>
 <form method="post" class="formulario" novalidate>

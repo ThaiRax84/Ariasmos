@@ -21,9 +21,12 @@ from .conftest import cliente, configurar, nuevo_usuario
 
 ROLES = ("Operación", "Supervisión", "Dirección")
 
-PUBLICAS = {"entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:pago", "asistente:caja", "asistente:cortes", "asistente:usuario", "asistente:codigo"}
+PUBLICAS = {
+    "entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:marca",
+    "asistente:vista_marca", "asistente:logo", "asistente:pago", "asistente:caja", "asistente:reglas", "asistente:cortes", "asistente:usuario", "asistente:codigo",
+}
 
-SOLO_SESION = {"inicio", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
+SOLO_SESION = {"inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -37,8 +40,8 @@ MATRIZ = {
     "titulares:baja": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:reactivar": ("solicitar_alta_baja", "alta_baja_directa"),
     "titulares:solicitar_alta": ("solicitar_alta_baja", "alta_baja_directa"),
-    "solicitudes:bandeja": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes"),
-    "solicitudes:detalle": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes"),
+    "solicitudes:bandeja": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes", "solicitar_importacion_padron"),
+    "solicitudes:detalle": ("solicitar_alta_baja", "alta_baja_directa", "aprobar_solicitudes", "solicitar_importacion_padron"),
     "solicitudes:aprobar": ("aprobar_solicitudes",),
     "solicitudes:rechazar": ("aprobar_solicitudes",),
     "solicitudes:codigo": ("solicitar_alta_baja",),
@@ -46,14 +49,14 @@ MATRIZ = {
     "solicitudes:politica_editar": ("administrar_politicas",),
     "usuarios": ("administrar_usuarios",),
     "usuario_nuevo": ("administrar_usuarios",),
+    "usuario_codigo": ("administrar_usuarios",),
     "usuario_editar": ("administrar_usuarios",),
     "roles": ("administrar_roles",),
     "rol_nuevo": ("administrar_roles",),
     "rol_editar": ("administrar_roles",),
     "dispositivos": ("aprobar_dispositivos",),
     "conectar": ("aprobar_dispositivos",),
-    "conectar_certificado": ("aprobar_dispositivos",),
-    "conectar_instalador": ("aprobar_dispositivos",),
+    "conectar_archivo": ("aprobar_dispositivos",),
     "dispositivos_descartar": ("aprobar_dispositivos",),
     "dispositivo_aprobar": ("aprobar_dispositivos",),
     "dispositivo_revocar": ("aprobar_dispositivos",),
@@ -121,6 +124,7 @@ MATRIZ = {
     "caja:motivo_nuevo": ("administrar_motivos_retiro",),
     "caja:motivo_editar": ("administrar_motivos_retiro",),
     "configuracion:caja": ("administrar_configuracion",),
+    "configuracion:reglas": ("administrar_configuracion",),
     "configuracion:carpeta_banco": ("administrar_configuracion",),
     "conciliacion:liberar": ("conciliar_banco",),
     "auditoria:lista": ("ver_auditoria",),
@@ -154,11 +158,11 @@ MATRIZ = {
     "respaldos:probar": ("administrar_respaldos",),
     "respaldos:clave": ("administrar_respaldos",),
     "respaldos:clave_nueva": ("administrar_respaldos",),
-    "configuracion:padron_subir": ("administrar_configuracion",),
-    "configuracion:padron_revisar": ("administrar_configuracion",),
-    "configuracion:padron_lote": ("administrar_configuracion",),
-    "configuracion:padron_matriculas": ("administrar_configuracion",),
-    "configuracion:padron_fichas": ("administrar_configuracion",),
+    "configuracion:padron_subir": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_revisar": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_lote": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_matriculas": ("importar_padron", "solicitar_importacion_padron"),
+    "configuracion:padron_fichas": ("importar_padron", "solicitar_importacion_padron"),
     "configuracion:inventario": ("administrar_configuracion",),
     "inventario:indice": ("vender_articulos", "registrar_movimientos_inventario", "subir_conteo_inventario", "devolver_articulos", "revisar_inventario", "administrar_articulos"),
     "inventario:articulos": ("administrar_articulos",),
@@ -188,7 +192,8 @@ MATRIZ = {
     "inventario:conteo_detalle": ("subir_conteo_inventario", "revisar_inventario", "aprobar_solicitudes"),
 }
 
-CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar", "conectar_certificado", "conectar_instalador"}
+CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
+LOTE_DE_OTRO = {"configuracion:padron_lote", "configuracion:padron_matriculas", "configuracion:padron_fichas"}
 
 OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
@@ -357,6 +362,8 @@ def test_matriz_url_por_rol(escenario, nombre):
         respuesta = cliente(usuario).get(url)
         if permitido(usuario.rol, nombre):
             esperados = (404,) if nombre in CARGA_DE_OTRO else (200, 302, 405)
+            if nombre in LOTE_DE_OTRO and not (usuario.tiene_permiso("importar_padron") or usuario.tiene_permiso("aprobar_solicitudes")):
+                esperados = (404,)
             assert respuesta.status_code in esperados, (nombre, nombre_rol, respuesta.status_code)
             if respuesta.status_code == 302:
                 assert reverse("entrar") not in respuesta.url

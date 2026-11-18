@@ -1,6 +1,6 @@
 {% extends "asistente/_base.html" %}
 {% block asistente %}
-<p class="subtitulo">Estos datos arman la ficha de pago que se entrega a cada {{ voc.titular|lower }}. El banco se reconoce por los tres primeros dígitos de la CLABE.</p>
+<p class="subtitulo">Estos datos arman la ficha de pago que se entrega a cada {{ voc.titular_min }}. Con CLABE, el banco se reconoce por sus tres primeros dígitos; si tu cuenta no tiene CLABE, elige «Otra cuenta». Puedes omitir este paso y capturarlo después en Configuración.</p>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
   {% include "comun/_campos.html" %}

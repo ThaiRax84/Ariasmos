@@ -150,7 +150,7 @@ def test_alerta_si_el_ultimo_respaldo_tiene_mas_de_48_horas(con_datos):
     assert any("48 horas" in a for a in servicios.alertas())
 
 
-def test_retencion_30_diarios_y_12_mensuales(tmp_path):
+def test_retencion_30_diarios_y_12_mensuales(db, tmp_path):
     inicio = datetime(2026, 11, 12, 2, 0)
     nombres = []
     for dias in range(0, 500, 1):

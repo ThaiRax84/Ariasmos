@@ -19,3 +19,6 @@ media/
 *.p8
 *.firma
 /herramientas/firma/salida/
+
+escritorio/**/bin/
+escritorio/**/obj/

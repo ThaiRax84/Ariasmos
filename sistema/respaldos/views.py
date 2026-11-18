@@ -8,6 +8,7 @@ from configuracion.models import Negocio
 from cortes.entrega import ErrorEntrega, validar_ruta
 from cuentas.decoradores import requiere_permiso
 from nucleo import sobre
+from proyecto.carpetas import con_carpetas
 
 from . import servicios
 from .models import Respaldo
@@ -15,6 +16,7 @@ from .models import Respaldo
 PERMISO = "administrar_respaldos"
 
 
+@con_carpetas("carpeta_respaldo")
 class FormularioCarpeta(forms.Form):
     carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (ruta absoluta; de preferencia una carpeta sincronizada con la nube o un disco externo)", max_length=400)
 

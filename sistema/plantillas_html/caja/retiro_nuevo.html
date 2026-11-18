@@ -4,7 +4,7 @@
   <div class="encabezado-texto">
     <span class="antetitulo">Mi caja{% if turno %} · {{ turno.caja }}{% endif %}</span>
     <h1>Retiro de caja</h1>
-    <p class="subtitulo">Sale efectivo de tu caja. Queda registrado con su motivo y comprobante, y Supervisión lo revisa después.</p>
+    <p class="subtitulo">Sale efectivo de tu caja. Queda registrado con su motivo y comprobante, y lo revisa después {{ roles.revisar_retiros }}.</p>
   </div>
 </div>
 {% if not turno %}

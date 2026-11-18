@@ -29,13 +29,15 @@ from .formularios import (
     FormularioMotivo,
     FormularioNegocio,
     FormularioParametros,
+    FormularioReglas,
     FormularioRelacion,
     FormularioVocabulario,
     TOPES_CARPETA,
     guardar_caja,
     valores_caja,
+    valores_reglas,
 )
-from .models import PARAMETROS, VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, parametro, vocabulario
+from .models import PARAMETROS, VOCABULARIO_BASE, Negocio, Parametro, Vocabulario, con_vocabulario, parametro, vocabulario
 
 PERMISO = "administrar_configuracion"
 
@@ -66,13 +68,13 @@ def avanzado(request):
     if request.method == "POST":
         if actual.matriculas_emitidas:
             registrar("ajustes_avanzados_rechazados", usuario=request.user, objeto=actual, datos={"motivo": "matriculas_emitidas"}, request=request)
-            messages.error(request, "Ya se emitieron matrículas: estos ajustes no se pueden cambiar.")
+            messages.error(request, f"Ya se emitieron {vocabulario()['matriculas_min']}: estos ajustes no se pueden cambiar.")
             return redirect("configuracion:avanzado")
         if formulario.is_valid():
             with transaction.atomic():
                 bloqueado = Negocio.objects.filter(pk=1, contador_matricula=0).exists()
                 if not bloqueado:
-                    messages.error(request, "Ya se emitieron matrículas: estos ajustes no se pueden cambiar.")
+                    messages.error(request, f"Ya se emitieron {vocabulario()['matriculas_min']}: estos ajustes no se pueden cambiar.")
                     return redirect("configuracion:avanzado")
                 guardado = formulario.save()
                 registrar("configuracion_cambiada", usuario=request.user, objeto=guardado, datos={"cambios": diferencias(antes, model_to_dict(guardado, fields=list(antes)))}, request=request)
@@ -135,7 +137,7 @@ def textos(request):
     if request.method == "POST" and formulario.is_valid():
         with transaction.atomic():
             for clave in VOCABULARIO_BASE:
-                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": formulario.cleaned_data[clave]})
+                Vocabulario.objects.update_or_create(clave=clave, defaults={"texto": formulario.cleaned_data[clave].strip() or antes[clave]})
             registrar("vocabulario_cambiado", usuario=request.user, datos={"cambios": diferencias(antes, vocabulario())}, request=request)
         messages.success(request, "Vocabulario guardado.")
         return redirect("configuracion:indice")
@@ -154,6 +156,20 @@ def parametros(request):
         messages.success(request, "Parámetros guardados.")
         return redirect("configuracion:indice")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Parámetros", "boton": "Guardar", "volver": "configuracion:indice"})
+
+
+@requiere_permiso(PERMISO, reingreso=True)
+def reglas(request):
+    antes = valores_reglas()
+    formulario = FormularioReglas(request.POST if request.method == "POST" else None, valores=antes)
+    if request.method == "POST" and formulario.is_valid():
+        with transaction.atomic():
+            for clave, valor in formulario.valores().items():
+                Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
+            registrar("reglas_cambiadas", usuario=request.user, datos={"cambios": diferencias(antes, valores_reglas())}, request=request)
+        messages.success(request, "Reglas del negocio guardadas.")
+        return redirect("configuracion:indice")
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Reglas del negocio", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 def registrar_caja(request, antes, despues, origen):
@@ -237,7 +253,7 @@ CATALOGOS = {
 }
 
 TITULOS = {
-    "agrupaciones": "Agrupaciones",
+    "agrupaciones": "{agrupaciones}",
     "motivos": "Motivos de baja",
     "relaciones": "Relaciones de contacto",
     "campos": "Campos de contacto",
@@ -252,7 +268,7 @@ def catalogo(request, catalogo):
     if catalogo not in CATALOGOS:
         return redirect("configuracion:indice")
     modelo = CATALOGOS[catalogo][0]
-    return render(request, "configuracion/catalogo.html", {"elementos": modelo.objects.all(), "catalogo": catalogo, "titulo": TITULOS[catalogo]})
+    return render(request, "configuracion/catalogo.html", {"elementos": modelo.objects.all(), "catalogo": catalogo, "titulo": con_vocabulario(TITULOS[catalogo])})
 
 
 def _guardar_catalogo(request, catalogo, pk=None):
@@ -268,7 +284,7 @@ def _guardar_catalogo(request, catalogo, pk=None):
             registrar(f"{evento}_{'cambiado' if antes else 'creado'}", usuario=request.user, objeto=guardado, datos={"nombre": str(guardado), "cambios": diferencias(antes or {}, model_to_dict(guardado))}, request=request)
         messages.success(request, "Guardado.")
         return redirect("configuracion:catalogo", catalogo=catalogo)
-    titulo = TITULOS[catalogo] + (": nuevo" if instancia is None else f": {instancia}")
+    titulo = con_vocabulario(TITULOS[catalogo]) + (": nuevo" if instancia is None else f": {instancia}")
     return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": titulo, "boton": "Guardar"})
 
 
@@ -298,16 +314,38 @@ def _contrastes(actual):
     }
 
 
+def propuesta_del_logo(actual):
+    from . import colores_logo
+
+    from caja import comprobantes
+
+    try:
+        contenido = marca_negocio.leer_logo(actual)
+    except (OSError, comprobantes.ComprobanteInvalido):
+        raise marca_negocio.MarcaInvalida("No se pudo leer el logo.")
+    if not contenido:
+        raise marca_negocio.MarcaInvalida("No hay logo del que tomar los colores.")
+    return colores_logo.proponer(contenido)
+
+
 @requiere_permiso(PERMISO, reingreso=True)
 def marca(request):
     actual = marca_negocio.actual()
     inicial = {"color_principal": actual.color_principal if actual else "", "color_acento": actual.color_acento if actual else ""}
+    propuesta = request.session.pop("propuesta_marca", None)
+    if propuesta:
+        inicial = {"color_principal": propuesta["principal"], "color_acento": propuesta["acento"]}
     colores = FormularioMarca(initial=inicial)
     logo = FormularioLogo()
     if request.method == "POST":
         accion = request.POST.get("accion", "")
         try:
-            if accion == "colores":
+            if accion == "colores_logo":
+                propuesta = propuesta_del_logo(actual)
+                colores = FormularioMarca(initial={"color_principal": propuesta["principal"], "color_acento": propuesta["acento"]})
+                registrar("marca_colores_propuestos", usuario=request.user, datos={"principal": propuesta["principal"], "acento": propuesta["acento"], "origen": propuesta["origen"]}, request=request)
+                messages.info(request, "Estos son los colores tomados del logo. Revísalos en la vista previa y guárdalos si te gustan.")
+            elif accion == "colores":
                 colores = FormularioMarca(request.POST)
                 if colores.is_valid():
                     marca_negocio.guardar_colores(colores.cleaned_data["color_principal"], colores.cleaned_data["color_acento"], request.user, request)
@@ -320,8 +358,9 @@ def marca(request):
             elif accion == "logo":
                 logo = FormularioLogo(request.POST, request.FILES)
                 if logo.is_valid():
-                    marca_negocio.guardar_logo(marca_negocio.leer_subida(logo.cleaned_data["archivo"]), request.user, request)
-                    messages.success(request, "Logo del negocio guardado.")
+                    guardada = marca_negocio.guardar_logo(marca_negocio.leer_subida(logo.cleaned_data["archivo"]), request.user, request)
+                    request.session["propuesta_marca"] = propuesta_del_logo(guardada)
+                    messages.success(request, "Logo del negocio guardado. Te proponemos los colores tomados del logo: revísalos y guárdalos, o elige otros.")
                     return redirect("configuracion:marca")
             elif accion == "quitar_logo":
                 marca_negocio.quitar_logo(request.user, request)
@@ -332,4 +371,11 @@ def marca(request):
         except marca_negocio.MarcaInvalida as error:
             registrar("marca_rechazada", usuario=request.user, datos={"accion": accion[:20], "motivo": str(error)}, request=request)
             (logo if accion == "logo" else colores).add_error(None, str(error))
-    return render(request, "configuracion/marca.html", {"colores": colores, "logo": logo, "actual": actual, "contrastes": _contrastes(actual)})
+    vista = None
+    principal, acento = colores["color_principal"].value() or "", colores["color_acento"].value() or ""
+    if principal and acento:
+        try:
+            vista = {"principal": marca_negocio.validar_color(principal), "acento": marca_negocio.validar_color(acento)}
+        except marca_negocio.MarcaInvalida:
+            vista = None
+    return render(request, "configuracion/marca.html", {"colores": colores, "logo": logo, "actual": actual, "contrastes": _contrastes(actual), "vista": vista, "propuesta": bool(propuesta)})

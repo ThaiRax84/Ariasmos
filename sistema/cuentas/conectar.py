@@ -1,13 +1,16 @@
+import json
 from pathlib import Path
 
 from django.conf import settings
 
 from proyecto import certificado as modulo_certificado
+from proyecto import equipo
 
 INICIO_PEM = "-----BEGIN CERTIFICATE-----"
 FIN_PEM = "-----END CERTIFICATE-----"
 TAMANO_MAXIMO = 64 * 1024
-NOMBRE = "ariasmos-servidor.crt"
+NOMBRE_ARCHIVO = "ariasmos-conexion.json"
+LOCALES = ("localhost", "127.0.0.1", "[::1]", "::1", "testserver")
 
 
 def certificado():
@@ -50,6 +53,8 @@ def datos():
     return {
         "pem": pem,
         "huella": modulo_certificado.huella_legible(objeto),
+        "huella_hex": modulo_certificado.huella(objeto),
+        "puerto": puerto(),
         "vence": modulo_certificado.vence(objeto),
         "dias": modulo_certificado.dias_restantes(objeto),
         "nombres": dns + ips,
@@ -57,31 +62,34 @@ def datos():
     }
 
 
-def instalador(pem):
-    renglones = [
-        "@echo off",
-        "setlocal",
-        "net session >nul 2>&1",
-        "if errorlevel 1 (",
-        "  echo Este archivo debe ejecutarse como administrador: clic derecho, Ejecutar como administrador.",
-        "  pause",
-        "  exit /b 1",
-        ")",
-        'set "CERT=%TEMP%\\ariasmos-servidor-%RANDOM%%RANDOM%.crt"',
-    ]
-    for numero, linea in enumerate(pem.strip().splitlines()):
-        renglones.append(f'{">" if numero == 0 else ">>"}"%CERT%" echo {linea}')
-    renglones += [
-        'certutil -addstore -f Root "%CERT%"',
-        "set RESULTADO=%ERRORLEVEL%",
-        'del "%CERT%" >nul 2>&1',
-        "if not %RESULTADO%==0 (",
-        "  echo No se pudo instalar el certificado. Codigo %RESULTADO%.",
-        "  pause",
-        "  exit /b %RESULTADO%",
-        ")",
-        "echo Listo: esta computadora ya confia en el sistema. Cierra y vuelve a abrir el navegador.",
-        "pause",
-        "exit /b 0",
-    ]
-    return "\r\n".join(renglones) + "\r\n"
+def puerto():
+    return equipo.puerto_valido(getattr(settings, "PUERTO_HTTPS", equipo.PUERTO_PREDETERMINADO)) or equipo.PUERTO_PREDETERMINADO
+
+
+def direcciones():
+    nombres, ips = [], []
+    for host in settings.ALLOWED_HOSTS:
+        texto = str(host).strip().lower()
+        if not texto or texto in LOCALES or texto.startswith("."):
+            continue
+        if _es_ipv4(texto):
+            ips.append(texto)
+        elif equipo.sanear(texto) == texto and texto not in nombres:
+            nombres.append(texto)
+    for ip in equipo.direcciones_locales():
+        if ip not in ips:
+            ips.append(ip)
+    return nombres + ips
+
+
+def _es_ipv4(texto):
+    partes = texto.split(".")
+    return len(partes) == 4 and all(p.isdigit() and len(p) <= 3 and (p == "0" or not p.startswith("0")) and int(p) <= 255 for p in partes)
+
+
+def archivo(direccion):
+    informacion = datos()
+    if informacion is None or direccion not in direcciones():
+        return None
+    contenido = {"producto": "ariasmos", "formato": 1, "direccion": direccion, "puerto": informacion["puerto"], "huella": informacion["huella_hex"]}
+    return (json.dumps(contenido, ensure_ascii=True) + "\n").encode("ascii")

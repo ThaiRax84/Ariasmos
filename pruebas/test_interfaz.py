@@ -308,34 +308,12 @@ def test_menu_no_pierde_entradas(personas):
         assert esperadas <= set(visibles) | set(ocultas), clave
 
 
-def test_splash_una_vez_por_sesion_del_navegador_y_con_la_version(roles, credencial):
-    c = cliente(credencial=credencial)
-    primera = c.get(reverse("entrar"))
-    texto = primera.content.decode()
-    assert "data-splash" in texto and "Iniciando el sistema" in texto
-    assert f"ver. {version_actual()}" in texto and re.search(r"ver\. \d+\.\d+\.\d+", texto)
-    galleta = primera.cookies["splash_visto"]
-    assert galleta.value == "1" and not galleta["max-age"] and not galleta["expires"]
-    assert galleta["httponly"] and galleta["samesite"] == "Strict"
-    assert "data-splash" not in c.get(reverse("entrar")).content.decode()
-    nuevo = cliente(credencial=credencial)
-    assert "data-splash" in nuevo.get(reverse("entrar")).content.decode()
-
-
-def test_splash_sigue_la_version_vigente(roles, credencial, settings, tmp_path):
-    (tmp_path / "VERSION").write_text("9.8.7\n", encoding="utf-8")
-    settings.RAIZ = tmp_path
+def test_el_splash_ya_no_vive_en_la_pagina(roles, credencial):
     texto = cliente(credencial=credencial).get(reverse("entrar")).content.decode()
-    assert "ver. 9.8.7" in texto
-    plantilla = (PLANTILLAS / "comun" / "_splash.html").read_text(encoding="utf-8")
-    assert "ver. {{ version }}" in plantilla and not re.search(r"ver\. \d", plantilla)
-
-
-def test_splash_se_puede_saltar_y_respeta_reducir_movimiento():
-    hoja = (ESTATICOS / "css" / "sistema.css").read_text(encoding="utf-8")
-    assert re.search(r"prefers-reduced-motion: reduce\)[^@]*\.splash \{ display: none; \}", hoja)
-    codigo = (ESTATICOS / "js" / "sistema.js").read_text(encoding="utf-8")
-    assert "prepararSplash" in codigo and '"keydown"' in codigo and '"click"' in codigo
+    assert "data-splash" not in texto and "Iniciando el sistema" not in texto and "splash_visto" not in str(cliente(credencial=credencial).get(reverse("entrar")).cookies)
+    assert not (PLANTILLAS / "comun" / "_splash.html").exists()
+    assert "splash" not in (ESTATICOS / "css" / "sistema.css").read_text(encoding="utf-8")
+    assert "splash" not in (ESTATICOS / "js" / "sistema.js").read_text(encoding="utf-8").lower()
 
 
 @pytest.fixture

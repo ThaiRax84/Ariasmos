@@ -20,6 +20,6 @@
 {% endif %}
 <table class="tabla">
 <thead><tr><th>Tipo</th><th>Fecha</th><th>Caja</th><th>Persona</th><th>Estado</th><th>Marcas</th></tr></thead>
-<tbody>{% for c in cortes %}<tr><td><a href="{% url 'cortes:detalle' c.pk %}">{{ c.get_tipo_display }}</a></td><td>{% if c.tipo == "mayor" %}{{ c.fecha|date:"m/Y" }}{% else %}{{ c.fecha|date:"d/m/Y" }}{% endif %}{% if c.numero > 1 %} ({{ c.numero }}){% endif %}</td><td>{{ c.caja|default:"" }}</td><td>{{ c.usuario|default:"" }}</td><td>{{ c.get_estado_display }}</td><td>{% if c.tardio %}tardío {% endif %}{% if c.sin_revisar %}sin revisar{% endif %}</td></tr>{% empty %}<tr><td colspan="6">Todavía no hay cortes.</td></tr>{% endfor %}</tbody>
+<tbody>{% for c in cortes %}<tr><td><a href="{% url 'cortes:detalle' c.pk %}">{{ c.nombre_tipo }}</a></td><td>{% if c.tipo == "mayor" %}{{ c.fecha|date:"m/Y" }}{% else %}{{ c.fecha|date:"d/m/Y" }}{% endif %}{% if c.numero > 1 %} ({{ c.numero }}){% endif %}</td><td>{{ c.caja|default:"" }}</td><td>{{ c.usuario|default:"" }}</td><td>{{ c.get_estado_display }}</td><td>{% if c.tardio %}tardío {% endif %}{% if c.sin_revisar %}sin revisar{% endif %}</td></tr>{% empty %}<tr><td colspan="6">Todavía no hay cortes.</td></tr>{% endfor %}</tbody>
 </table>
 {% endblock %}

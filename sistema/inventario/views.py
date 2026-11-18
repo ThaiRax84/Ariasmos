@@ -21,7 +21,8 @@ from cobros import libro
 from cobros.formularios import FormularioVerificarRecibo
 from cobros.models import Recibo
 from cobros.vistas_cobro import _verificaciones_bloqueadas, proponer_cambio
-from configuracion.models import parametro
+from configuracion.models import parametro, vocabulario
+from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
 from titulares.models import Titular
@@ -149,7 +150,7 @@ def _catalogo(formulario):
 def _avisar_sin_existencia(request, venta):
     faltan = [r.articulo.nombre for r in venta.renglones.filter(sin_existencia=True).select_related("articulo")]
     if faltan:
-        messages.warning(request, f"La existencia del sistema no alcanzaba para: {', '.join(faltan)}. La venta quedó registrada y Supervisión la revisará.")
+        messages.warning(request, f"La existencia del sistema no alcanzaba para: {', '.join(faltan)}. La venta quedó registrada y la revisará {quienes('revisar_inventario')}.")
 
 
 def _pantalla_publico(request, formulario, turno, **extra):
@@ -169,7 +170,7 @@ def vender_publico(request):
     if request.method != "POST":
         return _pantalla_publico(request, formulario, turno)
     if turno is None or not recibe_movimientos(turno):
-        messages.error(request, "Abre tu turno de caja (fuera de arqueo) para vender sin matrícula.")
+        messages.error(request, f"Abre tu turno de caja (fuera de arqueo) para vender sin {vocabulario()['matricula_min']}.")
         return redirect("caja:inicio")
     if not formulario.is_valid():
         return _pantalla_publico(request, formulario, turno)
@@ -273,7 +274,7 @@ def _venta_por_recibo(request, formulario):
     bloqueo = _verificaciones_bloqueadas(request)
     if bloqueo is not None:
         registrar("verificacion_bloqueada", request=request, datos={"por": bloqueo, "desde": "devolucion"})
-        formulario.add_error(None, "Hubo demasiadas verificaciones fallidas en la última hora. Busca por número de venta o pide ayuda a Supervisión.")
+        formulario.add_error(None, f"Hubo demasiadas verificaciones fallidas en la última hora. Busca por número de venta o pide ayuda a {quienes('revisar_inventario')}.")
         return None
     datos = verificacion.cleaned_data
     recibo = Recibo.objects.filter(serie=datos["serie"], folio=datos["numero"]).select_related("pago").first()

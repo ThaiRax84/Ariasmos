@@ -5,7 +5,7 @@ from configuracion.models import parametro
 from proyecto.captura import CampoContrasena, CampoDigitos, CampoGuiadoTexto, CampoUsuario
 
 from .models import Rol, Usuario
-from .permisos import DELEGABLES, PERMISOS
+from .permisos import DELEGABLES, PERMISOS, etiqueta, opciones
 
 
 class FormularioEntrar(forms.Form):
@@ -91,6 +91,7 @@ class FormularioRol(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["permisos"].choices = opciones()
         if self.instance.pk:
             self.initial["permisos"] = sorted(self.instance.permisos())
 
@@ -118,7 +119,7 @@ class FormularioDelegacion(forms.Form):
         super().__init__(*args, **kwargs)
         self.otorgante = otorgante
         self.fields["receptor"].queryset = Usuario.objects.filter(activo=True).exclude(pk=otorgante.pk)
-        self.fields["permiso"].choices = [(p, PERMISOS[p]) for p in DELEGABLES if otorgante.tiene_permiso_de_rol(p)]
+        self.fields["permiso"].choices = [(p, etiqueta(p)) for p in DELEGABLES if otorgante.tiene_permiso_de_rol(p)]
         self.fields["dias"].max_value = parametro("dias_maximos_delegacion")
         self.fields["dias"].help_text = f"Máximo {parametro('dias_maximos_delegacion')} días."
 

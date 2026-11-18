@@ -14,7 +14,7 @@ from caja.models import MovimientoPiezas, Turno
 from caja.servicios import neto_de, recibe_movimientos
 from cobros import libro
 from cobros.models import Aplicacion, CancelacionCargo, Cargo, Pago
-from configuracion.models import hoy_negocio, parametro
+from configuracion.models import hoy_negocio, parametro, vocabulario
 from configuracion.moneda import formatear
 from nucleo.exportar import neutralizar
 from titulares.models import MATRICULA_INTERNA, Titular
@@ -83,7 +83,7 @@ def cuenta_publico(usuario):
     try:
         with transaction.atomic():
             cuenta = Titular.todos.create(
-                matricula=MATRICULA_INTERNA, nombre="Público", apellidos="en general", estado=Titular.ACTIVO, interno=True, creado_por=usuario, activo_desde=hoy_negocio(),
+                matricula=MATRICULA_INTERNA, nombre=vocabulario()["publico"][:100], apellidos="", estado=Titular.ACTIVO, interno=True, creado_por=usuario, activo_desde=hoy_negocio(),
             )
     except IntegrityError:
         return Titular.todos.get(interno=True)
@@ -167,7 +167,7 @@ def vender_publico(renglones, usuario, turno, ficha, piezas=None, request=None):
     lista = validar_renglones(renglones)
     total = sum(articulo.precio * cantidad for articulo, cantidad in lista)
     if total > parametro("tope_pago_individual"):
-        raise ErrorInventario(f"La venta sin matrícula pasa del tope de un pago individual ({formatear(parametro('tope_pago_individual'))}); divídela o véndela a un registro.")
+        raise ErrorInventario(f"La venta sin {vocabulario()['matricula_min']} pasa del tope de un pago individual ({formatear(parametro('tope_pago_individual'))}); divídela o véndela a un registro.")
     with transaction.atomic():
         if ficha:
             existente = Pago.objects.filter(ficha=ficha).select_related("venta").first()
@@ -294,7 +294,7 @@ def devolver(venta, cantidades, medio, usuario, motivo, request=None, turno=None
             raise ErrorInventario("La venta está fuera del plazo de devolución.")
         limpio = validar_devolucion(venta, cantidades, incluir_pendientes=False)
         if venta.titular.interno and medio != Devolucion.EFECTIVO:
-            raise ErrorInventario("Una venta sin matrícula solo se devuelve en efectivo.")
+            raise ErrorInventario(f"Una venta sin {vocabulario()['matricula_min']} solo se devuelve en efectivo.")
         valor = sum(renglon.precio_unitario * cantidad for renglon, cantidad, _ in limpio.values())
         cancelado, partes = 0, {}
         for renglon, cantidad, _ in limpio.values():
