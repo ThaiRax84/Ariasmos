@@ -212,3 +212,14 @@ class CodigoActivacion(models.Model):
 
     def vigente(self, ahora=None):
         return self.usado_en is None and not self.invalidado and self.caduca > (ahora or timezone.now())
+
+
+class PreferenciaOrden(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="ordenes")
+    lista = models.CharField(max_length=30)
+    clave = models.CharField(max_length=30)
+    descendente = models.BooleanField(default=False)
+    cambiado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["usuario", "lista"], name="orden_uno_por_lista")]

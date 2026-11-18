@@ -1,3 +1,5 @@
+import re
+
 from django import template
 
 from cuentas.permisos import PERMISOS, etiqueta
@@ -47,8 +49,18 @@ def cifra(centavos):
 def denominacion_corta(etiqueta):
     from configuracion.moneda import actual
 
-    texto = str(etiqueta)
-    for prefijo in ("Recibí: piezas de", "Entrego de cambio: piezas de", "Entrego: piezas de", "Piezas de", "piezas de"):
-        texto = texto.replace(prefijo, "")
+    texto = re.sub(r"^.*?(piezas de|piezas que regresan:)\s*", "", str(etiqueta), count=1, flags=re.IGNORECASE)
     texto = texto.replace(actual()["codigo"], "").strip()
     return texto[:-3] if texto.endswith(".00") else texto
+
+
+@register.filter
+def dinero_texto(valor):
+    from nucleo.dinero import ErrorImporte, a_centavos
+
+    if isinstance(valor, int):
+        return formatear(valor)
+    try:
+        return formatear(a_centavos(str(valor or "0")))
+    except (ErrorImporte, ValueError):
+        return ""

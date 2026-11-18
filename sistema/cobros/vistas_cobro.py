@@ -32,6 +32,8 @@ from titulares.models import Titular
 
 from . import libro, qr
 from .estado import estado_cuenta
+from proyecto.orden import elegir
+
 from .formularios import (
     FormularioBeca,
     FormularioCancelacion,
@@ -54,14 +56,15 @@ def _miembros(titular):
 @requiere_permiso("registrar_pago_efectivo")
 def buscar(request):
     consulta = request.GET.get("q", "").strip()
+    orden = elegir(request, "cobrar")
     resultados = []
     if consulta:
         digitos = normalizar(consulta)
         filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
         if digitos:
             filtro |= Q(matricula__startswith=digitos)
-        resultados = Titular.objects.filter(filtro).exclude(estado=Titular.RECHAZADO).select_related("familia")[:30]
-    return render(request, "cobros/buscar.html", {"q": consulta, "resultados": resultados, "turno": turno_abierto(request.user)})
+        resultados = Titular.objects.filter(filtro).exclude(estado=Titular.RECHAZADO).select_related("familia", "agrupacion").order_by(*orden.campos)[:30]
+    return render(request, "cobros/buscar.html", {"q": consulta, "resultados": resultados, "orden": orden, "turno": turno_abierto(request.user)})
 
 
 def _venta(request, titular):

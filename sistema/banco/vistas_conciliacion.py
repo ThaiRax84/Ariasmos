@@ -17,6 +17,7 @@ from cuentas.permisos import quienes
 from configuracion.models import Negocio, vocabulario
 from nucleo.matricula import normalizar
 from proyecto.captura import CampoGuiadoTexto
+from proyecto.orden import elegir
 from titulares.models import Titular
 
 from . import adaptadores, conciliacion, lectura
@@ -227,11 +228,24 @@ def movimiento(request, pk):
     objeto = get_object_or_404(MovimientoBancario.objects.select_related("cuenta__banco", "propuesta", "propuesta_por", "pago__titular", "pago__recibo", "traslado__origen", "resuelto_por"), pk=pk)
     concilia = request.user.tiene_permiso(CONCILIA)
     sugeridos = [t for t in (Titular.objects.filter(matricula=m).first() for m in ([objeto.sugerencia] if objeto.sugerencia else []) + list(objeto.alternativas or [])) if t]
+    consulta = request.GET.get("q", "").strip()[:60]
+    orden = elegir(request, "conciliar")
+    encontrados = []
+    if consulta and objeto.estado == MovimientoBancario.POR_IDENTIFICAR:
+        digitos = normalizar(consulta)
+        filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
+        if digitos:
+            filtro |= Q(matricula__startswith=digitos)
+        encontrados = Titular.objects.filter(filtro).exclude(estado=Titular.RECHAZADO).select_related("familia", "agrupacion").order_by(*orden.campos)[:30]
+    elegida = normalizar(request.GET.get("matricula", "")[:20])
     contexto = {
         "movimiento": objeto,
         "concilia": concilia,
         "sugeridos": sugeridos,
-        "formulario": FormularioMatricula(initial={"matricula": (objeto.propuesta.matricula if objeto.propuesta else objeto.sugerencia)}),
+        "q": consulta,
+        "orden": orden,
+        "encontrados": encontrados,
+        "formulario": FormularioMatricula(initial={"matricula": elegida or (objeto.propuesta.matricula if objeto.propuesta else objeto.sugerencia)}),
         "motivo": FormularioMotivo(),
         "depositos": list(conciliacion.candidatos_deposito(objeto.cuenta, objeto.importe, objeto.fecha)) if objeto.clase == MovimientoBancario.EFECTIVO and objeto.estado == MovimientoBancario.POR_IDENTIFICAR else [],
     }

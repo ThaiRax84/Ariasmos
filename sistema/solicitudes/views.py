@@ -86,19 +86,24 @@ def puede_ver(usuario, solicitud):
     return politica is not None and usuario.tiene_permiso(politica.permiso_aprobar)
 
 
-def pendientes_para(usuario):
+def pendientes_para(usuario, orden=("creada",)):
     politicas = {p.accion: p for p in PoliticaAccion.objects.all()}
     acciones = [a for a, p in politicas.items() if usuario.tiene_permiso(p.permiso_aprobar)]
     consulta = Solicitud.objects.filter(estado=Solicitud.PENDIENTE, accion__in=acciones).exclude(solicitante=usuario)
-    filas = list(consulta.select_related("titular", "solicitante").order_by("creada"))
+    filas = list(consulta.select_related("titular", "solicitante").order_by(*orden))
     return [(s, s.resaltada(politicas[s.accion])) for s in filas]
 
 
 @requiere_permiso(*VEN_BANDEJA)
 def bandeja(request):
     motor.caducar_vencidas()
-    propias = Solicitud.objects.filter(solicitante=request.user).select_related("titular", "resuelta_por")[:50]
-    return render(request, "solicitudes/bandeja.html", {"pendientes": pendientes_para(request.user), "propias": propias})
+    from proyecto.orden import elegir
+
+    orden_pendientes = elegir(request, "solicitudes_pendientes", prefijo="p_")
+    orden_propias = elegir(request, "solicitudes_propias", prefijo="m_")
+    propias = Solicitud.objects.filter(solicitante=request.user).select_related("titular", "resuelta_por").order_by(*orden_propias.campos)[:50]
+    contexto = {"pendientes": pendientes_para(request.user, orden_pendientes.campos), "propias": propias, "orden_pendientes": orden_pendientes, "orden_propias": orden_propias}
+    return render(request, "solicitudes/bandeja.html", contexto)
 
 
 @requiere_permiso(*VEN_BANDEJA)

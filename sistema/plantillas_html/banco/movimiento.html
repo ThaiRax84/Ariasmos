@@ -26,6 +26,18 @@
   {% if sugeridos %}<p>Sugerencias: {% for t in sugeridos %}<strong>{{ t.matricula_formateada }}</strong> {{ t.nombre_completo }}{% if not forloop.last %} · {% endif %}{% endfor %}{% if movimiento.coincide_importe %} (el importe coincide con lo que debe){% endif %}</p>{% endif %}
 </section>
 {% if movimiento.estado == "por_identificar" %}
+<section class="panel">
+  <h2>Buscar a quién pertenece</h2>
+  <form method="get" class="buscador" role="search">
+    <label class="solo-lectores" for="buscar-conciliar">Buscar</label>
+    <input id="buscar-conciliar" type="search" name="q" value="{{ q }}" maxlength="60" placeholder="Buscar {{ voc.titular_min }} por {{ voc.matricula_min }} o nombre" aria-label="Buscar">
+    <button class="boton chico" type="submit">Buscar</button>
+  </form>
+  {% if q %}
+  {% include "comun/_orden_formulario.html" %}
+  <ul class="lista-estado">{% for t in encontrados %}<li><span class="renglon-texto"><span class="renglon-titulo">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</span>{% if t.agrupacion or t.familia %}<span class="renglon-detalle">{% if t.agrupacion %}{{ t.agrupacion }}{% endif %}{% if t.agrupacion and t.familia %} · {% endif %}{% if t.familia %}{{ voc.familia }} {{ t.familia }}{% endif %}</span>{% endif %}</span><a class="boton chico secundario" href="?matricula={{ t.matricula }}">Usar {{ voc.matricula_min }}</a></li>{% empty %}<li>Sin resultados.</li>{% endfor %}</ul>
+  {% endif %}
+</section>
 <div class="rejilla">
   <form method="post" action="{% url 'conciliacion:proponer' movimiento.pk %}" class="formulario">{% csrf_token %}{% include "comun/_campos.html" %}<button class="boton secundario" type="submit">Proponer a quién pertenece</button></form>
   {% if concilia %}

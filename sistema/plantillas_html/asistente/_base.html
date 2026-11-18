@@ -10,10 +10,14 @@
 {% block contenido %}
 <div class="asistente">
   <ol class="pasos" aria-label="Pasos de la instalación">
-    {% for nombre in nombres_pasos %}<li class="{% if forloop.counter < paso %}hecho{% elif forloop.counter == paso %}actual{% endif %}"{% if forloop.counter == paso %} aria-current="step"{% endif %}><span class="numero">{% if forloop.counter < paso %}✓{% else %}{{ forloop.counter }}{% endif %}</span>{{ nombre }}</li>{% endfor %}
+    {% for nombre, enlace in pasos_enlaces %}<li class="{% if forloop.counter < paso %}hecho{% elif forloop.counter == paso %}actual{% endif %}"{% if forloop.counter == paso %} aria-current="step"{% endif %}><span class="numero">{% if forloop.counter < paso %}✓{% else %}{{ forloop.counter }}{% endif %}</span>{% if enlace %}<a href="{% url enlace %}">{{ nombre }}</a>{% else %}{{ nombre }}{% endif %}</li>{% endfor %}
   </ol>
   <div class="asistente-cuerpo">
-    <h1>{{ titulo }}</h1>
+    <div class="encabezado-texto">
+      <span class="antetitulo">Paso {{ paso }} de {{ total }}</span>
+      <h1>{{ titulo }}</h1>
+      {% if intro %}<p class="subtitulo">{{ intro }}</p>{% endif %}
+    </div>
     {% block asistente %}{% endblock %}
   </div>
 </div>

@@ -287,8 +287,11 @@ def dispositivo_pendiente(request):
 
 @requiere_permiso("administrar_usuarios")
 def usuarios(request):
-    lista = Usuario.objects.select_related("rol").all()
-    return render(request, "cuentas/usuarios.html", {"usuarios": lista, "ahora": timezone.now()})
+    from proyecto.orden import elegir
+
+    orden = elegir(request, "usuarios")
+    lista = Usuario.objects.select_related("rol").order_by(*orden.campos)
+    return render(request, "cuentas/usuarios.html", {"usuarios": lista, "orden": orden, "ahora": timezone.now()})
 
 
 CODIGO_POR_MOSTRAR = "codigo_por_mostrar"

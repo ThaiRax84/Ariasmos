@@ -105,5 +105,5 @@ def renglones(esperadas, contadas):
     for valor in valores:
         esperada = int(esperadas.get(str(valor), 0))
         contada = int(contadas.get(str(valor), 0))
-        filas.append({"denominacion": valor, "esperadas": esperada, "contadas": contada, "diferencia": contada - esperada})
+        filas.append({"denominacion": valor, "esperadas": esperada, "contadas": contada, "diferencia": contada - esperada, "importe": (contada - esperada) * valor})
     return filas

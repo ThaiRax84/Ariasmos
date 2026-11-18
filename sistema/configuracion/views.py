@@ -190,7 +190,7 @@ def caja(request):
             registrar_caja(request, antes, valores_caja(), "configuracion")
         messages.success(request, "Caja: cortes y retiros guardados.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Caja: cortes y retiros", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "configuracion/caja.html", {"formulario": formulario, "denominaciones": list(Denominacion.objects.filter(activa=True))})
 
 
 @requiere_permiso(PERMISO, reingreso=True)

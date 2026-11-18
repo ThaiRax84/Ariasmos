@@ -27,18 +27,39 @@ class ConPiezas:
 
 
 class FormularioAbrir(ConPiezas, forms.Form):
+    CERO = "cero"
+    EFECTIVO = "efectivo"
     prefijo = "f_"
     etiqueta = "Fondo: piezas de"
-    caja = forms.ModelChoiceField(label="Caja", queryset=Caja.objects.none())
-    fondo_inicial = CampoImporte(label="Fondo inicial (cambio en la caja)", required=False)
+    caja = forms.ModelChoiceField(label="Caja", queryset=Caja.objects.none(), widget=forms.RadioSelect, empty_label=None)
+    apertura = forms.ChoiceField(label="¿Hay efectivo en la caja para dar cambio?", choices=[(EFECTIVO, "Sí, cuento lo que hay"), (CERO, "No, abro en cero")], initial=EFECTIVO, required=False, widget=forms.RadioSelect)
+    fondo_inicial = CampoImporte(label="Fondo inicial (efectivo para dar cambio)", required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         ocupadas = Turno.objects.filter(estado=Turno.ABIERTO).values("caja")
         self.fields["caja"].queryset = Caja.objects.filter(activa=True).exclude(pk__in=ocupadas)
+        libres = list(self.fields["caja"].queryset[:2])
+        if len(libres) == 1:
+            self.fields["caja"].initial = libres[0].pk
         self.agregar_piezas()
         if self.nombres_piezas:
             del self.fields["fondo_inicial"]
+
+    def en_cero(self):
+        return self.cleaned_data.get("apertura") == self.CERO
+
+    def fondo(self):
+        if self.en_cero():
+            return 0
+        return self.cleaned_data.get("fondo_inicial") or 0
+
+    def piezas(self):
+        if not self.nombres_piezas:
+            return None
+        if self.en_cero():
+            return {}
+        return super().piezas()
 
 
 class FormularioArqueo(forms.Form):
@@ -89,14 +110,16 @@ class FormularioDeposito(ConPiezas, forms.Form):
 
 
 class FormularioRetiro(ConPiezas, forms.Form):
-    importe = CampoImportePositivo(label="Importe que sale de la caja")
-    motivo = forms.ModelChoiceField(label="Motivo", queryset=MotivoRetiro.objects.none())
-    nota = forms.CharField(label="Nota (en qué se gastó)", max_length=300, required=False)
-    comprobante = forms.FileField(label="Comprobante: foto JPEG o PNG, o PDF, hasta 5 MB (puedes adjuntarlo después)", required=False)
+    etiqueta = "Salen: piezas de"
+    importe = CampoImportePositivo(label="Importe del retiro")
+    motivo = forms.ModelChoiceField(label="Motivo", queryset=MotivoRetiro.objects.none(), widget=forms.RadioSelect, empty_label=None)
+    nota = forms.CharField(label="Nota (en qué se gastó)", max_length=300, required=False, help_text="Ejemplo: hojas y marcadores para la oficina.")
+    comprobante = forms.FileField(label="Comprobante (foto o PDF del ticket o recibo)", required=False, help_text="JPEG, PNG o PDF de hasta 5 MB. Si no lo tienes ahora, adjúntalo después, antes de cerrar el turno.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["motivo"].queryset = MotivoRetiro.objects.filter(activo=True)
+        self.fields["motivo"].en_fila = True
         self.agregar_piezas()
 
     def clean_comprobante(self):

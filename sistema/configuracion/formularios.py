@@ -12,10 +12,11 @@ from cuentas.formularios import ContrasenaNueva
 from nucleo.dinero import ErrorImporte, a_centavos
 from proyecto.captura import CampoContrasena, CampoGuiadoTexto, CampoUsuario
 from proyecto.carpetas import con_carpetas
+from proyecto.plegables import ConPlegables, plegar, segun
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
-from . import moneda
+from . import moneda, zonas
 from .models import ESPECIALES, PARAMETROS, VOCABULARIO_BASE, Negocio, con_vocabulario, descripcion_parametro, opciones_vocabulario, vocabulario
 
 
@@ -35,12 +36,24 @@ ETIQUETAS_VOCABULARIO = {
 OPCIONALES_VOCABULARIO = ("padron", "descuento", "publico")
 
 
-def validar_zona(valor):
+def validar_zona(valor, actual=""):
+    if valor not in zonas.validas(actual):
+        raise forms.ValidationError("Elige una zona horaria de la lista.")
     try:
         ZoneInfo(valor)
     except (ZoneInfoNotFoundError, ValueError):
-        raise forms.ValidationError("Zona horaria desconocida.")
+        raise forms.ValidationError("Elige una zona horaria de la lista.")
     return valor
+
+
+class CampoZona(forms.ChoiceField):
+    def __init__(self, *args, actual="", **kwargs):
+        kwargs.setdefault("label", "Zona horaria")
+        kwargs.setdefault("help_text", "Escribe arriba el nombre de una ciudad para encontrarla. Entre paréntesis va la diferencia con la hora universal de hoy.")
+        kwargs.setdefault("widget", forms.Select(attrs={"data-buscar-zona": ""}))
+        super().__init__(*args, choices=zonas.opciones(actual), **kwargs)
+        self.error_messages["invalid_choice"] = "Elige una zona horaria de la lista."
+        self.error_messages["required"] = "Elige la zona horaria del negocio."
 
 
 class FormularioNegocio(forms.ModelForm):
@@ -56,8 +69,16 @@ class FormularioNegocio(forms.ModelForm):
         }
         widgets = {"nota_ficha": forms.Textarea(attrs={"rows": 3})}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.zona_actual = self.instance.zona_horaria if self.instance.pk else ""
+        self.fields["zona_horaria"] = CampoZona(actual=self.zona_actual)
+        self.fields["nombre"].help_text = "Así aparece en los recibos y en las fichas de pago."
+        self.fields["nota_ficha"].help_text = "Se imprime en la ficha mientras no registres la cuenta del banco."
+        self.order_fields(["nombre", "zona_horaria", "nota_ficha"])
+
     def clean_zona_horaria(self):
-        return validar_zona(self.cleaned_data["zona_horaria"])
+        return validar_zona(self.cleaned_data["zona_horaria"], self.zona_actual)
 
 
 class FormularioMoneda(forms.Form):
@@ -301,19 +322,24 @@ class FormularioCampoContacto(forms.ModelForm):
 IMPORTAR = "importar"
 
 
-class FormularioAsistenteInicio(forms.Form):
-    token = CampoContrasena(label="Token de instalación (lo mostró el comando inicializar)", max_length=200, autocompletar="off")
-    nombre = forms.CharField(label="Nombre del negocio", max_length=150)
-    zona_horaria = forms.CharField(label="Zona horaria", max_length=64, initial="America/Mexico_City")
-    moneda = forms.ChoiceField(label="Moneda", initial=moneda.POR_DEFECTO, required=False)
-    plantilla = forms.ChoiceField(label="Plantilla inicial", widget=forms.RadioSelect)
-    archivo = forms.FileField(label="Archivo de plantilla (solo si eliges importar; JSON de hasta 256 KB)", required=False)
+class FormularioAsistenteInicio(ConPlegables, forms.Form):
+    token = CampoContrasena(label="Token de instalación", max_length=200, autocompletar="off", help_text="Lo mostró el instalador (el comando inicializar) al terminar.")
+    nombre = forms.CharField(label="Nombre del negocio", max_length=150, help_text="Así aparece en los recibos y en las fichas de pago.")
+    zona_horaria = CampoZona()
+    moneda = forms.ChoiceField(label="Moneda", initial=moneda.POR_DEFECTO, required=False, help_text="La moneda no se cambia cuando ya hay cobros.")
+    plantilla = forms.ChoiceField(label="Plantilla inicial", widget=forms.RadioSelect, help_text="Trae el vocabulario, los conceptos y los roles de un tipo de negocio. Todo se puede cambiar.")
+    archivo = forms.FileField(label="Archivo de plantilla (JSON de hasta 256 KB)", required=False)
     inventario = forms.BooleanField(label="Llevar inventario de los artículos que vende el negocio; se puede cambiar después en Configuración", required=False)
 
     def __init__(self, *args, plantillas=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["plantilla"].choices = list((plantillas or {}).items()) + [(IMPORTAR, "Importar un archivo de plantilla")]
+        self.zona_actual = (self.initial or {}).get("zona_horaria") or ""
+        self.fields["zona_horaria"] = CampoZona(actual=self.zona_actual, widget=forms.Select(attrs={"data-buscar-zona": "", "data-proponer-local": ""}))
+        self.fields["plantilla"].choices = list((plantillas or {}).items()) + [(IMPORTAR, "Importar un archivo de plantilla (una propia en JSON)")]
         self.fields["moneda"].choices = moneda.opciones()
+        if self.initial.get("plantilla") not in dict(self.fields["plantilla"].choices):
+            self.initial.pop("plantilla", None)
+        segun(self, "plantilla", {"archivo": (IMPORTAR, "")})
 
     def clean_moneda(self):
         try:
@@ -322,7 +348,7 @@ class FormularioAsistenteInicio(forms.Form):
             raise forms.ValidationError("Elige una moneda del catálogo.")
 
     def clean_zona_horaria(self):
-        return validar_zona(self.cleaned_data["zona_horaria"])
+        return validar_zona(self.cleaned_data["zona_horaria"], self.zona_actual)
 
     def clean(self):
         datos = super().clean()
@@ -393,10 +419,20 @@ class FormularioAsistenteConceptos(forms.Form):
                 self.fields[f"dia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: {ayuda}", min_value=1, max_value=maximo, required=False)
             if concepto.nombre in (con_recargo or {}):
                 sugerido = (con_recargo or {})[concepto.nombre] or {}
-                self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: tipo de recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"), required=False)
-                self.fields[f"recargo_importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe fijo del recargo (si el tipo es fijo)", required=False)
-                self.fields[f"recargo_porcentaje_{concepto.pk}"] = CampoPorcentaje(label=f"{concepto.nombre}: porcentaje del recargo (si el tipo es porcentaje)", required=False)
-                self.fields[f"recargo_gracia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: días de gracia", min_value=0, max_value=60, required=False, initial=sugerido.get("dias_gracia", 0))
+                self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: cómo se calcula el recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"), required=False, widget=forms.RadioSelect)
+                self.fields[f"recargo_tipo_{concepto.pk}"].en_fila = True
+                self.fields[f"recargo_importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe fijo del recargo (si el tipo es importe fijo)", required=False, help_text="Ejemplo: 150.00. Vacío, sin recargo.")
+                self.fields[f"recargo_porcentaje_{concepto.pk}"] = CampoPorcentaje(label=f"{concepto.nombre}: porcentaje del recargo (si el tipo es porcentaje)", required=False, help_text="Sobre el saldo del cargo. Ejemplo: 10. Vacío, sin recargo.")
+                self.fields[f"recargo_gracia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: días de gracia", min_value=0, max_value=60, required=False, initial=sugerido.get("dias_gracia", 0), help_text="Días después del vencimiento en que todavía no se cobra.")
+                segun(self, f"recargo_tipo_{concepto.pk}", {f"recargo_importe_{concepto.pk}": (ReglaRecargo.FIJO, "Importe del recargo"), f"recargo_porcentaje_{concepto.pk}": (ReglaRecargo.PORCENTAJE, "Porcentaje del recargo")})
+
+    def grupos(self):
+        resultado = []
+        for concepto in self.conceptos:
+            nombres = [n for n in (f"importe_{concepto.pk}", f"dia_{concepto.pk}") if n in self.fields]
+            recargo = [n for n in (f"recargo_tipo_{concepto.pk}", f"recargo_importe_{concepto.pk}", f"recargo_porcentaje_{concepto.pk}", f"recargo_gracia_{concepto.pk}") if n in self.fields]
+            resultado.append({"concepto": concepto, "campos": [self[n] for n in nombres], "recargo": [self[n] for n in recargo]})
+        return resultado
 
     def clean(self):
         datos = super().clean()
@@ -430,14 +466,14 @@ class CampoHora(CampoGuiadoTexto):
         return texto
 
 
-class FormularioCajaCortes(forms.Form):
-    control_denominaciones = forms.BooleanField(label="Capturar piezas por denominación en apertura, cobros, retiros y devoluciones", required=False)
-    periodo_retiros = forms.ChoiceField(label="Los topes de retiros se cuentan por", choices=[("dia", "Día"), ("semana", "Semana (lunes a domingo)")])
-    tope_retiro_individual = CampoImporte(label="Importe máximo de un retiro sin autorización")
-    tope_retiros_periodo = CampoImporte(label="Importe máximo de retiros por caja en el periodo sin autorización")
-    maximo_retiros_periodo = forms.IntegerField(label="Número máximo de retiros por caja en el periodo sin autorización", min_value=0, max_value=10000)
-    maximo_efectivo_caja = CampoImporte(label="Efectivo máximo en una caja antes de avisar que se entregue (0 sin aviso)")
-    dias_retiro_sin_revisar = forms.IntegerField(label="Días que un retiro puede quedar sin revisar antes de avisar", min_value=1, max_value=365)
+class FormularioCajaCortes(ConPlegables, forms.Form):
+    control_denominaciones = forms.BooleanField(label="Contar billetes y monedas en cada apertura, cobro, retiro y devolución", required=False, help_text="Así el programa sabe cuántas piezas de cada denominación debe haber en la caja y propone el cambio. Apagado, solo se escriben importes.")
+    periodo_retiros = forms.ChoiceField(label="Los topes de retiros se cuentan por", choices=[("dia", "Día"), ("semana", "Semana (lunes a domingo)")], widget=forms.RadioSelect)
+    tope_retiro_individual = CampoImporte(label="Importe máximo de un retiro", help_text="Arriba de esto el retiro se vuelve solicitud y otra persona lo autoriza. Ejemplo: 500.00")
+    tope_retiros_periodo = CampoImporte(label="Importe máximo de retiros en el periodo, por caja", help_text="Suma de todos los retiros del día o de la semana. Ejemplo: 1500.00")
+    maximo_retiros_periodo = forms.IntegerField(label="Número máximo de retiros en el periodo, por caja", min_value=0, max_value=10000, help_text="Ejemplo: 3")
+    maximo_efectivo_caja = CampoImporte(label="Efectivo máximo en una caja antes de avisar que se entregue", help_text="Solo es un aviso; 0 para no avisar.")
+    dias_retiro_sin_revisar = forms.IntegerField(label="Días que un retiro puede quedar sin revisar antes de avisar", min_value=1, max_value=365, help_text="Ejemplo: 3")
 
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -446,13 +482,27 @@ class FormularioCajaCortes(forms.Form):
         valores = valores or {}
         dias = {}
         horario = valores.get("calendario_corte", calendario.PROPUESTO)
+        self.nombres_dias = []
         for numero, nombre in enumerate(calendario.DIAS):
-            dias[f"corte_{numero}"] = CampoHora(label=f"{nombre}: hora límite del corte (vacío si ese día no hay corte)", max_length=5, required=False, initial=horario.get(str(numero), ""))
+            dias[f"corte_{numero}"] = CampoHora(label=f"{nombre}: hora límite del corte (vacío si ese día no hay corte)", max_length=5, required=False, initial=horario.get(str(numero), ""), widget=forms.TextInput(attrs={"placeholder": "Sin corte"}))
+            dias[f"corte_{numero}"].dia = nombre
+            self.nombres_dias.append(f"corte_{numero}")
         dias.update(self.fields)
         self.fields = dias
+        self.fields["periodo_retiros"].en_fila = True
         for clave in ("control_denominaciones", "periodo_retiros", "tope_retiro_individual", "tope_retiros_periodo", "maximo_retiros_periodo", "maximo_efectivo_caja", "dias_retiro_sin_revisar"):
             if clave in valores:
                 self.fields[clave].initial = valores[clave]
+        plegar(self, "maximo_efectivo_caja", "dias_retiro_sin_revisar")
+
+    def dias_corte(self):
+        return [self[nombre] for nombre in self.nombres_dias]
+
+    def topes_retiro(self):
+        return [self[nombre] for nombre in ("periodo_retiros", "tope_retiro_individual", "tope_retiros_periodo", "maximo_retiros_periodo")]
+
+    def avanzados(self):
+        return [self[nombre] for nombre in ("maximo_efectivo_caja", "dias_retiro_sin_revisar")]
 
     def clean(self):
         datos = super().clean()
@@ -537,10 +587,10 @@ TAMANOS_HOJA = (("carta", "Carta"), ("a4", "A4"))
 CLAVES_REGLAS = ("prefijo_pais_telefono", "digitos_telefono_nacional", "tamano_hoja", "apellidos_obligatorios", "pedir_consentimiento", "texto_consentimiento")
 
 
-class FormularioReglas(forms.Form):
-    prefijo_pais_telefono = forms.IntegerField(label="Prefijo de país de los teléfonos (52 en México)", min_value=1, max_value=999)
-    digitos_telefono_nacional = forms.IntegerField(label="Dígitos de un teléfono nacional sin el prefijo (10 en México)", min_value=4, max_value=15)
-    tamano_hoja = forms.ChoiceField(label="Tamaño de hoja de los PDF", choices=TAMANOS_HOJA)
+class FormularioReglas(ConPlegables, forms.Form):
+    prefijo_pais_telefono = forms.IntegerField(label="Prefijo de país de los teléfonos", min_value=1, max_value=999, help_text="Ejemplo: 52 en México.")
+    digitos_telefono_nacional = forms.IntegerField(label="Dígitos de un teléfono nacional sin el prefijo", min_value=4, max_value=15, help_text="Ejemplo: 10 en México.")
+    tamano_hoja = forms.ChoiceField(label="Tamaño de hoja de los PDF", choices=TAMANOS_HOJA, widget=forms.RadioSelect)
     apellidos_obligatorios = forms.BooleanField(label="Pedir apellidos al dar de alta (quítalo si a veces das de alta empresas)", required=False)
     pedir_consentimiento = forms.BooleanField(label="Pedir la constancia de consentimiento de datos al dar de alta", required=False)
     texto_consentimiento = forms.CharField(label="Texto de la constancia de consentimiento", max_length=200, required=False)
@@ -550,6 +600,7 @@ class FormularioReglas(forms.Form):
         for clave, valor in (valores or {}).items():
             if clave in self.fields:
                 self.fields[clave].initial = bool(valor) if isinstance(self.fields[clave], forms.BooleanField) else valor
+        self.fields["tamano_hoja"].en_fila = True
 
     def clean(self):
         datos = super().clean()
@@ -599,7 +650,7 @@ class FormularioCarpetaBanco(forms.Form):
 
 
 @con_carpetas("carpeta_entrega", "carpeta_respaldo")
-class FormularioAsistenteCortes(FormularioCarpetaBanco):
+class FormularioAsistenteCortes(ConPlegables, FormularioCarpetaBanco):
     carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
     carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)
     field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco", "tope_pago_carpeta"]
@@ -631,6 +682,12 @@ class FormularioAsistenteCortes(FormularioCarpetaBanco):
             self.initial.setdefault(clave, int(parametro(clave)))
         if pide_clave:
             self.fields["guardada"] = forms.BooleanField(label="Ya imprimí la clave de recuperación y la guardé fuera de este equipo", required=True)
+        self.fields["carpeta_entrega"].help_text = "Ahí se dejan el corte diario, el corte mayor de cada mes y la lista de cobranza, en PDF, CSV y JSON."
+        self.fields["carpeta_respaldo"].help_text = "El respaldo diario va cifrado. Mejor si la carpeta está fuera de esta computadora."
+        self.fields["carpeta_banco"].help_text = "Deja ahí el archivo que descargas de la banca en línea: el programa lo revisa cada pocos minutos y lo importa solo."
+        self.ayuda_avanzados = "Un estado de cuenta en PDF que continúa al anterior aplica sus pagos de inmediato. Un Excel o CSV los aplica solo mientras no pase de los topes del día y del acumulado; lo que no cabe queda retenido hasta que alguien con permiso de conciliación lo libere. Con los topes en 0, todo Excel o CSV queda retenido."
+        avanzados = [nombre for nombre in self.fields if nombre.startswith("tope_") or nombre.startswith("nivel_") or nombre in ("actualizaciones_activas", "repositorio_canal", "clave_canal")]
+        plegar(self, *avanzados)
 
     def _ruta(self, clave):
         from cortes.entrega import ErrorEntrega, validar_ruta

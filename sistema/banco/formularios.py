@@ -5,6 +5,7 @@ from django.core.validators import validate_email
 from nucleo import clabe as nucleo_clabe
 from configuracion.models import vocabulario
 from proyecto.captura import CampoDigitos
+from proyecto.plegables import ConPlegables, plegar, segun
 from titulares.contactos import formatear_telefono, normalizar_telefono
 
 from .models import Banco, CuentaBancaria, MedioPago
@@ -23,7 +24,7 @@ def normalizar_contacto(valor):
     return formatear_telefono(normalizar_telefono(valor))
 
 
-class FormularioCuenta(forms.Form):
+class FormularioCuenta(ConPlegables, forms.Form):
     tipo = forms.ChoiceField(label="Cómo se identifica la cuenta", choices=[(CuentaBancaria.CLABE, "CLABE de 18 dígitos (México)"), (CuentaBancaria.OTRA, "Otra cuenta: número y banco escritos")], initial=CuentaBancaria.CLABE, required=False, widget=forms.RadioSelect)
     clabe = CampoDigitos(label="CLABE (18 dígitos)", max_length=30, maximo_tecleo=18, required=False, widget=forms.TextInput(attrs={"autocomplete": "off"}))
     banco = forms.ModelChoiceField(label="Banco", queryset=Banco.objects.none(), required=False, empty_label="Proponer según la CLABE")
@@ -66,6 +67,9 @@ class FormularioCuenta(forms.Form):
         if en_asistente:
             del self.fields["principal"]
             del self.fields["activa"]
+        self.fields["tipo"].en_fila = True
+        segun(self, "tipo", {"clabe": (CuentaBancaria.CLABE, ""), "banco": (CuentaBancaria.CLABE, "")})
+        plegar(self, "convenio", "nota_adicional", "referencia_en")
 
     def clean_numero_cuenta(self):
         valor = "".join(self.cleaned_data.get("numero_cuenta", "").split()).replace("-", "").upper()

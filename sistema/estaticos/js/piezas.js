@@ -31,7 +31,21 @@
     formulario.querySelectorAll("[data-ayuda-con-js]").forEach(function (ayuda) { ayuda.hidden = false; });
     if (cuadro && contenedor.contains(formulario.querySelector(".pieza input[name^='r_']"))) { cuadro.hidden = false; }
 
+    var destino = contenedor.getAttribute("data-total") ? document.getElementById(contenedor.getAttribute("data-total")) : null;
+
+    function sumarPropio() {
+      if (!destino) { return; }
+      var total = 0;
+      contenedor.querySelectorAll(".pieza[data-centavos] input").forEach(function (campo) {
+        var valor = parseInt(campo.closest(".pieza").getAttribute("data-centavos"), 10);
+        if (!isNaN(valor)) { total += leer(campo) * valor; }
+      });
+      destino.textContent = formatear(total, simbolo);
+      if (codigo) { destino.appendChild(crear("span", "moneda", codigo)); }
+    }
+
     function sumar() {
+      sumarPropio();
       if (!recibido) { return; }
       var total = 0;
       formulario.querySelectorAll(".pieza[data-centavos] input[name^='r_']").forEach(function (campo) {

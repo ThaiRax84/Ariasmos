@@ -1,9 +1,9 @@
 {% extends "asistente/_base.html" %}
 {% block asistente %}
-<p class="subtitulo">La plantilla ya quedó cargada. Si te sirve como está, sigue adelante; todo se puede cambiar después en Configuración.</p>
-<div class="acciones"><a class="boton grande" href="{% url 'asistente:conceptos' %}">Usar tal cual</a></div>
-<details>
+<form method="post" class="acciones" novalidate>{% csrf_token %}{% include "asistente/_atras.html" %}<a class="boton grande" href="{% url 'asistente:conceptos' %}">Usar tal cual</a></form>
+<details class="panel mas-opciones" data-abrir-con-error{% if formulario.is_bound %} open{% endif %}>
   <summary>Personalizar vocabulario y conceptos</summary>
+  <p class="ayuda">Cambia cómo se llama cada cosa en tu negocio, quita los conceptos que no uses o agrega uno nuevo.</p>
   <form method="post" class="formulario" novalidate>
     {% csrf_token %}
     {% include "comun/_campos.html" %}

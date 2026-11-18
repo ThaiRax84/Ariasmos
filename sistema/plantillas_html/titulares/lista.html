@@ -27,6 +27,7 @@
     {% for valor, nombre, total in filtros %}<a class="filtro{% if valor == estado %} activo{% endif %}" href="?estado={{ valor }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}"{% if valor == estado %} aria-current="true"{% endif %}>{{ nombre }} · {{ total }}</a>{% endfor %}
   </nav>
 </div>
+{% include "comun/_orden_formulario.html" %}
 <section class="panel">
 <table class="tabla">
 <thead><tr><th>{{ voc.titular }}</th><th>{{ voc.matricula }}</th><th>{{ voc.agrupacion }}</th><th>{{ voc.familia }}</th><th>Estado</th></tr></thead>

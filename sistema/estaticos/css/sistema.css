@@ -483,3 +483,36 @@ a.cifra.aviso:hover { color: var(--aviso-texto); }
 .piezas-entrega .ayuda { margin-top: 4px; }
 .selector-color { inline-size: 56px; block-size: 44px; margin-block-start: 8px; padding: 4px; border: 2px solid var(--borde); border-radius: 12px; background: var(--blanco, #fff); cursor: pointer; }
 .selector-color:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+.campo.opciones.en-fila > div { flex-direction: row; flex-wrap: wrap; }
+.campo.opciones.en-fila > div > div { flex: 1 1 180px; }
+.mas-opciones { border-top: 1px solid var(--borde); margin-top: 20px; padding-top: 12px; }
+.mas-opciones > summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; color: var(--tinta); }
+.mas-opciones > summary::-webkit-details-marker { display: none; }
+.mas-opciones > summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform var(--t-ui) ease; }
+.mas-opciones[open] > summary::before { transform: rotate(45deg); }
+.mas-opciones[open] > summary { margin-bottom: 12px; }
+.panel.mas-opciones { margin-top: 0; padding-top: 24px; }
+.buscar-zona { margin-bottom: 8px; }
+.zona-propuesta { color: var(--bien-texto); font-weight: 700; }
+.orden-formulario { margin: 0; }
+.orden { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; }
+.orden label { font-size: 13px; font-weight: 700; color: var(--suave); }
+.orden select { width: auto; min-height: 44px; padding: 6px 12px; font-size: 15px; }
+.dias-corte { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+.dia-corte { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 2px solid var(--borde); border-radius: 14px; background: #fff; }
+.dia-corte.con-corte, .dia-corte:has(input:not(:placeholder-shown)) { border-color: var(--primario); background: var(--tinte); }
+.dia-corte.con-error { border-color: var(--peligro); }
+.dia-nombre { font-weight: 800; font-size: 15px; color: var(--tinta); }
+.dia-corte input { text-align: center; font-weight: 800; }
+.muestra-piezas .mosaico { cursor: default; }
+.muestra-piezas .mosaico:hover { border-color: var(--borde); }
+.tope { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: 15px; }
+fieldset.recargo { border: 1px solid var(--borde); border-radius: 14px; padding: 16px; margin: 16px 0 0; }
+fieldset.recargo legend { font-weight: 800; padding: 0 6px; }
+.retiro-importe { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px 24px; align-items: start; }
+.pasos li a { color: inherit; text-decoration: none; }
+.pasos li a:hover { text-decoration: underline; }
+.formulario.centrado { margin: 0 auto; }
+.cuadro.bien { background: var(--bien-fondo); color: var(--bien-texto); }
+.cuadro .ayuda { display: block; }
+@media (max-width: 900px) { .retiro-importe { grid-template-columns: 1fr; } }

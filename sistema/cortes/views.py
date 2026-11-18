@@ -27,8 +27,11 @@ def _corte_visible(request, pk):
 
 @requiere_permiso(*VEN)
 def lista(request):
-    cortes = servicios.visibles(request.user).select_related("caja", "usuario")[:300]
-    contexto = {"cortes": cortes, "ve_todos": request.user.tiene_permiso("ver_cortes")}
+    from proyecto.orden import elegir
+
+    orden = elegir(request, "cortes")
+    cortes = servicios.visibles(request.user).select_related("caja", "usuario").order_by(*orden.campos)[:300]
+    contexto = {"cortes": cortes, "orden": orden, "ve_todos": request.user.tiene_permiso("ver_cortes")}
     if contexto["ve_todos"]:
         contexto["pendientes"] = servicios.diarios_pendientes()
     return render(request, "cortes/lista.html", contexto)

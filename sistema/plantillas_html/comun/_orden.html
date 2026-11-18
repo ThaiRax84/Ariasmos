@@ -1,0 +1,6 @@
+<div class="orden">
+  <label for="{{ orden.parametro }}-{{ orden.lista }}">Ordenar por</label>
+  <select id="{{ orden.parametro }}-{{ orden.lista }}" name="{{ orden.parametro }}" data-enviar-al-cambiar>{% for clave, texto in orden.opciones %}<option value="{{ clave }}"{% if clave == orden.clave %} selected{% endif %}>{{ texto }}</option>{% endfor %}</select>
+  <select name="{{ orden.parametro_sentido }}" aria-label="Sentido del orden" data-enviar-al-cambiar>{% for clave, texto in orden.sentidos %}<option value="{{ clave }}"{% if clave == orden.sentido %} selected{% endif %}>{{ texto }}</option>{% endfor %}</select>
+  <button class="boton secundario chico" type="submit" data-solo-sin-js>Ordenar</button>
+</div>

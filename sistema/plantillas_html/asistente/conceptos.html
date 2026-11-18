@@ -1,0 +1,23 @@
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<form method="post" class="pila" novalidate>
+  {% csrf_token %}
+  {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  {% for grupo in formulario.grupos %}
+  <section class="panel concepto-asistente">
+    <h2>{{ grupo.concepto.nombre }}</h2>
+    <p class="ayuda">{{ grupo.concepto.get_tipo_display }}{% if grupo.concepto.periodicidad %} · {{ grupo.concepto.get_periodicidad_display|lower }}{% endif %}</p>
+    <div class="rejilla">{% for campo in grupo.campos %}{% include "comun/_campo.html" %}{% endfor %}</div>
+    {% if grupo.recargo %}
+    <fieldset class="recargo">
+      <legend>Recargo por pago tardío</legend>
+      {% for campo in grupo.recargo %}{% include "comun/_campo.html" %}{% endfor %}
+    </fieldset>
+    {% endif %}
+  </section>
+  {% empty %}
+  <p class="ayuda">La plantilla no trae conceptos. Agrégalos después en Configuración.</p>
+  {% endfor %}
+  <div class="acciones">{% include "asistente/_atras.html" %}<button class="boton grande" type="submit">Continuar</button>{% if omitir %}<a class="boton secundario" href="{% url omitir %}">Omitir por ahora</a>{% endif %}</div>
+</form>
+{% endblock %}

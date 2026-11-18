@@ -25,6 +25,7 @@ from configuracion.models import parametro, vocabulario
 from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
+from proyecto.orden import elegir
 from titulares.models import Titular
 
 from . import servicios
@@ -75,7 +76,8 @@ def indice(request):
 @requiere_permiso("administrar_articulos")
 @encendido
 def articulos(request):
-    return render(request, "inventario/articulos.html", {"articulos": Articulo.objects.select_related("concepto").order_by("-activo", "nombre")})
+    orden = elegir(request, "articulos")
+    return render(request, "inventario/articulos.html", {"articulos": Articulo.objects.select_related("concepto").order_by(*orden.campos), "orden": orden})
 
 
 def _guardar_articulo(request, objeto=None):
@@ -106,14 +108,15 @@ def articulo_editar(request, pk):
 @encendido
 def vender(request):
     consulta = request.GET.get("q", "").strip()[:60]
+    orden = elegir(request, "vender")
     resultados = []
     if consulta:
         digitos = normalizar(consulta)
         filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
         if digitos:
             filtro |= Q(matricula__startswith=digitos)
-        resultados = Titular.objects.filter(filtro).filter(estado__in=[Titular.ACTIVO, Titular.PENDIENTE]).select_related("familia")[:30]
-    return render(request, "inventario/vender.html", {"q": consulta, "resultados": resultados})
+        resultados = Titular.objects.filter(filtro).filter(estado__in=[Titular.ACTIVO, Titular.PENDIENTE]).select_related("familia", "agrupacion").order_by(*orden.campos)[:30]
+    return render(request, "inventario/vender.html", {"q": consulta, "resultados": resultados, "orden": orden})
 
 
 @requiere_permiso("vender_articulos")
