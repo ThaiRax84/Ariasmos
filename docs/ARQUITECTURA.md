@@ -499,6 +499,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 8a | Programa de escritorio: `Ariasmos.exe` con ventana propia en la computadora principal y en las adicionales (§21) |
 | 8b | Nada fijo de un negocio: vocabulario completo, reportes, banco, reglas configurables y cobros semanales y quincenales (§22) |
 | 9a | Configurador y caja más cómodos: zona horaria en lista, signo según el tipo, apertura de turno con piezas, orden en los buscadores, pantallas de caja como el diseño aprobado (§23) |
+| 9b | Tarifas y cargos por agrupación, recargos tras el alta, límites de adeudo y rezagados con reglas propias (§24) |
 
 ## 14. Pendientes de decisión
 
@@ -954,3 +955,52 @@ Regla de la fase: quien configura o cobra no escribe lo que puede elegir, y no v
 - Lo avanzado va plegado bajo «Más opciones».
 - El paso de caja del asistente usa los mismos componentes que las pantallas de caja.
 - Las mismas reglas aplican a las pantallas de Configuración.
+
+## 24. Versión 0.21: tarifas por agrupación, límites de adeudo y rezagados (fase 9b)
+
+### 24.1 Tarifas y cargos por agrupación
+
+- Un concepto de cobro puede tener **tarifas por agrupación** (`TarifaAgrupacion`: concepto, agrupación, importe y, si el concepto es recurrente, periodicidad y vencimiento propios; activa o no). Sin tarifa para la agrupación del titular vale lo general del concepto.
+- Un concepto puede ser **por cantidad** (libros, materiales, sesiones): al cargarlo se pide la cantidad (entero de 1 al máximo configurado) y el importe es cantidad × tarifa. El cargo guarda cantidad e importe unitario.
+- Los cargos automáticos toman la tarifa de la agrupación que el titular tiene al generarse. Cambiarlo de agrupación aplica desde el siguiente periodo; los cargos ya generados no cambian.
+- Un concepto recurrente puede aplicar **solo a ciertas agrupaciones**: sin tarifa activa y con «solo con tarifa» marcado, no se genera cargo.
+- Lo configura quien administra conceptos, en Conceptos y, opcional, en el asistente. Cada cambio de tarifa queda en bitácora con antes y después.
+- Plantillas: la de escuela trae «Libros» por cantidad con tarifa por grupo; las demás traen un ejemplo equivalente con su vocabulario. Ninguna trae importes.
+- El inventario no cambia: un artículo sigue teniendo su precio; la tarifa por agrupación es de conceptos de cobro.
+
+### 24.2 Recargos tras el alta
+
+- Parámetro `recargos_tras_alta`: `siguiente_periodo` (de fábrica) o `desde_alta`.
+- Con `siguiente_periodo`, los cargos cuyo vencimiento cae dentro del periodo (según la periodicidad del concepto) en que el titular se dio de alta no generan recargo por atraso. Desde el periodo siguiente, todo normal.
+- Reactivar una baja cuenta como alta nueva para esta regla. La fecha que cuenta es la de activación, no la de la solicitud.
+- La regla se aplica al decidir si un cargo genera recargo, fuera de `nucleo/`.
+
+### 24.3 Límite de adeudo
+
+- Dos límites independientes: **importe máximo** de adeudo vencido y **días máximos** de atraso (días desde el vencimiento más antiguo con saldo). Cada uno se elige entre **«Ilimitado»** (opción explícita, de fábrica) o un valor.
+- Hay un valor del negocio y **excepciones por titular** (con su propio «Ilimitado», valor, motivo y vigencia opcional).
+- Permiso nuevo `configurar_limites_adeudo`; las plantillas lo dan a los niveles superiores. Cambios en bitácora con antes y después, y a la vista de quien tiene `ver_auditoria` en su inicio, como los topes del banco.
+- Rebasar cualquiera de los dos deja al titular **rezagado** y con la restricción «sin crédito» (§24.4).
+- **Nunca se bloquea recibir un pago** ni consultar el estado de cuenta.
+
+### 24.4 Rezagados: reglas y acciones
+
+- El negocio define **reglas** (`ReglaRezago`): nombre, a quién aplica, cuándo se cumple y qué acciones dispara.
+  - **A quién:** todos, una agrupación o un titular.
+  - **Cuándo:** a partir de N días de atraso, a partir de un importe vencido, al rebasar el límite de adeudo, o combinación (basta una condición).
+  - **Acciones** (una o varias):
+    - `aviso_inicio`: aparece en el inicio de **todos los papeles** con nombre, matrícula, agrupación, días de atraso y, solo para quien puede ver saldos, el adeudo.
+    - `marca`: una marca con **texto propio del negocio** (por ejemplo «No puede pasar») en la ficha, en los buscadores y al cobrar.
+    - `sin_credito`: las ventas al adeudo, los cargos manuales nuevos y las prórrogas para ese titular pasan a solicitud.
+    - `cobranza`: entra en la lista de cobranza.
+- **Reglas propias:** además de las de la plantilla, el negocio crea las suyas sin límite de cantidad, con su nombre y su texto. Si varias aplican a un titular, valen todas sus acciones; en el aviso se muestra el texto de la regla más grave (más días).
+- Una regla dirigida a un titular o a una agrupación tiene prioridad sobre la general del mismo tipo: permite ser más estricto o más tolerante con alguien en particular.
+- La condición se evalúa al momento con los saldos reales: al ponerse al corriente, el titular deja de estar rezagado sin que nadie haga nada. No se guarda un estado que pueda quedar viejo.
+- Permiso nuevo `configurar_rezagos`, a los niveles superiores en las plantillas. Bitácora de cambios.
+- El texto de la marca es dato del negocio: se muestra siempre escapado y con largo acotado.
+- Cada plantilla trae reglas de arranque con su vocabulario (escuela: aviso a los pocos días y «No puede pasar» más adelante; gimnasio: «Acceso suspendido»; etcétera), sin importes y todas editables.
+- El aviso del inicio lista como máximo los 20 más atrasados y enlaza a la lista completa, que se puede ordenar y exportar con el permiso de ver saldos.
+
+### 24.5 Rendimiento
+
+El cálculo de atraso y adeudo vencido de todos los titulares se hace con consultas agregadas (nunca una por titular) y debe responder con 5,000 titulares y 100,000 cargos sin que el inicio lo note; se prueba con el número de consultas.
