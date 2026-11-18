@@ -72,6 +72,18 @@ def neto_de(turno):
     return cobrado - devuelto - retirado + regresado - articulos
 
 
+def desglose(turno):
+    renglones = [
+        ("Fondo inicial", turno.fondo_inicial),
+        ("Cobros en efectivo", _suma(Pago.objects.filter(turno=turno, medio=Pago.EFECTIVO))),
+        ("Cobros revertidos", -_suma(ReversionPago.objects.filter(turno=turno), "pago__importe")),
+        ("Retiros de caja", -_suma(RetiroCaja.objects.filter(turno=turno))),
+        ("Retiros revertidos", _suma(ReversionRetiro.objects.filter(turno=turno), "retiro__importe")),
+        ("Devoluciones en efectivo", -_suma(devoluciones_articulos().filter(turno=turno), "importe_dinero")),
+    ]
+    return [(texto, importe) for indice, (texto, importe) in enumerate(renglones) if importe or indice < 2]
+
+
 def esperado_de(turno):
     return turno.fondo_inicial + neto_de(turno)
 

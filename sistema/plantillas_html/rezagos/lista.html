@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">{{ voc.padron }} · Atraso</span>
+    <h1>Con atraso</h1>
+  </div>
+  <div class="encabezado-lado">{% if ver_saldos and filas %}<a class="boton secundario" href="{% url 'rezagos:exportar' %}?orden={{ elegido }}">Exportar a CSV</a>{% endif %}{% if "configurar_rezagos" in permisos %}<a class="boton secundario" href="{% url 'rezagos:reglas' %}">Reglas de rezago</a>{% endif %}</div>
+</div>
+<form method="get" class="fila buscador">
+  {{ orden.orden.label_tag }} {{ orden.orden }}
+  <button class="boton chico" type="submit">Ordenar</button>
+</form>
+<section class="panel">
+<table class="tabla">
+<thead><tr><th>{{ voc.titular }}</th><th>{{ voc.matricula }}</th><th>{{ voc.agrupacion }}</th><th>Días de atraso</th>{% if ver_saldos %}<th>Adeudo vencido</th>{% endif %}<th>Aviso</th><th>Marcas</th></tr></thead>
+<tbody>{% for f in filas %}<tr data-rezagado><td class="fuerte">{% if ver_saldos %}<a href="{% url 'titulares:detalle' f.pk %}">{{ f.nombre }}</a>{% else %}{{ f.nombre }}{% endif %}</td><td>{{ f.matricula }}</td><td>{{ f.agrupacion|default:"—" }}</td><td>{{ f.dias }}</td>{% if ver_saldos %}<td>{{ f.adeudo|dinero }}</td>{% endif %}<td>{{ f.texto }}</td><td>{% for m in f.marcas %}<span class="estado aviso">{{ m }}</span> {% empty %}—{% endfor %}</td></tr>{% empty %}<tr><td colspan="7">Nadie tiene atraso que active una regla o rebase el límite de adeudo.</td></tr>{% endfor %}</tbody>
+</table>
+<div class="pie-tabla"><span>{{ filas|length }} en total</span></div>
+</section>
+{% endblock %}

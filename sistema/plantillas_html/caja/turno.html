@@ -5,7 +5,7 @@
   <div class="encabezado-texto">
     <span class="antetitulo">Mi caja · {{ turno.caja }} · Corte diario</span>
     <h1>{% if arqueo %}Resultado del conteo{% else %}Turno de {{ turno.usuario }}{% endif %}</h1>
-    <p class="subtitulo">Turno de {{ turno.usuario }} en {{ turno.caja }} · abierto {{ turno.abierto_en|date:"d/m/Y H:i" }}{% if turno.cerrado_en %} · cerrado {{ turno.cerrado_en|date:"d/m/Y H:i" }}{% endif %} · {{ cobros }} cobro{{ cobros|pluralize }}.</p>
+    <p class="subtitulo">{% if arqueo %}El turno ya quedó cerrado. Ahora sí puedes ver lo que debía haber.{% endif %} Turno de {{ turno.usuario }} en {{ turno.caja }} · abierto {{ turno.abierto_en|date:"d/m/Y H:i" }}{% if turno.cerrado_en %} · cerrado {{ turno.cerrado_en|date:"d/m/Y H:i" }}{% endif %} · {{ cobros }} cobro{{ cobros|pluralize }}.</p>
   </div>
 </div>
 {% if arqueo %}
@@ -14,15 +14,15 @@
     {% if piezas %}
     <section class="panel">
       <h2>Por denominación{% if arqueo.con_reconteo %} (reconteo){% endif %}</h2>
-      <table class="tabla"><thead><tr><th>Denominación</th><th class="num">Debe haber</th><th class="num">Hay</th><th class="num">Diferencia</th></tr></thead>
-      <tbody>{% for f in piezas %}<tr><td class="fuerte">{{ f.denominacion|dinero }}</td><td class="num">{{ f.esperadas }}</td><td class="num">{{ f.contadas }}</td><td class="num">{% if f.diferencia %}<span class="diferencia-otra">{{ f.diferencia }}</span>{% else %}<span class="diferencia-cero">0</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+      <table class="tabla"><thead><tr><th>Denominación</th><th class="num">Debe haber</th><th class="num">Contaste</th><th class="num">Diferencia</th></tr></thead>
+      <tbody>{% for f in piezas %}<tr><td class="fuerte">{{ f.denominacion|dinero }}</td><td class="num">{{ f.esperadas }}</td><td class="num">{{ f.contadas }}</td><td class="num">{% if f.diferencia %}<span class="diferencia-otra">{{ f.importe|dinero }} ({{ f.diferencia }} pieza{{ f.diferencia|pluralize }})</span>{% else %}<span class="diferencia-cero" aria-label="Sin diferencia">✓</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
       <p class="nota-pie">Las piezas son una guía: lo que cuenta para el corte es el total.</p>
     </section>
     {% if primer_piezas %}
     <section class="panel">
       <h2>Primer conteo</h2>
-      <table class="tabla"><thead><tr><th>Denominación</th><th class="num">Debe haber</th><th class="num">Hubo</th><th class="num">Diferencia</th></tr></thead>
-      <tbody>{% for f in primer_piezas %}<tr><td class="fuerte">{{ f.denominacion|dinero }}</td><td class="num">{{ f.esperadas }}</td><td class="num">{{ f.contadas }}</td><td class="num">{{ f.diferencia }}</td></tr>{% endfor %}</tbody></table>
+      <table class="tabla"><thead><tr><th>Denominación</th><th class="num">Debe haber</th><th class="num">Contaste</th><th class="num">Diferencia</th></tr></thead>
+      <tbody>{% for f in primer_piezas %}<tr><td class="fuerte">{{ f.denominacion|dinero }}</td><td class="num">{{ f.esperadas }}</td><td class="num">{{ f.contadas }}</td><td class="num">{% if f.diferencia %}{{ f.importe|dinero }}{% else %}<span class="diferencia-cero" aria-label="Sin diferencia">✓</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
     </section>
     {% endif %}
     {% endif %}
@@ -34,20 +34,19 @@
     {% endif %}
   </div>
   <section class="panel">
-    <h2>Arqueo</h2>
-    <div class="cuadro{% if arqueo.diferencia %} aviso{% endif %}">
+    <div class="cuadro{% if arqueo.diferencia %} aviso{% else %} bien{% endif %}">
       <span class="etiqueta">Diferencia</span>
-      <span class="valor cifra-importe media">{{ arqueo.diferencia|dinero }}</span>
+      <span class="valor cifra-importe media">{{ arqueo.diferencia|cifra }}</span>
       <span class="ayuda">{% if arqueo.diferencia < 0 %}Falta efectivo respecto a lo esperado.{% elif arqueo.diferencia > 0 %}Sobra efectivo respecto a lo esperado.{% else %}El conteo coincide con lo esperado.{% endif %}</span>
     </div>
     <dl class="datos">
-      <dt>Fondo inicial</dt><dd>{{ turno.fondo_inicial|dinero }}</dd>
-      <dt>Esperado</dt><dd>{{ arqueo.esperado|dinero }} (incluye fondo de {{ turno.fondo_inicial|dinero }})</dd>
+      {% for texto, importe in desglose %}<dt>{{ texto }}</dt><dd>{{ importe|dinero }}</dd>{% endfor %}
+      <dt>Esperado</dt><dd>{{ arqueo.esperado|dinero }}</dd>
       {% if arqueo.con_reconteo %}<dt>Primer conteo</dt><dd>{{ arqueo.primer_contado|dinero }}</dd>{% endif %}
-      <dt>Contado</dt><dd>{{ arqueo.contado|dinero }}{% if arqueo.con_reconteo %} (reconteo; el primer conteo fue {{ arqueo.primer_contado|dinero }}){% endif %}</dd>
+      <dt>{% if arqueo.con_reconteo %}Reconteo (el que vale){% else %}Contado{% endif %}</dt><dd>{{ arqueo.contado|dinero }}</dd>
       {% if arqueo.nota %}<dt>Nota</dt><dd>{{ arqueo.nota }}</dd>{% endif %}
     </dl>
-    <div class="acciones columna"><a class="boton secundario ancho" href="{% url 'cortes:lista' %}">Ver los cortes</a></div>
+    <div class="acciones columna">{% if turno.usuario_id == user.pk %}<a class="boton grande ancho" href="{% url 'caja:inicio' %}">Terminar</a>{% endif %}<a class="boton secundario ancho" href="{% url 'cortes:lista' %}">Ver los cortes</a></div>
   </section>
 </div>
 {% elif turno.abierto %}<p class="mensaje">El turno sigue abierto: lo esperado se muestra hasta que se cierre con su arqueo.</p>{% endif %}

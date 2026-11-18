@@ -92,6 +92,9 @@ def cargar_datos(datos, origen, usuario=None, request=None):
                 nombre=definicion["nombre"],
                 defaults={"tipo": definicion["tipo"], "periodicidad": definicion["periodicidad"], "aplica_a": definicion["aplica_a"], "prioridad": definicion["prioridad"]},
             )
+        from tarifas.servicios import cargar_de_plantilla
+
+        cargar_de_plantilla(datos)
         registrar("plantilla_cargada", usuario=usuario, datos={"plantilla": origen, "nombre": datos["nombre"]}, request=request)
     return datos
 
@@ -127,6 +130,9 @@ def recargos(datos):
 
 
 def exportar():
+    from rezagos.servicios import exportar_reglas
+    from tarifas.servicios import exportar_concepto
+
     roles = list(Rol.objects.prefetch_related("asignaciones").order_by("nivel", "nombre"))
     definiciones = [
         {"nombre": r.nombre, "nivel": r.nivel, "minutos_inactividad": r.minutos_inactividad, "requiere_totp": r.requiere_totp, "permisos": sorted(a.permiso for a in r.asignaciones.all())}
@@ -146,6 +152,7 @@ def exportar():
                 "aplica_a": concepto.aplica_a,
                 "prioridad": min(concepto.prioridad, 1000),
                 "recargo": {"tipo": regla.tipo, "dias_gracia": min(regla.dias_gracia, 60), "se_repite": regla.se_repite} if regla else False,
+                **exportar_concepto(concepto),
             }
         )
     datos = {
@@ -182,6 +189,7 @@ def exportar():
         "inventario": _inventario_exportado(),
         "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
         "cortes": [{"tipo": d.tipo, "nombre": d.nombre, "nivel": d.nivel, "activa": d.activa} for d in DefinicionCorte.objects.all()],
+        "rezagos": exportar_reglas(),
     }
     esquema.validar(datos)
     return datos

@@ -111,6 +111,7 @@ namespace Ariasmos
         private readonly Font letraTexto;
         private readonly Font letraVersion;
         private readonly Timer desvanecer;
+        private bool pedido;
 
         public Splash(string version)
         {
@@ -128,9 +129,16 @@ namespace Ariasmos
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size((int)Math.Round(720 * escala), (int)Math.Round(450 * escala));
             BackColor = Fondo;
-            ShowInTaskbar = false;
+            ShowInTaskbar = true;
             TopMost = true;
             Text = "Ariasmos";
+            try
+            {
+                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            }
+            catch (ArgumentException)
+            {
+            }
             DoubleBuffered = true;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
             desvanecer = new Timer { Interval = 15 };
@@ -140,16 +148,51 @@ namespace Ariasmos
                 if (Opacity <= 0)
                 {
                     desvanecer.Stop();
-                    Close();
+                    Cerrar();
                 }
             };
         }
 
+        public event EventHandler Cancelado;
+
         public void Desvanecer()
         {
+            pedido = true;
             if (!IsDisposed && !desvanecer.Enabled)
             {
                 desvanecer.Start();
+            }
+        }
+
+        public void Cerrar()
+        {
+            pedido = true;
+            if (!IsDisposed)
+            {
+                Close();
+            }
+        }
+
+        public void TraerAlFrente()
+        {
+            if (IsDisposed || pedido)
+            {
+                return;
+            }
+            if (WindowState == FormWindowState.Minimized)
+            {
+                WindowState = FormWindowState.Normal;
+            }
+            Activate();
+            BringToFront();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            base.OnFormClosed(e);
+            if (!pedido && Cancelado != null)
+            {
+                Cancelado(this, EventArgs.Empty);
             }
         }
 

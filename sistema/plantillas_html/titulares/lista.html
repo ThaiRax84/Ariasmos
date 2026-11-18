@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load rezagos %}
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
@@ -27,12 +28,13 @@
     {% for valor, nombre, total in filtros %}<a class="filtro{% if valor == estado %} activo{% endif %}" href="?estado={{ valor }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}"{% if valor == estado %} aria-current="true"{% endif %}>{{ nombre }} · {{ total }}</a>{% endfor %}
   </nav>
 </div>
+{% include "comun/_orden_formulario.html" %}
 <section class="panel">
 <table class="tabla">
 <thead><tr><th>{{ voc.titular }}</th><th>{{ voc.matricula }}</th><th>{{ voc.agrupacion }}</th><th>{{ voc.familia }}</th><th>Estado</th></tr></thead>
 <tbody>
 {% for t in titulares %}
-<tr><td class="fuerte"><a href="{% url 'titulares:detalle' t.pk %}">{{ t.apellidos }}, {{ t.nombre }}</a></td><td><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }}</a></td><td>{{ t.agrupacion|default:"—" }}</td><td>{{ t.familia|default:"—" }}</td><td><span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span></td></tr>
+<tr><td class="fuerte"><a href="{% url 'titulares:detalle' t.pk %}">{{ t.apellidos }}, {{ t.nombre }}</a></td><td><a href="{% url 'titulares:detalle' t.pk %}">{{ t.matricula_formateada }}</a></td><td>{{ t.agrupacion|default:"—" }}</td><td>{{ t.familia|default:"—" }}</td><td><span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span>{% marca_rezago t titulares %}</td></tr>
 {% empty %}<tr><td colspan="5">Sin resultados.</td></tr>
 {% endfor %}
 </tbody></table>

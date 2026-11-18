@@ -35,20 +35,34 @@ CAJEROS = ("turno_caja", "recibir_efectivo")
 RETIROS = ("retirar_efectivo", "revisar_retiros")
 
 
-@requiere_permiso("turno_caja")
-def inicio(request):
+def _limite(turno):
+    from proyecto.tablero import corte_propio
+
+    return corte_propio(turno) if turno is not None else None
+
+
+def _pantalla_inicio(request, formulario=None):
     turno = servicios.turno_abierto(request.user)
+    if turno is None and formulario is None:
+        formulario = FormularioAbrir()
     contexto = {
         "turno": turno,
         "en_arqueo": turno is not None and ConteoArqueo.objects.filter(turno=turno).exists(),
         "cobros": turno.pagos.count() if turno else 0,
         "retiros": turno.retiros.count() if turno else 0,
         "pendientes_comprobante": list(servicios.comprobantes_pendientes(turno)) if turno else [],
-        "formulario": FormularioAbrir() if turno is None else None,
+        "formulario": formulario if turno is None else None,
+        "con_piezas": turno is None and bool(formulario.nombres_piezas),
+        "limite": _limite(turno),
         "disponible": servicios.disponible_para_trasladar(request.user),
         "turnos": Turno.objects.filter(usuario=request.user, estado=Turno.CERRADO).select_related("caja", "arqueo")[:10],
     }
     return render(request, "caja/inicio.html", contexto)
+
+
+@requiere_permiso("turno_caja")
+def inicio(request):
+    return _pantalla_inicio(request)
 
 
 @requiere_permiso("turno_caja")
@@ -57,13 +71,15 @@ def abrir(request):
     formulario = FormularioAbrir(request.POST)
     if formulario.is_valid():
         try:
-            servicios.abrir_turno(request.user, formulario.cleaned_data["caja"], formulario.cleaned_data.get("fondo_inicial") or 0, request, piezas=formulario.piezas())
-            messages.success(request, "Turno abierto.")
+            servicios.abrir_turno(request.user, formulario.cleaned_data["caja"], formulario.fondo(), request, piezas=formulario.piezas())
         except servicios.ErrorCaja as error:
-            messages.error(request, str(error))
-    else:
-        messages.error(request, "Elige una caja libre y revisa el fondo.")
-    return redirect("caja:inicio")
+            formulario.add_error(None, str(error))
+        else:
+            messages.success(request, "Turno abierto.")
+            return redirect("caja:inicio")
+    elif "caja" in formulario.errors:
+        formulario.errors["caja"] = formulario.error_class(["Elige una caja libre."])
+    return _pantalla_inicio(request, formulario)
 
 
 def _turno_visible(request, turno):
@@ -84,6 +100,7 @@ def turno(request, pk):
         "arqueo": arqueo,
         "cobros": objeto.pagos.count(),
         "retiros": objeto.retiros.select_related("motivo") if arqueo else None,
+        "desglose": servicios.desglose(objeto) if arqueo else [],
         "piezas": control_piezas.renglones(arqueo.esperado_piezas, arqueo.conteo) if arqueo and arqueo.esperado_piezas else [],
         "primer_piezas": control_piezas.renglones(arqueo.esperado_piezas, arqueo.primer_conteo) if arqueo and arqueo.esperado_piezas and arqueo.con_reconteo else [],
     }
@@ -117,7 +134,7 @@ def cerrar(request, pk):
             messages.success(request, "El conteo coincide: turno cerrado.")
             return redirect("caja:turno", pk=pk)
         return redirect("caja:reconteo", pk=pk)
-    return render(request, "caja/cerrar.html", {"turno": objeto, "formulario": formulario, "pendientes": pendientes})
+    return render(request, "caja/cerrar.html", {"turno": objeto, "formulario": formulario, "pendientes": pendientes, "limite": _limite(objeto), "cobros": objeto.pagos.count()})
 
 
 @requiere_permiso("turno_caja")
@@ -143,7 +160,7 @@ def reconteo(request, pk):
                 return redirect("caja:inicio")
             messages.success(request, "Turno cerrado.")
             return redirect("caja:turno", pk=pk)
-    return render(request, "caja/reconteo.html", {"turno": objeto, "recontar": recontar, "con_primero": con_primero})
+    return render(request, "caja/reconteo.html", {"turno": objeto, "recontar": recontar, "con_primero": con_primero, "primero": servicios.conteo_pendiente(objeto)})
 
 
 @requiere_permiso(*CAJEROS)
@@ -256,7 +273,26 @@ def retiro_nuevo(request):
             else:
                 messages.success(request, f"Retiro {resultado.retiro} registrado.")
                 return redirect("caja:retiro", pk=resultado.retiro.pk)
-    return render(request, "caja/retiro_nuevo.html", {"formulario": formulario, "turno": turno})
+    return render(request, "caja/retiro_nuevo.html", {"formulario": formulario, "turno": turno, **_topes_de(request.user, turno)})
+
+
+def _barra(usado, tope):
+    return {"usado": usado, "tope": tope, "valor": min(usado, tope) if tope > 0 else 0}
+
+
+def _topes_de(usuario, turno):
+    if turno is None:
+        return {}
+    limites = retiros.topes()
+    usado = retiros.uso(turno.caja, persona=usuario)
+    return {
+        "periodo_topes": "de esta semana" if limites["periodo"] == "semana" else "de hoy",
+        "barra_importe": _barra(usado["importe"], limites["importe_periodo"]),
+        "barra_cantidad": _barra(usado["cantidad"], limites["cantidad_periodo"]),
+        "tope_individual": limites["importe_individual"],
+        "retiros_turno": turno.retiros.select_related("motivo").order_by("-creado")[:10],
+        "con_piezas": bool(control_piezas.activo()),
+    }
 
 
 def _retiro_visible(request, pk):

@@ -20,6 +20,8 @@ from . import contactos
 from .historial import historial
 from .formularios import FormularioAlta, FormularioBaja, FormularioCambioFamilia, FormularioEditarContacto, FormularioNota, FormularioTitular
 from .models import Contacto, Familia, Titular
+from proyecto.orden import elegir
+
 from .servicios import crear_titular, foto_titular, guardar_contacto
 
 CAPTURA = ("solicitar_alta_baja", "alta_baja_directa")
@@ -38,7 +40,8 @@ def _avisar_resultado(request, resultado):
 def lista(request):
     consulta = request.GET.get("q", "").strip()
     estado = request.GET.get("estado", "")
-    titulares = Titular.objects.select_related("agrupacion")
+    orden = elegir(request, "padron")
+    titulares = Titular.objects.select_related("agrupacion").order_by(*orden.campos)
     if consulta:
         digitos = normalizar(consulta)
         filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
@@ -50,7 +53,7 @@ def lista(request):
     conteos = dict(Titular.objects.values_list("estado").annotate(total=Count("id")).order_by())
     filtros = [(valor, nombre, conteos.get(valor, 0)) for valor, nombre in Titular.ESTADOS]
     contexto = {
-        "titulares": titulares.select_related("familia")[:200], "q": consulta, "estado": estado, "estados": Titular.ESTADOS, "filtros": filtros,
+        "titulares": titulares.select_related("familia")[:200], "orden": orden, "q": consulta, "estado": estado, "estados": Titular.ESTADOS, "filtros": filtros,
         "vacio": not consulta and not estado and not any(conteos.values()),
         "puede_importar": request.user.tiene_permiso("importar_padron") or request.user.tiene_permiso("solicitar_importacion_padron"),
     }

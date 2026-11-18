@@ -93,8 +93,21 @@ namespace Ariasmos
             Registro.Escribir("Servidor " + conexion.Origen + (principal ? " (computadora principal)" : " (computadora adicional)"));
             int resultado;
             using (var ventana = new VentanaPrincipal(conexion, principal, verificar, aviso))
+            using (var contexto = new ApplicationContext())
             {
-                Application.Run(ventana);
+                bool terminado = false;
+                EventHandler terminar = (origen, evento) =>
+                {
+                    if (!terminado)
+                    {
+                        terminado = true;
+                        contexto.ExitThread();
+                    }
+                };
+                ventana.FormClosed += (origen, evento) => terminar(origen, evento);
+                ventana.Disposed += terminar;
+                ventana.Arrancar();
+                Application.Run(contexto);
                 resultado = ventana.Resultado;
             }
             GC.KeepAlive(unica);

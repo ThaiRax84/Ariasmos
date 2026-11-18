@@ -16,6 +16,8 @@ from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
 from titulares.models import Agrupacion, Contacto, Familia, LotePadron, Titular
 from titulares.servicios import crear_titular
+from rezagos.models import ExcepcionLimite, LimiteAdeudo, ReglaRezago
+from tarifas.models import TarifaAgrupacion
 
 from .conftest import cliente, configurar, nuevo_usuario
 
@@ -26,7 +28,7 @@ PUBLICAS = {
     "asistente:vista_marca", "asistente:logo", "asistente:pago", "asistente:caja", "asistente:reglas", "asistente:cortes", "asistente:usuario", "asistente:codigo",
 }
 
-SOLO_SESION = {"inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
+SOLO_SESION = {"rezagos:lista", "inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -190,6 +192,17 @@ MATRIZ = {
     "inventario:conteo": ("subir_conteo_inventario",),
     "inventario:conteo_lista": ("subir_conteo_inventario",),
     "inventario:conteo_detalle": ("subir_conteo_inventario", "revisar_inventario", "aprobar_solicitudes"),
+    "tarifas:indice": ("administrar_conceptos",),
+    "tarifas:concepto": ("administrar_conceptos",),
+    "tarifas:nueva": ("administrar_conceptos",),
+    "tarifas:editar": ("administrar_conceptos",),
+    "rezagos:exportar": ("ver_titulares",),
+    "rezagos:limites": ("configurar_limites_adeudo",),
+    "rezagos:excepcion": ("configurar_limites_adeudo",),
+    "rezagos:reglas": ("configurar_rezagos",),
+    "rezagos:regla_nueva": ("configurar_rezagos",),
+    "rezagos:regla_editar": ("configurar_rezagos",),
+    "rezagos:recargos_alta": ("administrar_conceptos",),
 }
 
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
@@ -257,6 +270,15 @@ def escenario(db):
     devolucion = inventario.devolver(venta, {str(renglon.pk): [1, True]}, Devolucion.SALDO, usuarios["Operación"], "prueba")
     registro = inventario.registrar_movimiento("entrada", articulo, 5, "Compra", "", usuarios["Operación"])
     conteo = inventario.subir_conteo({articulo.pk: 3}, usuarios["Operación"], Conteo.PANTALLA)
+    Titular.objects.filter(pk=titular.pk).update(agrupacion=agrupacion)
+    titular.refresh_from_db()
+    libros = ConceptoCobro.objects.get(nombre="Libros")
+    tarifa = TarifaAgrupacion.objects.create(concepto=libros, agrupacion=agrupacion, importe_centavos=12000)
+    libro.crear_cargo(titular, libros, 30000, timezone.now().date() - timezone.timedelta(days=40), "manual")
+    regla_rezago = ReglaRezago.objects.create(nombre="Atraso general", texto="Pago atrasado", dias_minimos=5, aviso_inicio=True, marca=True, cobranza=True)
+    ReglaRezago.objects.create(nombre="Regla propia", texto="Acuerdo propio", alcance=ReglaRezago.TITULAR, titular=titular, dias_minimos=60, marca=True)
+    LimiteAdeudo.objects.create(pk=1, modo_importe="valor", importe_maximo=1000)
+    ExcepcionLimite.objects.create(titular=titular, modo_dias="ilimitado", motivo="Acuerdo de prueba", creada_por=usuarios["Dirección"])
     argumentos = {
         "cortes:detalle": {"pk": mayor.pk},
         "cortes:descargar": {"pk": mayor.pk, "formato": "json"},
@@ -340,6 +362,11 @@ def escenario(db):
         "inventario:devolucion_revisar": {"pk": devolucion.pk},
         "inventario:renglon_revisar": {"pk": renglon.pk},
         "inventario:conteo_detalle": {"pk": conteo.pk},
+        "tarifas:concepto": {"pk": libros.pk},
+        "tarifas:nueva": {"pk": libros.pk},
+        "tarifas:editar": {"pk": tarifa.pk},
+        "rezagos:excepcion": {"pk": titular.pk},
+        "rezagos:regla_editar": {"pk": regla_rezago.pk},
     }
     return usuarios, argumentos
 

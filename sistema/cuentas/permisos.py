@@ -34,6 +34,8 @@ PERMISOS = {
     "configurar_topes_banco": "Configurar los topes del banco para aplicar pagos solos",
     "importar_padron": "Importar o actualizar {padron_min} desde una hoja, sin aprobación",
     "solicitar_importacion_padron": "Pedir que se importe o actualice {padron_min} desde una hoja",
+    "configurar_limites_adeudo": "Configurar los límites de adeudo y sus excepciones",
+    "configurar_rezagos": "Configurar las reglas de rezago y sus acciones",
 }
 
 OPCIONES = list(PERMISOS.items())

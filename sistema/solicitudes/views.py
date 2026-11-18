@@ -67,6 +67,10 @@ def describir(solicitud):
             filas.append(("Venta", f"{venta} · {venta.titular.nombre_completo}"))
             renglones = {str(r.pk): r for r in RenglonVenta.objects.filter(venta=venta).select_related("articulo")}
             filas.append(("Artículos", "; ".join(f"{renglones[k].articulo.nombre} × {v[0]}{'' if v[1] else ' (mal estado)'}" for k, v in (datos.get("renglones") or {}).items() if k in renglones)))
+    elif solicitud.accion in ("cargo_sin_credito", "venta_sin_credito"):
+        from rezagos.acciones import describir as describir_sin_credito
+
+        filas += describir_sin_credito(solicitud)
     elif solicitud.accion == "importacion_padron":
         filas += [("Archivo", datos.get("nombre_archivo", "")), ("Altas", str(datos.get("altas", 0))), ("Cambios", str(datos.get("cambios", 0))), ("Con cambio de nombre", str(datos.get("nombres", 0)))]
     elif solicitud.accion == "cambio_familia":
@@ -86,19 +90,24 @@ def puede_ver(usuario, solicitud):
     return politica is not None and usuario.tiene_permiso(politica.permiso_aprobar)
 
 
-def pendientes_para(usuario):
+def pendientes_para(usuario, orden=("creada",)):
     politicas = {p.accion: p for p in PoliticaAccion.objects.all()}
     acciones = [a for a, p in politicas.items() if usuario.tiene_permiso(p.permiso_aprobar)]
     consulta = Solicitud.objects.filter(estado=Solicitud.PENDIENTE, accion__in=acciones).exclude(solicitante=usuario)
-    filas = list(consulta.select_related("titular", "solicitante").order_by("creada"))
+    filas = list(consulta.select_related("titular", "solicitante").order_by(*orden))
     return [(s, s.resaltada(politicas[s.accion])) for s in filas]
 
 
 @requiere_permiso(*VEN_BANDEJA)
 def bandeja(request):
     motor.caducar_vencidas()
-    propias = Solicitud.objects.filter(solicitante=request.user).select_related("titular", "resuelta_por")[:50]
-    return render(request, "solicitudes/bandeja.html", {"pendientes": pendientes_para(request.user), "propias": propias})
+    from proyecto.orden import elegir
+
+    orden_pendientes = elegir(request, "solicitudes_pendientes", prefijo="p_")
+    orden_propias = elegir(request, "solicitudes_propias", prefijo="m_")
+    propias = Solicitud.objects.filter(solicitante=request.user).select_related("titular", "resuelta_por").order_by(*orden_propias.campos)[:50]
+    contexto = {"pendientes": pendientes_para(request.user, orden_pendientes.campos), "propias": propias, "orden_pendientes": orden_pendientes, "orden_propias": orden_propias}
+    return render(request, "solicitudes/bandeja.html", contexto)
 
 
 @requiere_permiso(*VEN_BANDEJA)

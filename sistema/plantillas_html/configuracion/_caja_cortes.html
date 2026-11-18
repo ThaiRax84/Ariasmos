@@ -1,0 +1,45 @@
+{% load formato %}
+{% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+<section class="panel">
+  <h2>Corte de caja: qué días se hace y hora límite de cada día</h2>
+  <p class="ayuda">Cada día puede tener su propia hora. Deja vacío el día en que no hay corte.</p>
+  <div class="dias-corte">
+    {% for campo in formulario.dias_corte %}
+    <div class="dia-corte{% if campo.value %} con-corte{% endif %}{% if campo.errors %} con-error{% endif %}">
+      <label for="{{ campo.id_for_label }}"><span class="dia-nombre">{{ campo.field.dia }}</span><span class="solo-lectores">: hora límite del corte (vacío si ese día no hay corte)</span></label>
+      {{ campo }}
+      {% for e in campo.errors %}<p class="error">{{ e }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+<section class="panel">
+  <h2>Billetes y monedas</h2>
+  {% include "comun/_campo.html" with campo=formulario.control_denominaciones %}
+  {% if denominaciones %}
+  <p class="ayuda">Así se ven al abrir el turno, al cobrar y al cerrar: se toca cada billete o moneda para contarlo.</p>
+  <div class="piezas mosaicos muestra-piezas" aria-label="Denominaciones de la caja">{% for d in denominaciones %}<span class="mosaico"><span class="mosaico-valor">{{ d|denominacion_corta }}</span><span class="mosaico-cuenta">—</span></span>{% endfor %}</div>
+  {% if enlace_denominaciones %}<p class="nota-pie"><a href="{% url 'configuracion:catalogo' 'denominaciones' %}">Cambiar las denominaciones</a></p>{% endif %}
+  {% endif %}
+  {% if piezas %}
+  <p class="subtitulo">Elegiste una moneda distinta a la de la plantilla: escribe sus billetes y monedas para que la caja pueda contar piezas y proponer el cambio. Después se ajustan en Configuración.</p>
+  {% include "comun/_campos.html" with formulario=piezas %}
+  {% endif %}
+</section>
+<section class="panel">
+  <h2>Retiros de caja</h2>
+  <p class="ayuda">Quien cobra puede sacar efectivo para un gasto sin pedir permiso mientras no pase de estos topes. Arriba del tope se pide autorización.</p>
+  <div class="columnas">
+    <div>{% for campo in formulario.topes_retiro %}{% include "comun/_campo.html" %}{% endfor %}</div>
+    <div class="cuadro">
+      <span class="etiqueta">Así lo verá quien retira</span>
+      <div class="tope"><div class="fila entre"><span>Importe retirado</span><strong>{{ 0|dinero }} de {{ formulario.tope_retiros_periodo.value|default:0|dinero_texto }}</strong></div><progress max="1" value="0" aria-hidden="true"></progress></div>
+      <div class="tope"><div class="fila entre"><span>Retiros</span><strong>0 de {{ formulario.maximo_retiros_periodo.value|default:0 }}</strong></div><progress max="1" value="0" aria-hidden="true"></progress></div>
+      <p class="ayuda">Los topes se cuentan por caja y por persona.</p>
+    </div>
+  </div>
+  <details class="mas-opciones" data-abrir-con-error{% if formulario.avanzados_con_error %} open{% endif %}>
+    <summary>Más opciones</summary>
+    {% for campo in formulario.avanzados %}{% include "comun/_campo.html" %}{% endfor %}
+  </details>
+</section>

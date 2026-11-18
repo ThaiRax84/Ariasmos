@@ -271,7 +271,7 @@ ORIGINALES = {
     "bitacora_no_integra", "deposito_sin_conciliar", "efectivo_sin_trasladar", "entrega_sin_confirmar", "diferencia_arqueo", "recibo_cancelado",
     "retiros_cerca_del_tope", "retiro_sin_comprobante", "retiro_sin_revisar", "efectivo_sobre_maximo", "importacion_retenida", "pago_sin_respaldo",
     "pago_sin_estado", "carpeta_vigilada", "importacion_por_revisar", "inventario_bajo_minimo", "inventario_existencia_baja", "inventario_por_revisar",
-    "inventario_conteo_viejo", "banco", "entregas_por_confirmar", "corte_diario_pendiente", "clave_recuperacion", "respaldos", "entregas_cortes",
+    "inventario_conteo_viejo", "ventas_sin_cobrar", "banco", "entregas_por_confirmar", "corte_diario_pendiente", "clave_recuperacion", "respaldos", "entregas_cortes",
     "corte_mayor_borrador", "faltan_denominaciones", "falta_cuenta", "codigo_autorizacion", "certificado_por_vencer",
 }
 
@@ -306,7 +306,7 @@ def todos_los_avisos(personas, monkeypatch):
     falsa_importacion = Falso(CARPETA="carpeta", objects=Falso(filter=lambda **k: Consulta([importacion]), order_by=lambda *a: Consulta([importacion])))
     monkeypatch.setattr(tablero, "Importacion", falsa_importacion)
     articulo = Falso(texto="LIB-A · Libro A", minimo=3)
-    monkeypatch.setattr(inventario, "avisos", lambda u: {"bajo_minimo": [(articulo, 1)], "existencia_baja": [(articulo, 2, 10)], "por_revisar": 2, "conteo_viejo": Falso(pk=1, creado=ahora)})
+    monkeypatch.setattr(inventario, "avisos", lambda u: {"bajo_minimo": [(articulo, 1)], "existencia_baja": [(articulo, 2, 10)], "por_revisar": 2, "ventas_sin_cobrar": 2, "conteo_viejo": Falso(pk=1, creado=ahora)})
     monkeypatch.setattr(tablero, "Traslado", Falso(PENDIENTE="pendiente", objects=Falso(filter=lambda **k: Consulta([1]))))
     diarios = [{"caja": "Caja 1", "persona": persona, "desde": ahora, "dia_anterior": True, "limite": ahora}]
     monkeypatch.setattr(tablero.cortes, "diarios_pendientes", lambda: diarios)

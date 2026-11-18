@@ -25,6 +25,8 @@ from configuracion.models import parametro, vocabulario
 from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from nucleo.matricula import normalizar
+from proyecto.orden import elegir
+from rezagos.servicios import sin_credito, solicitar_venta
 from titulares.models import Titular
 
 from . import servicios
@@ -75,7 +77,8 @@ def indice(request):
 @requiere_permiso("administrar_articulos")
 @encendido
 def articulos(request):
-    return render(request, "inventario/articulos.html", {"articulos": Articulo.objects.select_related("concepto").order_by("-activo", "nombre")})
+    orden = elegir(request, "articulos")
+    return render(request, "inventario/articulos.html", {"articulos": Articulo.objects.select_related("concepto").order_by(*orden.campos), "orden": orden})
 
 
 def _guardar_articulo(request, objeto=None):
@@ -106,14 +109,21 @@ def articulo_editar(request, pk):
 @encendido
 def vender(request):
     consulta = request.GET.get("q", "").strip()[:60]
+    orden = elegir(request, "vender")
     resultados = []
     if consulta:
         digitos = normalizar(consulta)
         filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
         if digitos:
             filtro |= Q(matricula__startswith=digitos)
-        resultados = Titular.objects.filter(filtro).filter(estado__in=[Titular.ACTIVO, Titular.PENDIENTE]).select_related("familia")[:30]
-    return render(request, "inventario/vender.html", {"q": consulta, "resultados": resultados})
+        resultados = Titular.objects.filter(filtro).filter(estado__in=[Titular.ACTIVO, Titular.PENDIENTE]).select_related("familia", "agrupacion").order_by(*orden.campos)[:30]
+    return render(request, "inventario/vender.html", {"q": consulta, "resultados": resultados, "orden": orden})
+
+
+def _puede_cobrar_ya(usuario):
+    from caja import servicios as caja
+
+    return usuario.tiene_permiso("registrar_pago_efectivo") and caja.turno_abierto(usuario) is not None
 
 
 @requiere_permiso("vender_articulos")
@@ -123,7 +133,12 @@ def vender_titular(request, pk):
     if titular.estado not in (Titular.ACTIVO, Titular.PENDIENTE):
         raise PermissionDenied
     formulario = FormularioVenta(request.POST if request.method == "POST" else None)
-    if request.method == "POST" and formulario.is_valid():
+    if request.method == "POST" and formulario.is_valid() and sin_credito(titular) and (formulario.cleaned_data["modo"] == Venta.ADEUDO or not _puede_cobrar_ya(request.user)):
+        respuesta, error = solicitar_venta(request, titular, formulario.cleaned_data["renglones"])
+        if respuesta is not None:
+            return respuesta
+        formulario.add_error(None, error)
+    elif request.method == "POST" and formulario.is_valid():
         try:
             venta = servicios.vender(titular, formulario.cleaned_data["renglones"], formulario.cleaned_data["modo"], request.user, request)
         except servicios.ErrorInventario as error:

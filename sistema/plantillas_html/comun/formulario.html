@@ -4,6 +4,7 @@
   <div class="encabezado-texto">
     <span class="antetitulo">{% if antetitulo %}{{ antetitulo }}{% endif %}</span>
     <h1>{{ titulo }}</h1>
+    {% if subtitulo %}<p class="subtitulo">{{ subtitulo }}</p>{% endif %}
   </div>
 </div>
 <form method="post" class="formulario" novalidate>

@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.20 · 17/11/2026 · Estado: fases 1 a 7a construidas; fase 8a (programa de escritorio, §21) y fase 8b (nada fijo de un negocio, §22) en diseño; fase 6b (facturación, §17) diseñada.
+Versión 0.21 · 18/11/2026 · Estado: fases 1 a 8b construidas (0.9.0); fase 9a (configurador y caja más cómodos, §23) en construcción; fase 9b (tarifas por agrupación, límites de adeudo y rezagados) en diseño; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -498,6 +498,8 @@ instancia/         (ignorada) claves, base, configuración local
 | 7a | Topes del banco por día y acumulado, configurables por quien concilia y por Dirección (§19); actualizaciones del programa: buscar, avisar y descargar con firma (§20) |
 | 8a | Programa de escritorio: `Ariasmos.exe` con ventana propia en la computadora principal y en las adicionales (§21) |
 | 8b | Nada fijo de un negocio: vocabulario completo, reportes, banco, reglas configurables y cobros semanales y quincenales (§22) |
+| 9a | Configurador y caja más cómodos: zona horaria en lista, signo según el tipo, apertura de turno con piezas, orden en los buscadores, pantallas de caja como el diseño aprobado (§23) |
+| 9b | Tarifas y cargos por agrupación, recargos tras el alta, límites de adeudo y rezagados con reglas propias (§24) |
 
 ## 14. Pendientes de decisión
 
@@ -757,6 +759,7 @@ El servidor no cambia: los tres servicios (web, trabajador, TLS) siguen en la co
 
 - Ventana real, sin marco, de 720 × 450, centrada: la escena aprobada, «ARIASMOS», «Iniciando el sistema…» y «ver. X.Y.Z». Se dibuja con los recursos del propio programa (imagen y letras incluidas), sin depender del servidor.
 - Se muestra mientras arranca la ventana principal y hasta que carga la primera pantalla; después se desvanece. Si el servidor no responde, la ventana principal muestra el problema y «Reintentar».
+- Mientras el splash está a la vista no se muestra ninguna otra ventana del programa.
 - El splash que hoy vive dentro de la pantalla de inicio de sesión se elimina.
 
 ### 21.3 Dos formas de instalar, el mismo instalador
@@ -915,3 +918,90 @@ Regla de diseño para esta fase y las siguientes: el programa no pide lo que pue
 
 - El idioma (español), el formato de fechas y de números, y el catálogo de bancos de México. Otro país es una fase aparte.
 - La marca «Ariasmos» del programa.
+
+## 23. Versión 0.21: configurador y caja más cómodos (fase 9a)
+
+Regla de la fase: quien configura o cobra no escribe lo que puede elegir, y no ve lo que no aplica.
+
+### 23.1 Zona horaria en lista
+
+- La zona horaria se **elige de una lista con buscador**, nunca se escribe. La lista sale de la base de zonas horarias IANA que ya trae el programa (`zoneinfo` con `tzdata`), solo las zonas canónicas con región (`América/…`, `Europa/…`), agrupadas por región y mostradas como «Ciudad (UTC−06:00)» con el desfase vigente.
+- El asistente propone la zona de la computadora principal si se reconoce; si no, ninguna.
+- El servidor valida contra la misma lista.
+
+### 23.2 El signo sigue al tipo
+
+- Donde se elige entre **porcentaje** e **importe fijo** (recargos, descuentos y cualquier otro), el campo del valor muestra solo el signo que corresponde (`%` o el símbolo de la moneda) y cambia al cambiar el tipo, con sus límites y su captura guiada. Sin JavaScript se ven los dos campos con su etiqueta.
+- El servidor sigue validando el valor según el tipo recibido.
+
+### 23.3 Abrir turno contando las piezas
+
+- Con el control de piezas activo, abrir turno con efectivo **pide cuántas piezas hay de cada denominación**, con los mismos mosaicos del cobro; el fondo inicial es la suma y no se escribe aparte. Abrir en cero sigue siendo un solo paso.
+- Sin control de piezas se pide solo el importe.
+- Las piezas de apertura entran al registro de piezas de la caja, para que el cambio propuesto las tome en cuenta. La apertura es declaración de quien abre; el arqueo ciego no cambia.
+
+### 23.4 Orden en los buscadores y listas
+
+- Toda lista o buscador de titulares (padrón, buscar para cobrar, vender, conciliar) ofrece **ordenar por**: nombre, apellidos, matrícula, agrupación o familia, ascendente o descendente. Las demás listas largas (artículos, usuarios, solicitudes, cortes) ofrecen los órdenes que les sean naturales.
+- El orden elegido se recuerda por persona y por lista.
+- El servidor solo acepta claves de una lista cerrada por pantalla; nunca un campo recibido tal cual.
+
+### 23.5 Pantallas de caja como el diseño aprobado
+
+- «Mi caja» (abrir turno, turno abierto, cerrar con conteo, reconteo, resultado) y el retiro siguen las referencias aprobadas `docs/diseno/referencia/` de corte, reconteo, resultado y retiro: mosaicos de piezas, suma en vivo, pasos claros y una sola acción principal por pantalla. Las reglas del arqueo ciego (§15.2) no cambian.
+
+### 23.6 Configurador más amable
+
+- Cada paso del asistente: una idea por pantalla, texto breve que dice para qué sirve, valores de fábrica ya puestos, elegir en lugar de escribir (listas, interruptores, mosaicos), ejemplos junto al campo, errores junto al campo que los causa y en palabras llanas, y «Atrás» sin perder lo capturado.
+- Lo avanzado va plegado bajo «Más opciones».
+- El paso de caja del asistente usa los mismos componentes que las pantallas de caja.
+- Las mismas reglas aplican a las pantallas de Configuración.
+
+## 24. Versión 0.21: tarifas por agrupación, límites de adeudo y rezagados (fase 9b)
+
+### 24.1 Tarifas y cargos por agrupación
+
+- Un concepto de cobro puede tener **tarifas por agrupación** (`TarifaAgrupacion`: concepto, agrupación, importe y, si el concepto es recurrente, periodicidad y vencimiento propios; activa o no). Sin tarifa para la agrupación del titular vale lo general del concepto.
+- Un concepto puede ser **por cantidad** (libros, materiales, sesiones): al cargarlo se pide la cantidad (entero de 1 al máximo configurado) y el importe es cantidad × tarifa. El cargo guarda cantidad e importe unitario.
+- Los cargos automáticos toman la tarifa de la agrupación que el titular tiene al generarse. Cambiarlo de agrupación aplica desde el siguiente periodo; los cargos ya generados no cambian.
+- Un concepto recurrente puede aplicar **solo a ciertas agrupaciones**: sin tarifa activa y con «solo con tarifa» marcado, no se genera cargo.
+- Lo configura quien administra conceptos, en Conceptos y, opcional, en el asistente. Cada cambio de tarifa queda en bitácora con antes y después.
+- Plantillas: la de escuela trae «Libros» por cantidad con tarifa por grupo; las demás traen un ejemplo equivalente con su vocabulario. Ninguna trae importes.
+- El inventario no cambia: un artículo sigue teniendo su precio; la tarifa por agrupación es de conceptos de cobro.
+
+### 24.2 Recargos tras el alta
+
+- Parámetro `recargos_tras_alta`: `siguiente_periodo` (de fábrica) o `desde_alta`.
+- Con `siguiente_periodo`, los cargos cuyo vencimiento cae dentro del periodo (según la periodicidad del concepto) en que el titular se dio de alta no generan recargo por atraso. Desde el periodo siguiente, todo normal.
+- Reactivar una baja cuenta como alta nueva para esta regla. La fecha que cuenta es la de activación, no la de la solicitud.
+- La regla se aplica al decidir si un cargo genera recargo, fuera de `nucleo/`.
+
+### 24.3 Límite de adeudo
+
+- Dos límites independientes: **importe máximo** de adeudo vencido y **días máximos** de atraso (días desde el vencimiento más antiguo con saldo). Cada uno se elige entre **«Ilimitado»** (opción explícita, de fábrica) o un valor.
+- Hay un valor del negocio y **excepciones por titular** (con su propio «Ilimitado», valor, motivo y vigencia opcional).
+- Permiso nuevo `configurar_limites_adeudo`; las plantillas lo dan a los niveles superiores. Cambios en bitácora con antes y después, y a la vista de quien tiene `ver_auditoria` en su inicio, como los topes del banco.
+- Rebasar cualquiera de los dos deja al titular **rezagado** y con la restricción «sin crédito» (§24.4).
+- **Nunca se bloquea recibir un pago** ni consultar el estado de cuenta.
+
+### 24.4 Rezagados: reglas y acciones
+
+- El negocio define **reglas** (`ReglaRezago`): nombre, a quién aplica, cuándo se cumple y qué acciones dispara.
+  - **A quién:** todos, una agrupación o un titular.
+  - **Cuándo:** a partir de N días de atraso, a partir de un importe vencido, al rebasar el límite de adeudo, o combinación (basta una condición).
+  - **Acciones** (una o varias):
+    - `aviso_inicio`: aparece en el inicio de **todos los papeles** con nombre, matrícula, agrupación, días de atraso y, solo para quien puede ver saldos, el adeudo.
+    - `marca`: una marca con **texto propio del negocio** (por ejemplo «No puede pasar») en la ficha, en los buscadores y al cobrar.
+    - `sin_credito`: las ventas al adeudo, los cargos manuales nuevos y las prórrogas para ese titular pasan a solicitud.
+    - `cobranza`: entra en la lista de cobranza.
+- **Reglas propias:** además de las de la plantilla, el negocio crea las suyas sin límite de cantidad, con su nombre y su texto. Si varias aplican a un titular, valen todas sus acciones; en el aviso se muestra el texto de la regla más grave (más días).
+- Una regla dirigida a un titular o a una agrupación tiene prioridad sobre la general del mismo tipo: permite ser más estricto o más tolerante con alguien en particular.
+- La condición se evalúa al momento con los saldos reales: al ponerse al corriente, el titular deja de estar rezagado sin que nadie haga nada. No se guarda un estado que pueda quedar viejo.
+- Permiso nuevo `configurar_rezagos`, a los niveles superiores en las plantillas. Bitácora de cambios.
+- El texto de la marca es dato del negocio: se muestra siempre escapado y con largo acotado.
+- Cada plantilla trae reglas de arranque con su vocabulario (escuela: aviso a los pocos días y «No puede pasar» más adelante; gimnasio: «Acceso suspendido»; etcétera), sin importes y todas editables.
+- El aviso del inicio lista como máximo los 20 más atrasados y enlaza a la lista completa, que se puede ordenar y exportar con el permiso de ver saldos.
+
+### 24.5 Rendimiento
+
+El cálculo de atraso y adeudo vencido de todos los titulares se hace con consultas agregadas (nunca una por titular) y debe responder con 5,000 titulares y 100,000 cargos sin que el inicio lo note; se prueba con el número de consultas.

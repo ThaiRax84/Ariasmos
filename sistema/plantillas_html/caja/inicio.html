@@ -3,28 +3,67 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <h1>Mi caja</h1>
+    <span class="antetitulo">Mi caja{% if turno %} · {{ turno.caja }}{% endif %}</span>
+    <h1>{% if turno %}Turno abierto{% else %}Abrir turno{% endif %}</h1>
+    <p class="subtitulo">{% if turno %}Desde las {{ turno.abierto_en|time:"H:i" }} del {{ turno.abierto_en|date:"d/m/Y" }} en {{ turno.caja }}.{% else %}Elige tu caja y cuenta el efectivo con el que empiezas. Así el cambio y el corte cuadran desde el principio.{% endif %}</p>
   </div>
+  {% if limite %}<div class="encabezado-lado"><div class="recuadro-cifra aviso"><span class="etiqueta">Hora límite del corte</span><span class="valor">{{ limite.texto }}</span></div></div>{% endif %}
 </div>
 {% if turno %}
+{% if en_arqueo %}<div class="aviso-pantalla"><div class="aviso-texto"><span class="aviso-titulo">El turno está en arqueo</span><p>Ya no recibe cobros ni retiros. Termina de cerrarlo.</p></div><a class="boton" href="{% url 'caja:reconteo' turno.pk %}">Terminar el cierre</a></div>{% endif %}
+{% if pendientes_comprobante %}<div class="aviso-pantalla"><div class="aviso-texto"><span class="aviso-titulo">Retiros con comprobante pendiente</span><p>Adjúntalos antes de cerrar el turno: {% for r in pendientes_comprobante %}<a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p></div></div>{% endif %}
+<div class="cifras">
+  <div class="cifra"><span class="etiqueta">Abierto desde</span><span class="numero">{{ turno.abierto_en|time:"H:i" }}</span><span class="detalle">{{ turno.abierto_en|date:"d/m/Y" }}</span></div>
+  <div class="cifra"><span class="etiqueta">Cobros del turno</span><span class="numero">{{ cobros }}</span><span class="detalle">cobro{{ cobros|pluralize }} registrado{{ cobros|pluralize }}</span></div>
+  <div class="cifra"><span class="etiqueta">Retiros del turno</span><span class="numero">{{ retiros }}</span><span class="detalle">retiro{{ retiros|pluralize }} de caja</span></div>
+</div>
+{% if not en_arqueo %}
 <section class="panel">
-  <h2>Turno abierto en {{ turno.caja }}</h2>
-  <p>Desde {{ turno.abierto_en|date:"d/m/Y H:i" }} · {{ cobros }} cobro{{ cobros|pluralize }} registrado{{ cobros|pluralize }}{% if retiros %} · {{ retiros }} retiro{{ retiros|pluralize }}{% endif %}.</p>
-  {% if en_arqueo %}<p class="mensaje warning">El turno está en arqueo: ya no recibe cobros ni retiros. <a href="{% url 'caja:reconteo' turno.pk %}">Termina de cerrarlo</a>.</p>{% endif %}
-  {% if pendientes_comprobante %}<p class="mensaje warning">Retiros con comprobante pendiente: {% for r in pendientes_comprobante %}<a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  <h2>¿Qué sigue?</h2>
+  <p class="ayuda">Cobra con normalidad. Al terminar el día cuenta el efectivo y cierra el turno: el sistema no te dice antes cuánto debe haber.</p>
   <div class="acciones"><a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% if "retirar_efectivo" in permisos %}<a class="boton secundario" href="{% url 'caja:retiro_nuevo' %}">Retirar efectivo</a>{% endif %}<a class="boton secundario" href="{% url 'caja:cerrar' turno.pk %}">Cerrar turno</a></div>
 </section>
-{% else %}
-<form method="post" action="{% url 'caja:abrir' %}" class="formulario angosto" novalidate>
+{% endif %}
+{% elif formulario %}
+<form method="post" action="{% url 'caja:abrir' %}" class="columnas principal" novalidate>
   {% csrf_token %}
-  <h2>Abrir turno</h2>
-  {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Abrir turno</button></div>
+  <section class="panel">
+    {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    {% if not formulario.fields.caja.queryset %}<p class="mensaje warning">No hay cajas libres: todas tienen un turno abierto o están apagadas.</p>{% endif %}
+    {% include "comun/_campo.html" with campo=formulario.caja %}
+    {% include "comun/_campo.html" with campo=formulario.apertura %}
+    <div data-mostrar-con="apertura" data-mostrar-valor="efectivo">
+      {% if con_piezas %}
+      <div class="campo">
+        <span class="etiqueta">Fondo inicial: billetes y monedas que hay en la caja</span>
+        <span class="ayuda" data-ayuda-sin-js>Escribe cuántas piezas hay de cada billete o moneda. Si no hay efectivo, déjalo todo en cero.</span>
+        <span class="ayuda" data-ayuda-con-js hidden>Toca cada billete o moneda que pongas en la caja; con «−» quitas una.</span>
+        {% include "caja/_piezas.html" with campos=formulario.campos_piezas prefijo="Fondo: piezas de" mosaicos=True total="fondo-total" %}
+      </div>
+      {% else %}
+      <div class="importe-principal">{% include "comun/_campo.html" with campo=formulario.fondo_inicial %}</div>
+      {% endif %}
+    </div>
+  </section>
+  <section class="panel">
+    {% if con_piezas %}
+    <span class="etiqueta-campo">Fondo inicial</span>
+    <p class="cifra-importe grande" id="fondo-total" aria-live="polite">{{ 0|dinero }}</p>
+    <p class="ayuda">Es la suma de las piezas; no se escribe aparte. Abrir en cero también vale.</p>
+    {% else %}
+    <h2>Antes de abrir</h2>
+    <p class="ayuda">El fondo es el efectivo con el que empiezas para dar cambio. Abrir en cero también vale.</p>
+    {% endif %}
+    <div class="acciones columna"><button class="boton grande ancho" type="submit">Abrir turno</button></div>
+    <p class="nota-pie">Lo que declares al abrir queda registrado a tu nombre y entra en el corte.</p>
+  </section>
 </form>
 {% endif %}
 <section class="panel">
-  <h2>Efectivo de turnos cerrados por trasladar: {{ disponible|dinero }}</h2>
-  <div class="acciones"><a class="boton secundario" href="{% url 'caja:traslados' %}">Entregas y depósitos</a></div>
+  <div class="fila entre">
+    <div><h2>Efectivo de turnos cerrados por trasladar</h2><p class="cifra-importe media">{{ disponible|dinero }}</p></div>
+    <a class="boton secundario" href="{% url 'caja:traslados' %}">Entregas y depósitos</a>
+  </div>
 </section>
-{% if turnos %}<section class="panel"><h2>Turnos cerrados</h2><ul class="lista">{% for t in turnos %}<li><a href="{% url 'caja:turno' t.pk %}">{{ t.caja }} · {{ t.cerrado_en|date:"d/m/Y H:i" }}</a>{% if t.arqueo.supera_umbral %} · <strong>diferencia {{ t.arqueo.diferencia|dinero }}</strong>{% endif %}</li>{% endfor %}</ul></section>{% endif %}
+{% if turnos %}<section class="panel"><h2>Tus turnos cerrados</h2><ul class="lista">{% for t in turnos %}<li><a href="{% url 'caja:turno' t.pk %}">{{ t.caja }} · {{ t.cerrado_en|date:"d/m/Y H:i" }}</a>{% if t.arqueo.supera_umbral %} · <span class="estado aviso">diferencia {{ t.arqueo.diferencia|dinero }}</span>{% endif %}</li>{% endfor %}</ul></section>{% endif %}
 {% endblock %}

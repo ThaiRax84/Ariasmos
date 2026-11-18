@@ -27,6 +27,9 @@ namespace Ariasmos
         private readonly Label textoCubierta;
         private readonly Button reintentar;
         private readonly System.Windows.Forms.Timer limite;
+        private readonly System.Windows.Forms.Timer pausa;
+        private readonly Stopwatch reloj = new Stopwatch();
+        private EstadoArranque estadoArranque = EstadoArranque.Cargando;
         private WebView2 vista;
         private Splash splash;
         private bool documentoVerificado;
@@ -95,6 +98,12 @@ namespace Ariasmos
                     Fallar(Codigos.Tiempo, "El sistema no terminó de abrir a tiempo.", true);
                 }
             };
+            pausa = new System.Windows.Forms.Timer();
+            pausa.Tick += (origen, evento) =>
+            {
+                pausa.Stop();
+                Avanzar();
+            };
         }
 
         public int Resultado { get; private set; }
@@ -104,29 +113,95 @@ namespace Ariasmos
             vista = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Claro };
             Controls.Add(vista);
             cubierta.BringToFront();
+            if (IsHandleCreated)
+            {
+                Identificador(vista);
+            }
         }
 
-        protected override void OnLoad(EventArgs e)
+        private static void Identificador(Control control)
         {
-            base.OnLoad(e);
+            if (control.Handle == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("No se pudo crear la ventana de " + control.GetType().Name + ".");
+            }
+        }
+
+        public void Arrancar()
+        {
             splash = new Splash(Programa.Version);
+            splash.Cancelado += (origen, evento) =>
+            {
+                if (Arranque.CerrarAlCancelarSplash(Visible) && !cerrando)
+                {
+                    Registro.Escribir("Se cerró el splash antes de abrir la ventana; el programa termina.");
+                    splash = null;
+                    BeginInvoke(new Action(Close));
+                }
+            };
             splash.Show();
             splash.Refresh();
+            reloj.Start();
+            Identificador(this);
+            Identificador(vista);
             if (aviso != null)
             {
                 var hilo = new Thread(EsperarAviso) { IsBackground = true, Name = "Ariasmos.Mostrar" };
                 hilo.Start();
             }
-        }
-
-        protected override async void OnShown(EventArgs e)
-        {
-            base.OnShown(e);
             if (verificar)
             {
                 limite.Start();
             }
+            Avanzar();
+            BeginInvoke(new Action(Empezar));
+        }
+
+        private async void Empezar()
+        {
             await IniciarAsync();
+        }
+
+        private void Avanzar()
+        {
+            pausa.Stop();
+            if (cerrando || IsDisposed)
+            {
+                return;
+            }
+            var paso = Arranque.Decidir(estadoArranque, reloj.Elapsed, verificar, Visible);
+            if (paso.Accion == AccionArranque.Esperar)
+            {
+                pausa.Interval = Math.Max(1, (int)Math.Ceiling(paso.Espera.TotalMilliseconds));
+                pausa.Start();
+                return;
+            }
+            if (paso.Accion == AccionArranque.Mostrar)
+            {
+                MostrarVentana();
+            }
+        }
+
+        private void MostrarVentana()
+        {
+            Registro.Escribir("Se muestra la ventana (" + estadoArranque + ", " + (long)reloj.Elapsed.TotalMilliseconds + " ms de splash).");
+            Show();
+            Activate();
+            if (!cubierta.Visible && vista != null)
+            {
+                vista.Focus();
+            }
+            CerrarSplash();
+        }
+
+        private void CambiarArranque(EstadoArranque estado)
+        {
+            if (estadoArranque == EstadoArranque.Lista)
+            {
+                return;
+            }
+            estadoArranque = estado;
+            Avanzar();
         }
 
         private void EsperarAviso()
@@ -158,6 +233,16 @@ namespace Ariasmos
 
         private void TraerAlFrente()
         {
+            var frente = Arranque.AlPedirFrente(Visible, splash != null && !splash.IsDisposed);
+            if (frente == Frente.Splash)
+            {
+                splash.TraerAlFrente();
+                return;
+            }
+            if (frente != Frente.Ventana)
+            {
+                return;
+            }
             if (WindowState == FormWindowState.Minimized)
             {
                 WindowState = FormWindowState.Normal;
@@ -326,12 +411,13 @@ namespace Ariasmos
                 primeraCarga = false;
                 Resultado = Codigos.Bien;
                 limite.Stop();
-                CerrarSplash();
                 Registro.Escribir("Primera pantalla cargada y huella comprobada.");
                 if (verificar)
                 {
                     Close();
+                    return;
                 }
+                CambiarArranque(EstadoArranque.Lista);
             }
         }
 
@@ -606,8 +692,8 @@ namespace Ariasmos
                 Close();
                 return;
             }
-            CerrarSplash();
             MostrarCubierta(mensaje, conReintento);
+            CambiarArranque(EstadoArranque.Error);
         }
 
         private async void Reintentar()
@@ -716,7 +802,7 @@ namespace Ariasmos
 
         private void GuardarEstado()
         {
-            if (verificar)
+            if (verificar || !Visible)
             {
                 return;
             }
@@ -742,10 +828,12 @@ namespace Ariasmos
             cerrando = true;
             GuardarEstado();
             limite.Stop();
+            pausa.Stop();
             if (splash != null && !splash.IsDisposed)
             {
-                splash.Close();
+                splash.Cerrar();
             }
+            splash = null;
             if (aviso != null)
             {
                 aviso.Set();

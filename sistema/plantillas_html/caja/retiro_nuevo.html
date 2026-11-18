@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load formato %}
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
@@ -8,22 +9,48 @@
   </div>
 </div>
 {% if not turno %}
-<p class="mensaje warning">Abre tu turno de caja para retirar efectivo. <a href="{% url 'caja:inicio' %}">Ir a mi caja</a></p>
+<div class="aviso-pantalla"><div class="aviso-texto"><span class="aviso-titulo">Abre tu turno de caja para retirar efectivo</span><p>El retiro sale del efectivo de tu turno.</p></div><a class="boton" href="{% url 'caja:inicio' %}">Ir a mi caja</a></div>
 {% else %}
 <div class="columnas principal">
-  <form method="post" class="panel importe-principal" enctype="multipart/form-data" novalidate>
+  <form method="post" class="panel" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
-    {% include "comun/_campos.html" %}
+    {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    <div class="retiro-importe">
+      <div class="importe-principal">{% include "comun/_campo.html" with campo=formulario.importe %}</div>
+      {% if formulario.nombres_piezas %}
+      <div class="campo">
+        <span class="etiqueta">Billetes y monedas que salen</span>
+        <span class="ayuda" data-ayuda-sin-js>Escribe cuántas piezas salen de cada billete o moneda; deben sumar el importe.</span>
+        <span class="ayuda" data-ayuda-con-js hidden>Toca cada billete o moneda que sale; deben sumar el importe. Llevas <strong id="retiro-piezas">{{ 0|dinero }}</strong>.</span>
+        {% include "caja/_piezas.html" with campos=formulario.campos_piezas prefijo="Salen: piezas de" mosaicos=True total="retiro-piezas" %}
+      </div>
+      {% endif %}
+    </div>
+    {% include "comun/_campo.html" with campo=formulario.motivo %}
+    {% include "comun/_campo.html" with campo=formulario.nota %}
+    {% include "comun/_campo.html" with campo=formulario.comprobante %}
     <div class="acciones"><button class="boton grande" type="submit">Registrar retiro</button><a class="boton secundario" href="{% url 'caja:inicio' %}">Cancelar</a></div>
   </form>
-  <section class="panel">
-    <h2>Antes de retirar</h2>
-    <ul class="vias">
-      <li><div><strong>Sale de tu turno</strong><span>El retiro sale del efectivo de tu turno en {{ turno.caja }}.</span></div></li>
-      <li><div><strong>Topes del negocio</strong><span>Si pasa de los topes queda como solicitud para que otra persona lo autorice.</span></div></li>
-      <li><div><strong>Comprobante</strong><span>Adjunta el ticket o recibo ahora o después; el turno no se puede cerrar con comprobantes pendientes.</span></div></li>
-    </ul>
-  </section>
+  <div class="pila">
+    <section class="panel">
+      <h2>Tus topes {{ periodo_topes }}</h2>
+      <div class="tope">
+        <div class="fila entre"><span>Importe retirado</span><strong>{{ barra_importe.usado|dinero }} de {{ barra_importe.tope|dinero }}</strong></div>
+        <progress max="{{ barra_importe.tope|default:1 }}" value="{{ barra_importe.valor }}" aria-label="Importe retirado: {{ barra_importe.usado|dinero }} de {{ barra_importe.tope|dinero }}"></progress>
+      </div>
+      <div class="tope">
+        <div class="fila entre"><span>Retiros</span><strong>{{ barra_cantidad.usado }} de {{ barra_cantidad.tope }}</strong></div>
+        <progress max="{{ barra_cantidad.tope|default:1 }}" value="{{ barra_cantidad.valor }}" aria-label="Retiros: {{ barra_cantidad.usado }} de {{ barra_cantidad.tope }}"></progress>
+      </div>
+      <p class="ayuda">Tope por retiro: <strong>{{ tope_individual|dinero }}</strong>. Si necesitas más, el retiro queda como solicitud para que otra persona lo autorice.</p>
+    </section>
+    <section class="panel">
+      <h2>Retiros de tu turno</h2>
+      {% if retiros_turno %}
+      <table class="tabla compacta"><tbody>{% for r in retiros_turno %}<tr><td><a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a> · {{ r.motivo }}<span class="detalle">{{ r.creado|time:"H:i" }} · {{ r.get_comprobante_display|lower }}</span></td><td class="importe">{{ r.importe|dinero }}</td><td><span class="estado {{ r.revision }}">{{ r.get_revision_display }}</span></td></tr>{% endfor %}</tbody></table>
+      {% else %}<p class="ayuda">Todavía no hay retiros en este turno.</p>{% endif %}
+    </section>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

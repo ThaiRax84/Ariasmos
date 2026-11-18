@@ -96,8 +96,15 @@ class OtorgarBeca(AccionLibro):
 
 
 class OtorgarProrroga(AccionLibro):
+    motivo_obligatoria = "sin_credito"
+
     def llave(self, datos):
         return {"datos__cargo": datos.get("cargo")}
+
+    def exige_solicitud(self, usuario, titular, datos):
+        from rezagos.calculo import sin_credito
+
+        return titular is not None and sin_credito(titular)
 
     def validar(self, titular, datos):
         cargo = _cargo(titular, datos)

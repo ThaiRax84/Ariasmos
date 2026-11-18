@@ -34,6 +34,7 @@ RAIZ = {
     "motivos_retiro": False,
     "caja": False,
     "inventario": False,
+    "rezagos": False,
 }
 PERIODOS_RETIRO = ("dia", "semana")
 TOPES_CAJA = {
@@ -224,7 +225,7 @@ def _recargo(valor, ruta):
 
 
 def _concepto(valor, ruta):
-    _objeto(valor, ruta, ("nombre", "tipo", "periodicidad", "aplica_a", "prioridad", "recargo"), ("nombre", "tipo"))
+    _objeto(valor, ruta, ("nombre", "tipo", "periodicidad", "aplica_a", "prioridad", "recargo", "por_cantidad", "cantidad_maxima", "solo_con_tarifa"), ("nombre", "tipo"))
     concepto = {
         "nombre": _texto(valor["nombre"], f"{ruta}.nombre", 100),
         "tipo": _opcion(valor["tipo"], f"{ruta}.tipo", TIPOS_CONCEPTO),
@@ -232,6 +233,7 @@ def _concepto(valor, ruta):
         "prioridad": _entero(valor.get("prioridad", 100), f"{ruta}.prioridad", 0, 1000),
         "recargo": _recargo(valor.get("recargo", False), f"{ruta}.recargo"),
     }
+    concepto.update(_tarifas_de_concepto(valor, ruta, concepto["tipo"]))
     periodicidad = valor.get("periodicidad", "")
     if concepto["tipo"] == "recurrente":
         concepto["periodicidad"] = _opcion(periodicidad, f"{ruta}.periodicidad", PERIODICIDADES)
@@ -240,6 +242,23 @@ def _concepto(valor, ruta):
     else:
         concepto["periodicidad"] = ""
     return concepto
+
+
+def _tarifas_de_concepto(valor, ruta, tipo):
+    salida = {}
+    if "por_cantidad" in valor:
+        salida["por_cantidad"] = _logico(valor["por_cantidad"], f"{ruta}.por_cantidad")
+        if salida["por_cantidad"] and tipo != "por_evento":
+            _falla(f"{ruta}.por_cantidad", "solo un concepto por evento se cobra por cantidad")
+    if "cantidad_maxima" in valor:
+        if not salida.get("por_cantidad"):
+            _falla(f"{ruta}.cantidad_maxima", "solo aplica a un concepto por cantidad")
+        salida["cantidad_maxima"] = _entero(valor["cantidad_maxima"], f"{ruta}.cantidad_maxima", 1, 10000)
+    elif salida.get("por_cantidad"):
+        salida["cantidad_maxima"] = 20
+    if "solo_con_tarifa" in valor:
+        salida["solo_con_tarifa"] = _logico(valor["solo_con_tarifa"], f"{ruta}.solo_con_tarifa")
+    return salida
 
 
 def validar(datos):
@@ -297,6 +316,9 @@ def validar(datos):
     conceptos = _lista(datos.get("conceptos", []), "conceptos", "conceptos")
     limpia["conceptos"] = [_concepto(c, f"conceptos[{i}]") for i, c in enumerate(conceptos)]
     _sin_repetidos([c["nombre"] for c in limpia["conceptos"]], "conceptos")
+    from rezagos.esquema import validar_reglas
+
+    limpia["rezagos"] = validar_reglas(datos.get("rezagos", []), _falla)
     return limpia
 
 

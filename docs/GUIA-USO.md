@@ -23,6 +23,7 @@ Cada rol ve un Inicio distinto:
 - **Dirección**: cuatro cuadros (cobrado en el mes con su reparto entre efectivo y banco, por cobrar vencido, efectivo en custodia y retiros de la semana), **Salud del sistema** (bitácora, respaldo, prueba de restauración, certificado y equipos por aprobar) y **Avisos de control**.
 - Cada cuadro aparece solo si tu rol tiene el permiso correspondiente. Si tienes un turno de caja abierto, los cuadros de cobrado y de efectivo dicen «Se muestra al cerrar tu turno»: el arqueo sigue siendo ciego.
 - Cada aviso lleva una etiqueta (**Revisar**, **Por hacer**, **Por revisar**, **Bien**…) y un enlace a donde se atiende.
+- **Todos los roles** ven el aviso **Con atraso** cuando alguien cumple una regla de rezago con aviso o rebasa el límite de adeudo: nombre, matrícula, agrupación, días de atraso y el texto de la regla más grave (por ejemplo «No puede pasar»). Muestra a los 20 más atrasados y enlaza a la lista completa. El adeudo solo lo ve quien tiene el permiso de ver saldos; los demás ven el resto sin importes.
 
 ## Operación
 
@@ -43,10 +44,14 @@ Cada rol ve un Inicio distinto:
 5. Al aprobarse, cada renglón se vuelve a comparar con los datos del momento: si alguien cambió ese dato mientras tanto, el renglón se salta y aparece en la lista de **Renglones saltados**.
 6. La vista previa solo muestra los datos que tu rol puede ver.
 
+### Ordenar las listas
+
+En el padrón, en los buscadores (cobrar, vender y conciliar un movimiento del banco) y en las listas largas (artículos, usuarios, solicitudes y cortes) aparece **Ordenar por** con el sentido ascendente o descendente. El programa recuerda el orden que elegiste en cada lista, solo para ti.
+
 ### Cobrar en efectivo
 
-1. Abre tu turno en **Mi caja** (el fondo inicial es opcional). Si el negocio captura piezas por denominación, escribe cuántos billetes y monedas de cada valor hay en el fondo.
-2. Menú **Cobrar** → busca al titular por nombre o matrícula.
+1. Abre tu turno en **Mi caja**: elige tu caja y di si hay efectivo para dar cambio. Con **No, abro en cero** se abre en un solo paso. Con **Sí, cuento lo que hay**: si el negocio captura piezas por denominación, toca cada billete y moneda del fondo (con **−** quitas una; también puedes escribir el número) y el fondo inicial es la suma, que no se escribe aparte; si no, escribe el importe del fondo. Las piezas del fondo cuentan para el cambio que el sistema te propone al cobrar.
+2. Menú **Cobrar** → busca al titular por nombre o matrícula. Con **Ordenar por** eliges el orden de los resultados (nombre, apellidos, matrícula, agrupación o familia, ascendente o descendente).
 3. A la izquierda ves los cargos pendientes y arriba a la derecha el adeudo. Escribe el importe (solo el número: el signo y la moneda ya vienen puestos). El sistema muestra en **Así se va a aplicar** cómo se reparte entre los cargos pendientes (y los de su familia).
 4. Si se capturan piezas: toca cada billete o moneda que te entregan (con **−** quitas una; también puedes escribir el número) y elige **Calcular el cambio**. Mientras tocas, **Recibido** suma lo que capturaste. El recuadro **Entrega exactamente estas piezas** dice qué piezas dar de cambio para que tu caja cuadre en el corte; si entregas otras, ábrelas con **Di el cambio con otras piezas** y corrígelas antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
 5. Elige **Confirmar y dar recibo**. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
@@ -54,7 +59,7 @@ Cada rol ve un Inicio distinto:
 ### Retirar efectivo para un gasto
 
 1. Con tu turno abierto, en **Mi caja** elige **Retirar efectivo**.
-2. Escribe el importe, elige el motivo, anota en qué se gastó y adjunta la foto o el PDF del ticket (JPEG, PNG o PDF de hasta 5 MB). Puedes adjuntarlo después desde el retiro.
+2. Escribe el importe (si se capturan piezas, toca los billetes y monedas que salen), elige el motivo, anota en qué se gastó y adjunta la foto o el PDF del ticket (JPEG, PNG o PDF de hasta 5 MB). Puedes adjuntarlo después desde el retiro.
 3. Si el retiro cabe en los topes del negocio, queda registrado de inmediato con su folio. Si pasa de algún tope, queda como **solicitud** y se registra cuando otra persona lo autoriza (por la bandeja, con una delegación o con su código por teléfono).
 4. Solo se puede retirar efectivo cobrado en tu turno. Si no alcanza, el sistema lo dice sin decir cuánto hay; después de los intentos que fije el negocio (tres de fábrica), los retiros de ese turno piden autorización.
 5. No puedes cerrar el turno con retiros sin comprobante: adjúntalo o declara que no lo hay con su motivo (recibe el aviso quien revisa retiros).
@@ -84,6 +89,12 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - **Devolución**: busca la venta por su número o por el recibo (código o QR). Lo no pagado se cancela; lo pagado regresa como **saldo a favor** al momento o en **efectivo**, que siempre se solicita y autoriza otra persona (sale de tu turno al aprobarse).
 - **Entrada o merma**: artículo, cantidad, motivo y, si lo hay, el comprobante (JPEG, PNG o PDF de hasta 5 MB). No pide permiso; Supervisión la revisa después.
 - **Conteo mensual**: descarga la lista para contar (no trae existencias), cuenta y sube el Excel o CSV con clave y cantidad, o captúralo en pantalla. Al guardarlo queda fijo, ves las diferencias y otra persona lo aprueba.
+
+### Cargos por cantidad y titulares sin crédito
+
+- **Cargo manual**: elige el concepto y la **cantidad**. Si el concepto se cobra por cantidad (en la plantilla de escuela, «Libros»), la cantidad va de 1 al máximo configurado y el importe es cantidad × la tarifa de la agrupación del titular (o el importe general del concepto si su agrupación no tiene tarifa). El importe lo calcula el programa; cambiar el importe por unidad requiere el permiso de ajustes. Un concepto que no es por cantidad se carga de uno en uno.
+- Si el titular tiene una **marca** (por ejemplo «No puede pasar» o «Sin crédito»), la ves en su ficha, en los buscadores (padrón, cobrar, vender) y al cobrar.
+- Un titular **sin crédito** (rebasó su límite de adeudo o una regla le quitó el crédito) se cobra igual: recibir pagos, el estado de cuenta y los cargos automáticos no cambian. Lo que cambia es que su **venta al adeudo**, un **cargo manual** nuevo o una **prórroga** quedan como **solicitud** que autoriza otra persona por cualquiera de las tres vías. La venta que se paga en el momento no cambia. Al ponerse al corriente recupera el crédito sin que nadie haga nada.
 
 ### Verificar un recibo
 
@@ -117,6 +128,39 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - La pantalla muestra cuánto se ha aplicado hoy contra el tope del día y cuánto hay acumulado contra el tope acumulado. Al instalar todo está en 0: aplicar solo es una decisión del negocio.
 - Cada cambio queda en la bitácora con los valores de antes y de después, y Dirección lo ve en su Inicio durante 7 días.
 
+### Tarifas por agrupación y conceptos por cantidad
+
+**Conceptos → Tarifas por agrupación** (permiso «Administrar conceptos de cobro»):
+
+- Cada concepto puede tener una **tarifa por agrupación**: importe y, si es recurrente, periodicidad y día de vencimiento propios, activa o no. Sin tarifa para la agrupación del titular vale lo general del concepto.
+- **Por cantidad** (solo conceptos por evento): al cargarlo se pide cuántos, de 1 al máximo que fijes.
+- **Solo con tarifa**: a quien no tenga tarifa activa para su agrupación no se le cobra ese concepto (sirve para cargos especiales de ciertas agrupaciones).
+- Los cargos automáticos toman la tarifa que corresponde al momento de generarse. Cambiar a alguien de agrupación aplica desde el siguiente periodo; los cargos ya generados no cambian. Si la nueva tarifa tiene otra periodicidad, el primer periodo nuevo empieza después de que termina el último cobrado, sin cobrar dos veces los mismos días.
+- Cada cambio queda en la bitácora con antes y después.
+
+### Recargos tras el alta
+
+**Reglas de recargo → Recargos tras el alta** (permiso «Administrar conceptos de cobro»): de fábrica, a quien se acaba de dar de alta **no se le cobran recargos** de lo que vence dentro del periodo de su alta (según la periodicidad de cada concepto; los que no se repiten cuentan por mes). Desde el periodo siguiente, todo normal. Puedes cambiarlo a «Desde el alta». Reactivar una baja cuenta como alta nueva y vale la fecha de activación. El saldo inicial de una migración sí genera recargo.
+
+### Límites de adeudo
+
+**Más → Límites de adeudo** (permiso «Configurar los límites de adeudo», que traen Supervisión y Dirección; pide tu contraseña otra vez):
+
+- Dos límites independientes: **importe máximo** de adeudo vencido y **días máximos** de atraso (desde el vencimiento más antiguo con saldo; una prórroga mueve ese vencimiento). Cada uno es **Ilimitado** (de fábrica) o **Hasta un valor**.
+- **Excepciones por titular**: desde su ficha, «Excepción al límite», con su propio «Como el negocio», «Ilimitado» o valor para cada límite, motivo y vigencia opcional. Solo las ve quien configura los límites o quien ve la ficha.
+- Quien rebasa cualquiera de los dos aparece en el aviso **Con atraso** del Inicio y queda **sin crédito**. Nunca se bloquea recibir un pago ni consultar el estado de cuenta.
+- Cada cambio queda en la bitácora con antes y después, y Dirección lo ve en su Inicio durante 7 días.
+
+### Reglas de rezago
+
+**Más → Reglas de rezago** (permiso «Configurar las reglas de rezago»):
+
+- Cada regla tiene **nombre**, **texto** (hasta 60 caracteres, por ejemplo «No puede pasar»), **a quién aplica** (todos, una agrupación o un titular por su matrícula), **cuándo** (a partir de N días de atraso, de un importe vencido o al rebasar el límite; basta una) y **acciones**: aviso en el Inicio de todos, marca en la ficha, buscadores y cobro, sin crédito y lista de cobranza.
+- Puedes crear todas las reglas propias que quieras. Si varias aplican, valen todas sus acciones; el aviso muestra el texto de la más grave (más días).
+- Una regla para una agrupación o para un titular manda sobre la general en la misma acción: sirve para ser más estricto o más tolerante con alguien. Las reglas para un titular solo las ve quien configura las reglas o quien ve la ficha.
+- Las plantillas traen reglas de arranque con su contexto (escuela: «Pago atrasado» a los 10 días y «No puede pasar» a los 30; gimnasio: «Acceso suspendido»; etcétera), sin importes y editables. Solo llegan en una instalación nueva.
+- **Con atraso** (enlace del aviso del Inicio) es la lista completa; se ordena por días, nombre, matrícula o agrupación, y quien ve saldos también por adeudo y la exporta a CSV.
+
 ### Efectivo
 
 - **Efectivo** muestra quién tiene dinero en custodia, las entregas por confirmar y los depósitos por conciliar. Si tú mismo tienes un turno abierto, tu efectivo no se muestra hasta que lo cierres.
@@ -144,6 +188,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 ### Lista de cobranza
 
 - Cada lunes se genera la lista de adeudos vencidos; en **Cortes** puedes generarla en cualquier momento.
+- Si hay reglas de rezago con la acción de cobranza, la lista trae además la sección «Con atraso según las reglas del negocio», de los más atrasados a los menos, con el texto de la regla.
 
 ## Todas las personas: versión nueva
 
@@ -174,7 +219,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario (incluye cómo se llama el padrón, el descuento autorizado y la venta sin registro), **Reglas del negocio** (prefijo y dígitos del teléfono, tamaño de hoja de los PDF —Carta o A4—, apellidos obligatorios o no y la constancia de consentimiento con su texto), parámetros (entre otros: tramos de la cartera vencida, cuántos respaldos diarios y mensuales se conservan, horas sin respaldo antes de avisar, días entre pruebas de restauración, intentos de retiro rechazados antes de pedir autorización y porcentaje de aviso del tope de retiros), catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
+- **Configuración** (cada pantalla dice para qué sirve; lo poco usado está plegado bajo **Más opciones**): datos del negocio (la zona horaria se elige de una lista con buscador: escribe una ciudad), vocabulario (incluye cómo se llama el padrón, el descuento autorizado y la venta sin registro), **Reglas del negocio** (prefijo y dígitos del teléfono, tamaño de hoja de los PDF —Carta o A4—, apellidos obligatorios o no y la constancia de consentimiento con su texto), parámetros (entre otros: tramos de la cartera vencida, cuántos respaldos diarios y mensuales se conservan, horas sin respaldo antes de avisar, días entre pruebas de restauración, intentos de retiro rechazados antes de pedir autorización y porcentaje de aviso del tope de retiros), catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
 
 ### Marca del negocio
@@ -202,6 +247,10 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 ### Cambios en los topes del banco
 
 Quien tiene «Ver auditoría» ve en su Inicio los cambios de topes del banco de los últimos 7 días que hizo **otra** persona: quién, cuándo y de cuánto a cuánto. Quien concilia también libera pagos, así que conviene revisar que los topes sean los acordados.
+
+### Cambios en los límites de adeudo
+
+Quien tiene «Ver auditoría» ve en su Inicio los cambios del límite de adeudo del negocio y de las excepciones por titular de los últimos 7 días hechos por **otra** persona, con quién, cuándo y de cuánto a cuánto.
 
 ### Actualizaciones del programa
 

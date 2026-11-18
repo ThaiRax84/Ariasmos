@@ -1,0 +1,14 @@
+{% load formato %}{% if cambios %}
+<section class="panel alerta" aria-labelledby="aviso-limites">
+  <h2 id="aviso-limites">Cambios en los límites de adeudo</h2>
+  <p>Cambios de los últimos 7 días hechos por otra persona en el límite del negocio o en las excepciones.</p>
+  <ul class="lista">{% for c in cambios %}<li>{{ c.momento|date:"d/m/Y H:i" }} · {{ c.quien }} · {% if c.excepcion %}{% if c.quitada %}quitó la excepción de{% else %}excepción de{% endif %} {{ voc.matricula_min }} {{ c.matricula }}{% else %}límite del negocio{% endif %}{% for r in c.renglones %} · {{ r.nombre }}: {{ r.antes }} → {{ r.despues }}{% endfor %}</li>{% endfor %}</ul>
+  {% if "configurar_limites_adeudo" in permisos %}<a class="boton secundario" href="{% url 'rezagos:limites' %}">Ver límites</a>{% endif %}
+</section>
+{% endif %}{% if aviso %}
+<section class="panel alerta" aria-labelledby="aviso-rezagados" data-rezagados>
+  <h2 id="aviso-rezagados">Con atraso · {{ aviso.total }}</h2>
+  <ul class="lista-estado">{% for f in aviso.filas %}<li data-rezagado><span class="renglon-texto"><span class="renglon-titulo">{% if aviso.ver_fichas %}<a href="{% url 'titulares:detalle' f.pk %}">{{ f.nombre }}</a>{% else %}{{ f.nombre }}{% endif %}</span><span class="renglon-detalle">{{ f.matricula }}{% if f.agrupacion %} · {{ f.agrupacion }}{% endif %} · {{ f.dias }} día{{ f.dias|pluralize }} de atraso{% if aviso.ver_saldos %} · adeudo vencido {{ f.adeudo|dinero }}{% endif %}</span></span><span class="estado aviso">{{ f.texto }}</span></li>{% endfor %}</ul>
+  <a class="boton secundario" href="{% url 'rezagos:lista' %}">{% if aviso.mas %}Ver la lista completa ({{ aviso.total }}){% else %}Ver la lista{% endif %}</a>
+</section>
+{% endif %}

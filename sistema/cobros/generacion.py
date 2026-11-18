@@ -4,6 +4,8 @@ from django.db.models import Max, Q, Sum
 
 from configuracion.models import Negocio, hoy_negocio, parametro
 from nucleo import recargos
+from rezagos import tras_alta
+from tarifas import servicios as tarifas
 from titulares.models import Titular
 
 from . import libro
@@ -93,21 +95,28 @@ def generar_recurrentes(hoy=None, request=None):
     dia = min(max(parametro("dia_generacion_cargos"), 1), 28)
     creados = 0
     for concepto in ConceptoCobro.objects.filter(tipo=ConceptoCobro.RECURRENTE, activo=True, periodicidad__in=GENERADAS):
+        del_concepto = tarifas.DelConcepto(concepto)
         for titular in _titulares_de(concepto):
+            vigente = del_concepto.para(titular)
+            if vigente is None or vigente.periodicidad not in GENERADAS:
+                continue
             desde = max(inicio, titular.activo_desde or hoy)
             hechos = set(Cargo.objects.filter(titular=titular, concepto=concepto, origen=Cargo.AUTOMATICO).values_list("periodo", flat=True))
-            for periodo, fecha, vencimiento in periodos(concepto, desde, hoy, dia):
-                if periodo in hechos:
+            frontera = del_concepto.desde(titular, vigente, hechos)
+            desde = max(desde, frontera or desde)
+            for periodo, fecha, vencimiento in periodos(vigente.regla, desde, hoy, dia):
+                if periodo in hechos or not del_concepto.admite(vigente, periodo, frontera):
                     continue
                 if fecha > hoy:
                     continue
                 plan = plan_vigente(titular.pk, concepto.pk, fecha)
                 if concepto.aplica_a not in (ConceptoCobro.TODOS, ConceptoCobro.AGRUPACION) and plan is None:
                     continue
-                base = plan.importe_centavos if plan is not None and plan.importe_centavos is not None else concepto.importe_centavos
+                base = plan.importe_centavos if plan is not None and plan.importe_centavos is not None else vigente.importe
                 final, descuento, beca = importe_con_beca(titular.pk, concepto, base, fecha)
                 cargo = libro.crear_cargo(titular, concepto, base, vencimiento, Cargo.AUTOMATICO, periodo=periodo, descripcion=concepto.nombre, beca=beca, descuento=descuento, request=request)
                 if cargo is not None:
+                    del_concepto.anotar(cargo, vigente, periodo)
                     creados += 1
     return creados
 
@@ -115,10 +124,13 @@ def generar_recurrentes(hoy=None, request=None):
 def generar_recargos(hoy=None, request=None):
     hoy = hoy or hoy_negocio()
     creados = 0
+    exento = tras_alta.evaluador()
     base = libro.con_saldo(
         Cargo.objects.filter(origen__in=[Cargo.AUTOMATICO, Cargo.MANUAL, Cargo.SALDO_INICIAL], concepto__regla_recargo__activa=True, vencimiento__lt=hoy, titular__interno=False).select_related("concepto__regla_recargo", "titular")
     ).filter(saldo__gt=0)
     for cargo in base:
+        if exento(cargo):
+            continue
         regla = cargo.concepto.regla_recargo
         existentes = cargo.recargos.all()
         ya = list(existentes.values_list("fecha_recargo", flat=True))
@@ -142,7 +154,9 @@ def cargos_de_alta(titular, hoy=None, request=None):
     hoy = hoy or hoy_negocio()
     creados = []
     for concepto in titular.conceptos_iniciales.filter(activo=True).exclude(tipo=ConceptoCobro.RECURRENTE):
-        cargo = libro.crear_cargo(titular, concepto, concepto.importe_centavos, hoy, Cargo.AUTOMATICO, descripcion=concepto.nombre, request=request)
+        if tarifas.sin_tarifa_obligatoria(concepto, titular):
+            continue
+        cargo = libro.crear_cargo(titular, concepto, tarifas.precio(concepto, titular), hoy, Cargo.AUTOMATICO, descripcion=concepto.nombre, request=request)
         if cargo is not None:
             creados.append(cargo)
     return creados

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo"><a href="{% url 'rezagos:reglas' %}">Reglas de rezago</a></span>
+    <h1>{{ titulo }}</h1>
+  </div>
+</div>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones">
+    <button class="boton" type="submit">Guardar regla</button>
+    <a class="boton secundario" href="{% url 'rezagos:reglas' %}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -4,6 +4,7 @@ from django import forms
 
 from nucleo.dinero import ErrorImporte, a_centavos, a_texto
 from proyecto.captura import CampoGuiadoTexto, EntradaDinero, EntradaPorcentaje
+from proyecto.plegables import ConPlegables, plegar, segun
 from titulares.models import Agrupacion, Titular
 
 from configuracion.models import opciones_vocabulario, vocabulario
@@ -159,20 +160,25 @@ def valor_de_recargo(tipo, importe, porcentaje):
     return importe
 
 
-class FormularioRegla(forms.ModelForm):
-    valor_importe = CampoImporte(label="Importe fijo del recargo (si el tipo es fijo)", required=False)
-    valor_porcentaje = CampoPorcentaje(label="Porcentaje del recargo (si el tipo es porcentaje)", required=False)
-    tope_centavos = CampoImporte(label="Tope (opcional)", required=False)
+class FormularioRegla(ConPlegables, forms.ModelForm):
+    valor_importe = CampoImporte(label="Importe fijo del recargo (si el tipo es importe fijo)", required=False, help_text="Ejemplo: 150.00")
+    valor_porcentaje = CampoPorcentaje(label="Porcentaje del recargo (si el tipo es porcentaje)", required=False, help_text="Sobre el saldo del cargo. Ejemplo: 10")
+    tope_centavos = CampoImporte(label="Tope del recargo (opcional)", required=False, help_text="El recargo nunca pasa de esta cantidad. Vacío, sin tope.")
 
     class Meta:
         model = ReglaRecargo
         fields = ["nombre", "tipo", "dias_gracia", "se_repite", "tope_centavos", "activa"]
-        labels = {"dias_gracia": "Días de gracia", "se_repite": "Se repite cada periodo", "activa": "Activa"}
+        labels = {"tipo": "Cómo se calcula", "dias_gracia": "Días de gracia", "se_repite": "Se repite cada periodo", "activa": "Activa"}
+        help_texts = {"nombre": "Ejemplo: Recargo por pago tardío", "dias_gracia": "Días después del vencimiento en que todavía no se cobra el recargo.", "se_repite": "Si sigue sin pagarse, el recargo vuelve a aplicarse en cada periodo."}
+        widgets = {"tipo": forms.RadioSelect}
 
     field_order = ["nombre", "tipo", "valor_importe", "valor_porcentaje", "dias_gracia", "se_repite", "tope_centavos", "activa"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["tipo"].en_fila = True
+        segun(self, "tipo", {"valor_importe": (ReglaRecargo.FIJO, "Importe del recargo"), "valor_porcentaje": (ReglaRecargo.PORCENTAJE, "Porcentaje del recargo")})
+        plegar(self, "se_repite", "tope_centavos")
         if self.instance.pk:
             clave = "valor_porcentaje" if self.instance.tipo == ReglaRecargo.PORCENTAJE else "valor_importe"
             self.initial.setdefault(clave, self.instance.valor)

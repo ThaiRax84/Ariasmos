@@ -1,0 +1,15 @@
+{% load formato %}<section class="panel{% if situacion %} alerta{% endif %}" data-ficha-rezago>
+  <h2>Atraso y crédito</h2>
+  {% if situacion %}
+  <p>{{ situacion.dias }} día{{ situacion.dias|pluralize }} de atraso · adeudo vencido {{ situacion.vencido|dinero }}{% if marcas %} · {% for m in marcas %}<span class="estado aviso">{{ m }}</span> {% endfor %}{% endif %}</p>
+  <dl class="datos">
+    <dt>Aviso</dt><dd>{{ texto }}</dd>
+    <dt>Límite de importe</dt><dd>{{ limite_importe }}{% if situacion.rebasa_importe %} · <strong>rebasado</strong>{% endif %}</dd>
+    <dt>Límite de días</dt><dd>{{ limite_dias }}{% if situacion.rebasa_dias %} · <strong>rebasado</strong>{% endif %}</dd>
+    <dt>Crédito</dt><dd>{% if situacion.sin_credito %}Sin crédito: las ventas al adeudo, los cargos manuales y las prórrogas pasan a solicitud. Recibir pagos y el estado de cuenta no cambian.{% else %}Con crédito{% endif %}</dd>
+  </dl>
+  {% else %}<p>Sin atraso.</p>{% endif %}
+  {% if excepcion %}<p>Excepción al límite: importe «{{ excepcion_importe }}», días «{{ excepcion_dias }}»{% if excepcion.vigente_hasta %} · hasta el {{ excepcion.vigente_hasta|date:"d/m/Y" }}{% endif %} · {{ excepcion.motivo }}</p>{% endif %}
+  {% if dirigidas %}<p>Reglas propias:{% for r in dirigidas %} {% if "configurar_rezagos" in permisos %}<a href="{% url 'rezagos:regla_editar' r.pk %}">{{ r.nombre }}</a>{% else %}{{ r.nombre }}{% endif %}{% if not r.activa %} (inactiva){% endif %}{% if not forloop.last %},{% endif %}{% endfor %}</p>{% endif %}
+  {% if "configurar_limites_adeudo" in permisos %}<div class="acciones"><a class="boton secundario" href="{% url 'rezagos:excepcion' titular.pk %}">{% if excepcion %}Cambiar la excepción al límite{% else %}Excepción al límite{% endif %}</a></div>{% endif %}
+</section>

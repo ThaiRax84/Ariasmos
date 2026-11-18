@@ -1,0 +1,5 @@
+<form method="get" class="fila orden-formulario" aria-label="Orden de la lista">
+  {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+  {% if estado %}<input type="hidden" name="estado" value="{{ estado }}">{% endif %}
+  {% include "comun/_orden.html" %}
+</form>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo"><a href="{% url 'rezagos:limites' %}">Límites de adeudo</a> · Excepción</span>
+    <h1>{{ titular.nombre_completo }}</h1>
+    <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong> · límite del negocio: importe «{{ negocio_importe }}», días «{{ negocio_dias }}»</p>
+  </div>
+</div>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones">
+    <button class="boton" type="submit">Guardar</button>
+    <a class="boton secundario" href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a>
+  </div>
+</form>
+{% endblock %}
