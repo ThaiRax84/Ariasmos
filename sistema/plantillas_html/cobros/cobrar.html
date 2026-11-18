@@ -16,6 +16,7 @@
 </div>
 {% if venta %}<p class="mensaje">Cobro de la venta {{ venta }} por {{ venta.total|dinero }}: el pago se aplica primero a los artículos de esa venta y lo que sobre, al adeudo normal.</p>{% endif %}
 {% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
+{% load rezagos %}{% cobro_rezago titular %}
 <div class="columnas mitades">
   <section class="panel">
     <h2>Cargos pendientes</h2>

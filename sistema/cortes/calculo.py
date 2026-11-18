@@ -460,4 +460,9 @@ def cifras_cobranza(fecha):
         datos["encabezado"] = {"fecha": fecha.isoformat()}
     datos["totales"] = {"renglones": len(filas), "importe_pendiente": sum(f["importe_pendiente"] for f in filas)}
     datos["secciones"] = [seccion("adeudos", "Adeudos vencidos", filas)]
+    from rezagos.presentacion import filas_cobranza
+
+    rezagados = filas_cobranza(fecha, titular)
+    if rezagados:
+        datos["secciones"].append(seccion("rezagados", "Con atraso según las reglas del negocio", rezagados))
     return datos

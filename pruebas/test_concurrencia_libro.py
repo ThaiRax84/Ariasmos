@@ -11,7 +11,7 @@ from cobros.models import Aplicacion, Cargo, Pago, Recibo
 from cuentas.models import Usuario
 
 from .conftest import configurar, nuevo_usuario
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de, verificar_sumas
+from .libro_ayudas import preparar_conceptos, recargos_desde_el_alta, titular_activo, turno_de, verificar_sumas
 
 
 def en_hilos(funcion, argumentos):
@@ -39,6 +39,7 @@ def en_hilos(funcion, argumentos):
 def base(transactional_db):
     roles = configurar("escuela")
     preparar_conceptos()
+    recargos_desde_el_alta()
     sup = nuevo_usuario("supervision", roles["Supervisión"])
     cajeros = [nuevo_usuario(f"cajero{i}", roles["Operación"]) for i in range(6)]
     ana = titular_activo(cajeros[0], sup, "Ana")

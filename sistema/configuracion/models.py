@@ -32,6 +32,7 @@ PARAMETROS = {
     "intentos_codigo_por_hora": (5, "Códigos por teléfono erróneos por hora, por capturista y por autorizador, antes de bloquear esa vía"),
     "maximo_equipos_pendientes": (50, "Equipos pendientes de aprobación como máximo; los de más de 24 horas se depuran solos"),
     "dia_generacion_cargos": (1, "Día del mes en que se generan los cargos recurrentes"),
+    "recargos_tras_alta": ("siguiente_periodo", "Cuándo empiezan los recargos de quien se acaba de dar de alta: siguiente_periodo (lo que vence en el periodo del alta no genera recargo) o desde_alta"),
     "orden_reparto": ("recargos,vencimiento,prioridad", "Orden en que un pago cubre los cargos (recargos, vencimiento, prioridad, separados por comas)"),
     "tope_pago_individual": (5000000, "Importe máximo en centavos de un pago individual sin autorización"),
     "umbral_diferencia_arqueo": (1000, "Diferencia en centavos a partir de la cual el arqueo pide nota y avisa a {rol:recibir_efectivo}"),
@@ -87,6 +88,7 @@ PARAMETROS = {
 
 ESPECIALES = (
     "calendario_corte",
+    "recargos_tras_alta",
     "control_denominaciones",
     "periodo_retiros",
     "tope_retiro_individual",

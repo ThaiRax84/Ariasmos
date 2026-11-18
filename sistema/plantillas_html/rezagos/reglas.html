@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Atraso</span>
+    <h1>Reglas de rezago</h1>
+  </div>
+  <div class="encabezado-lado"><a class="boton" href="{% url 'rezagos:regla_nueva' %}">Nueva regla</a></div>
+</div>
+<p class="ayuda">Cada regla dice a quién aplica, cuándo se cumple (basta una condición) y qué hace. Si varias aplican, valen todas sus acciones; en el aviso se muestra el texto de la más grave. Las reglas por {{ voc.agrupacion_min }} o por persona mandan sobre las generales en la misma acción. Se evalúa al momento con los saldos reales.</p>
+<div class="atajos"><a class="boton secundario" href="{% url 'rezagos:lista' %}">Ver quién tiene atraso</a>{% if "configurar_limites_adeudo" in permisos %}<a class="boton secundario" href="{% url 'rezagos:limites' %}">Límites de adeudo</a>{% endif %}</div>
+<section class="panel">
+<table class="tabla">
+<thead><tr><th>Regla</th><th>Texto</th><th>A quién</th><th>Cuándo</th><th>Acciones</th><th>Activa</th><th></th></tr></thead>
+<tbody>{% for r in reglas %}<tr><td class="fuerte">{{ r.nombre }}</td><td>{{ r.texto }}</td><td>{% if r.alcance == "todos" %}Todos{% elif r.alcance == "agrupacion" %}{{ voc.agrupacion }} {{ r.agrupacion }}{% else %}{{ r.titular.nombre_completo }} ({{ r.titular.matricula_formateada }}){% endif %}</td><td>{% if r.dias_minimos %}{{ r.dias_minimos }} días o más{% endif %}{% if r.importe_minimo %}{% if r.dias_minimos %} · {% endif %}{{ r.importe_minimo|dinero }} o más{% endif %}{% if r.al_rebasar_limite %}{% if r.dias_minimos or r.importe_minimo %} · {% endif %}al rebasar el límite{% endif %}</td><td>{% if r.aviso_inicio %}Aviso {% endif %}{% if r.marca %}Marca {% endif %}{% if r.sin_credito %}Sin crédito {% endif %}{% if r.cobranza %}Cobranza{% endif %}</td><td>{% if r.activa %}Sí{% else %}No{% endif %}</td><td><a href="{% url 'rezagos:regla_editar' r.pk %}">Editar</a></td></tr>{% empty %}<tr><td colspan="7">Todavía no hay reglas. <a class="boton chico" href="{% url 'rezagos:regla_nueva' %}">Crear la primera</a></td></tr>{% endfor %}</tbody>
+</table>
+</section>
+{% endblock %}

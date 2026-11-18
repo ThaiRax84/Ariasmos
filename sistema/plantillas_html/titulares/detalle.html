@@ -28,6 +28,7 @@
 <nav class="pestanas" aria-label="Secciones de la ficha"><a href="{% url 'titulares:detalle' titular.pk %}" aria-current="page">Estado de cuenta</a><a href="{% url 'titulares:historial' titular.pk %}">Historial</a></nav>
 <div class="pila">
 <div class="pila">
+{% load rezagos %}{% ficha_rezago titular %}
 {% include "cobros/_estado_cuenta.html" with varios=0 %}
 <section class="panel">
   <h2>Solicitudes</h2>

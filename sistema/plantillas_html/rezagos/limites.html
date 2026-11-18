@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Crédito</span>
+    <h1>Límites de adeudo</h1>
+  </div>
+  <div class="encabezado-lado"><a class="boton secundario" href="{% url 'rezagos:lista' %}">Ver quién tiene atraso</a></div>
+</div>
+<div class="cifras">
+  <div class="cifra{% if rebasan %} aviso{% endif %}"><span class="etiqueta">Rebasan el límite hoy</span><span class="numero">{{ rebasan }}</span><span class="detalle">con «Ilimitado» nadie lo rebasa</span></div>
+  <div class="cifra{% if sin_credito %} aviso{% endif %}"><span class="etiqueta">Sin crédito hoy</span><span class="numero">{{ sin_credito }}</span><span class="detalle">por el límite o por una regla de rezago</span></div>
+</div>
+<p class="ayuda">Quien rebasa cualquiera de los dos límites aparece en el aviso del inicio y queda sin crédito: sus ventas al adeudo, cargos manuales nuevos y prórrogas pasan a solicitud. Nunca se bloquea recibir un pago ni consultar el estado de cuenta. Al ponerse al corriente deja de estar rezagado sin que nadie haga nada.</p>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <div class="acciones"><button class="boton" type="submit">Guardar límites</button></div>
+</form>
+<section class="panel">
+  <h2>Excepciones por persona</h2>
+  <p class="ayuda">Para dar más o menos margen a alguien en particular, abre su ficha y elige «Excepción al límite».</p>
+  {% if excepciones %}
+  <table class="tabla">
+  <thead><tr><th>{{ voc.titular }}</th><th>{{ voc.matricula }}</th><th>Importe</th><th>Días</th><th>Vigente hasta</th><th>Motivo</th><th></th></tr></thead>
+  <tbody>{% for f in excepciones %}<tr><td class="fuerte">{{ f.excepcion.titular.nombre_completo }}</td><td>{{ f.excepcion.titular.matricula_formateada }}</td><td>{{ f.importe }}</td><td>{{ f.dias }}</td><td>{{ f.excepcion.vigente_hasta|date:"d/m/Y"|default:"Sin fin" }}</td><td>{{ f.excepcion.motivo }}</td><td><a href="{% url 'rezagos:excepcion' f.excepcion.titular.pk %}">Cambiar</a></td></tr>{% endfor %}</tbody>
+  </table>
+  {% else %}<p>Sin excepciones.</p>{% endif %}
+</section>
+{% endblock %}

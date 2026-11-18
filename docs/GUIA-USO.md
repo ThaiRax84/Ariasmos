@@ -23,6 +23,7 @@ Cada rol ve un Inicio distinto:
 - **Dirección**: cuatro cuadros (cobrado en el mes con su reparto entre efectivo y banco, por cobrar vencido, efectivo en custodia y retiros de la semana), **Salud del sistema** (bitácora, respaldo, prueba de restauración, certificado y equipos por aprobar) y **Avisos de control**.
 - Cada cuadro aparece solo si tu rol tiene el permiso correspondiente. Si tienes un turno de caja abierto, los cuadros de cobrado y de efectivo dicen «Se muestra al cerrar tu turno»: el arqueo sigue siendo ciego.
 - Cada aviso lleva una etiqueta (**Revisar**, **Por hacer**, **Por revisar**, **Bien**…) y un enlace a donde se atiende.
+- **Todos los roles** ven el aviso **Con atraso** cuando alguien cumple una regla de rezago con aviso o rebasa el límite de adeudo: nombre, matrícula, agrupación, días de atraso y el texto de la regla más grave (por ejemplo «No puede pasar»). Muestra a los 20 más atrasados y enlaza a la lista completa. El adeudo solo lo ve quien tiene el permiso de ver saldos; los demás ven el resto sin importes.
 
 ## Operación
 
@@ -85,6 +86,12 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - **Entrada o merma**: artículo, cantidad, motivo y, si lo hay, el comprobante (JPEG, PNG o PDF de hasta 5 MB). No pide permiso; Supervisión la revisa después.
 - **Conteo mensual**: descarga la lista para contar (no trae existencias), cuenta y sube el Excel o CSV con clave y cantidad, o captúralo en pantalla. Al guardarlo queda fijo, ves las diferencias y otra persona lo aprueba.
 
+### Cargos por cantidad y titulares sin crédito
+
+- **Cargo manual**: elige el concepto y la **cantidad**. Si el concepto se cobra por cantidad (en la plantilla de escuela, «Libros»), la cantidad va de 1 al máximo configurado y el importe es cantidad × la tarifa de la agrupación del titular (o el importe general del concepto si su agrupación no tiene tarifa). El importe lo calcula el programa; cambiar el importe por unidad requiere el permiso de ajustes. Un concepto que no es por cantidad se carga de uno en uno.
+- Si el titular tiene una **marca** (por ejemplo «No puede pasar» o «Sin crédito»), la ves en su ficha, en los buscadores (padrón, cobrar, vender) y al cobrar.
+- Un titular **sin crédito** (rebasó su límite de adeudo o una regla le quitó el crédito) se cobra igual: recibir pagos, el estado de cuenta y los cargos automáticos no cambian. Lo que cambia es que su **venta al adeudo**, un **cargo manual** nuevo o una **prórroga** quedan como **solicitud** que autoriza otra persona por cualquiera de las tres vías. La venta que se paga en el momento no cambia. Al ponerse al corriente recupera el crédito sin que nadie haga nada.
+
 ### Verificar un recibo
 
 - **Verificar recibo** acepta el código del recibo con su folio, o el texto del QR: con un lector de códigos conectado por USB basta con leer el QR del recibo.
@@ -117,6 +124,39 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - La pantalla muestra cuánto se ha aplicado hoy contra el tope del día y cuánto hay acumulado contra el tope acumulado. Al instalar todo está en 0: aplicar solo es una decisión del negocio.
 - Cada cambio queda en la bitácora con los valores de antes y de después, y Dirección lo ve en su Inicio durante 7 días.
 
+### Tarifas por agrupación y conceptos por cantidad
+
+**Conceptos → Tarifas por agrupación** (permiso «Administrar conceptos de cobro»):
+
+- Cada concepto puede tener una **tarifa por agrupación**: importe y, si es recurrente, periodicidad y día de vencimiento propios, activa o no. Sin tarifa para la agrupación del titular vale lo general del concepto.
+- **Por cantidad** (solo conceptos por evento): al cargarlo se pide cuántos, de 1 al máximo que fijes.
+- **Solo con tarifa**: a quien no tenga tarifa activa para su agrupación no se le cobra ese concepto (sirve para cargos especiales de ciertas agrupaciones).
+- Los cargos automáticos toman la tarifa que corresponde al momento de generarse. Cambiar a alguien de agrupación aplica desde el siguiente periodo; los cargos ya generados no cambian. Si la nueva tarifa tiene otra periodicidad, el primer periodo nuevo empieza después de que termina el último cobrado, sin cobrar dos veces los mismos días.
+- Cada cambio queda en la bitácora con antes y después.
+
+### Recargos tras el alta
+
+**Reglas de recargo → Recargos tras el alta** (permiso «Administrar conceptos de cobro»): de fábrica, a quien se acaba de dar de alta **no se le cobran recargos** de lo que vence dentro del periodo de su alta (según la periodicidad de cada concepto; los que no se repiten cuentan por mes). Desde el periodo siguiente, todo normal. Puedes cambiarlo a «Desde el alta». Reactivar una baja cuenta como alta nueva y vale la fecha de activación. El saldo inicial de una migración sí genera recargo.
+
+### Límites de adeudo
+
+**Más → Límites de adeudo** (permiso «Configurar los límites de adeudo», que traen Supervisión y Dirección; pide tu contraseña otra vez):
+
+- Dos límites independientes: **importe máximo** de adeudo vencido y **días máximos** de atraso (desde el vencimiento más antiguo con saldo; una prórroga mueve ese vencimiento). Cada uno es **Ilimitado** (de fábrica) o **Hasta un valor**.
+- **Excepciones por titular**: desde su ficha, «Excepción al límite», con su propio «Como el negocio», «Ilimitado» o valor para cada límite, motivo y vigencia opcional. Solo las ve quien configura los límites o quien ve la ficha.
+- Quien rebasa cualquiera de los dos aparece en el aviso **Con atraso** del Inicio y queda **sin crédito**. Nunca se bloquea recibir un pago ni consultar el estado de cuenta.
+- Cada cambio queda en la bitácora con antes y después, y Dirección lo ve en su Inicio durante 7 días.
+
+### Reglas de rezago
+
+**Más → Reglas de rezago** (permiso «Configurar las reglas de rezago»):
+
+- Cada regla tiene **nombre**, **texto** (hasta 60 caracteres, por ejemplo «No puede pasar»), **a quién aplica** (todos, una agrupación o un titular por su matrícula), **cuándo** (a partir de N días de atraso, de un importe vencido o al rebasar el límite; basta una) y **acciones**: aviso en el Inicio de todos, marca en la ficha, buscadores y cobro, sin crédito y lista de cobranza.
+- Puedes crear todas las reglas propias que quieras. Si varias aplican, valen todas sus acciones; el aviso muestra el texto de la más grave (más días).
+- Una regla para una agrupación o para un titular manda sobre la general en la misma acción: sirve para ser más estricto o más tolerante con alguien. Las reglas para un titular solo las ve quien configura las reglas o quien ve la ficha.
+- Las plantillas traen reglas de arranque con su contexto (escuela: «Pago atrasado» a los 10 días y «No puede pasar» a los 30; gimnasio: «Acceso suspendido»; etcétera), sin importes y editables. Solo llegan en una instalación nueva.
+- **Con atraso** (enlace del aviso del Inicio) es la lista completa; se ordena por días, nombre, matrícula o agrupación, y quien ve saldos también por adeudo y la exporta a CSV.
+
 ### Efectivo
 
 - **Efectivo** muestra quién tiene dinero en custodia, las entregas por confirmar y los depósitos por conciliar. Si tú mismo tienes un turno abierto, tu efectivo no se muestra hasta que lo cierres.
@@ -144,6 +184,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 ### Lista de cobranza
 
 - Cada lunes se genera la lista de adeudos vencidos; en **Cortes** puedes generarla en cualquier momento.
+- Si hay reglas de rezago con la acción de cobranza, la lista trae además la sección «Con atraso según las reglas del negocio», de los más atrasados a los menos, con el texto de la regla.
 
 ## Todas las personas: versión nueva
 
@@ -202,6 +243,10 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 ### Cambios en los topes del banco
 
 Quien tiene «Ver auditoría» ve en su Inicio los cambios de topes del banco de los últimos 7 días que hizo **otra** persona: quién, cuándo y de cuánto a cuánto. Quien concilia también libera pagos, así que conviene revisar que los topes sean los acordados.
+
+### Cambios en los límites de adeudo
+
+Quien tiene «Ver auditoría» ve en su Inicio los cambios del límite de adeudo del negocio y de las excepciones por titular de los últimos 7 días hechos por **otra** persona, con quién, cuándo y de cuánto a cuánto.
 
 ### Actualizaciones del programa
 

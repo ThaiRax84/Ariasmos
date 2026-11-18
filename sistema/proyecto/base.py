@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     "cortes",
     "respaldos",
     "actualizaciones",
+    "tarifas",
+    "rezagos",
     "envios",
 ]
 

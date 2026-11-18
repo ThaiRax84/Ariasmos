@@ -12,12 +12,13 @@ from solicitudes import motor
 from solicitudes.models import Solicitud
 
 from .conftest import cliente, codigo_actual
-from .libro_ayudas import cargos_de, preparar_conceptos, titular_activo, turno_de, verificar_sumas
+from .libro_ayudas import cargos_de, preparar_conceptos, recargos_desde_el_alta, titular_activo, turno_de, verificar_sumas
 
 
 @pytest.fixture
 def base(personas):
     preparar_conceptos()
+    recargos_desde_el_alta()
     ana = titular_activo(personas["op"], personas["sup"], "Ana", iniciales=())
     return personas, ana, ConceptoCobro.objects.get(nombre="Colegiatura")
 

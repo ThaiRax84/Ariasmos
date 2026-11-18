@@ -67,6 +67,10 @@ def describir(solicitud):
             filas.append(("Venta", f"{venta} · {venta.titular.nombre_completo}"))
             renglones = {str(r.pk): r for r in RenglonVenta.objects.filter(venta=venta).select_related("articulo")}
             filas.append(("Artículos", "; ".join(f"{renglones[k].articulo.nombre} × {v[0]}{'' if v[1] else ' (mal estado)'}" for k, v in (datos.get("renglones") or {}).items() if k in renglones)))
+    elif solicitud.accion in ("cargo_sin_credito", "venta_sin_credito"):
+        from rezagos.acciones import describir as describir_sin_credito
+
+        filas += describir_sin_credito(solicitud)
     elif solicitud.accion == "importacion_padron":
         filas += [("Archivo", datos.get("nombre_archivo", "")), ("Altas", str(datos.get("altas", 0))), ("Cambios", str(datos.get("cambios", 0))), ("Con cambio de nombre", str(datos.get("nombres", 0)))]
     elif solicitud.accion == "cambio_familia":

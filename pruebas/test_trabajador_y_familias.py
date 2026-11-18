@@ -15,13 +15,14 @@ from solicitudes.models import Solicitud
 from titulares.models import Contacto, Familia, Titular
 
 from .conftest import cliente
-from .libro_ayudas import preparar_conceptos, titular_activo
+from .libro_ayudas import preparar_conceptos, recargos_desde_el_alta, titular_activo
 from .test_flujos import datos_alta
 
 
 def test_trabajador_se_pone_al_dia_sin_duplicar(personas, django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks(execute=True):
         preparar_conceptos()
+        recargos_desde_el_alta()
         ana = titular_activo(personas["op"], personas["sup"], "Ana")
     with django_capture_on_commit_callbacks(execute=True):
         ejecutar_ciclo(date(2026, 1, 5))

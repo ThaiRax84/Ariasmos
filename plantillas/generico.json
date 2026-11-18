@@ -69,7 +69,9 @@
         "revisar_inventario",
         "administrar_articulos",
         "configurar_topes_banco",
-        "solicitar_importacion_padron"
+        "solicitar_importacion_padron",
+        "configurar_limites_adeudo",
+        "configurar_rezagos"
       ]
     },
     {
@@ -112,7 +114,9 @@
         "administrar_articulos",
         "configurar_topes_banco",
         "solicitar_importacion_padron",
-        "importar_padron"
+        "importar_padron",
+        "configurar_limites_adeudo",
+        "configurar_rezagos"
       ]
     }
   ],
@@ -277,6 +281,26 @@
       "horas_resaltar": 24,
       "permite_delegacion": true,
       "permite_codigo": true
+    },
+    {
+      "accion": "cargo_sin_credito",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "cargo_manual",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
+    },
+    {
+      "accion": "venta_sin_credito",
+      "permiso_directo": "aplicar_ajustes",
+      "permiso_solicitar": "vender_articulos",
+      "permiso_aprobar": "aprobar_solicitudes",
+      "horas_caducidad": 72,
+      "horas_resaltar": 24,
+      "permite_delegacion": true,
+      "permite_codigo": true
     }
   ],
   "motivos_baja": [
@@ -323,7 +347,9 @@
       "tipo": "por_evento",
       "aplica_a": "manual",
       "prioridad": 30,
-      "recargo": false
+      "recargo": false,
+      "por_cantidad": true,
+      "cantidad_maxima": 50
     },
     {
       "nombre": "Otro cargo",
@@ -394,6 +420,27 @@
       "tipo": "cobranza",
       "nombre": "Lista de cobranza",
       "nivel": "completo"
+    }
+  ],
+  "rezagos": [
+    {
+      "nombre": "Aviso de atraso",
+      "texto": "Pago atrasado",
+      "dias_minimos": 10,
+      "acciones": [
+        "aviso_inicio",
+        "cobranza"
+      ]
+    },
+    {
+      "nombre": "Sin servicio",
+      "texto": "Sin servicio hasta ponerse al corriente",
+      "dias_minimos": 30,
+      "acciones": [
+        "aviso_inicio",
+        "marca",
+        "cobranza"
+      ]
     }
   ]
 }

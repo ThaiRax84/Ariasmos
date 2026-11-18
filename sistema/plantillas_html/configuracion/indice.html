@@ -18,6 +18,9 @@
   <a class="acceso" href="{% url 'configuracion:vocabulario' %}"><span class="acceso-titulo">Vocabulario</span></a>
   <a class="acceso" href="{% url 'configuracion:reglas' %}"><span class="acceso-titulo">Reglas del negocio</span><span class="acceso-detalle">Teléfono, hoja de los PDF, apellidos y consentimiento</span></a>
   <a class="acceso" href="{% url 'configuracion:parametros' %}"><span class="acceso-titulo">Parámetros</span></a>
+  <a class="acceso" href="{% url 'tarifas:indice' %}"><span class="acceso-titulo">Tarifas por {{ voc.agrupacion_min }}</span><span class="acceso-detalle">Importes por {{ voc.agrupacion_min }} y conceptos por cantidad</span></a>
+  <a class="acceso" href="{% url 'rezagos:limites' %}"><span class="acceso-titulo">Límites de adeudo</span><span class="acceso-detalle">Importe y días máximos, con excepciones</span></a>
+  <a class="acceso" href="{% url 'rezagos:reglas' %}"><span class="acceso-titulo">Reglas de rezago</span><span class="acceso-detalle">Avisos, marcas y crédito según el atraso</span></a>
   <a class="acceso" href="{% url 'configuracion:catalogo' 'agrupaciones' %}"><span class="acceso-titulo">{{ voc.agrupaciones }}</span></a>
   <a class="acceso" href="{% url 'configuracion:catalogo' 'motivos' %}"><span class="acceso-titulo">Motivos de baja</span></a>
   <a class="acceso" href="{% url 'configuracion:catalogo' 'campos' %}"><span class="acceso-titulo">Campos de contacto</span></a>

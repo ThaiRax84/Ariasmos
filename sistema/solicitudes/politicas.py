@@ -4,6 +4,8 @@ RETIROS = ("aprobar_solicitudes", "retirar_efectivo", "aprobar_solicitudes")
 CONTEO = ("aprobar_solicitudes", "subir_conteo_inventario", "aprobar_solicitudes")
 DEVOLUCION = ("aprobar_solicitudes", "devolver_articulos", "aprobar_solicitudes")
 IMPORTACION = ("importar_padron", "solicitar_importacion_padron", "aprobar_solicitudes")
+CARGO_SIN_CREDITO = ("aplicar_ajustes", "cargo_manual", "aprobar_solicitudes")
+VENTA_SIN_CREDITO = ("aplicar_ajustes", "vender_articulos", "aprobar_solicitudes")
 
 POR_DEFECTO = {
     "correccion_nombre": ALTAS,
@@ -19,6 +21,8 @@ POR_DEFECTO = {
     "conteo_inventario": CONTEO,
     "devolucion_efectivo": DEVOLUCION,
     "importacion_padron": IMPORTACION,
+    "cargo_sin_credito": CARGO_SIN_CREDITO,
+    "venta_sin_credito": VENTA_SIN_CREDITO,
 }
 
 

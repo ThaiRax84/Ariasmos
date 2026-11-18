@@ -29,12 +29,14 @@ def _prioritarias(permisos, voc, inventario):
 def _demas(permisos, voc):
     return [
         (voc["familias"], "titulares:familias", "ver_titulares" in permisos, ("/titulares/familias/",), ()),
-        ("Conceptos", "cobros:conceptos", "administrar_conceptos" in permisos, ("/cobros/conceptos/", "/cobros/recargos/", "/cobros/planes/"), ()),
+        ("Conceptos", "cobros:conceptos", "administrar_conceptos" in permisos, ("/cobros/conceptos/", "/cobros/recargos/", "/cobros/planes/", "/cobros/tarifas/"), ()),
         ("Delegaciones", "delegaciones", "otorgar_delegaciones" in permisos, ("/cuentas/delegaciones/",), ()),
         ("Equipos", "dispositivos", "aprobar_dispositivos" in permisos, ("/cuentas/dispositivos/", "/cuentas/conectar/"), ()),
         ("Usuarios", "usuarios", "administrar_usuarios" in permisos, ("/cuentas/usuarios/",), ()),
         ("Roles", "roles", "administrar_roles" in permisos, ("/cuentas/roles/",), ()),
         ("Políticas", "solicitudes:politicas", "administrar_politicas" in permisos, ("/solicitudes/politicas/",), ()),
+        ("Límites de adeudo", "rezagos:limites", "configurar_limites_adeudo" in permisos, ("/rezagos/limites/",), ()),
+        ("Reglas de rezago", "rezagos:reglas", "configurar_rezagos" in permisos, ("/rezagos/reglas/",), ()),
         ("Topes del banco", "conciliacion:topes", "configurar_topes_banco" in permisos and not _alguno(permisos, "conciliar_banco", "sugerir_conciliacion"), ("/banco/topes/",), ()),
         ("Configuración", "configuracion:indice", "administrar_configuracion" in permisos, ("/configuracion/", "/actualizaciones/"), ()),
         ("Respaldos", "respaldos:panel", "administrar_respaldos" in permisos, ("/respaldos/",), ()),

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo"><a href="{% url 'cobros:conceptos' %}">Conceptos</a> · Tarifas</span>
+    <h1>Tarifas por {{ voc.agrupacion_min }} y conceptos por cantidad</h1>
+  </div>
+</div>
+<p class="ayuda">Cada concepto puede tener un importe distinto para cada {{ voc.agrupacion_min }} y, si es recurrente, su propia periodicidad y vencimiento. Sin tarifa vale lo general del concepto. Los cargos automáticos toman la tarifa que corresponde al momento de generarse; un cambio de {{ voc.agrupacion_min }} aplica desde el siguiente periodo y los cargos ya generados no cambian.</p>
+<div class="atajos"><a class="boton secundario" href="{% url 'rezagos:recargos_alta' %}">Recargos tras el alta</a></div>
+<section class="panel">
+<table class="tabla">
+<thead><tr><th>Concepto</th><th>Tipo</th><th>Por cantidad</th><th>Solo con tarifa</th><th>Tarifas activas</th><th></th></tr></thead>
+<tbody>{% for f in filas %}<tr><td class="fuerte">{{ f.concepto.nombre }}</td><td>{{ f.concepto.get_tipo_display }}{% if f.concepto.periodicidad %} · {{ f.concepto.get_periodicidad_display }}{% endif %}</td><td>{% if f.opcion.por_cantidad %}Sí, hasta {{ f.opcion.cantidad_maxima }}{% else %}No{% endif %}</td><td>{% if f.opcion.solo_con_tarifa %}Sí{% else %}No{% endif %}</td><td>{{ f.tarifas }}</td><td><a class="boton chico secundario" href="{% url 'tarifas:concepto' f.concepto.pk %}">Configurar</a></td></tr>{% empty %}<tr><td colspan="6">Todavía no hay conceptos activos. <a class="boton chico" href="{% url 'cobros:concepto_nuevo' %}">Agregar el primero</a></td></tr>{% endfor %}</tbody>
+</table>
+</section>
+{% endblock %}
