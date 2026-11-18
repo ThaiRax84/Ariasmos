@@ -516,3 +516,7 @@ fieldset.recargo legend { font-weight: 800; padding: 0 6px; }
 .cuadro.bien { background: var(--bien-fondo); color: var(--bien-texto); }
 .cuadro .ayuda { display: block; }
 @media (max-width: 900px) { .retiro-importe { grid-template-columns: 1fr; } }
+.asistente-cuerpo > .encabezado-texto { flex: none; }
+.muestra-piezas .mosaico { grid-column: auto; }
+.campo.casilla { flex-wrap: wrap; }
+.campo.casilla > small { flex-basis: 100%; padding-left: 32px; }

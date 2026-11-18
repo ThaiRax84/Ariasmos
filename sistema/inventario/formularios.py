@@ -5,6 +5,7 @@ from caja.comprobantes import LIMITE as LIMITE_COMPROBANTE
 from cobros.formularios import CampoImportePositivo
 from cobros.models import ConceptoCobro
 from proyecto.captura import CampoGuiadoTexto
+from proyecto.plegables import ConPlegables, plegar
 
 from .models import MAXIMO_CANTIDAD, MAXIMO_CONTEO, OBSERVADO, REVISADO, Articulo, Devolucion, RegistroInventario, Venta
 from .servicios import CLAVE, LIMITE_CONTEO
@@ -176,9 +177,13 @@ class FormularioCapturaConteo(forms.Form):
         return datos
 
 
-class FormularioConfiguracion(forms.Form):
+class FormularioConfiguracion(ConPlegables, forms.Form):
     modulo_inventario = forms.BooleanField(label="Llevar inventario de artículos", required=False)
     devoluciones_inventario = forms.BooleanField(label="Aceptar devoluciones de artículos vendidos", required=False)
     dias_devolucion = forms.IntegerField(label="Días después de la venta en que se acepta una devolución", min_value=0, max_value=365)
     dias_conteo_sin_aprobar = forms.IntegerField(label="Días que un conteo puede esperar aprobación antes de avisar", min_value=1, max_value=60)
     porcentaje_existencia_baja = forms.IntegerField(label="Porcentaje de existencia baja: se marca «pocas» cuando quedan este porcentaje o menos de lo que había tras la última entrada o conteo", min_value=1, max_value=99, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        plegar(self, "dias_conteo_sin_aprobar", "porcentaje_existencia_baja")

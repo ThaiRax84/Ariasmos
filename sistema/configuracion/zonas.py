@@ -17,6 +17,49 @@ REGIONES = {
 }
 ORDEN_REGIONES = tuple(REGIONES)
 
+EN_ESPANOL = {
+    "America/Mexico_City": "Ciudad de México",
+    "America/Ciudad_Juarez": "Ciudad Juárez",
+    "America/Merida": "Mérida",
+    "America/Cancun": "Cancún",
+    "America/Mazatlan": "Mazatlán",
+    "America/Bahia_Banderas": "Bahía de Banderas",
+    "America/New_York": "Nueva York",
+    "America/Los_Angeles": "Los Ángeles",
+    "America/Bogota": "Bogotá",
+    "America/Sao_Paulo": "São Paulo",
+    "America/Havana": "La Habana",
+    "America/Panama": "Panamá",
+    "America/Asuncion": "Asunción",
+    "America/Argentina/Buenos_Aires": "Buenos Aires (Argentina)",
+    "America/Argentina/Cordoba": "Córdoba (Argentina)",
+    "America/Argentina/Tucuman": "Tucumán (Argentina)",
+    "America/Puerto_Rico": "Puerto Rico",
+    "Europe/London": "Londres",
+    "Europe/Paris": "París",
+    "Europe/Berlin": "Berlín",
+    "Europe/Rome": "Roma",
+    "Europe/Lisbon": "Lisboa",
+    "Europe/Brussels": "Bruselas",
+    "Europe/Amsterdam": "Ámsterdam",
+    "Europe/Athens": "Atenas",
+    "Europe/Moscow": "Moscú",
+    "Europe/Stockholm": "Estocolmo",
+    "Europe/Warsaw": "Varsovia",
+    "Europe/Vienna": "Viena",
+    "Europe/Zurich": "Zúrich",
+    "Europe/Dublin": "Dublín",
+    "Europe/Prague": "Praga",
+    "Atlantic/Canary": "Canarias",
+    "Asia/Tokyo": "Tokio",
+    "Asia/Shanghai": "Shanghái",
+    "Asia/Seoul": "Seúl",
+    "Asia/Singapore": "Singapur",
+    "Asia/Jerusalem": "Jerusalén",
+    "Pacific/Easter": "Isla de Pascua",
+    "Pacific/Galapagos": "Galápagos",
+}
+
 
 def _leer(nombre):
     try:
@@ -42,6 +85,8 @@ def canonicas():
 
 
 def ciudad(nombre):
+    if nombre in EN_ESPANOL:
+        return EN_ESPANOL[nombre]
     partes = nombre.split("/")[1:]
     texto = partes[-1].replace("_", " ")
     if len(partes) > 1:

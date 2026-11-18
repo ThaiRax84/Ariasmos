@@ -85,7 +85,7 @@ PASO = {nombre: numero for numero, nombre in enumerate(("inicio", "personalizar"
 
 
 NOMBRE_DE_PASO = {numero: nombre for nombre, numero in PASO.items()}
-ANTERIOR = {"personalizar": "inicio", "conceptos": "personalizar", "marca": "conceptos", "pago": "marca", "caja": "pago", "reglas": "caja", "cortes": "reglas", "usuario": "cortes", "codigo": "usuario"}
+ANTERIOR = {"conceptos": "personalizar", "marca": "conceptos", "pago": "marca", "caja": "pago", "reglas": "caja", "cortes": "reglas", "usuario": "cortes", "codigo": "usuario"}
 RESERVADOS = {"csrfmiddlewaretoken", "ficha_envio", "token", "contrasena1", "contrasena2", "clave_canal", "codigo", "atras", "omitir", "accion", "seguir", "guardada"}
 
 
@@ -158,7 +158,7 @@ def _leer_plantilla(formulario):
 
 def inicio(request):
     negocio = _disponible(request)
-    inicial = {"nombre": negocio.nombre, "zona_horaria": negocio.zona_horaria, "moneda": negocio.moneda, "plantilla": negocio.plantilla} if negocio else {"zona_horaria": zonas.de_la_computadora()}
+    inicial = {"nombre": negocio.nombre, "zona_horaria": negocio.zona_horaria, "moneda": negocio.moneda, "plantilla": negocio.plantilla} if negocio else {"zona_horaria": zonas.de_la_computadora(), "plantilla": "generico"}
     datos_post = request.POST if request.method == "POST" else None
     formulario = FormularioAsistenteInicio(datos_post, request.FILES if request.method == "POST" else None, plantillas=plantillas.disponibles(con_descripcion=True), initial=inicial)
     if request.method == "POST" and formulario.is_valid():
@@ -226,14 +226,10 @@ def personalizar(request):
     negocio = _exigir_autorizado(request)
     if negocio is None:
         return redirect("asistente:inicio")
-    if _pide_atras(request, "personalizar"):
-        return _atras(request, "personalizar")
     lista = list(ConceptoCobro.objects.all())
     antes = vocabulario()
     formulario = FormularioPersonalizar(request.POST if request.method == "POST" else None, textos=antes, conceptos=lista)
-    _recordar(request, "personalizar", formulario)
     if request.method == "POST" and formulario.is_valid():
-        _olvidar(request, "personalizar")
         datos = formulario.cleaned_data
         recargos = dict(_estado(request).get("recargos") or {})
         with transaction.atomic():

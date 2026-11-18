@@ -392,6 +392,7 @@ class FormularioPersonalizar(forms.Form):
             campos[f"quitar_{concepto.pk}"] = forms.BooleanField(label=f"Quitar «{concepto.nombre}» ({concepto.get_tipo_display().lower()})", required=False)
         campos.update(self.fields)
         self.fields = campos
+        segun(self, "nuevo_tipo", {"nuevo_periodicidad": (ConceptoCobro.RECURRENTE, "Periodicidad")})
 
     def clean(self):
         datos = super().clean()
@@ -593,14 +594,16 @@ class FormularioReglas(ConPlegables, forms.Form):
     tamano_hoja = forms.ChoiceField(label="Tamaño de hoja de los PDF", choices=TAMANOS_HOJA, widget=forms.RadioSelect)
     apellidos_obligatorios = forms.BooleanField(label="Pedir apellidos al dar de alta (quítalo si a veces das de alta empresas)", required=False)
     pedir_consentimiento = forms.BooleanField(label="Pedir la constancia de consentimiento de datos al dar de alta", required=False)
-    texto_consentimiento = forms.CharField(label="Texto de la constancia de consentimiento", max_length=200, required=False)
+    texto_consentimiento = forms.CharField(label="Texto de la constancia de consentimiento", max_length=200, required=False, help_text="Es lo que dice la constancia que se pide al dar de alta.")
 
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
-        for clave, valor in (valores or {}).items():
+        self.anteriores = dict(valores or {})
+        for clave, valor in self.anteriores.items():
             if clave in self.fields:
                 self.fields[clave].initial = bool(valor) if isinstance(self.fields[clave], forms.BooleanField) else valor
         self.fields["tamano_hoja"].en_fila = True
+        segun(self, "pedir_consentimiento", {"texto_consentimiento": ("on", "")})
 
     def clean(self):
         datos = super().clean()
@@ -616,7 +619,7 @@ class FormularioReglas(ConPlegables, forms.Form):
             "tamano_hoja": datos["tamano_hoja"],
             "apellidos_obligatorios": 1 if datos.get("apellidos_obligatorios") else 0,
             "pedir_consentimiento": 1 if datos.get("pedir_consentimiento") else 0,
-            "texto_consentimiento": (datos.get("texto_consentimiento") or "").strip() or PARAMETROS["texto_consentimiento"][0],
+            "texto_consentimiento": (datos.get("texto_consentimiento") or "").strip() or self.anteriores.get("texto_consentimiento") or PARAMETROS["texto_consentimiento"][0],
         }
 
 
@@ -630,9 +633,13 @@ TOPES_CARPETA = ("tope_pago_carpeta",)
 
 
 @con_carpetas("carpeta_banco")
-class FormularioCarpetaBanco(forms.Form):
-    carpeta_banco = forms.CharField(label="Carpeta vigilada del banco (opcional; ruta absoluta donde se deja el archivo descargado del banco)", max_length=400, required=False)
-    tope_pago_carpeta = CampoImporte(label="Importe máximo de un pago que se aplica solo desde un archivo editable (0 sin tope individual)", required=False, maximo=10 ** 11)
+class FormularioCarpetaBanco(ConPlegables, forms.Form):
+    carpeta_banco = forms.CharField(label="Carpeta vigilada del banco (opcional; ruta absoluta donde se deja el archivo descargado del banco)", max_length=400, required=False, help_text="Deja ahí el archivo que descargas de la banca en línea: el programa lo revisa cada pocos minutos y lo importa solo. Vacía, no se vigila ninguna carpeta.")
+    tope_pago_carpeta = CampoImporte(label="Importe máximo de un pago que se aplica solo desde un archivo editable (0 sin tope individual)", required=False, maximo=10 ** 11, help_text="Un pago más grande que llegue en Excel o CSV queda retenido hasta que alguien con permiso de conciliación lo libere.")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        plegar(self, *TOPES_CARPETA)
 
     def topes(self):
         return {clave: self.cleaned_data.get(clave) or 0 for clave in TOPES_CARPETA}
@@ -650,7 +657,7 @@ class FormularioCarpetaBanco(forms.Form):
 
 
 @con_carpetas("carpeta_entrega", "carpeta_respaldo")
-class FormularioAsistenteCortes(ConPlegables, FormularioCarpetaBanco):
+class FormularioAsistenteCortes(FormularioCarpetaBanco):
     carpeta_entrega = forms.CharField(label="Carpeta donde se entregan los cortes (opcional; ruta absoluta)", max_length=400, required=False)
     carpeta_respaldo = forms.CharField(label="Carpeta de respaldo (opcional; de preferencia sincronizada con la nube o en un disco externo)", max_length=400, required=False)
     field_order = ["carpeta_entrega", "carpeta_respaldo", "carpeta_banco", "tope_pago_carpeta"]

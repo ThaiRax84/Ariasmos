@@ -57,7 +57,7 @@ def negocio(request):
         registrar("configuracion_cambiada", usuario=request.user, objeto=guardado, datos={"cambios": diferencias(antes, model_to_dict(guardado))}, request=request)
         messages.success(request, "Configuración guardada.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Datos del negocio", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Datos del negocio", "subtitulo": "Nombre, zona horaria y la nota de la ficha de pago. La zona horaria decide el día de los cortes y de los vencimientos.", "antetitulo": "Configuración", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 @requiere_permiso(PERMISO, reingreso=True)
@@ -141,7 +141,7 @@ def textos(request):
             registrar("vocabulario_cambiado", usuario=request.user, datos={"cambios": diferencias(antes, vocabulario())}, request=request)
         messages.success(request, "Vocabulario guardado.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Vocabulario", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Vocabulario", "subtitulo": "Cómo se llama cada cosa en tu negocio. Estos nombres aparecen en todas las pantallas, recibos, cortes y archivos.", "antetitulo": "Configuración", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 @requiere_permiso(PERMISO, reingreso=True)
@@ -155,7 +155,7 @@ def parametros(request):
             registrar("parametros_cambiados", usuario=request.user, datos={"cambios": diferencias(antes, {clave: parametro(clave) for clave in PARAMETROS})}, request=request)
         messages.success(request, "Parámetros guardados.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Parámetros", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Parámetros", "subtitulo": "Ajustes finos del programa. Los valores de fábrica sirven para la mayoría de los negocios; cambia solo lo que necesites.", "antetitulo": "Configuración", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 @requiere_permiso(PERMISO, reingreso=True)
@@ -169,7 +169,7 @@ def reglas(request):
             registrar("reglas_cambiadas", usuario=request.user, datos={"cambios": diferencias(antes, valores_reglas())}, request=request)
         messages.success(request, "Reglas del negocio guardadas.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Reglas del negocio", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Reglas del negocio", "subtitulo": "Detalles de cómo trabaja el negocio: teléfonos, tamaño de hoja y lo que se pide al dar de alta.", "antetitulo": "Configuración", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 def registrar_caja(request, antes, despues, origen):
@@ -208,7 +208,7 @@ def carpeta_banco(request):
             registrar("carpeta_banco_cambiada", usuario=request.user, objeto=actual, datos={"cambios": cambios}, request=request)
         messages.success(request, "Carpeta vigilada guardada." if nueva else "Carpeta vigilada desactivada.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Carpeta vigilada del banco", "subtitulo": "Una carpeta donde dejas los estados de cuenta o archivos de movimientos: el programa los importa solo.", "antetitulo": "Configuración", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 CLAVES_INVENTARIO = ("modulo_inventario", "devoluciones_inventario", "dias_devolucion", "dias_conteo_sin_aprobar", "porcentaje_existencia_baja")
@@ -239,7 +239,7 @@ def inventario(request):
                 registrar("inventario_configurado", usuario=request.user, datos={"cambios": cambios}, request=request)
         messages.success(request, "Inventario guardado.")
         return redirect("configuracion:indice")
-    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Inventario", "boton": "Guardar", "volver": "configuracion:indice"})
+    return render(request, "comun/formulario.html", {"formulario": formulario, "titulo": "Inventario", "subtitulo": "Si el negocio vende artículos, el programa lleva sus existencias con cada venta, devolución, entrada y conteo.", "antetitulo": "Configuración", "boton": "Guardar", "volver": "configuracion:indice"})
 
 
 CATALOGOS = {

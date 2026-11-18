@@ -43,10 +43,14 @@ Cada rol ve un Inicio distinto:
 5. Al aprobarse, cada renglón se vuelve a comparar con los datos del momento: si alguien cambió ese dato mientras tanto, el renglón se salta y aparece en la lista de **Renglones saltados**.
 6. La vista previa solo muestra los datos que tu rol puede ver.
 
+### Ordenar las listas
+
+En el padrón, en los buscadores (cobrar, vender y conciliar un movimiento del banco) y en las listas largas (artículos, usuarios, solicitudes y cortes) aparece **Ordenar por** con el sentido ascendente o descendente. El programa recuerda el orden que elegiste en cada lista, solo para ti.
+
 ### Cobrar en efectivo
 
-1. Abre tu turno en **Mi caja** (el fondo inicial es opcional). Si el negocio captura piezas por denominación, escribe cuántos billetes y monedas de cada valor hay en el fondo.
-2. Menú **Cobrar** → busca al titular por nombre o matrícula.
+1. Abre tu turno en **Mi caja**: elige tu caja y di si hay efectivo para dar cambio. Con **No, abro en cero** se abre en un solo paso. Con **Sí, cuento lo que hay**: si el negocio captura piezas por denominación, toca cada billete y moneda del fondo (con **−** quitas una; también puedes escribir el número) y el fondo inicial es la suma, que no se escribe aparte; si no, escribe el importe del fondo. Las piezas del fondo cuentan para el cambio que el sistema te propone al cobrar.
+2. Menú **Cobrar** → busca al titular por nombre o matrícula. Con **Ordenar por** eliges el orden de los resultados (nombre, apellidos, matrícula, agrupación o familia, ascendente o descendente).
 3. A la izquierda ves los cargos pendientes y arriba a la derecha el adeudo. Escribe el importe (solo el número: el signo y la moneda ya vienen puestos). El sistema muestra en **Así se va a aplicar** cómo se reparte entre los cargos pendientes (y los de su familia).
 4. Si se capturan piezas: toca cada billete o moneda que te entregan (con **−** quitas una; también puedes escribir el número) y elige **Calcular el cambio**. Mientras tocas, **Recibido** suma lo que capturaste. El recuadro **Entrega exactamente estas piezas** dice qué piezas dar de cambio para que tu caja cuadre en el corte; si entregas otras, ábrelas con **Di el cambio con otras piezas** y corrígelas antes de confirmar. Si no hay combinación exacta, te lo dice y tú escribes lo que entregas.
 5. Elige **Confirmar y dar recibo**. Se emite el recibo foliado con su código de verificación y su **QR**; imprímelo o descárgalo en PDF.
@@ -54,7 +58,7 @@ Cada rol ve un Inicio distinto:
 ### Retirar efectivo para un gasto
 
 1. Con tu turno abierto, en **Mi caja** elige **Retirar efectivo**.
-2. Escribe el importe, elige el motivo, anota en qué se gastó y adjunta la foto o el PDF del ticket (JPEG, PNG o PDF de hasta 5 MB). Puedes adjuntarlo después desde el retiro.
+2. Escribe el importe (si se capturan piezas, toca los billetes y monedas que salen), elige el motivo, anota en qué se gastó y adjunta la foto o el PDF del ticket (JPEG, PNG o PDF de hasta 5 MB). Puedes adjuntarlo después desde el retiro.
 3. Si el retiro cabe en los topes del negocio, queda registrado de inmediato con su folio. Si pasa de algún tope, queda como **solicitud** y se registra cuando otra persona lo autoriza (por la bandeja, con una delegación o con su código por teléfono).
 4. Solo se puede retirar efectivo cobrado en tu turno. Si no alcanza, el sistema lo dice sin decir cuánto hay; después de los intentos que fije el negocio (tres de fábrica), los retiros de ese turno piden autorización.
 5. No puedes cerrar el turno con retiros sin comprobante: adjúntalo o declara que no lo hay con su motivo (recibe el aviso quien revisa retiros).
@@ -174,7 +178,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 
 ### Configuración
 
-- **Configuración**: datos del negocio, vocabulario (incluye cómo se llama el padrón, el descuento autorizado y la venta sin registro), **Reglas del negocio** (prefijo y dígitos del teléfono, tamaño de hoja de los PDF —Carta o A4—, apellidos obligatorios o no y la constancia de consentimiento con su texto), parámetros (entre otros: tramos de la cartera vencida, cuántos respaldos diarios y mensuales se conservan, horas sin respaldo antes de avisar, días entre pruebas de restauración, intentos de retiro rechazados antes de pedir autorización y porcentaje de aviso del tope de retiros), catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
+- **Configuración** (cada pantalla dice para qué sirve; lo poco usado está plegado bajo **Más opciones**): datos del negocio (la zona horaria se elige de una lista con buscador: escribe una ciudad), vocabulario (incluye cómo se llama el padrón, el descuento autorizado y la venta sin registro), **Reglas del negocio** (prefijo y dígitos del teléfono, tamaño de hoja de los PDF —Carta o A4—, apellidos obligatorios o no y la constancia de consentimiento con su texto), parámetros (entre otros: tramos de la cartera vencida, cuántos respaldos diarios y mensuales se conservan, horas sin respaldo antes de avisar, días entre pruebas de restauración, intentos de retiro rechazados antes de pedir autorización y porcentaje de aviso del tope de retiros), catálogos, datos de pago, destinos de los cortes, **Caja: cortes y retiros** (días y horas de corte, piezas por denominación y topes de retiros), **Carpeta vigilada del banco** (con el tope por pago), **Actualizaciones del programa** (ver abajo), **Inventario** (encenderlo, devoluciones, plazos y el porcentaje de existencia baja) e importación inicial del padrón.
 - **Equipos**: aprueba las computadoras nuevas y abre **Conectar otra computadora**.
 
 ### Marca del negocio
