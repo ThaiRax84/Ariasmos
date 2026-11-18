@@ -758,6 +758,7 @@ El servidor no cambia: los tres servicios (web, trabajador, TLS) siguen en la co
 
 - Ventana real, sin marco, de 720 × 450, centrada: la escena aprobada, «ARIASMOS», «Iniciando el sistema…» y «ver. X.Y.Z». Se dibuja con los recursos del propio programa (imagen y letras incluidas), sin depender del servidor.
 - Se muestra mientras arranca la ventana principal y hasta que carga la primera pantalla; después se desvanece. Si el servidor no responde, la ventana principal muestra el problema y «Reintentar».
+- Mientras el splash está a la vista no se muestra ninguna otra ventana del programa.
 - El splash que hoy vive dentro de la pantalla de inicio de sesión se elimina.
 
 ### 21.3 Dos formas de instalar, el mismo instalador
