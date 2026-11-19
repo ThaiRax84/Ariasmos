@@ -112,3 +112,24 @@ def test_pago_exacto_se_registra_con_un_toque_y_esc_cierra(sesion_navegador):
     pagina.wait_for_selector("#panel-cobro [data-exito]")
     assert Pago.objects.get().importe == 10000
     sin_errores(sesion_navegador)
+
+
+def test_buscar_o_ir_a_con_ctrl_k_abre_el_cobro_y_los_trucos_con_signo(sesion_navegador):
+    datos = preparar()
+    beto = datos["titulares"][1]
+    pagina = sesion_navegador.pagina(datos["op"])
+    sesion_navegador.ir(pagina, reverse("inicio"))
+    pagina.keyboard.press("Control+k")
+    pagina.wait_for_selector("#paleta[open]")
+    pagina.locator("#paleta-texto").fill("beto")
+    espera(pagina.locator(".paleta-item")).to_have_count(1)
+    sesion_navegador.captura(pagina, "paleta")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_selector("#panel-cobro [data-cobro-efectivo]")
+    assert f"abrir={beto.pk}" in pagina.url
+    pagina.keyboard.press("Escape")
+    pagina.locator("body").click(position={"x": 5, "y": 400})
+    pagina.keyboard.press("?")
+    pagina.wait_for_selector("#atajos[open]")
+    pagina.locator("#atajos [data-cerrar-dialogo]").click()
+    sin_errores(sesion_navegador)

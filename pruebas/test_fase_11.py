@@ -1,0 +1,163 @@
+import re
+
+import pytest
+from django.core.cache import cache
+from django.urls import reverse
+
+from auditoria.models import Evento
+from caja.models import MovimientoPiezas
+from caja.servicios import abrir_turno
+from caja.models import Caja
+from cobros import libro
+from cobros.models import Cargo, ConceptoCobro, Pago
+from configuracion.models import Parametro
+from cuentas.models import PermisoRol
+from titulares.models import Agrupacion, Titular
+from titulares.servicios import crear_titular
+
+from .conftest import cliente
+from .libro_ayudas import preparar_conceptos
+
+
+def alta(personas, nombre, apellidos="Prueba", **datos):
+    from solicitudes import motor
+
+    titular = crear_titular(personas["op"], {"nombre": nombre, "apellidos": apellidos, **datos}, contacto={"nombre": "Resp", "valores": {}}, conceptos=[])
+    motor.ejecutar("alta", personas["sup"], titular)
+    titular.refresh_from_db()
+    return titular
+
+
+@pytest.fixture
+def padron(personas):
+    cache.clear()
+    preparar_conceptos()
+    grupo = Agrupacion.objects.create(nombre="Tercero B")
+    ana = alta(personas, "Ana", "Zamora", agrupacion=grupo)
+    beto = alta(personas, "Beto", "Alcalá")
+    concepto = ConceptoCobro.objects.get(nombre="Inscripción")
+    libro.crear_cargo(ana, concepto, 120000, Titular.objects.get(pk=ana.pk).creado.date(), Cargo.MANUAL, usuario=personas["sup"])
+    return {"ana": ana, "beto": beto}
+
+
+@pytest.fixture
+def turno(personas):
+    return abrir_turno(personas["op"], Caja.objects.filter(activa=True).first(), 37000, piezas={"10000": 2, "5000": 2, "2000": 5, "1000": 5, "500": 4})
+
+
+def _panel(c, titular, **datos):
+    return c.post(reverse("cobros:cobrar", args=[titular.pk]), {"panel": "1", "paso": "panel", **datos})
+
+
+def test_el_panel_es_la_misma_pantalla_con_la_region_del_panel(personas, padron, turno):
+    c = cliente(personas["op"])
+    texto = c.get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1"}).content.decode()
+    assert 'id="panel-cobro-region"' in texto and "data-cobro-efectivo" in texto and 'name="r_50000"' in texto
+    assert 'value="1200.00"' in texto
+    lista = c.get(reverse("cobros:buscar")).content.decode()
+    assert f'data-abre-panel="{reverse("cobros:cobrar", args=[padron["ana"].pk])}?panel=1"' in lista
+
+
+def test_el_panel_nunca_lleva_las_existencias_de_la_caja(personas, padron, turno):
+    c = cliente(personas["op"])
+    respuesta = _panel(c, padron["ana"], importe="1200", r_100000="1", r_50000="1")
+    texto = respuesta.content.decode()
+    assert "Entrega este cambio, con estas piezas" in texto
+    assert "existencia" not in texto.lower() and 'name="c_' in texto
+    assert Pago.objects.count() == 0
+
+
+def test_pago_exacto_en_el_panel_se_registra_con_su_recibo(personas, padron, turno):
+    c = cliente(personas["op"])
+    respuesta = _panel(c, padron["ana"], importe="1200", r_100000="1", r_10000="2")
+    assert respuesta.status_code == 302 and "hecho=" in respuesta.url
+    pago = Pago.objects.get()
+    assert pago.importe == 120000 and pago.medio == Pago.EFECTIVO
+    assert not MovimientoPiezas.objects.filter(pago=pago, origen=MovimientoPiezas.CAMBIO).exists()
+    hecho = c.get(respuesta.url).content.decode()
+    assert "data-exito" in hecho and str(pago.recibo) in hecho
+
+
+def test_el_panel_rechaza_piezas_que_no_alcanzan(personas, padron, turno):
+    c = cliente(personas["op"])
+    texto = _panel(c, padron["ana"], importe="1200", r_50000="1").content.decode()
+    assert "no alcanzan" in texto and Pago.objects.count() == 0
+
+
+def test_el_panel_confirma_con_cambio_igual_que_el_flujo_por_pasos(personas, padron, turno):
+    c = cliente(personas["op"])
+    texto = _panel(c, padron["ana"], importe="1200", r_100000="1", r_50000="1").content.decode()
+    datos = dict(re.findall(r'<input type="hidden" name="([^"]+)" value="([^"]*)"', texto))
+    for nombre in re.findall(r'name="(c_\d+)"', texto):
+        valor = re.search(rf'name="{nombre}" value="(\d+)"', texto)
+        datos[nombre] = valor.group(1) if valor else "0"
+    assert datos["paso"] == "confirmar" and datos["panel"] == "1"
+    hecho = c.post(reverse("cobros:cobrar", args=[padron["ana"].pk]), datos)
+    assert hecho.status_code == 302 and "hecho=" in hecho.url
+    pago = Pago.objects.get()
+    cambio = sum(m.denominacion * -m.piezas for m in MovimientoPiezas.objects.filter(pago=pago, origen=MovimientoPiezas.CAMBIO))
+    assert cambio == 30000
+    otra = c.post(reverse("cobros:cobrar", args=[padron["ana"].pk]), datos)
+    assert otra.status_code == 302 and Pago.objects.count() == 1
+
+
+def test_el_recibo_ajeno_no_se_muestra_en_otro_panel(personas, padron, turno):
+    c = cliente(personas["op"])
+    _panel(c, padron["ana"], importe="1200", r_100000="1", r_10000="2")
+    recibo = Pago.objects.get().recibo
+    respuesta = c.get(reverse("cobros:cobrar", args=[padron["beto"].pk]), {"panel": "1", "hecho": recibo.pk})
+    assert respuesta.status_code == 302 and "hecho" not in respuesta.url
+
+
+def test_el_flujo_por_pasos_sin_js_sigue_igual(personas, padron, turno):
+    c = cliente(personas["op"])
+    texto = c.post(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"importe": "1200"}).content.decode()
+    assert 'name="paso" value="cambio"' in texto and "panel-cobro-region" not in texto
+
+
+def test_ir_exige_sesion_y_equipo_aprobado(personas, padron):
+    respuesta = cliente().get(reverse("ir"), {"q": "ana"})
+    assert respuesta.status_code == 302
+    from cuentas.models import Dispositivo
+
+    from .conftest import equipo_aprobado
+
+    credencial = equipo_aprobado()
+    c = cliente(personas["op"], credencial=credencial)
+    assert c.get(reverse("ir"), {"q": "ana"}).status_code == 200
+    Dispositivo.objects.update(estado=Dispositivo.PENDIENTE)
+    respuesta = c.get(reverse("ir"), {"q": "ana"})
+    assert respuesta.status_code in (302, 403) and b"Ana" not in respuesta.content
+
+
+def test_ir_devuelve_personas_pantallas_y_acciones_segun_permisos(personas, padron):
+    datos = cliente(personas["op"]).get(reverse("ir"), {"q": "ana"}).json()["resultados"]
+    personas_encontradas = [r for r in datos if r["tipo"] == "persona"]
+    assert [p["titulo"] for p in personas_encontradas] == ["Ana Zamora"]
+    assert personas_encontradas[0]["url"].endswith(f"?abrir={padron['ana'].pk}")
+    pantallas = cliente(personas["op"]).get(reverse("ir"), {"q": ""}).json()["resultados"]
+    urls = {r["url"] for r in pantallas}
+    assert reverse("configuracion:indice") not in urls and reverse("usuarios") not in urls
+    assert reverse("configuracion:indice") in {r["url"] for r in cliente(personas["dir"]).get(reverse("ir"), {"q": ""}).json()["resultados"]}
+
+
+def test_ir_solo_da_el_adeudo_a_quien_ve_saldos(personas, padron):
+    con = cliente(personas["sup"]).get(reverse("ir"), {"q": "zamora"}).json()["resultados"]
+    assert con[0]["lado"] == "$1,200.00 MXN" or "1,200.00" in con[0]["lado"]
+    PermisoRol.objects.filter(rol=personas["op"].rol, permiso="ver_titulares").delete()
+    sin = cliente(personas["op"]).get(reverse("ir"), {"q": "zamora"}).json()["resultados"]
+    assert sin and all("lado" not in r for r in sin)
+    assert "1,200" not in cliente(personas["op"]).get(reverse("ir"), {"q": "zamora"}).content.decode()
+
+
+def test_ir_tiene_tope_y_limite_de_frecuencia_y_no_guarda_lo_buscado(personas, padron):
+    for numero in range(12):
+        alta(personas, f"Zeta{numero:02d}", "Repetida")
+    antes = Evento.objects.count()
+    c = cliente(personas["op"])
+    datos = c.get(reverse("ir"), {"q": "repetida"}).json()["resultados"]
+    assert len([r for r in datos if r["tipo"] == "persona"]) == 7 and len(datos) <= 40
+    assert not Evento.objects.filter(pk__gt=0).exclude(pk__lte=antes).filter(datos__icontains="repetida").exists()
+    codigos = [c.get(reverse("ir"), {"q": "x"}).status_code for _ in range(130)]
+    assert 429 in codigos
+    assert c.get(reverse("ir"), {"q": "y" * 500}).status_code in (200, 429)

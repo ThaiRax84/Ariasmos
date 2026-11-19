@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "tarifas",
     "rezagos",
     "envios",
+    "vivo",
 ]
 
 MIDDLEWARE = [
