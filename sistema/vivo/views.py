@@ -47,21 +47,27 @@ def pulso(request):
 def ultimo(request):
     from django.shortcuts import render
 
+    if excedida(request, "ultimo", PULSO_POR_MINUTO, 60):
+        return _json({"error": "espera"}, status=429)
+    return render(request, "vivo/ultimo.html", {"pagos": pagos_recientes(request.user, ULTIMOS)})
+
+
+def pagos_recientes(usuario, cuantos):
     from cobros.models import Pago
     from rezagos.presentacion import ve_saldos
 
-    usuario = request.user
-    if excedida(request, "ultimo", PULSO_POR_MINUTO, 60):
-        return _json({"error": "espera"}, status=429)
     consulta = Pago.objects.select_related("titular", "recibo").prefetch_related("aplicaciones__cargo__concepto").order_by("-fecha", "-id")
     if usuario.tiene_permiso("ver_titulares"):
-        pagos = list(consulta[:ULTIMOS])
+        pagos = list(consulta[:cuantos])
     elif usuario.tiene_permiso("registrar_pago_efectivo"):
-        pagos = list(consulta.filter(registrado_por=usuario)[:ULTIMOS])
+        pagos = list(consulta.filter(registrado_por=usuario)[:cuantos])
     else:
         pagos = []
+    from caja.servicios import turno_abierto
+
+    ciego = usuario.tiene_permiso("turno_caja") and turno_abierto(usuario) is not None
     saldos = ve_saldos(usuario)
     for pago in pagos:
-        pago.ve_importe = saldos or pago.registrado_por_id == usuario.pk
+        pago.ve_importe = not ciego and (saldos or pago.registrado_por_id == usuario.pk)
         pago.conceptos = " + ".join(str(a.cargo) for a in pago.aplicaciones.all()[:3])
-    return render(request, "vivo/ultimo.html", {"pagos": pagos})
+    return pagos

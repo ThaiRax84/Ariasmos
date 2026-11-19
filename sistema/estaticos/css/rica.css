@@ -341,3 +341,8 @@ a.paleta-item { text-decoration: none; }
 .clabe code, .clabe .ayuda { display: block; }
 .clabe .ayuda { margin-top: 4px; }
 .espera .ayuda { display: block; }
+.solicitud .datos { margin: 0; }
+.solicitud .acciones { align-items: center; }
+.lista-rezagados .renglon-rezago { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; }
+.lista-rezagados .renglon-texto .estado { margin-top: 4px; }
+.cifra .numero[data-cuenta] { font-variant-numeric: tabular-nums; }

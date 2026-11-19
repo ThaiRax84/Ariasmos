@@ -174,3 +174,46 @@ def test_la_transferencia_que_llega_se_ve_sola_en_el_panel_y_en_la_lista(sesion_
     pagina.wait_for_selector("#campana-panel li[data-id]")
     sesion_navegador.captura(pagina, "campana")
     sin_errores(sesion_navegador)
+
+
+def test_inicio_con_cifras_grafica_y_solicitudes_que_se_deshacen(sesion_navegador):
+    from solicitudes.models import Solicitud
+
+    datos = preparar(con_turno=False)
+    caja.abrir_turno(datos["op"], Caja.objects.filter(activa=True).first(), 37000, piezas={"10000": 2, "5000": 2, "2000": 5, "1000": 5, "500": 4})
+    turno = Turno.objects.get(usuario=datos["op"])
+    libro.registrar_pago(datos["titulares"][2], 50000, Pago.EFECTIVO, datos["op"], turno=turno, piezas={"recibidas": {"50000": 1}, "cambio": {}})
+    solicitudes = []
+    for nombre in ("Eva", "Fede"):
+        nuevo = crear_titular(datos["op"], {"nombre": nombre, "apellidos": "Pendiente"}, contacto={"nombre": "Resp", "valores": {}}, conceptos=[])
+        solicitudes.append(motor.ejecutar("alta", datos["op"], nuevo).solicitud)
+    assert all(s is not None for s in solicitudes)
+    pagina = sesion_navegador.pagina(datos["sup"])
+    sesion_navegador.ir(pagina, reverse("inicio"))
+    pagina.wait_for_timeout(900)
+    sesion_navegador.captura(pagina, "inicio")
+    assert "500.00" in pagina.locator("[data-cifra='cobrado_hoy'] .numero").inner_text()
+    alto = pagina.locator(".dia.hoy .tramo.ef").evaluate("e => e.getBoundingClientRect().height")
+    assert alto > 10
+    primera, segunda = solicitudes
+    caja_primera = pagina.locator(f"[data-solicitud][data-id='{primera.pk}']")
+    caja_primera.locator("[data-abrir-solicitud]").click()
+    caja_primera.locator("form[data-en-espera='aprobar'] button").click()
+    pagina.wait_for_selector(".aviso-breve .accion-aviso")
+    pagina.locator(".aviso-breve .accion-aviso", has_text="Deshacer").click()
+    pagina.wait_for_timeout(6000)
+    assert Solicitud.objects.get(pk=primera.pk).estado == Solicitud.PENDIENTE
+    assert caja_primera.is_visible()
+    caja_primera.locator("form[data-en-espera='aprobar'] button").click()
+    pagina.wait_for_timeout(6500)
+    assert Solicitud.objects.get(pk=primera.pk).estado == Solicitud.APROBADA
+    caja_segunda = pagina.locator(f"[data-solicitud][data-id='{segunda.pk}']")
+    caja_segunda.locator("[data-abrir-solicitud]").click()
+    caja_segunda.locator("[data-rechazar]").click()
+    caja_segunda.locator("textarea").fill("Faltan datos")
+    caja_segunda.locator("form[data-en-espera='rechazar'] button").click()
+    pagina.wait_for_timeout(300)
+    sesion_navegador.ir(pagina, reverse("solicitudes:bandeja"))
+    assert Solicitud.objects.get(pk=segunda.pk).estado == Solicitud.RECHAZADA
+    assert Solicitud.objects.get(pk=segunda.pk).nota_resolucion == "Faltan datos"
+    sin_errores(sesion_navegador)
