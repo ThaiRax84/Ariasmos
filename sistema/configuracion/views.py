@@ -188,9 +188,18 @@ def caja(request):
         with transaction.atomic():
             guardar_caja(formulario.valores())
             registrar_caja(request, antes, valores_caja(), "configuracion")
+            Parametro.objects.filter(clave="aviso_control_denominaciones").update(valor="0")
         messages.success(request, "Caja: cortes y retiros guardados.")
         return redirect("configuracion:indice")
     return render(request, "configuracion/caja.html", {"formulario": formulario, "denominaciones": list(Denominacion.objects.filter(activa=True))})
+
+
+@requiere_permiso(PERMISO)
+@require_POST
+def aviso_piezas(request):
+    if Parametro.objects.filter(clave="aviso_control_denominaciones", valor="1").update(valor="0"):
+        registrar("aviso_control_denominaciones_descartado", usuario=request.user, datos={"control_denominaciones": parametro("control_denominaciones")}, request=request)
+    return redirect("inicio")
 
 
 @requiere_permiso(PERMISO, reingreso=True)

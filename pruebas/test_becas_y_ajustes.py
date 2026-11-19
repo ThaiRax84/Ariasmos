@@ -135,9 +135,11 @@ def test_cancelar_condonar_y_revertir(base):
     turno = turno_de(personas["op"])
     pago = libro.registrar_pago(ana, 150000, Pago.EFECTIVO, personas["op"], turno=turno)
     assert libro.saldo_de(cargo) == 50000
-    sin_turno = sup.post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "Error de captura"}, follow=True)
+    sin_piezas = cliente(personas["op"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "Error de captura"})
+    assert sin_piezas.status_code == 200 and "data-mosaicos" in sin_piezas.content.decode() and not Solicitud.objects.filter(accion="revertir_pago").exists()
+    sin_turno = sup.post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "Error de captura", "p_100000": "1", "p_50000": "1"}, follow=True)
     assert "turno de caja abierto" in sin_turno.content.decode() and not ReversionPago.objects.exists()
-    cliente(personas["op"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "Error de captura"})
+    cliente(personas["op"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "Error de captura", "p_100000": "1", "p_50000": "1"})
     solicitud = Solicitud.objects.get(accion="revertir_pago")
     sup.post(reverse("solicitudes:aprobar", args=[solicitud.pk]))
     reversion = ReversionPago.objects.get()

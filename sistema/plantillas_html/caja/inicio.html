@@ -32,7 +32,7 @@
     {% if not formulario.fields.caja.queryset %}<p class="mensaje warning">No hay cajas libres: todas tienen un turno abierto o están apagadas.</p>{% endif %}
     {% include "comun/_campo.html" with campo=formulario.caja %}
     {% include "comun/_campo.html" with campo=formulario.apertura %}
-    <div data-mostrar-con="apertura" data-mostrar-valor="efectivo">
+    <div data-depende-de="apertura" data-mostrar-si="efectivo">
       {% if con_piezas %}
       <div class="campo">
         <span class="etiqueta">Fondo inicial: billetes y monedas que hay en la caja</span>

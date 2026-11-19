@@ -5,6 +5,7 @@ from caja.comprobantes import LIMITE as LIMITE_COMPROBANTE
 from cobros.formularios import CampoImportePositivo
 from cobros.models import ConceptoCobro
 from proyecto.captura import CampoGuiadoTexto
+from proyecto.dependencias import ConDependencias, depende
 from proyecto.plegables import ConPlegables, plegar
 
 from .models import MAXIMO_CANTIDAD, MAXIMO_CONTEO, OBSERVADO, REVISADO, Articulo, Devolucion, RegistroInventario, Venta
@@ -86,7 +87,9 @@ class FormularioBuscarVenta(forms.Form):
     folio = CampoGuiadoTexto(label="Folio del recibo (serie-número; no hace falta si leíste el QR)", max_length=24, required=False, acepta="folio", maximo_tecleo=24)
 
 
-class FormularioDevolucion(forms.Form):
+class FormularioDevolucion(ConDependencias, forms.Form):
+    titulo_piezas = "Billetes y monedas que entregas"
+    ayuda_piezas = "deben sumar lo que regresa en efectivo"
     medio = forms.ChoiceField(label="¿Cómo regresa lo ya pagado?", choices=[(Devolucion.SALDO, "Saldo a favor (al momento; se revisa después)"), (Devolucion.EFECTIVO, "Efectivo (se solicita y lo autoriza otra persona)")], widget=forms.RadioSelect, initial=Devolucion.SALDO)
     motivo = forms.CharField(label="Motivo de la devolución", max_length=300)
 
@@ -103,7 +106,9 @@ class FormularioDevolucion(forms.Form):
         if publico:
             self.fields["medio"].choices = [(Devolucion.EFECTIVO, "Efectivo (se solicita y lo autoriza otra persona)")]
             self.fields["medio"].initial = Devolucion.EFECTIVO
-        self.nombres_piezas = control_piezas.campos(self, "p_", "Piezas que entregas (solo si es en efectivo):") if control_piezas.activo() else []
+        self.nombres_piezas = control_piezas.campos(self, "p_", "Piezas que entregas:") if control_piezas.activo() else []
+        for nombre, _ in self.nombres_piezas:
+            depende(self, nombre, "medio", [Devolucion.EFECTIVO])
 
     def clean(self):
         datos = super().clean()
@@ -146,9 +151,13 @@ class FormularioComprobante(forms.Form):
     archivo = forms.FileField(label="Comprobante: foto JPEG o PNG, o PDF, hasta 5 MB")
 
 
-class FormularioRevision(forms.Form):
+class FormularioRevision(ConDependencias, forms.Form):
     resultado = forms.ChoiceField(label="Resultado", choices=[(REVISADO, "Revisado"), (OBSERVADO, "Observado")])
-    nota = forms.CharField(label="Nota (obligatoria si queda observado)", max_length=300, required=False)
+    nota = forms.CharField(label="Nota", max_length=300, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        depende(self, "nota", "resultado", etiquetas={REVISADO: "Nota (opcional)", OBSERVADO: "Qué se observó (obligatorio)"})
 
 
 class FormularioSubirConteo(forms.Form):

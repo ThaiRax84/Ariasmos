@@ -66,3 +66,23 @@ def verificar_sumas():
     depositado = Traslado.objects.filter(tipo=Traslado.DEPOSITO).aggregate(t=Sum("importe"))["t"] or 0
     en_custodia = sum(custodia(u) for u in Usuario.objects.all())
     assert cobrado == en_custodia + depositado
+
+
+DENOMINACIONES = (100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50)
+
+
+def piezas_de(importe):
+    piezas = {}
+    for valor in DENOMINACIONES:
+        if importe >= valor:
+            piezas[str(valor)], importe = divmod(importe, valor)
+    assert importe == 0
+    return piezas
+
+
+def campos_piezas(importe, prefijo="p_"):
+    return {f"{prefijo}{valor}": str(cantidad) for valor, cantidad in piezas_de(importe).items()}
+
+
+def cobro_en_piezas(importe):
+    return {"recibidas": piezas_de(importe), "cambio": {}}

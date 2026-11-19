@@ -111,6 +111,7 @@ MATRIZ = {
     "caja:entrega": ("turno_caja", "recibir_efectivo"),
     "caja:deposito": ("turno_caja", "recibir_efectivo"),
     "caja:confirmar": ("recibir_efectivo",),
+    "configuracion:aviso_piezas": ("administrar_configuracion",),
     "caja:rechazar": ("recibir_efectivo",),
     "caja:custodia": ("recibir_efectivo",),
     "caja:reconteo": ("turno_caja",),
@@ -208,7 +209,7 @@ MATRIZ = {
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
 LOTE_DE_OTRO = {"configuracion:padron_lote", "configuracion:padron_matriculas", "configuracion:padron_fichas"}
 
-OBJETO_PROPIO = {"solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
+OBJETO_PROPIO = {"caja:confirmar": {"Supervisión"}, "solicitudes:codigo": {"Operación"}, "solicitudes:detalle": None, "caja:cerrar": {"Operación"}, "caja:reconteo": {"Operación"}, "cortes:detalle": {"Supervisión", "Dirección"}, "cortes:descargar": {"Supervisión", "Dirección"}}
 
 
 def nombres_de_rutas(patrones=None, prefijo=""):

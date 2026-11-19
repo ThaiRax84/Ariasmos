@@ -22,10 +22,6 @@ def base(personas):
     return personas, titular_activo(personas["op"], personas["sup"], "Ana")
 
 
-def encender():
-    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "1"})
-
-
 def textos_de(centavos):
     pesos, resto = divmod(centavos, 100)
     return {f"{pesos:,}.{resto:02d}", f"{pesos}.{resto:02d}", str(centavos)}
@@ -130,7 +126,6 @@ def test_turno_en_arqueo_no_recibe_movimientos(base):
 
 
 def _turno_con_piezas(personas, fondo):
-    encender()
     caja_ = Caja.objects.get_or_create(nombre="Caja 1")[0]
     datos = {"caja": caja_.pk}
     datos.update({f"f_{valor}": cantidad for valor, cantidad in fondo.items()})

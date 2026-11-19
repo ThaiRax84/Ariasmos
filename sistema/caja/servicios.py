@@ -287,17 +287,28 @@ def depositar(origen, importe, cuenta, fecha, referencia, nota="", request=None,
     return traslado
 
 
-def confirmar_entrega(traslado, usuario, importe, request=None):
+def confirmar_entrega(traslado, usuario, importe, request=None, piezas=None):
     if traslado.destino_id != usuario.pk or traslado.origen_id == usuario.pk:
         raise ErrorCaja("Solo quien recibe puede confirmar la entrega.")
+    if piezas is not None:
+        try:
+            piezas = control_piezas.validar(piezas)
+        except control_piezas.ErrorPiezas as error:
+            raise ErrorCaja(str(error))
+        importe = control_piezas.total(piezas)
     if importe != traslado.importe:
-        registrar("entrega_importe_distinto", usuario=usuario, objeto=traslado, datos={"declarado": traslado.importe, "recibido": importe}, request=request)
-        raise ErrorCaja("El importe no coincide con lo enviado. Si recibiste otra cantidad, rechaza la entrega.")
+        registrar("entrega_importe_distinto", usuario=usuario, objeto=traslado, datos={"declarado": traslado.importe, "recibido": importe, "piezas": piezas or {}}, request=request)
+        raise ErrorCaja("Lo que contaste no coincide con lo enviado. Si recibiste otra cantidad, rechaza la entrega.")
     with transaction.atomic():
         hechos = Traslado.objects.filter(pk=traslado.pk, estado=Traslado.PENDIENTE, destino=usuario).update(estado=Traslado.CONFIRMADO, resuelto_en=timezone.now())
         if hechos != 1:
             raise ErrorCaja("La entrega ya no está pendiente.")
-        registrar("entrega_confirmada", usuario=usuario, objeto=traslado, datos={"de": str(traslado.origen), "importe": traslado.importe}, request=request)
+        enviadas = {str(f["denominacion"]): -f["piezas"] for f in MovimientoPiezas.objects.filter(traslado=traslado, usuario_id=traslado.origen_id).values("denominacion", "piezas")}
+        if piezas:
+            control_piezas.registrar(None, usuario, MovimientoPiezas.TRASLADO, piezas, 1, traslado=traslado)
+        registrar("entrega_confirmada", usuario=usuario, objeto=traslado, datos={"de": str(traslado.origen), "importe": traslado.importe, "piezas": piezas or {}}, request=request)
+        if piezas and enviadas and enviadas != piezas:
+            registrar("entrega_piezas_distintas", usuario=usuario, objeto=traslado, datos={"enviadas": enviadas, "recibidas": piezas}, request=request)
 
 
 def rechazar_entrega(traslado, usuario, nota, request=None):

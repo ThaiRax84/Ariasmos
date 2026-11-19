@@ -15,7 +15,7 @@
 {% for t in traslados %}
 <tr><td>{{ t.creado|date:"d/m/Y H:i" }}</td><td>{{ t.get_tipo_display }}</td><td>{{ t.origen }}</td><td>{% if t.destino %}{{ t.destino }}{% else %}{{ t.cuenta_bancaria }}{% endif %}</td><td>{{ t.importe|dinero }}</td><td>{{ t.get_estado_display }}</td>
 <td>{% if t.estado == "pendiente" and t.destino_id == user.pk %}
-  <form method="post" action="{% url 'caja:confirmar' t.pk %}" class="en-linea">{% csrf_token %}<input type="text" name="importe" inputmode="decimal" placeholder="Importe recibido" required><button class="boton" type="submit">Confirmar</button></form>
+  <a class="boton" href="{% url 'caja:confirmar' t.pk %}">Contar y confirmar</a>
   <form method="post" action="{% url 'caja:rechazar' t.pk %}" class="en-linea">{% csrf_token %}<input type="text" name="nota" placeholder="Motivo" required><button class="boton peligro" type="submit">Rechazar</button></form>
 {% endif %}</td></tr>
 {% empty %}<tr><td colspan="7">Sin movimientos.</td></tr>{% endfor %}

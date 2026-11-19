@@ -14,7 +14,7 @@ from solicitudes import motor
 from solicitudes.models import Solicitud
 
 from .conftest import cliente
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de, verificar_sumas
+from .libro_ayudas import campos_piezas, preparar_conceptos, titular_activo, turno_de, verificar_sumas
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def cobrar(usuario, titular, importe):
 def test_nadie_revierte_solo_un_pago_que_el_mismo_cobro(base):
     personas, ana = base
     pago = cobrar(personas["sup"], ana, 50000)
-    cliente(personas["sup"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "error de captura"})
+    cliente(personas["sup"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "error de captura", **campos_piezas(pago.importe)})
     assert not ReversionPago.objects.exists()
     solicitud = Solicitud.objects.get(accion="revertir_pago")
     assert solicitud.estado == Solicitud.PENDIENTE and solicitud.solicitante == personas["sup"]
@@ -48,7 +48,7 @@ def test_supervision_si_revierte_directo_un_pago_que_cobro_otra_persona(base):
     pago = cobrar(personas["op"], ana, 50000)
     turno_de(personas["sup"], "Caja 2")
     cobrar(personas["sup"], ana, 80000)
-    cliente(personas["sup"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "devolución"})
+    cliente(personas["sup"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "devolución", **campos_piezas(pago.importe)})
     assert ReversionPago.objects.filter(pago=pago).exists()
     assert caja.custodia(personas["sup"]) == 30000
     verificar_sumas()
@@ -63,7 +63,7 @@ def test_no_se_devuelve_efectivo_que_el_turno_no_tiene(base):
     entrega = caja.entregar(op, sup, 100000)
     caja.confirmar_entrega(entrega, sup, 100000)
     turno_de(op)
-    cliente(op).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "devolución"})
+    cliente(op).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "devolución", **campos_piezas(pago.importe)})
     solicitud = Solicitud.objects.filter(accion="revertir_pago").first()
     if solicitud is not None and solicitud.estado == Solicitud.PENDIENTE:
         with pytest.raises(motor.ErrorSolicitud):
@@ -83,7 +83,7 @@ def test_depositos_por_conciliar_quedan_a_la_vista_y_alertan(base):
     cuenta = CuentaBancaria.objects.first() or CuentaBancaria.objects.create(
         banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="Negocio", contacto_dudas="5512345678", principal=True
     )
-    cliente(op).post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "1000.00", "fecha": "2026-11-12", "referencia": "FOLIO-778899"})
+    cliente(op).post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "1000.00", "fecha": "2026-11-12", "referencia": "FOLIO-778899", "p_100000": "1"})
     deposito = Traslado.objects.get(tipo=Traslado.DEPOSITO)
     pagina = cliente(personas["sup"]).get(reverse("caja:custodia")).content.decode()
     assert "FOLIO-778899" in pagina and "por conciliar" in pagina.lower()

@@ -62,12 +62,16 @@ def _pantalla_inicio(request, formulario=None):
 
 @requiere_permiso("turno_caja")
 def inicio(request):
+    if control_piezas.faltan_para_contar() and servicios.turno_abierto(request.user) is None:
+        return control_piezas.pantalla_faltan(request)
     return _pantalla_inicio(request)
 
 
 @requiere_permiso("turno_caja")
 @require_POST
 def abrir(request):
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request)
     formulario = FormularioAbrir(request.POST)
     if formulario.is_valid():
         try:
@@ -122,6 +126,8 @@ def cerrar(request, pk):
         return redirect("caja:turno", pk=pk)
     if ConteoArqueo.objects.filter(turno=objeto).exists():
         return redirect("caja:reconteo", pk=pk)
+    if control_piezas.faltan():
+        return control_piezas.pantalla_faltan(request, "caja:inicio")
     pendientes = list(servicios.comprobantes_pendientes(objeto))
     formulario = FormularioArqueo(request.POST if request.method == "POST" else None)
     if request.method == "POST" and not pendientes and formulario.is_valid():
@@ -171,6 +177,8 @@ def traslados(request):
 
 @requiere_permiso(*CAJEROS)
 def entrega(request):
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "caja:traslados")
     formulario = FormularioEntrega(request.POST if request.method == "POST" else None, origen=request.user)
     if request.method == "POST" and formulario.is_valid():
         try:
@@ -184,6 +192,8 @@ def entrega(request):
 
 @requiere_permiso(*CAJEROS)
 def deposito(request):
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "caja:traslados")
     formulario = FormularioDeposito(request.POST if request.method == "POST" else None)
     if request.method == "POST" and formulario.is_valid():
         datos = formulario.cleaned_data
@@ -205,19 +215,24 @@ def _entrega_propia(request, pk):
 
 
 @requiere_permiso("recibir_efectivo")
-@require_POST
 def confirmar(request, pk):
     traslado = _entrega_propia(request, pk)
-    formulario = FormularioConfirmar(request.POST)
-    if formulario.is_valid():
+    if traslado.estado != Traslado.PENDIENTE:
+        messages.info(request, "La entrega ya no está pendiente.")
+        return redirect("caja:traslados")
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "caja:traslados")
+    formulario = FormularioConfirmar(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and formulario.is_valid():
         try:
-            servicios.confirmar_entrega(traslado, request.user, formulario.cleaned_data["importe"], request)
-            messages.success(request, "Entrega confirmada.")
+            servicios.confirmar_entrega(traslado, request.user, formulario.cleaned_data["importe"], request, piezas=formulario.piezas())
         except servicios.ErrorCaja as error:
-            messages.error(request, str(error))
-    else:
-        messages.error(request, "Escribe el importe que recibiste.")
-    return redirect("caja:traslados")
+            formulario.add_error(None, str(error))
+        else:
+            messages.success(request, "Entrega confirmada.")
+            return redirect("caja:traslados")
+    contexto = {"formulario": formulario, "titulo": "Confirmar la entrega de efectivo", "antetitulo": "Efectivo", "subtitulo": f"De {traslado.origen}. Cuenta lo que recibiste: debe coincidir con lo enviado.", "boton": "Confirmar", "volver": "caja:traslados"}
+    return render(request, "comun/formulario.html", contexto)
 
 
 @requiere_permiso("recibir_efectivo")
@@ -254,6 +269,8 @@ def _leer_archivo(archivo):
 
 @requiere_permiso("retirar_efectivo")
 def retiro_nuevo(request):
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "caja:inicio")
     turno = servicios.turno_abierto(request.user)
     formulario = FormularioRetiro(request.POST if request.method == "POST" else None, request.FILES if request.method == "POST" else None)
     if request.method == "POST" and turno is not None and formulario.is_valid():
@@ -400,6 +417,8 @@ def retiro_revisar(request, pk):
 @requiere_permiso(*RETIROS)
 def retiro_revertir(request, pk):
     objeto = _retiro_visible(request, pk)
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request)
     formulario = FormularioRevertirRetiro(request.POST if request.method == "POST" else None)
     if request.method == "POST" and formulario.is_valid():
         datos = {"retiro": objeto.pk, "motivo": formulario.cleaned_data["motivo"]}

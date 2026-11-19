@@ -12,7 +12,7 @@ from configuracion.models import Parametro
 from solicitudes.models import Solicitud
 
 from .conftest import cliente
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de, verificar_sumas
+from .libro_ayudas import campos_piezas, preparar_conceptos, titular_activo, turno_de, verificar_sumas
 
 
 @pytest.fixture
@@ -31,14 +31,15 @@ def cobrar(c, titular, importe):
 
 
 def confirmar(c, titular, ficha, centavos):
-    return c.post(reverse("cobros:cobrar", args=[titular.pk]), {"paso": "confirmar", "ficha": ficha, "importe": centavos})
+    piezas = campos_piezas(int(centavos), "r_") if str(centavos).isdigit() and int(centavos) % 50 == 0 else {}
+    return c.post(reverse("cobros:cobrar", args=[titular.pk]), {"paso": "confirmar", "ficha": ficha, "importe": centavos, **piezas})
 
 
 def test_cobro_con_vista_previa_y_doble_envio(caja):
     personas, ana = caja
     op = cliente(personas["op"])
     assert op.post(reverse("cobros:cobrar", args=[ana.pk]), {"importe": "100"}).url == reverse("caja:inicio")
-    op.post(reverse("caja:abrir"), {"caja": _caja_libre(), "fondo_inicial": "0"})
+    op.post(reverse("caja:abrir"), {"caja": _caja_libre(), "apertura": "cero"})
     assert Turno.objects.filter(usuario=personas["op"], estado=Turno.ABIERTO).exists()
     vista, ficha, centavos = cobrar(op, ana, "1,200.50")
     assert "Inscripción" in vista.content.decode() and "Queda a favor" in vista.content.decode()
@@ -145,30 +146,35 @@ def test_entrega_con_doble_firma_y_custodia(caja):
     libro.registrar_pago(ana, 150000, Pago.EFECTIVO, op, turno=turno)
     assert custodia(op) == 150000 and disponible_para_trasladar(op) == 0
     c_op = cliente(op)
-    respuesta = c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "1000"})
+    respuesta = c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "1000", "p_100000": "1"})
     assert respuesta.status_code == 200 and not Traslado.objects.exists()
     cerrar_turno(turno, op, {"100000": 1, "50000": 1})
-    c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "1000"})
+    assert c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "1000"}).status_code == 200 and not Traslado.objects.exists()
+    c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "1000", "p_100000": "1"})
     entrega = Traslado.objects.get()
     assert entrega.estado == Traslado.PENDIENTE and custodia(op) == 150000 and disponible_para_trasladar(op) == 50000
-    assert c_op.post(reverse("caja:confirmar", args=[entrega.pk]), {"importe": "1000"}).status_code == 403
-    assert cliente(direccion).post(reverse("caja:confirmar", args=[entrega.pk]), {"importe": "1000"}).status_code == 403
+    assert c_op.post(reverse("caja:confirmar", args=[entrega.pk]), {"p_100000": "1"}).status_code == 403
+    assert cliente(direccion).post(reverse("caja:confirmar", args=[entrega.pk]), {"p_100000": "1"}).status_code == 403
     c_sup = cliente(sup)
-    c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"importe": "999"})
+    pantalla = c_sup.get(reverse("caja:confirmar", args=[entrega.pk])).content.decode()
+    assert "data-mosaicos" in pantalla and 'name="p_100000"' in pantalla and 'name="importe"' not in pantalla
+    assert c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"importe": "1000"}).status_code == 200
+    c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"p_50000": "1"})
     entrega.refresh_from_db()
     assert entrega.estado == Traslado.PENDIENTE
-    c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"importe": "1000"})
-    c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"importe": "1000"})
+    c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"p_50000": "2"})
+    c_sup.post(reverse("caja:confirmar", args=[entrega.pk]), {"p_50000": "2"})
     entrega.refresh_from_db()
     assert entrega.estado == Traslado.CONFIRMADO
     assert custodia(op) == 50000 and custodia(sup) == 100000
     cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
-    c_sup.post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "600", "fecha": "2026-01-15", "referencia": "DEP1"})
+    assert c_sup.post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "600", "fecha": "2026-01-15", "referencia": "DEP1"}).status_code == 200
+    c_sup.post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "600", "fecha": "2026-01-15", "referencia": "DEP1", "p_50000": "1", "p_10000": "1"})
     deposito = Traslado.objects.get(tipo=Traslado.DEPOSITO)
     assert deposito.estado == Traslado.POR_CONCILIAR and custodia(sup) == 40000
-    assert c_sup.post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "500", "fecha": "2026-01-15", "referencia": "DEP2"}).status_code == 200
+    assert c_sup.post(reverse("caja:deposito"), {"cuenta": cuenta.pk, "importe": "500", "fecha": "2026-01-15", "referencia": "DEP2", "p_50000": "1"}).status_code == 200
     assert Traslado.objects.filter(tipo=Traslado.DEPOSITO).count() == 1
-    c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "500"})
+    c_op.post(reverse("caja:entrega"), {"destino": sup.pk, "importe": "500", "p_50000": "1"})
     otra = Traslado.objects.filter(estado=Traslado.PENDIENTE).get()
     c_sup.post(reverse("caja:rechazar", args=[otra.pk]), {"nota": "No llegó"})
     otra.refresh_from_db()

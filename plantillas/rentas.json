@@ -406,7 +406,7 @@
       "4": "18:00",
       "5": "18:00"
     },
-    "control_denominaciones": false,
+    "control_denominaciones": true,
     "periodo_retiros": "dia"
   },
   "inventario": {
