@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.22 · 18/11/2026 · Estado: fases 1 a 9b construidas (0.9.1); fase 10 (efectivo siempre contado, formularios que se adaptan, cobrar con lista y pantallas en vivo, §25) en construcción; fase 6b (facturación, §17) diseñada.
+Versión 0.22 · 18/11/2026 · Estado: fases 1 a 9b construidas (0.9.1); fase 10 (efectivo siempre contado, formularios que se adaptan, botones a prueba de clics y cobrar con lista, §25.1 a §25.4 y §25.6) en construcción; pantallas en vivo (§25.5) diseñadas, sin construir; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -500,7 +500,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 8b | Nada fijo de un negocio: vocabulario completo, reportes, banco, reglas configurables y cobros semanales y quincenales (§22) |
 | 9a | Configurador y caja más cómodos: zona horaria en lista, signo según el tipo, apertura de turno con piezas, orden en los buscadores, pantallas de caja como el diseño aprobado (§23) |
 | 9b | Tarifas y cargos por agrupación, recargos tras el alta, límites de adeudo y rezagados con reglas propias (§24) |
-| 10 | Conteo de piezas de fábrica en todo movimiento de efectivo, formularios que se adaptan a lo elegido, botones a prueba de clics repetidos, cobrar con la lista a la vista y pantallas que se actualizan solas (§25) |
+| 10 | Conteo de piezas de fábrica en todo movimiento de efectivo, formularios que se adaptan a lo elegido, botones a prueba de clics repetidos y cobrar con la lista a la vista (§25.1 a §25.4 y §25.6). Las pantallas que se actualizan solas (§25.5) quedan diseñadas para la fase de transferencias |
 
 ## 14. Pendientes de decisión
 
@@ -1039,7 +1039,9 @@ Origen: pruebas del dueño sobre una instalación real. Regla de la fase: **todo
 - Lo mismo en Vender a un titular.
 - Con muchos titulares la lista no se carga entera: página de 50 y consultas agregadas (sin una consulta por renglón).
 
-### 25.5 Pantallas que se actualizan solas
+### 25.5 Pantallas que se actualizan solas (diseñada, no se construye en la fase 10)
+
+Se construye junto con la llegada de transferencias, cuando el dueño lo confirme.
 
 - Cuando en cualquier computadora aprobada se registra un movimiento (pago, venta, retiro, alta, solicitud, importación del banco), las demás pantallas abiertas lo reflejan en segundos sin recargar: inicio, lista de cobrar, ficha, solicitudes, banco y existencias.
 - Mecanismo: cada página consulta cada pocos segundos una ruta ligera (`/pulso`) que devuelve solo contadores de cambio por tema; cuando un contador cambia, la página vuelve a pedir **la misma pantalla** y sustituye sus regiones marcadas como vivas. No hay conexión permanente ni puente nuevo.
