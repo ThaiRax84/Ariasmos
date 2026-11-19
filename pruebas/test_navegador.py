@@ -181,6 +181,7 @@ def test_inicio_con_cifras_grafica_y_solicitudes_que_se_deshacen(sesion_navegado
 
     datos = preparar(con_turno=False)
     caja.abrir_turno(datos["op"], Caja.objects.filter(activa=True).first(), 37000, piezas={"10000": 2, "5000": 2, "2000": 5, "1000": 5, "500": 4})
+    turno = Turno.objects.get(usuario=datos["op"])
     libro.registrar_pago(datos["titulares"][2], 50000, Pago.EFECTIVO, datos["op"], turno=turno, piezas={"recibidas": {"50000": 1}, "cambio": {}})
     solicitudes = []
     for nombre in ("Eva", "Fede"):
