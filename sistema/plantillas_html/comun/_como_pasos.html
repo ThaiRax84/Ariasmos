@@ -1,0 +1,1 @@
+{% load formato %}{% pasos_como clave as lista %}<div class="pliegue como" id="como-{{ clave }}"><div><ol class="pasos-llanos">{% for titulo, texto in lista %}<li><span><strong>{{ titulo }}</strong> {{ texto }}</span></li>{% endfor %}</ol></div></div>

@@ -1,0 +1,105 @@
+{% load formato rezagos %}<div class="cabeza-persona">
+  <span class="avatar grande" aria-hidden="true">{{ titular.nombre_completo|iniciales }}</span>
+  <div class="texto"><h2>{{ titular.nombre_completo }}</h2><p class="ayuda">{% if not titular.interno %}{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% endif %}{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %}</p></div>
+  <button class="cerrar" type="button" data-accion="cerrar-panel" aria-label="Cerrar" hidden>×</button>
+</div>
+{% if hecho %}
+<div class="exito" data-exito>
+  <svg class="palomita" viewBox="0 0 88 88" aria-hidden="true"><circle cx="44" cy="44" r="40"/><path d="M27 45l12 12 23-25"/></svg>
+  <h2>{% if hecho.pago.medio == "banco" %}Transferencia recibida y aplicada{% else %}Pago registrado{% endif %}</h2>
+  <span class="cifra-importe grande">{{ hecho.pago.importe|cifra }}</span>
+  <p class="ayuda">Recibo {{ hecho }} · {{ hecho.pago.get_medio_display|capfirst }}{% if cambio_entregado %} · Cambio entregado {{ cambio_entregado|dinero }}{% endif %}</p>
+  <div class="acciones columna">
+    <a class="boton grande ancho" href="{% url 'cobros:recibo' hecho.pk %}" data-sin-panel>Ver e imprimir el recibo</a>
+    <button class="boton secundario ancho" type="button" data-accion="siguiente" hidden>Siguiente cobro</button>
+  </div>
+</div>
+{% else %}
+{% cobro_rezago titular %}
+{% if not turno %}<p class="mensaje warning">Para cobrar en efectivo primero abre tu turno. <a href="{% url 'caja:inicio' %}" data-sin-panel>Ir a mi caja</a></p>{% endif %}
+{% if propuesta and piezas.listo %}
+<form method="post" action="{% url 'cobros:cobrar' titular.pk %}" class="pila" novalidate data-panel-formulario>
+  {% csrf_token %}
+  <input type="hidden" name="panel" value="1">
+  <input type="hidden" name="paso" value="confirmar">
+  <input type="hidden" name="importe" value="{{ importe }}">
+  <input type="hidden" name="ficha" value="{{ ficha }}">
+  {% if piezas.formulario.non_field_errors %}<div class="errores" role="alert">{% for e in piezas.formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  <div class="total-cobro"><span>Importe a cobrar</span><strong class="cifra-importe media">{{ importe|cifra }}</strong></div>
+  {% if sobre_tope %}<p class="mensaje warning">Este importe pasa del tope de un pago individual: al confirmar se pide autorización.</p>{% endif %}
+  <div class="cuadros">
+    <div class="cuadro"><span class="etiqueta">Recibido</span><span class="valor">{{ importe|add:piezas.cambio|dinero }}</span></div>
+    <div class="cuadro{% if piezas.cambio %} aviso{% else %} bien{% endif %}"><span class="etiqueta">{% if piezas.cambio %}Cambio a entregar{% else %}Pago exacto, sin cambio{% endif %}</span><span class="valor">{{ piezas.cambio|dinero }}</span></div>
+  </div>
+  {% if piezas.aviso %}<p class="mensaje warning">{{ piezas.aviso }}</p>{% endif %}
+  {% if piezas.cambio and not piezas.aviso %}<div class="piezas-entrega"><div><span class="etiqueta">Entrega este cambio, con estas piezas</span><span class="cuales">{{ piezas.formulario.campos_cambio|piezas_texto }}</span><span class="ayuda">Así tu caja cuadra al final del día.</span></div></div>{% endif %}
+  <div class="oculto-piezas" hidden>{% for c in piezas.formulario.campos_recibidas %}{{ c.as_hidden }}{% endfor %}</div>
+  {% if piezas.cambio %}<details class="campo"{% if piezas.formulario.errors or piezas.aviso %} open{% endif %}>
+    <summary class="enlace">{% if piezas.aviso %}¿Con qué piezas das el cambio?{% else %}¿Diste el cambio con otras piezas?{% endif %}</summary>
+    {% include "caja/_piezas.html" with campos=piezas.formulario.campos_cambio prefijo="Entrego de cambio: piezas de" mosaicos=True %}
+  </details>{% endif %}
+  <div class="acciones columna">
+    <button class="boton grande ancho" type="submit">Confirmar y dar recibo</button>
+    <a class="enlace" href="{% url 'cobros:cobrar' titular.pk %}?panel=1" data-recargar-panel>Corregir lo que te dieron</a>
+  </div>
+</form>
+{% else %}
+{% if cargos_panel %}<div>
+  <span class="etiqueta-campo">1 · ¿Qué va a pagar?</span>
+  <span class="ayuda">Quita la palomita de lo que no pague hoy.</span>
+  <ul class="cargos" data-cargos>
+  {% for fila in cargos_panel %}{% with c=fila.cargo %}<li><label class="cargo"><input type="checkbox" checked data-cargo-centavos="{{ fila.saldo }}"><span><span class="concepto">{{ c }}</span>{% if c.titular_id != titular.pk %}<span class="vence">{{ c.titular.nombre_completo }}</span>{% endif %}<span class="vence{% if fila.estado == 'vencido' %} tarde{% endif %}">{% if fila.estado == "vencido" %}Venció{% else %}Vence{% endif %} el {{ c.vencimiento|date:"j M" }}</span></span><strong>{{ fila.saldo|dinero }}</strong></label></li>{% endwith %}{% endfor %}
+  </ul>
+</div>{% elif not estado.adeudo %}<p class="mensaje success">Al corriente. No debe nada.</p>{% endif %}
+<div class="segmentado" role="group" aria-label="¿Cómo paga?" data-metodos hidden><span class="pastilla"></span><button type="button" data-metodo="efectivo" aria-pressed="true">Efectivo</button><button type="button" data-metodo="transferencia" aria-pressed="false">Transferencia</button></div>
+<div data-metodo-cuerpo="efectivo">
+{% if turno %}
+<form method="post" action="{% url 'cobros:cobrar' titular.pk %}" class="pila" novalidate data-panel-formulario data-cobro-efectivo>
+  {% csrf_token %}
+  <input type="hidden" name="panel" value="1">
+  <input type="hidden" name="paso" value="panel">
+  {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  <div class="total-cobro campo-total">
+    <label for="importe-panel">Importe a cobrar</label>
+    <span class="con-adorno"><span class="adorno">{{ moneda.simbolo }}</span><input id="importe-panel" type="text" name="importe" inputmode="decimal" autocomplete="off" maxlength="16" data-acepta="dinero" data-importe-cobro value="{% if formulario.data.importe %}{{ formulario.data.importe }}{% elif estado.adeudo %}{{ estado.adeudo|dinero_plano }}{% endif %}"{% if formulario.importe.errors %} aria-invalid="true"{% endif %}><span class="adorno">{{ moneda.codigo }}</span></span>
+  </div>
+  {% for e in formulario.importe.errors %}<p class="error">{{ e }}</p>{% endfor %}
+  {% if con_piezas %}
+  <div class="campo">
+    <span class="etiqueta">2 · ¿Con qué te pagó?</span>
+    <span class="ayuda">Toca cada billete o moneda que te den. Si te equivocas, con «−» quitas uno.</span>
+    {% if piezas.formulario.non_field_errors %}<div class="errores" role="alert">{% for e in piezas.formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    {% include "caja/_piezas.html" with campos=piezas.formulario.campos_recibidas prefijo="Recibí: piezas de" mosaicos=True %}
+  </div>
+  <div class="cuadros" data-cuadros-cobro data-simbolo="{{ moneda.simbolo }}">
+    <div class="cuadro"><span class="etiqueta">Recibido</span><span class="valor" data-recibido-cobro>{{ 0|dinero }}</span></div>
+    <div class="cuadro" data-cuadro-falta><span class="etiqueta" data-rotulo-falta data-falta="Falta por recibir" data-exacto="Pago exacto, sin cambio" data-cambio="Cambio a entregar" data-sin-importe="Escribe cuánto va a pagar">Falta por recibir</span><span class="valor" data-falta-valor>{{ 0|dinero }}</span></div>
+  </div>
+  <p class="ayuda" data-aviso-cambio hidden>Al tocar «Ver el cambio», el programa te dice qué billetes y monedas entregar.</p>
+  {% endif %}
+  {% if sobre_tope %}<p class="mensaje warning">Este importe pasa del tope de un pago individual: al confirmar se pide autorización.</p>{% endif %}
+  <div class="acciones columna">
+    <button class="boton grande ancho" type="submit" data-boton-cobro data-texto-exacto="Confirmar y dar recibo" data-texto-cambio="Ver el cambio">Confirmar y dar recibo</button>
+    <a class="enlace" href="{% url 'titulares:detalle' titular.pk %}" data-sin-panel>Ver ficha completa</a>
+  </div>
+</form>
+{% else %}
+<p class="ayuda">Sin turno abierto no se recibe efectivo.</p>
+{% endif %}
+</div>
+<div data-metodo-cuerpo="transferencia" hidden>
+  {% if pago_banco %}
+  <div class="espera" data-espera-transferencia data-direccion="{% url 'cobros:cobrar' titular.pk %}?panel=1&amp;metodo=transferencia&amp;desde={{ ultimo_banco }}">
+    <span class="punto-vivo" aria-hidden="true"></span>
+    <div><strong>Esperando la transferencia…</strong><span class="ayuda">Cuando el dinero llegue al banco y el programa lo reciba, aquí aparece solo. No tienes que hacer nada.</span></div>
+  </div>
+  <div class="clabe">
+    <div><span class="etiqueta-campo">{{ pago_banco.cuenta.etiqueta_numero }} · {{ pago_banco.cuenta.nombre_banco }}</span><code data-copiable>{{ pago_banco.cuenta.numero_formateado }}</code><span class="ayuda">A nombre de {{ pago_banco.cuenta.beneficiario }}. Que escriba <strong>{{ titular.referencia_bancaria }}</strong> {{ pago_banco.lugar }}.</span></div>
+    <button class="boton secundario chico" type="button" data-copiar="{{ pago_banco.cuenta.identificador }}" data-copiado="Cuenta copiada: ya puedes pegarla en un mensaje" data-no-copiado="No se pudo copiar; dicta la cuenta en voz alta.">Copiar</button>
+  </div>
+  {% else %}
+  <p class="mensaje warning">Todavía no hay una cuenta del negocio para recibir transferencias.{% if configura_banco %} <a href="{% url 'banco:nueva' %}" data-sin-panel>Agrégala aquí</a>.{% else %} Pide a {{ roles.administrar_configuracion }} que la agregue.{% endif %}</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}

@@ -8,15 +8,17 @@
 <link rel="stylesheet" href="{% static 'css/sistema.css' %}">
 {% block transicion %}<link rel="stylesheet" href="{% static 'css/transiciones.css' %}">{% endblock %}
 {% if user.is_authenticated and marca.con_colores %}<link rel="stylesheet" href="{% url 'marca_css' %}?v={{ marca.version }}">{% endif %}
+<link rel="stylesheet" href="{% static 'css/rica.css' %}">
 <link rel="stylesheet" href="{% static 'css/escritorio.css' %}">
 <script src="{% static 'js/sistema.js' %}" defer></script>
 <script src="{% static 'js/escritorio.js' %}" defer></script>
 <script src="{% static 'js/captura.js' %}" defer></script>
 <script src="{% static 'js/formularios.js' %}" defer></script>
 <script src="{% static 'js/piezas.js' %}" defer></script>
+<script src="{% static 'js/rica.js' %}" defer></script>
 {% block cabeza %}{% endblock %}
 </head>
-<body{% block clase_cuerpo %}{% endblock %}>
+<body{% block clase_cuerpo %}{% endblock %} data-simbolo="{{ moneda.simbolo }}">
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <div class="franja"></div>
 {% block barra %}

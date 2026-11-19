@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block transicion %}{% endblock %}
+{% block contenido %}
+<div id="panel-cobro-region" class="panel-cobro-region" data-titular="{{ titular.pk }}">{% include "cobros/_panel.html" %}</div>
+{% endblock %}

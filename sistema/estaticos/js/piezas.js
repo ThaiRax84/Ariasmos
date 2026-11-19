@@ -62,7 +62,7 @@
     piezas.forEach(function (pieza) {
       var campo = pieza.querySelector("input");
       var etiqueta = pieza.querySelector(".denominacion");
-      if (!campo || !etiqueta) { return; }
+      if (!campo || !etiqueta || pieza.classList.contains("con-mosaico")) { return; }
       var nombre = "";
       etiqueta.childNodes.forEach(function (nodo) { if (nodo.nodeType === 3) { nombre += nodo.textContent; } });
       nombre = nombre.trim();
@@ -72,39 +72,73 @@
       var cuenta = crear("span", "mosaico-cuenta");
       tocar.appendChild(denominacion);
       tocar.appendChild(cuenta);
-      var quitar = crear("button", "mosaico-quitar", "−");
+      var quitar = crear("button", "mosaico-quitar", "\u2212");
       quitar.type = "button";
       quitar.setAttribute("aria-label", "Quitar una pieza de " + nombre);
       pieza.classList.add("con-mosaico");
       pieza.insertBefore(tocar, pieza.firstChild);
       pieza.appendChild(quitar);
+      var tecleo = 0;
 
       function pintar() {
         var piezasActuales = leer(campo);
-        cuenta.textContent = piezasActuales > 0 ? "× " + piezasActuales : "—";
+        cuenta.textContent = piezasActuales > 0 ? "\u00d7 " + piezasActuales : "\u2014";
         tocar.setAttribute("aria-label", "Agregar una pieza de " + nombre + ". Llevas " + piezasActuales);
         pieza.classList.toggle("elegida", piezasActuales > 0);
-        quitar.disabled = piezasActuales <= 0;
+        quitar.tabIndex = piezasActuales > 0 ? 0 : -1;
         sumar();
+        formulario.dispatchEvent(new CustomEvent("piezas-cambio", { bubbles: true }));
+      }
+
+      function poner(cantidad) {
+        var maximo = parseInt(campo.getAttribute("max"), 10);
+        if (!isNaN(maximo) && cantidad > maximo) { cantidad = maximo; }
+        campo.value = String(Math.max(0, cantidad));
+        pintar();
       }
 
       tocar.addEventListener("click", function () {
-        var maximo = parseInt(campo.getAttribute("max"), 10);
-        var nuevo = leer(campo) + 1;
-        if (!isNaN(maximo) && nuevo > maximo) { nuevo = maximo; }
-        campo.value = String(nuevo);
-        pintar();
+        poner(leer(campo) + 1);
+        tocar.classList.remove("toque");
+        void tocar.offsetWidth;
+        tocar.classList.add("toque");
+        if (!quieto()) {
+          var vuela = crear("span", "vuela", "+" + nombre);
+          pieza.appendChild(vuela);
+          window.setTimeout(function () { vuela.remove(); }, 640);
+        }
       });
       quitar.addEventListener("click", function () {
-        campo.value = String(Math.max(0, leer(campo) - 1));
-        pintar();
+        poner(leer(campo) - 1);
+        if (!leer(campo)) { tocar.focus(); }
+      });
+      [tocar, quitar].forEach(function (boton) {
+        boton.addEventListener("keydown", function (evento) {
+          if (!/^[0-9]$/.test(evento.key) && evento.key !== "Backspace") { return; }
+          evento.preventDefault();
+          var ahora = Date.now();
+          var previo = ahora - tecleo < 1200 ? String(leer(campo) || "") : "";
+          tecleo = ahora;
+          poner(evento.key === "Backspace" ? 0 : Math.min(999, parseInt(previo + evento.key, 10)));
+          tocar.focus();
+        });
       });
       campo.addEventListener("input", pintar);
       pintar();
     });
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("[data-mosaicos]").forEach(prepararMosaicos);
-  });
+  function quieto() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function preparar(raiz) {
+    raiz.querySelectorAll("[data-mosaicos]").forEach(function (contenedor) {
+      if (!contenedor.classList.contains("mosaicos")) { prepararMosaicos(contenedor); }
+    });
+  }
+
+  document.addEventListener("ariasmos:contenido", function (evento) { preparar(evento.target); });
+
+  document.addEventListener("DOMContentLoaded", function () { preparar(document); });
 }());
