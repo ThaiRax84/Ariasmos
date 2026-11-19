@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.22 · 18/11/2026 · Estado: fases 1 a 9b construidas (0.9.1); fase 10 (efectivo siempre contado, formularios que se adaptan, botones a prueba de clics y cobrar con lista, §25.1 a §25.4 y §25.6) en construcción; pantallas en vivo (§25.5) diseñadas, sin construir; fase 6b (facturación, §17) diseñada.
+Versión 0.22 · 18/11/2026 · Estado: fases 1 a 10 construidas (0.9.2; fase 10: efectivo siempre contado, formularios que se adaptan, botones a prueba de clics, cobrar con lista y pruebas de fábrica, §25.1 a §25.4 y §25.6); pantallas en vivo (§25.5) diseñadas, sin construir; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -1008,6 +1008,8 @@ Regla de la fase: quien configura o cobra no escribe lo que puede elegir, y no v
 El cálculo de atraso y adeudo vencido de todos los titulares se hace con consultas agregadas (nunca una por titular) y debe responder con 5,000 titulares y 100,000 cargos sin que el inicio lo note; se prueba con el número de consultas.
 
 ## 25. Versión 0.22: lo que el cliente ve desde el primer día (fase 10)
+
+Estado: construida en 0.9.2, salvo §25.5 (diseñada, sin construir).
 
 Origen: pruebas del dueño sobre una instalación real. Regla de la fase: **todo se prueba como lo recibe un cliente**, con los valores de fábrica de cada plantilla, sin encender nada a mano.
 
