@@ -7,8 +7,10 @@
     <h1>{% if turno %}Turno abierto{% else %}Abrir turno{% endif %}</h1>
     <p class="subtitulo">{% if turno %}Desde las {{ turno.abierto_en|time:"H:i" }} del {{ turno.abierto_en|date:"d/m/Y" }} en {{ turno.caja }}.{% else %}Elige tu caja y cuenta el efectivo con el que empiezas. Así el cambio y el corte cuadran desde el principio.{% endif %}</p>
   </div>
+  <div class="encabezado-lado">{% include "comun/_como.html" with clave="caja" %}</div>
   {% if limite %}<div class="encabezado-lado"><div class="recuadro-cifra aviso"><span class="etiqueta">Hora límite del corte</span><span class="valor">{{ limite.texto }}</span></div></div>{% endif %}
 </div>
+{% include "comun/_como_pasos.html" with clave="caja" %}
 {% if turno %}
 {% if en_arqueo %}<div class="aviso-pantalla"><div class="aviso-texto"><span class="aviso-titulo">El turno está en arqueo</span><p>Ya no recibe cobros ni retiros. Termina de cerrarlo.</p></div><a class="boton" href="{% url 'caja:reconteo' turno.pk %}">Terminar el cierre</a></div>{% endif %}
 {% if pendientes_comprobante %}<div class="aviso-pantalla"><div class="aviso-texto"><span class="aviso-titulo">Retiros con comprobante pendiente</span><p>Adjúntalos antes de cerrar el turno: {% for r in pendientes_comprobante %}<a href="{% url 'caja:retiro' r.pk %}">{{ r }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p></div></div>{% endif %}
@@ -20,7 +22,7 @@
 {% if not en_arqueo %}
 <section class="panel">
   <h2>¿Qué sigue?</h2>
-  <p class="ayuda">Cobra con normalidad. Al terminar el día cuenta el efectivo y cierra el turno: el sistema no te dice antes cuánto debe haber.</p>
+  <p class="ayuda">Cobra con normalidad. Al terminar el día cuenta el efectivo y cierra tu turno. El programa no te dice antes cuánto debe haber: así el conteo es honesto.</p>
   <div class="acciones"><a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% if "retirar_efectivo" in permisos %}<a class="boton secundario" href="{% url 'caja:retiro_nuevo' %}">Retirar efectivo</a>{% endif %}<a class="boton secundario" href="{% url 'caja:cerrar' turno.pk %}">Cerrar turno</a></div>
 </section>
 {% endif %}
@@ -61,7 +63,7 @@
 {% endif %}
 <section class="panel">
   <div class="fila entre">
-    <div><h2>Efectivo de turnos cerrados por trasladar</h2><p class="cifra-importe media">{{ disponible|dinero }}</p></div>
+    <div><h2>Efectivo de turnos cerrados que falta entregar</h2><p class="cifra-importe media">{{ disponible|dinero }}</p></div>
     <a class="boton secundario" href="{% url 'caja:traslados' %}">Entregas y depósitos</a>
   </div>
 </section>

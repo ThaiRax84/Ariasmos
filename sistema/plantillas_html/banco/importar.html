@@ -3,8 +3,8 @@
 <div class="encabezado">
   <div class="encabezado-texto">
     <span class="antetitulo">Banco</span>
-    <h1>Importar movimientos del banco</h1>
-    <p class="subtitulo">Sube el estado de cuenta en PDF (sin contraseña, hasta 10 MB) o el archivo de movimientos de la banca en línea en Excel o CSV (hasta 5 MB). Antes de guardar verás qué pasará con cada movimiento.</p>
+    <h1>Subir el estado de cuenta</h1>
+    <p class="subtitulo">Arrastra el archivo que descargas de tu banco: el estado de cuenta en PDF (sin contraseña, hasta 10 MB) o los movimientos en Excel o CSV (hasta 5 MB). Antes de guardar verás de quién es cada depósito.</p>
     <p class="subtitulo">Estados de cuenta en PDF que se leen hoy: {{ lectores_pdf }}. Para cualquier otro banco usa el archivo de movimientos en Excel o CSV.</p>
   </div>
 </div>
@@ -13,6 +13,6 @@
   <div class="zona-soltar solo-con-js" data-zona-soltar hidden><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 16V5m0 0l-4 4m4-4l4 4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2>Arrastra aquí el estado de cuenta</h2><p class="ayuda">Sirve el archivo tal como lo da el banco: PDF, Excel o CSV.</p></div>
   <div class="leyendo" data-leyendo hidden><h2>Leyendo el archivo…</h2><div class="barra-progreso"><span></span></div><p class="ayuda">Buscando de quién es cada depósito</p></div>
   {% include "comun/_campos.html" %}
-  <div class="acciones"><button class="boton grande" type="submit">Revisar archivo</button><a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones anteriores</a></div>
+  <div class="acciones"><button class="boton grande" type="submit">Leer el archivo</button><a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones anteriores</a></div>
 </form>
 {% endblock %}

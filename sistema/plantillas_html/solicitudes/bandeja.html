@@ -3,20 +3,23 @@
 <div class="encabezado">
   <div class="encabezado-texto">
     <h1>Solicitudes</h1>
+    <p class="subtitulo">Aquí se ve lo que alguien pidió y espera un sí o un no.</p>
   </div>
+  <div class="encabezado-lado">{% include "comun/_como.html" with clave="solicitudes" %}</div>
 </div>
+{% include "comun/_como_pasos.html" with clave="solicitudes" %}
 <div class="columnas">
   <div class="pila" id="solicitudes-region" data-vivo="solicitudes">
     {% if "aprobar_solicitudes" in permisos %}
     <section class="panel">
-      <h2>Por resolver</h2>
+      <h2>Esperan tu respuesta</h2>
       {% if pendientes %}{% include "comun/_orden_formulario.html" with orden=orden_pendientes %}{% endif %}
       {% if pendientes %}<ul class="lista-estado">{% for s, resaltada in pendientes %}<li><span class="renglon-texto"><a class="renglon-titulo" href="{% url 'solicitudes:detalle' s.pk %}">{{ s }}{% if s.titular %} · {{ s.titular.matricula_formateada }}{% endif %}</a><span class="renglon-detalle">de {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</span></span>{% if resaltada %}<span class="estado aviso">Lleva tiempo esperando</span>{% else %}<span class="estado calma">En espera</span>{% endif %}</li>{% endfor %}</ul>
-      {% else %}<p>No hay pendientes.</p>{% endif %}
+      {% else %}<p>No hay nada esperando tu respuesta.</p>{% endif %}
     </section>
     {% endif %}
     <section class="panel">
-      <h2>Mis solicitudes</h2>
+      <h2>Lo que yo pedí</h2>
       {% if propias %}{% include "comun/_orden_formulario.html" with orden=orden_propias %}{% endif %}
       <div class="desplazable"><table class="tabla">
       <thead><tr><th>Solicitud</th><th>{{ voc.titular }}</th><th>Enviada</th><th>Resolvió</th><th>Estado</th></tr></thead>
@@ -25,8 +28,8 @@
     </section>
   </div>
   <section class="panel">
-    <h2>¿Urge una autorización?</h2>
-    <p class="ayuda">Hay tres caminos; no tienes que esperar a que alguien abra su bandeja.</p>
+    <h2>¿Te urge que te digan que sí?</h2>
+    <p class="ayuda">Hay tres caminos. No tienes que esperar a que alguien abra esta pantalla.</p>
     <ol class="vias">
       <li><div><strong>Bandeja</strong><span>Quien autoriza la ve en su inicio y la resuelve cuando entra.</span></div></li>
       <li><div><strong>Permiso temporal</strong><span>Si te delegaron ese permiso, la acción se aplica al momento.</span></div></li>
