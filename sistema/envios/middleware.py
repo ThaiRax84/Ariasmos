@@ -1,9 +1,10 @@
 import re
 import secrets
+import time
 from datetime import timedelta
 
 from django.contrib import messages
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, OperationalError, connection, transaction
 from django.http import HttpResponseRedirect
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -16,6 +17,8 @@ ENTRADA_CSRF = re.compile(rb'<input type="hidden" name="csrfmiddlewaretoken" val
 VIGENCIA = timedelta(days=2)
 REDIRECCIONES = (301, 302, 303, 307, 308)
 MENSAJE = "Esa operación ya se había enviado; no se repitió."
+ESPERA_MAXIMA = 30
+PAUSA = 0.05
 
 
 def nueva_ficha():
@@ -44,20 +47,46 @@ class FichaDeEnvio:
         valor = request.POST.get(CAMPO, "")
         if not PATRON.match(valor):
             return None
+        limite = time.monotonic() + ESPERA_MAXIMA
+        while True:
+            reservada = self._reservar(valor, request.path)
+            if reservada:
+                request.ficha_envio = valor
+                return None
+            if reservada is None:
+                if time.monotonic() >= limite:
+                    return None
+                time.sleep(PAUSA)
+                continue
+            previo = EnvioUsado.objects.filter(ficha=valor).values_list("destino", flat=True).first()
+            if previo:
+                return self._repetido(request, previo)
+            if previo is None:
+                continue
+            if time.monotonic() >= limite:
+                return self._repetido(request, "")
+            time.sleep(PAUSA)
+
+    def _reservar(self, valor, ruta):
         try:
             with transaction.atomic():
                 EnvioUsado.objects.filter(creado__lt=timezone.now() - VIGENCIA).delete()
-                EnvioUsado.objects.create(ficha=valor, ruta=request.path[:300])
+                EnvioUsado.objects.create(ficha=valor, ruta=ruta[:300])
         except IntegrityError:
-            return self._repetido(request, valor)
-        request.ficha_envio = valor
-        return None
+            return False
+        except OperationalError as error:
+            if not ocupada(error):
+                raise
+            return None
+        return True
 
-    def _repetido(self, request, valor):
-        previo = EnvioUsado.objects.filter(ficha=valor).first()
-        destino = previo.destino if previo is not None else ""
-        if not destino or not url_has_allowed_host_and_scheme(destino, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
-            destino = request.path
+    def _seguro(self, request, destino):
+        return bool(destino) and url_has_allowed_host_and_scheme(destino, allowed_hosts={request.get_host()}, require_https=request.is_secure())
+
+    def _repetido(self, request, destino):
+        if not self._seguro(request, destino):
+            anterior = request.META.get("HTTP_REFERER", "")
+            destino = anterior if self._seguro(request, anterior) else "/"
         messages.info(request, MENSAJE)
         return HttpResponseRedirect(destino)
 
@@ -78,3 +107,42 @@ class FichaDeEnvio:
         if respuesta.has_header("Content-Length"):
             respuesta["Content-Length"] = str(len(respuesta.content))
         return respuesta
+
+
+REINTENTOS = 3
+OCUPADA = "La base de datos estuvo ocupada y no se pudo guardar. Vuelve a intentarlo."
+
+
+def ocupada(error):
+    texto = str(error).lower()
+    return isinstance(error, OperationalError) and ("locked" in texto or "busy" in texto)
+
+
+class BaseOcupada:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_view(self, request, vista, args, kwargs):
+        request.vista_reintentable = (vista, args, kwargs)
+        return None
+
+    def process_exception(self, request, error):
+        if not ocupada(error) or connection.in_atomic_block or not hasattr(request, "vista_reintentable"):
+            return None
+        vista, args, kwargs = request.vista_reintentable
+        for intento in range(REINTENTOS):
+            time.sleep(PAUSA * (intento + 1) * 4)
+            for archivo in request.FILES.values():
+                archivo.seek(0)
+            try:
+                return vista(request, *args, **kwargs)
+            except OperationalError as otro:
+                if not ocupada(otro) or connection.in_atomic_block:
+                    raise
+        messages.error(request, OCUPADA)
+        anterior = request.META.get("HTTP_REFERER", "")
+        seguro = anterior and url_has_allowed_host_and_scheme(anterior, allowed_hosts={request.get_host()}, require_https=request.is_secure())
+        return HttpResponseRedirect(anterior if seguro else "/")

@@ -264,7 +264,54 @@
     });
   }
 
+  var LIBERAR_MS = 15000;
+
+  function marcarTrabajando(elemento) {
+    elemento.classList.add("trabajando");
+    elemento.setAttribute("aria-busy", "true");
+    elemento.setAttribute("aria-disabled", "true");
+  }
+
+  function liberar(elemento) {
+    elemento.classList.remove("trabajando");
+    elemento.removeAttribute("aria-busy");
+    elemento.removeAttribute("aria-disabled");
+  }
+
+  function liberarTodo() {
+    document.querySelectorAll("form[data-enviando]").forEach(function (formulario) { delete formulario.dataset.enviando; });
+    document.querySelectorAll(".trabajando").forEach(liberar);
+  }
+
+  function prepararEnvioUnico() {
+    document.addEventListener("submit", function (evento) {
+      var formulario = evento.target;
+      if (!(formulario instanceof HTMLFormElement)) { return; }
+      if (formulario.dataset.enviando === "1") { evento.preventDefault(); return; }
+      if (evento.defaultPrevented) { return; }
+      formulario.dataset.enviando = "1";
+      var boton = evento.submitter || formulario.querySelector("button[type=submit], button:not([type]), input[type=submit]");
+      formulario.querySelectorAll("button[type=submit], button:not([type]), input[type=submit]").forEach(function (otro) { otro.setAttribute("aria-disabled", "true"); });
+      if (boton) { marcarTrabajando(boton); }
+      window.setTimeout(function () {
+        delete formulario.dataset.enviando;
+        formulario.querySelectorAll("[aria-disabled]").forEach(liberar);
+      }, LIBERAR_MS);
+    });
+    document.addEventListener("click", function (evento) {
+      var boton = evento.target.closest && evento.target.closest("button, input[type=submit]");
+      if (boton && boton.form && boton.form.dataset.enviando === "1" && boton.type === "submit") { evento.preventDefault(); return; }
+      var enlace = evento.target.closest && evento.target.closest("a.boton[href]");
+      if (!enlace || evento.defaultPrevented || evento.button !== 0 || evento.ctrlKey || evento.metaKey || evento.shiftKey || evento.altKey || enlace.target) { return; }
+      if (enlace.classList.contains("trabajando")) { evento.preventDefault(); return; }
+      marcarTrabajando(enlace);
+      window.setTimeout(function () { liberar(enlace); }, LIBERAR_MS);
+    });
+    window.addEventListener("pageshow", liberarTodo);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    prepararEnvioUnico();
     prepararDependencias();
     prepararImprimir();
     prepararConfirmaciones();
