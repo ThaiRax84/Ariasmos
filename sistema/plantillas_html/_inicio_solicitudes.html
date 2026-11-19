@@ -1,0 +1,21 @@
+<section class="panel" id="solicitudes-inicio" data-vivo="solicitudes">
+  <div class="panel-cabeza"><h2>{{ titulo }} · {{ pendientes|length }}</h2><a class="enlace" href="{% url 'solicitudes:bandeja' %}">Ver todas</a></div>
+  {% for s, resaltada in pendientes|slice:":10" %}<div class="solicitud" data-id="{{ s.pk }}" data-solicitud>
+    <button class="solicitud-cabeza" type="button" aria-expanded="false" aria-controls="solicitud-{{ s.pk }}" data-abrir-solicitud><span><strong>{{ s }}{% if s.titular and not s.titular.interno %} · {{ s.titular.matricula_formateada }}{% endif %}</strong><span class="detalle">Pidió {{ s.solicitante }} · {{ s.creada|date:"d/m/Y H:i" }}</span></span><span class="estado {% if resaltada %}aviso{% else %}pendiente{% endif %}">{% if resaltada %}Lleva tiempo esperando{% else %}Por aprobar{% endif %}</span><span class="flecha-abre" aria-hidden="true"></span></button>
+    <div class="pliegue" id="solicitud-{{ s.pk }}"><div><div class="solicitud-cuerpo">
+      {% if s.descripcion %}<dl class="datos">{% for etiqueta, valor in s.descripcion %}<dt>{{ etiqueta }}</dt><dd>{{ valor }}</dd>{% endfor %}</dl>{% endif %}
+      {% if s.datos.nota %}<p>Motivo: {{ s.datos.nota }}</p>{% endif %}
+      <div class="acciones">
+        <form method="post" action="{% url 'solicitudes:aprobar' s.pk %}" class="en-linea" data-en-espera="aprobar" data-hecho="Solicitud aprobada">{% csrf_token %}<button class="boton chico" type="submit">Aprobar</button></form>
+        <button class="boton chico secundario solo-con-js" type="button" data-rechazar hidden>Rechazar</button>
+        <a class="enlace" href="{% url 'solicitudes:detalle' s.pk %}">Ver todo</a>
+      </div>
+      <div class="pliegue" data-motivo><div>
+        <form method="post" action="{% url 'solicitudes:rechazar' s.pk %}" class="pila" data-en-espera="rechazar" data-hecho="Solicitud rechazada">{% csrf_token %}
+          <div class="campo"><label for="motivo-{{ s.pk }}">Motivo del rechazo</label><textarea id="motivo-{{ s.pk }}" name="nota" rows="2" maxlength="300" required placeholder="Lo verá quien hizo la solicitud"></textarea></div>
+          <div class="acciones"><button class="boton chico peligro" type="submit">Confirmar rechazo</button></div>
+        </form>
+      </div></div>
+    </div></div></div>
+  </div>{% endfor %}
+</section>

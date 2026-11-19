@@ -15,6 +15,9 @@ from . import tablero
 from proyecto.avisos import contexto_inicio
 
 
+MAXIMO_SOLICITUDES = 10
+
+
 @requiere_sesion
 def inicio(request):
     usuario = request.user
@@ -33,6 +36,19 @@ def inicio(request):
         "salud": tablero.salud(usuario, certificado, dispositivos),
         "avisos": tablero.ordenar(tablero.avisos_control(usuario, certificado, diarios)),
     }
+    contexto["saludo"] = tablero.saludo()
+    if contexto["pendientes"]:
+        from solicitudes.views import describir
+
+        for solicitud, _ in contexto["pendientes"][:MAXIMO_SOLICITUDES]:
+            solicitud.descripcion = describir(solicitud)
+    if tablero.ve_cobranza(usuario):
+        contexto["semana"] = tablero.cobranza_semana()
+        contexto["avance"] = tablero.avance_periodo()
+    if usuario.tiene_permiso("ver_titulares") or usuario.tiene_permiso("registrar_pago_efectivo"):
+        from vivo.views import pagos_recientes
+
+        contexto["pagos"] = pagos_recientes(usuario, 5)
     if turno is not None:
         contexto["cobros_turno"] = turno.pagos.count()
         contexto["corte_propio"] = tablero.corte_propio(turno)

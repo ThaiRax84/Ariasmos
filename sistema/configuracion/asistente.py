@@ -91,13 +91,13 @@ RESERVADOS = {"csrfmiddlewaretoken", "ficha_envio", "token", "contrasena1", "con
 
 
 INTROS = {
-    "inicio": "Con esto se crea la base del programa. Todo se puede cambiar después en Configuración.",
+    "inicio": "Empecemos: dinos cómo se llama tu negocio y a qué se parece. Todo se puede cambiar después en Configuración.",
     "personalizar": "La plantilla ya quedó cargada. Si te sirve como está, sigue adelante; todo se puede cambiar después en Configuración.",
     "conceptos": "Escribe cuánto cuesta cada concepto y cuándo vence. Lo que dejes vacío se completa después en Configuración.",
     "marca": "Sube el logo del negocio y te proponemos los colores del programa tomados de él. Puedes aceptarlos, elegir otros u omitir este paso.",
     "pago": "Con estos datos se arma la ficha de pago que se entrega a cada {titular_min}. Puedes omitir este paso y capturarlo después.",
     "caja": "Cada negocio decide cuándo hace su corte y cuánto efectivo puede salir de la caja sin pedir permiso. Se puede cambiar después.",
-    "reglas": "Detalles de cómo trabaja el negocio. Los valores de fábrica sirven para empezar hoy.",
+    "reglas": "Pequeños detalles de cómo trabaja tu negocio. Si no sabes qué poner, deja lo que ya viene: sirve para empezar hoy.",
     "cortes": "Dónde se guardan los cortes y los respaldos. Puedes omitir este paso y configurarlo después.",
     "usuario": "La primera persona que entra al programa. Después ella da de alta a las demás.",
     "codigo": "Quien dirige el negocio entra con su contraseña y con un código de su teléfono. Así, aunque alguien conozca la contraseña, no puede entrar ni autorizar nada sin el teléfono.",
@@ -408,8 +408,8 @@ def caja(request):
         with transaction.atomic():
             guardar_caja(nuevos)
             if piezas is not None:
-                for valor in piezas.cleaned_data["denominaciones"]:
-                    Denominacion.objects.get_or_create(valor=valor)
+                for valor, tipo in piezas.piezas():
+                    Denominacion.objects.get_or_create(valor=valor, defaults={"tipo": tipo})
                 registrar("asistente_denominaciones", datos={"moneda": negocio.moneda, "denominaciones": piezas.cleaned_data["denominaciones"]}, request=request)
             registrar("asistente_caja", datos={"cambios": diferencias(antes, valores_caja()), "origen": "asistente"}, request=request)
         return redirect("asistente:reglas")

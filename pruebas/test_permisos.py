@@ -28,7 +28,7 @@ PUBLICAS = {
     "asistente:vista_marca", "asistente:logo", "asistente:pago", "asistente:caja", "asistente:reglas", "asistente:cortes", "asistente:usuario", "asistente:codigo",
 }
 
-SOLO_SESION = {"rezagos:lista", "inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
+SOLO_SESION = {"ir", "pulso", "ultimo", "rezagos:lista", "inicio", "primeros_pasos", "marca_vista_css", "marca_css", "marca_logo", "salir", "confirmar", "totp", "contrasena", "autorizaciones", "revisar_autorizacion", "aviso_enterado", "actualizaciones:descargar"}
 
 MATRIZ = {
     "titulares:lista": ("ver_titulares",),
@@ -144,6 +144,7 @@ MATRIZ = {
     "conciliacion:movimiento": ("sugerir_conciliacion", "conciliar_banco"),
     "conciliacion:proponer": ("sugerir_conciliacion", "conciliar_banco"),
     "conciliacion:confirmar": ("conciliar_banco",),
+    "conciliacion:aplicar_varios": ("conciliar_banco",),
     "conciliacion:no_cobro": ("conciliar_banco",),
     "conciliacion:emparejar": ("conciliar_banco",),
     "cortes:lista": ("turno_caja", "ver_cortes"),

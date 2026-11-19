@@ -77,8 +77,8 @@ def cargar_datos(datos, origen, usuario=None, request=None):
             Parametro.objects.update_or_create(clave=clave, defaults={"valor": _texto_parametro(clave, valor)})
         negocio = Negocio.actual()
         if datos["moneda"] == (negocio.moneda if negocio else moneda.POR_DEFECTO):
-            for valor in datos["denominaciones"]:
-                Denominacion.objects.get_or_create(valor=valor)
+            for denominacion in datos["denominaciones"]:
+                Denominacion.objects.get_or_create(valor=denominacion["centavos"], defaults={"tipo": denominacion["tipo"]})
         for definicion in datos["cortes"]:
             DefinicionCorte.objects.update_or_create(tipo=definicion["tipo"], defaults={"nombre": definicion["nombre"], "nivel": definicion["nivel"], "activa": definicion["activa"]})
         for orden, medio in enumerate(datos["medios_pago"], start=1):
@@ -187,7 +187,7 @@ def exportar():
         "motivos_retiro": list(MotivoRetiro.objects.filter(activo=True).values_list("nombre", flat=True)),
         "caja": _caja_exportada(),
         "inventario": _inventario_exportado(),
-        "denominaciones": list(Denominacion.objects.filter(activa=True).values_list("valor", flat=True)),
+        "denominaciones": [{"centavos": valor, "tipo": tipo} for valor, tipo in Denominacion.objects.filter(activa=True).values_list("valor", "tipo")],
         "cortes": [{"tipo": d.tipo, "nombre": d.nombre, "nivel": d.nivel, "activa": d.activa} for d in DefinicionCorte.objects.all()],
         "rezagos": exportar_reglas(),
     }

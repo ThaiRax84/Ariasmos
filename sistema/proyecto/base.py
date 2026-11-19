@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "tarifas",
     "rezagos",
     "envios",
+    "vivo",
 ]
 
 MIDDLEWARE = [
@@ -129,3 +130,4 @@ def base_de_datos(ruta):
     }
 
 FORM_RENDERER = "proyecto.captura.Renderizador"
+ORIGENES_TRANSFERENCIA = ()

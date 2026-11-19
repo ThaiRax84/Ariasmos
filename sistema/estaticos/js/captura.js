@@ -114,14 +114,12 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("input[data-acepta]").forEach(function (campo) {
-      if (campo.type === "number") {
-        return;
-      }
-      campo.addEventListener("beforeinput", antesDeEscribir);
-      campo.addEventListener("input", function () { aplicar(campo); });
-      campo.addEventListener("paste", alPegar);
-    });
-  });
+  function aceptado(evento) {
+    var campo = evento.target;
+    return campo && campo.matches && campo.matches("input[data-acepta]") && campo.type !== "number";
+  }
+
+  document.addEventListener("beforeinput", function (evento) { if (aceptado(evento)) { antesDeEscribir(evento); } }, true);
+  document.addEventListener("input", function (evento) { if (aceptado(evento)) { aplicar(evento.target); } }, true);
+  document.addEventListener("paste", function (evento) { if (aceptado(evento)) { alPegar(evento); } });
 })();

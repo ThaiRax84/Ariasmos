@@ -374,19 +374,7 @@
     "Mantenimiento",
     "Otro gasto del negocio"
   ],
-  "denominaciones": [
-    100000,
-    50000,
-    20000,
-    10000,
-    5000,
-    2000,
-    1000,
-    500,
-    200,
-    100,
-    50
-  ],
+  "denominaciones": [{"centavos": 100000, "tipo": "billete"}, {"centavos": 50000, "tipo": "billete"}, {"centavos": 20000, "tipo": "billete"}, {"centavos": 10000, "tipo": "billete"}, {"centavos": 5000, "tipo": "billete"}, {"centavos": 2000, "tipo": "billete"}, {"centavos": 1000, "tipo": "moneda"}, {"centavos": 500, "tipo": "moneda"}, {"centavos": 200, "tipo": "moneda"}, {"centavos": 100, "tipo": "moneda"}, {"centavos": 50, "tipo": "moneda"}],
   "caja": {
     "calendario_corte": {
       "0": "18:00",

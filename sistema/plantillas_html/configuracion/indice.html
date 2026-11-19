@@ -2,33 +2,37 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <h1>Configuración</h1>
+    <span class="antetitulo">Configuración</span>
+    <h1>Tu negocio, a tu manera</h1>
+    <p class="subtitulo">Elige qué quieres cambiar. Nada cambia hasta que lo guardas.</p>
   </div>
+  <div class="encabezado-lado">{% include "comun/_como.html" with clave="configuracion" %}</div>
 </div>
+{% include "comun/_como_pasos.html" with clave="configuracion" %}
 <nav class="accesos" aria-label="Secciones de configuración">
-  <a class="acceso" href="{% url 'configuracion:negocio' %}"><span class="acceso-titulo">Datos del negocio</span></a>
+  <a class="acceso" href="{% url 'configuracion:negocio' %}"><span class="acceso-titulo">Datos del negocio</span><span class="acceso-detalle">Nombre, dirección y horario</span></a>
   <a class="acceso" href="{% url 'configuracion:marca' %}"><span class="acceso-titulo">Marca del negocio</span><span class="acceso-detalle">Logo y colores</span></a>
-  <a class="acceso" href="{% url 'banco:lista' %}"><span class="acceso-titulo">Datos de pago</span></a>
-  <a class="acceso" href="{% url 'configuracion:catalogo' 'medios' %}"><span class="acceso-titulo">Medios de pago</span></a>
-  <a class="acceso" href="{% url 'configuracion:catalogo' 'cajas' %}"><span class="acceso-titulo">Cajas</span></a>
-  <a class="acceso" href="{% url 'configuracion:catalogo' 'denominaciones' %}"><span class="acceso-titulo">Denominaciones</span></a>
-  <a class="acceso" href="{% url 'configuracion:caja' %}"><span class="acceso-titulo">Caja: cortes y retiros</span></a>
-  <a class="acceso" href="{% url 'configuracion:carpeta_banco' %}"><span class="acceso-titulo">Carpeta vigilada del banco</span></a>
-  <a class="acceso" href="{% url 'configuracion:inventario' %}"><span class="acceso-titulo">Inventario</span></a>
-  <a class="acceso" href="{% url 'configuracion:vocabulario' %}"><span class="acceso-titulo">Vocabulario</span></a>
+  <a class="acceso" href="{% url 'banco:lista' %}"><span class="acceso-titulo">Datos de pago</span><span class="acceso-detalle">La cuenta donde te depositan</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'medios' %}"><span class="acceso-titulo">Medios de pago</span><span class="acceso-detalle">Cómo te pueden pagar</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'cajas' %}"><span class="acceso-titulo">Cajas</span><span class="acceso-detalle">Los lugares donde se cobra en efectivo</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'denominaciones' %}"><span class="acceso-titulo">Denominaciones</span><span class="acceso-detalle">Los billetes y monedas que se cuentan</span></a>
+  <a class="acceso" href="{% url 'configuracion:caja' %}"><span class="acceso-titulo">Caja: cortes y retiros</span><span class="acceso-detalle">A qué hora se cierra y cuánto se puede sacar</span></a>
+  <a class="acceso" href="{% url 'configuracion:carpeta_banco' %}"><span class="acceso-titulo">Carpeta vigilada del banco</span><span class="acceso-detalle">Donde el programa busca solo los archivos del banco</span></a>
+  <a class="acceso" href="{% url 'configuracion:inventario' %}"><span class="acceso-titulo">Inventario</span><span class="acceso-detalle">Si vendes artículos y cómo se cobran</span></a>
+  <a class="acceso" href="{% url 'configuracion:vocabulario' %}"><span class="acceso-titulo">Vocabulario</span><span class="acceso-detalle">Las palabras que usa tu negocio</span></a>
   <a class="acceso" href="{% url 'configuracion:reglas' %}"><span class="acceso-titulo">Reglas del negocio</span><span class="acceso-detalle">Teléfono, hoja de los PDF, apellidos y consentimiento</span></a>
-  <a class="acceso" href="{% url 'configuracion:parametros' %}"><span class="acceso-titulo">Parámetros</span></a>
+  <a class="acceso" href="{% url 'configuracion:parametros' %}"><span class="acceso-titulo">Parámetros</span><span class="acceso-detalle">Ajustes finos; los de fábrica sirven casi siempre</span></a>
   <a class="acceso" href="{% url 'tarifas:indice' %}"><span class="acceso-titulo">Tarifas por {{ voc.agrupacion_min }}</span><span class="acceso-detalle">Importes por {{ voc.agrupacion_min }} y conceptos por cantidad</span></a>
   <a class="acceso" href="{% url 'rezagos:limites' %}"><span class="acceso-titulo">Límites de adeudo</span><span class="acceso-detalle">Importe y días máximos, con excepciones</span></a>
   <a class="acceso" href="{% url 'rezagos:reglas' %}"><span class="acceso-titulo">Reglas de rezago</span><span class="acceso-detalle">Avisos, marcas y crédito según el atraso</span></a>
   <a class="acceso" href="{% url 'configuracion:catalogo' 'agrupaciones' %}"><span class="acceso-titulo">{{ voc.agrupaciones }}</span></a>
-  <a class="acceso" href="{% url 'configuracion:catalogo' 'motivos' %}"><span class="acceso-titulo">Motivos de baja</span></a>
-  <a class="acceso" href="{% url 'configuracion:catalogo' 'campos' %}"><span class="acceso-titulo">Campos de contacto</span></a>
-  <a class="acceso" href="{% url 'configuracion:catalogo' 'relaciones' %}"><span class="acceso-titulo">Relaciones de contacto</span></a>
-  <a class="acceso" href="{% url 'configuracion:avanzado' %}"><span class="acceso-titulo">Ajustes avanzados</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'motivos' %}"><span class="acceso-titulo">Motivos de baja</span><span class="acceso-detalle">Por qué alguien deja de venir</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'campos' %}"><span class="acceso-titulo">Campos de contacto</span><span class="acceso-detalle">Qué datos se piden para avisar</span></a>
+  <a class="acceso" href="{% url 'configuracion:catalogo' 'relaciones' %}"><span class="acceso-titulo">Relaciones de contacto</span><span class="acceso-detalle">Mamá, papá, tutor y demás</span></a>
+  <a class="acceso" href="{% url 'configuracion:avanzado' %}"><span class="acceso-titulo">Ajustes avanzados</span><span class="acceso-detalle">Moneda, zona horaria y seguridad</span></a>
   <a class="acceso" href="{% url 'configuracion:padron_subir' %}"><span class="acceso-titulo">Importar o actualizar {{ voc.padron_min }} desde una hoja</span></a>
-  <a class="acceso" href="{% url 'cortes:destinos' %}"><span class="acceso-titulo">Destinos de cortes</span></a>
+  <a class="acceso" href="{% url 'cortes:destinos' %}"><span class="acceso-titulo">Destinos de cortes</span><span class="acceso-detalle">A qué carpeta se mandan los cortes</span></a>
   <a class="acceso" href="{% url 'actualizaciones:configurar' %}"><span class="acceso-titulo">Actualizaciones del programa</span><span class="acceso-detalle">Buscar, avisar y descargar versiones firmadas</span></a>
-  <a class="acceso" href="{% url 'configuracion:exportar' %}"><span class="acceso-titulo">Guardar configuración como plantilla</span></a>
+  <a class="acceso" href="{% url 'configuracion:exportar' %}"><span class="acceso-titulo">Guardar configuración como plantilla</span><span class="acceso-detalle">Para usarla en otro negocio</span></a>
 </nav>
 {% endblock %}

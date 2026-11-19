@@ -45,6 +45,13 @@ class ControlDispositivo:
         return respuesta
 
 
+SIN_ACTIVIDAD = ("/pulso",)
+
+
+def _solo_consulta(request):
+    return request.method == "GET" and (request.path in SIN_ACTIVIDAD or request.headers.get("X-Ariasmos-Vivo") == "1")
+
+
 class ControlSesion:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -68,7 +75,8 @@ class ControlSesion:
                 logout(request)
                 messages.info(request, "Tu sesión se cerró por inactividad.")
                 return redirect("entrar")
-            request.session["ultima_actividad"] = ahora
+            if not _solo_consulta(request):
+                request.session["ultima_actividad"] = ahora
             if usuario.rol_id and usuario.rol.requiere_totp and not usuario.totp_confirmado:
                 if not request.path.startswith(LIBRES_TOTP):
                     return redirect("totp")

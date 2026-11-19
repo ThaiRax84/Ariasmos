@@ -455,3 +455,53 @@ def dispositivos_para(usuario):
     if not usuario.tiene_permiso("aprobar_dispositivos"):
         return 0
     return Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count()
+
+
+DIAS_CORTOS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+DIAS_LARGOS = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+
+
+def ve_cobranza(usuario):
+    return usuario.tiene_permiso("ver_cortes") and turno_abierto(usuario) is None
+
+
+def cobranza_semana(ahora=None):
+    hoy = local(ahora or timezone.now()).date()
+    lugar = zona()
+    dias = []
+    for atras in range(6, -1, -1):
+        dia = hoy - timedelta(days=atras)
+        desde = datetime.combine(dia, time.min, tzinfo=lugar)
+        datos = cobrado(desde, desde + timedelta(days=1))
+        dias.append({
+            "corto": "Hoy" if atras == 0 else DIAS_CORTOS[dia.weekday()],
+            "nombre": "Hoy" if atras == 0 else DIAS_LARGOS[dia.weekday()],
+            "efectivo": datos["efectivo"],
+            "banco": datos["banco"],
+            "hoy": atras == 0,
+        })
+    tope = max((d["efectivo"] + d["banco"] for d in dias), default=0)
+    for d in dias:
+        d["alto_efectivo"] = round(d["efectivo"] * 1000 / (tope * 1.12)) if tope else 0
+        d["alto_banco"] = round(d["banco"] * 1000 / (tope * 1.12)) if tope else 0
+    return dias
+
+
+def avance_periodo(ahora=None):
+    desde, hasta = mes_en_curso(ahora)
+    consulta = con_saldo(Cargo.objects.filter(vencimiento__gte=desde.date(), vencimiento__lt=hasta.date(), titular__interno=False))
+    datos = consulta.aggregate(esperado=Sum("importe_final"), cancelado=Sum("cancelado"), pendiente=Sum("saldo"))
+    esperado = (datos["esperado"] or 0) - (datos["cancelado"] or 0)
+    pendiente = max(datos["pendiente"] or 0, 0)
+    cobrado_ = max(esperado - pendiente, 0)
+    porcentaje = min(100, round(cobrado_ * 100 / esperado)) if esperado else 0
+    return {"esperado": esperado, "cobrado": cobrado_, "porcentaje": porcentaje, "mes": _nombre_mes(ahora)}
+
+
+def saludo(ahora=None):
+    hora = local(ahora or timezone.now()).hour
+    if hora < 12:
+        return "Buenos días"
+    if hora < 19:
+        return "Buenas tardes"
+    return "Buenas noches"

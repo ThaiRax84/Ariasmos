@@ -634,6 +634,9 @@ def aplicar(movimiento, titular, usuario, request=None):
         hechos = MovimientoBancario.objects.filter(pk=fresco.pk, pago__isnull=True).update(estado=MovimientoBancario.APLICADO, pago=pago, resuelto_por=usuario, resuelto_en=timezone.now())
         if hechos != 1:
             raise ErrorConciliacion("El movimiento ya está resuelto.")
+        from . import llegadas
+
+        llegadas.transferencia_aplicada(pago)
         if fresco.retencion and fresco.liberado_en is None and usuario is not None:
             MovimientoBancario.objects.filter(pk=fresco.pk, liberado_en__isnull=True).update(liberado_por=usuario, liberado_en=timezone.now())
     return pago
@@ -726,7 +729,7 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
         raise ErrorConciliacion("Una importación manual necesita a la persona que la hace.")
     with transaction.atomic():
         clasificacion = continuidad(cuenta, adaptador, resumen)
-        vigilado = origen == Importacion.CARPETA and adaptador == Importacion.ARCHIVO
+        vigilado = origen in (Importacion.CARPETA, Importacion.AVISO) and adaptador == Importacion.ARCHIVO
         pdf_sin_cadena = origen == Importacion.CARPETA and adaptador == Importacion.ESTADO_PDF and clasificacion != Importacion.VERIFICADA
         importacion = Importacion.objects.create(
             continuidad=clasificacion, origen=origen, retenida=pdf_sin_cadena,
@@ -867,3 +870,20 @@ def no_es_cobro(movimiento, motivo, usuario, request=None):
         if hechos != 1:
             raise ErrorConciliacion("El movimiento ya está resuelto.")
         registrar("movimiento_no_cobro", usuario=usuario, objeto=movimiento, datos={"importe": movimiento.importe, "motivo": motivo}, request=request)
+
+
+SEGURO = "seguro"
+REVISAR = "revisar"
+SIN_PISTA = "sin_pista"
+
+
+def de_quien(movimiento, modelo_titular):
+    if movimiento.propuesta_id:
+        return movimiento.propuesta, SEGURO
+    if not movimiento.sugerencia:
+        return None, SIN_PISTA
+    titular = modelo_titular.objects.filter(matricula=movimiento.sugerencia).exclude(estado=modelo_titular.RECHAZADO).first()
+    if titular is None:
+        return None, SIN_PISTA
+    claro = movimiento.coincide_importe and not movimiento.alternativas and not movimiento.posible_duplicado and not movimiento.retencion
+    return titular, SEGURO if claro else REVISAR

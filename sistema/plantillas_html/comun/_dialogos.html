@@ -1,0 +1,26 @@
+<dialog class="dialogo paleta" id="paleta" aria-label="Buscar o ir a">
+  <div class="dialogo-caja">
+    <label class="paleta-entrada"><span class="icono-svg icono-buscar grande" aria-hidden="true"></span><span class="solo-lectores">Escribe un nombre o lo que quieres hacer</span><input type="text" id="paleta-texto" placeholder="Escribe un nombre o lo que quieres hacer" autocomplete="off" spellcheck="false" maxlength="60" role="combobox" aria-expanded="true" aria-controls="paleta-lista"><kbd>Esc</kbd></label>
+    <div class="paleta-lista" id="paleta-lista" role="listbox" aria-label="Resultados"></div>
+    <p class="ayuda vacio" id="paleta-vacio" hidden>No encontramos nada con esas letras. Prueba con otro nombre.</p>
+    <p class="ayuda vacio" id="paleta-espera" hidden>Vas muy rápido. Espera unos segundos y vuelve a escribir.</p>
+    <div class="paleta-pie"><span><kbd>↑</kbd> <kbd>↓</kbd> moverse</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Esc</kbd> cerrar</span></div>
+  </div>
+</dialog>
+<dialog class="dialogo ayuda-teclas" id="atajos" aria-labelledby="atajos-titulo">
+  <div class="dialogo-caja">
+    <h2 class="dialogo-titulo" id="atajos-titulo">Trucos para ir más rápido</h2>
+    <p class="dialogo-texto">No son obligatorios: todo se puede hacer con el ratón.</p>
+    <dl class="lista-atajos">
+      <div><dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Buscar a una persona o ir a otra pantalla</dd></div>
+      {% if "registrar_pago_efectivo" in permisos %}<div><dt><kbd>/</kbd></dt><dd>Ir a Cobrar y escribir un nombre</dd></div>{% endif %}
+      <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Subir y bajar por la lista</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>Abrir a la persona elegida</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>Cerrar lo que esté abierto</dd></div>
+      <div><dt><kbd>0</kbd>–<kbd>9</kbd></dt><dd>Con un billete elegido, escribir cuántos son</dd></div>
+      <div><dt><kbd>Alt</kbd> <kbd>←</kbd> <kbd>→</kbd></dt><dd>Atrás y adelante</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Ver estos trucos</dd></div>
+    </dl>
+    <div class="dialogo-acciones"><button class="boton" type="button" data-cerrar-dialogo>Entendido</button></div>
+  </div>
+</dialog>

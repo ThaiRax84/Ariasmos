@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from reportlab.pdfgen import canvas
 
@@ -57,8 +58,8 @@ def _miembros(titular):
 def buscar(request):
     from titulares import lista
 
-    contexto = lista.preparar(request, "cobrar", [Titular.ACTIVO])
-    contexto.update({"turno": turno_abierto(request.user), "destino": "cobros:cobrar", "accion": "Cobrar", "titulo_lista": "cobrar"})
+    contexto = lista.preparar(request, "cobrar", [Titular.ACTIVO], con_filtros=True)
+    contexto.update({"turno": turno_abierto(request.user), "destino": "cobros:cobrar", "accion": "Cobrar", "titulo_lista": "cobrar", "con_panel": True})
     return render(request, "cobros/buscar.html", contexto)
 
 
@@ -73,6 +74,35 @@ def _primero(venta):
     from inventario import servicios as inventario
 
     return inventario.cargos_de(venta) if venta is not None else None
+
+
+def es_panel(request):
+    return (request.POST if request.method == "POST" else request.GET).get("panel") == "1"
+
+
+def _cargos_en_orden(titular, estado):
+    if estado["adeudo"] <= 0:
+        return []
+    partes, _ = libro.proponer_reparto(titular, estado["adeudo"])
+    por_id = {fila["cargo"].pk: fila for fila in estado["cargos"]}
+    filas = []
+    for parte in partes:
+        fila = por_id.get(parte.cargo)
+        if fila is not None:
+            filas.append({"cargo": fila["cargo"], "estado": fila["estado"], "saldo": parte.importe})
+    return filas
+
+
+def _contexto_panel(request, titular, contexto):
+    from banco.ficha import datos_de_pago
+
+    contexto["cargos_panel"] = _cargos_en_orden(titular, contexto["estado"])
+    contexto["pago_banco"] = datos_de_pago()
+    contexto["ultimo_banco"] = Pago.objects.filter(titular__in=[m.pk for m in contexto["estado"]["titulares"]], medio=Pago.BANCO).order_by("-pk").values_list("pk", flat=True).first() or 0
+    contexto["configura_banco"] = request.user.tiene_permiso("administrar_configuracion")
+    if contexto["con_piezas"] and contexto["piezas"] is None:
+        contexto["piezas"] = {"formulario": FormularioPiezasCobro()}
+    return contexto
 
 
 def _pantalla_cobro(request, titular, formulario, propuesta=None, importe=None, ficha=None, status=200, piezas=None):
@@ -97,7 +127,39 @@ def _pantalla_cobro(request, titular, formulario, propuesta=None, importe=None, 
         "con_piezas": control_piezas.activo(),
         "piezas": piezas,
     }
+    if es_panel(request):
+        return render(request, "cobros/panel.html", _contexto_panel(request, titular, contexto), status=status)
     return render(request, "cobros/cobrar.html", contexto, status=status)
+
+
+def _miembro_de(titular, pago):
+    return pago is not None and pago.titular_id in libro.miembros_de(titular)
+
+
+def _panel_hecho(request, titular, recibo_pk):
+    recibo = Recibo.objects.select_related("pago__titular").filter(pk=recibo_pk).first() if str(recibo_pk).isdigit() else None
+    if recibo is None or not _miembro_de(titular, recibo.pago):
+        return redirect(f"{reverse('cobros:cobrar', args=[titular.pk])}?panel=1")
+    from caja.models import MovimientoPiezas
+
+    cambio = sum(m.denominacion * -m.piezas for m in MovimientoPiezas.objects.filter(pago=recibo.pago, origen=MovimientoPiezas.CAMBIO))
+    contexto = {"titular": titular, "hecho": recibo, "cambio_entregado": cambio, "estado": {"titulares": [titular]}}
+    return render(request, "cobros/panel.html", contexto)
+
+
+def _panel_transferencia(request, titular):
+    desde = request.GET.get("desde", "")
+    desde = int(desde) if desde.isdigit() and len(desde) < 19 else 0
+    pago = Pago.objects.filter(titular__in=libro.miembros_de(titular), medio=Pago.BANCO, pk__gt=desde).select_related("recibo").order_by("pk").first()
+    if pago is not None and hasattr(pago, "recibo"):
+        return _panel_hecho(request, titular, pago.recibo.pk)
+    return None
+
+
+def _hecho(request, titular, recibo):
+    if es_panel(request):
+        return redirect(f"{reverse('cobros:cobrar', args=[titular.pk])}?panel=1&hecho={recibo.pk}")
+    return redirect("cobros:recibo", pk=recibo.pk)
 
 
 def _propuesta(titular, importe, primero=None):
@@ -142,11 +204,15 @@ def _cambio(request, titular, turno):
     piezas = FormularioPiezasCobro(request.POST)
     if not piezas.is_valid():
         return _pantalla_cobro(request, titular, FormularioPago(), _propuesta(titular, importe, _primero(_venta(request, titular))), importe, ficha, piezas={"formulario": piezas})
+    return _con_piezas(request, titular, turno, importe, ficha, piezas)
+
+
+def _con_piezas(request, titular, turno, importe, ficha, piezas):
     recibidas = piezas.piezas_recibidas()
     entregado = control_piezas.total(recibidas)
     if entregado < importe:
         piezas.add_error(None, "Las piezas recibidas no alcanzan el importe del pago.")
-        return _pantalla_cobro(request, titular, FormularioPago(), _propuesta(titular, importe, _primero(_venta(request, titular))), importe, ficha, piezas={"formulario": piezas})
+        return _pantalla_cobro(request, titular, FormularioPago(initial={"importe": importe}), _propuesta(titular, importe, _primero(_venta(request, titular))), importe, ficha, piezas={"formulario": piezas})
     vuelto = entregado - importe
     sugerida, aviso = proponer_cambio(request, turno, recibidas, vuelto)
     formulario = FormularioPiezasCobro(initial={nombre: recibidas.get(str(valor), 0) for nombre, valor in piezas.recibidas}, con_cambio=bool(vuelto), propuesta=sugerida)
@@ -162,6 +228,12 @@ def cobrar(request, pk):
         return control_piezas.pantalla_faltan(request, "cobros:buscar")
     turno = turno_abierto(request.user)
     if request.method != "POST":
+        if es_panel(request) and request.GET.get("hecho"):
+            return _panel_hecho(request, titular, request.GET["hecho"])
+        if es_panel(request) and request.GET.get("metodo") == "transferencia":
+            llegada = _panel_transferencia(request, titular)
+            if llegada is not None:
+                return llegada
         return _pantalla_cobro(request, titular, FormularioPago())
     if turno is None:
         messages.error(request, "Abre tu turno de caja antes de cobrar.")
@@ -173,12 +245,30 @@ def cobrar(request, pk):
         return _confirmar(request, titular, turno)
     if request.POST.get("paso") == "cambio" and control_piezas.activo():
         return _cambio(request, titular, turno)
+    if request.POST.get("paso") == "panel" and es_panel(request):
+        return _paso_panel(request, titular, turno)
     formulario = FormularioPago(request.POST)
     if not formulario.is_valid():
         return _pantalla_cobro(request, titular, formulario)
     importe = formulario.cleaned_data["importe"]
     piezas = {"formulario": FormularioPiezasCobro()} if control_piezas.activo() else None
     return _pantalla_cobro(request, titular, formulario, _propuesta(titular, importe, _primero(_venta(request, titular))), importe, secrets.token_urlsafe(24), piezas=piezas)
+
+
+def _paso_panel(request, titular, turno):
+    formulario = FormularioPago(request.POST)
+    piezas = FormularioPiezasCobro(request.POST) if control_piezas.activo() else None
+    if not formulario.is_valid():
+        return _pantalla_cobro(request, titular, formulario, piezas={"formulario": piezas} if piezas is not None else None)
+    importe = formulario.cleaned_data["importe"]
+    ficha = secrets.token_urlsafe(24)
+    if piezas is None:
+        return _registrar(request, titular, turno, ficha, importe, None)
+    if not piezas.is_valid():
+        return _pantalla_cobro(request, titular, formulario, piezas={"formulario": piezas})
+    if control_piezas.total(piezas.piezas_recibidas()) == importe:
+        return _registrar(request, titular, turno, ficha, importe, {"recibidas": piezas.piezas_recibidas(), "cambio": {}})
+    return _con_piezas(request, titular, turno, importe, ficha, piezas)
 
 
 def _piezas_confirmadas(request, titular, importe, ficha):
@@ -205,10 +295,14 @@ def _confirmar(request, titular, turno):
     existente = Pago.objects.filter(ficha=ficha).select_related("recibo").first()
     if existente is not None:
         messages.info(request, "Ese pago ya estaba registrado; no se cobró dos veces.")
-        return redirect("cobros:recibo", pk=existente.recibo.pk)
+        return _hecho(request, titular, existente.recibo)
     piezas, error_piezas = _piezas_confirmadas(request, titular, importe, ficha)
     if error_piezas is not None:
         return error_piezas
+    return _registrar(request, titular, turno, ficha, importe, piezas)
+
+
+def _registrar(request, titular, turno, ficha, importe, piezas):
     venta = _venta(request, titular)
     if importe > parametro("tope_pago_individual"):
         datos = {"importe": importe, "ficha": ficha}
@@ -224,7 +318,7 @@ def _confirmar(request, titular, turno):
         if resultado.solicitud is not None:
             messages.warning(request, f"El pago de {formatear(importe)} pasa del tope: quedó como solicitud. Se registrará al autorizarse.")
             return redirect("solicitudes:detalle", pk=resultado.solicitud.pk)
-        return redirect("cobros:recibo", pk=resultado.objeto.recibo.pk)
+        return _hecho(request, titular, resultado.objeto.recibo)
     try:
         with transaction.atomic():
             pago = libro.registrar_pago(titular, importe, Pago.EFECTIVO, request.user, turno=turno, ficha=ficha, request=request, piezas=piezas, primero=_primero(venta))
@@ -234,12 +328,13 @@ def _confirmar(request, titular, turno):
                 inventario.ligar_pago(venta, pago)
     except libro.PagoDuplicado as duplicado:
         messages.info(request, "Ese pago ya estaba registrado; no se cobró dos veces.")
-        return redirect("cobros:recibo", pk=duplicado.pago.recibo.pk)
+        return _hecho(request, titular, duplicado.pago.recibo)
     except libro.ErrorLibro as error:
         messages.error(request, str(error))
         return redirect("cobros:cobrar", pk=titular.pk)
-    messages.success(request, f"Pago registrado: recibo {pago.recibo}.")
-    return redirect("cobros:recibo", pk=pago.recibo.pk)
+    if not es_panel(request):
+        messages.success(request, f"Pago registrado: recibo {pago.recibo}.")
+    return _hecho(request, titular, pago.recibo)
 
 
 def _datos_recibo(recibo):

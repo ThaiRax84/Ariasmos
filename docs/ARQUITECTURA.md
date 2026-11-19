@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.22 · 18/11/2026 · Estado: fases 1 a 10 construidas (0.9.2; fase 10: efectivo siempre contado, formularios que se adaptan, botones a prueba de clics, cobrar con lista y pruebas de fábrica, §25.1 a §25.4 y §25.6); pantallas en vivo (§25.5) diseñadas, sin construir; fase 6b (facturación, §17) diseñada.
+Versión 0.23 · 18/11/2026 · Estado: fases 1 a 11 construidas (0.10.0); fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -501,6 +501,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 9a | Configurador y caja más cómodos: zona horaria en lista, signo según el tipo, apertura de turno con piezas, orden en los buscadores, pantallas de caja como el diseño aprobado (§23) |
 | 9b | Tarifas y cargos por agrupación, recargos tras el alta, límites de adeudo y rezagados con reglas propias (§24) |
 | 10 | Conteo de piezas de fábrica en todo movimiento de efectivo, formularios que se adaptan a lo elegido, botones a prueba de clics repetidos y cobrar con la lista a la vista (§25.1 a §25.4 y §25.6). Las pantallas que se actualizan solas (§25.5) quedan diseñadas para la fase de transferencias |
+| 11 | Interfaz interactiva aprobada sobre la interfaz actual: buscar o ir a, cobrar en una sola pantalla, inicio vivo, ficha, banco y configuración, textos llanos (§26) y pantallas que se actualizan solas (§25.5) |
 
 ## 14. Pendientes de decisión
 
@@ -1009,7 +1010,7 @@ El cálculo de atraso y adeudo vencido de todos los titulares se hace con consul
 
 ## 25. Versión 0.22: lo que el cliente ve desde el primer día (fase 10)
 
-Estado: construida en 0.9.2, salvo §25.5 (diseñada, sin construir).
+Estado: construida en 0.9.2; §25.5 construida en 0.10.0 (fase 11, §26.6).
 
 Origen: pruebas del dueño sobre una instalación real. Regla de la fase: **todo se prueba como lo recibe un cliente**, con los valores de fábrica de cada plantilla, sin encender nada a mano.
 
@@ -1041,9 +1042,7 @@ Origen: pruebas del dueño sobre una instalación real. Regla de la fase: **todo
 - Lo mismo en Vender a un titular.
 - Con muchos titulares la lista no se carga entera: página de 50 y consultas agregadas (sin una consulta por renglón).
 
-### 25.5 Pantallas que se actualizan solas (diseñada, no se construye en la fase 10)
-
-Se construye junto con la llegada de transferencias, cuando el dueño lo confirme.
+### 25.5 Pantallas que se actualizan solas (construida en la fase 11)
 
 - Cuando en cualquier computadora aprobada se registra un movimiento (pago, venta, retiro, alta, solicitud, importación del banco), las demás pantallas abiertas lo reflejan en segundos sin recargar: inicio, lista de cobrar, ficha, solicitudes, banco y existencias.
 - Mecanismo: cada página consulta cada pocos segundos una ruta ligera (`/pulso`) que devuelve solo contadores de cambio por tema; cuando un contador cambia, la página vuelve a pedir **la misma pantalla** y sustituye sus regiones marcadas como vivas. No hay conexión permanente ni puente nuevo.
@@ -1060,3 +1059,75 @@ Se construye junto con la llegada de transferencias, cuando el dueño lo confirm
 
 - Una prueba de punta a punta por cada plantilla: corre el asistente con los valores de fábrica y recorre un día completo (abrir turno, cobrar con cambio, vender, retirar, devolver, cerrar), comprobando que cada paso pide las piezas y que ninguna pantalla falla.
 - Las pruebas de pantallas dejan de encender parámetros a mano, salvo cuando prueban justo el caso apagado.
+
+## 26. Versión 0.23: interfaz interactiva (fase 11)
+
+Estado: construida en 0.10.0 (ver §26.8 para lo que quedó fuera).
+
+Origen: prototipo aprobado por el dueño el 18/11/2026. Se parte de la interfaz actual, que le gusta: se mejora, no se reemplaza. Debe verse y comportarse como el prototipo (mismas pantallas, distribución y animaciones, con sus duraciones y curvas), respetando todo lo que el programa ya tiene; donde el prototipo no muestra algo, manda el programa.
+
+### 26.1 Reglas de interfaz (valen para todo cambio de interfaz)
+
+- Toda interfaz se enseña al dueño antes de implementarla.
+- **Los logotipos se ven como hoy**: el del negocio y el de Ariasmos, tal cual, en su lugar y a su tamaño. No se sustituyen por iniciales ni se rediseñan.
+- **Textos para gente que no sabe de tecnología**: palabras llanas, preguntas en lugar de etiquetas técnicas, una frase por pantalla que diga qué hacer, sin jerga. Todo texto pasa por el vocabulario (§22).
+- **Mejora progresiva**: cada pantalla funciona sin JavaScript como hoy; el JS propio la enriquece. Sin dependencias, con la CSP estricta (sin estilos ni scripts en línea; los estilos dinámicos se ponen por CSSOM).
+- Respeta `prefers-reduced-motion`. Objetivos de clic de 44 px o más. Todo se alcanza con teclado.
+- «Deshacer» nunca en pagos ni en movimientos de caja. En aprobaciones solo como envío en espera (§26.4) y en datos de la ficha como cambio nuevo auditado (§26.5).
+
+### 26.2 Buscar o ir a
+
+- Un botón en la barra y `Ctrl K` abren una caja única: personas, pantallas y acciones.
+- Ruta `GET /ir/?q=` que devuelve JSON. Exige sesión y equipo aprobado. Solo devuelve pantallas y acciones que la persona puede abrir, y titulares que puede ver; el adeudo solo si tiene permiso de ver saldos. Tope de resultados y límite de frecuencia. No se guarda lo buscado.
+- Flechas, Enter y Esc. Sin JS, el botón lleva al buscador de siempre.
+
+### 26.3 Cobrar en una sola pantalla
+
+- La lista (§25.4) queda a la vista; al elegir a alguien se abre un panel al lado (cajón en ventanas angostas) con sus cargos, lo que paga, los mosaicos y la confirmación. `Esc` lo cierra. Flechas y Enter recorren la lista; al escribir se resalta la coincidencia.
+- Mosaicos: un toque suma; «−» resta sin que la pantalla brinque; con la pieza enfocada se puede escribir la cantidad. Lo recibido y lo que falta se calculan al instante en el navegador **solo como ayuda**.
+- El servidor sigue siendo la autoridad: valida el importe, las piezas y el cambio como hoy. **Las existencias de la caja nunca viajan al navegador**: el cambio a entregar lo propone el servidor con la misma regla y los mismos permisos que el paso de cambio actual.
+- El flujo por pasos actual se conserva como camino sin JS.
+- Al confirmar: botón bloqueado (§25.3), confirmación con el recibo y «Siguiente cobro».
+- El arqueo ciego (§15.2) no cambia.
+- Cómo quedó: el panel es la misma vista de cobro con `?panel=1`; el navegador la pide, toma la región `#panel-cobro-region` con `DOMParser` y envía sus formularios por `fetch`. Un solo paso (`paso=panel`) lleva el importe y las piezas recibidas: si el pago es exacto se registra de una vez; si hay cambio, el servidor lo propone con `proponer_cambio` (mismo límite de propuestas por turno) y la persona confirma. Los cargos se muestran en el orden en que el pago los cubre (§23.4) y las casillas solo ayudan a llenar el importe: quitar uno quita también los que van después, porque el reparto lo decide el orden configurado.
+- Método «Transferencia» (cambio del dueño): selector Efectivo / Transferencia; en Transferencia, «Esperando la transferencia…», la cuenta principal del negocio con «Copiar» y la matrícula como referencia, todo de la configuración. Sin cuenta configurada se dice en palabras llanas y quien puede configurarla recibe el enlace. Cuando llega un pago por banco del titular o su familia, el panel pasa solo a «Transferencia recibida y aplicada».
+- Puerta de llegada (`banco/llegadas.py`): toda transferencia aplicada, venga de donde venga (estado de cuenta subido, carpeta vigilada, confirmación en la cola o un origen nuevo), pasa por `conciliacion.aplicar`, que avisa a `llegadas.transferencia_aplicada` y sube el contador `transferencias` de `/pulso`. Los orígenes nuevos se registran por configuración en `ORIGENES_TRANSFERENCIA` (rutas a clases que heredan de `llegadas.Origen`, con `consultar()` para consulta periódica y `leer_aviso()` para avisos entrantes) y entregan `llegadas.Aviso`; `llegadas.recibir` los convierte en movimientos y los pasa por `conciliacion.importar` con el origen `aviso`, que aplica las mismas reglas que la carpeta vigilada (topes del día y de exposición, retenciones, bitácora). El comando `consultar_transferencias` recorre los orígenes registrados. No hay ningún proveedor implementado; las pruebas usan un origen que solo existe en `pruebas/`.
+
+### 26.4 Inicio
+
+- Cifras que cuentan hasta su valor, gráfica de cobranza de los últimos siete días (efectivo y transferencia) con detalle al pasar el cursor o enfocar, y avance del periodo. Cada dato respeta el permiso que hoy lo protege; quien no puede ver importes no los recibe.
+- Solicitudes: se abren, aprueban o rechazan ahí mismo (el rechazo pide motivo), con los mismos permisos y la misma bitácora. Sin «Deshacer».
+- Rezagados con «Cobrar» directo.
+- Campana con lo último que entró.
+- Cambio del dueño: aprobar o rechazar desde el inicio muestra «Solicitud aprobada / rechazada · Deshacer» unos 5 segundos y funciona como envío en espera: nada se manda al servidor hasta que el aviso se agota, la persona hace otra acción o sale de la página (`pagehide` con `fetch` y `keepalive`). «Deshacer» solo cancela el envío pendiente, así la bitácora registra únicamente lo que pasó. Si el servidor rechaza la acción, se avisa y la solicitud vuelve a la lista. Sin JS, el flujo de siempre.
+- La gráfica y el avance del mes los ve quien tiene «ver cortes» y no tiene un turno abierto (arqueo ciego). «Lo último que entró» muestra importes solo a quien ve saldos o a quien registró el pago, y a nadie con turno abierto.
+
+### 26.5 Ficha, banco y configuración
+
+- **Ficha**: pestañas (estado de cuenta, historial, datos), historial como línea de tiempo, y corrección en su lugar solo de los datos que esa persona ya puede cambiar directo; lo que hoy pide aprobación la sigue pidiendo. La corrección en su lugar es de los datos de contacto y usa el mismo formulario y la misma bitácora que «Editar contacto»; «Deshacer» guarda de inmediato un cambio nuevo, también auditado, con el valor anterior.
+- **Banco**: zona para soltar el archivo, avance de lectura, «¿De quién es?» y «¿Qué tan seguro?» en palabras, elegir varios y aplicarlos juntos. Topes, retenciones y permisos (§19) sin cambio. «Aplicar pagos» (`/banco/cola/aplicar/`, permiso de conciliar) confirma cada movimiento elegido con la misma función que la confirmación de uno solo.
+- **Configuración**: vista previa al instante de colores y logotipo (§22.9), listas que se ordenan arrastrando o con botones donde ya exista un orden configurable, y barra de «cambios sin guardar».
+- **«¿Cómo se usa?»**: en las pantallas principales, tres pasos en palabras llanas, plegables.
+- **Trucos de teclado**: ayuda en «?», presentados como opcionales.
+
+### 26.6 Pantallas en vivo
+
+- Se construye §25.5 tal como está escrita: ruta `/pulso` con contadores por tema, sin datos; la página vuelve a pedirse a sí misma y sustituye sus regiones vivas; nunca sobre un formulario a medias ni en pantallas de conteo.
+- En la interfaz: la campana, «Lo último que entró», las cifras del inicio, la lista de cobrar y las solicitudes se ponen al día solas, con un destello discreto en lo que cambió y un aviso breve.
+- La llegada automática de transferencias desde un proveedor **no** entra en esta fase; sí la puerta de llegada para conectarla (§26.3).
+- Cómo quedó: modelo `vivo.Contador` con un renglón por tema (cobros, transferencias, titulares, solicitudes, caja, banco, inventario); señales al guardar o borrar los modelos de cada tema suben su contador dentro de la misma transacción. `/pulso` (sesión, equipo aprobado, 40 consultas por minuto) devuelve solo esos números y no cuenta como actividad de la sesión; las páginas consultan cada 5 segundos con la ventana a la vista, piden la misma dirección con la cabecera `X-Ariasmos-Vivo` (tampoco cuenta como actividad) y sustituyen las regiones con `data-vivo`. Con un formulario tocado, un panel de cobro abierto o un «Deshacer» pendiente, aparece «Hay cambios — Actualizar». `/ultimo/` da «Lo último que entró» con los mismos permisos.
+
+### 26.7 Pruebas
+
+- Pruebas de servidor para cada ruta nueva: permisos, equipo aprobado, saldos ocultos a quien no puede verlos, límites de frecuencia.
+- Pruebas en navegador real que se omiten solas si no hay navegador: flujo de fábrica de abrir turno, cobrar en el panel, clics repetidos, buscar o ir a, dependencias y filtro en vivo, sin errores de consola ni de política de contenido.
+
+### 26.8 Lo que quedó fuera de la fase 11
+
+- Ninguna ruta de avisos entrantes de proveedores: la interfaz `leer_aviso` existe, pero abrir una ruta pública se decide cuando haya proveedor.
+
+### 26.9 Cierre para quedar igual que el prototipo
+
+- **Filtros de Cobrar** («Todos / Con adeudo / Rezagados» con su cuenta): parámetro `estado` por GET en `titulares/lista.py`, también con el filtro en vivo y con los renglones que se reacomodan. «Rezagados» son quienes tienen aviso o marca de rezago visible para esa persona y lo ve todo el que cobra. «Con adeudo» y su cuenta solo para quien ve saldos; a los demás no se les muestra y el parámetro se ignora. Consultas agregadas, sin una por renglón.
+- **Billete o moneda** es un dato de cada denominación (`Denominacion.tipo`), con migración que deja «billete» en lo existente. Va en las seis plantillas, se edita en Configuración › Denominaciones («¿Es billete o moneda?») y el asistente lo pregunta cuando la moneda no es la de la plantilla. Los mosaicos de moneda son redondos y, sin piezas, dicen «billete» o «moneda».
+- **Buscar o ir a** con la caja vacía muestra los tres primeros rezagados; el adeudo solo a quien ve saldos.

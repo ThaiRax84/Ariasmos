@@ -7,12 +7,13 @@
     <p class="subtitulo">{{ voc.matricula }} {{ titular.matricula_formateada }} · <a href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a></p>
   </div>
 </div>
-<ul class="lista historial">
+<section class="panel" id="historial-region" data-vivo="cobros titulares solicitudes">
+<ol class="linea-tiempo historial">
 {% for f in filas %}
-  <li>
-    <strong>{{ f.momento|date:"d/m/Y H:i" }}</strong> · {{ f.usuario }} · {{ f.descripcion }}
-    {% if f.cambios %}<ul>{% for etiqueta, antes, despues in f.cambios %}<li>{{ etiqueta }}: {{ antes }} → {{ despues }}</li>{% endfor %}</ul>{% endif %}
+  <li class="{{ f.tipo }}"><strong>{{ f.descripcion }}</strong><span>{{ f.momento|date:"d/m/Y H:i" }} · {{ f.usuario }}</span>
+    {% if f.cambios %}<ul class="detalle-cambios">{% for etiqueta, antes, despues in f.cambios %}<li>{{ etiqueta }}: {{ antes }} → {{ despues }}</li>{% endfor %}</ul>{% endif %}
   </li>
 {% empty %}<li>Sin movimientos registrados.</li>{% endfor %}
-</ul>
+</ol>
+</section>
 {% endblock %}

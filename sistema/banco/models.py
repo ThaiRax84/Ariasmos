@@ -143,7 +143,8 @@ class Importacion(models.Model):
     continuidad = models.CharField(max_length=16, choices=CONTINUIDADES, default=CON_HUECO)
     MANUAL = "manual"
     CARPETA = "carpeta"
-    ORIGENES = [(MANUAL, "Subida por una persona"), (CARPETA, "Carpeta vigilada")]
+    AVISO = "aviso"
+    ORIGENES = [(MANUAL, "Subida por una persona"), (CARPETA, "Carpeta vigilada"), (AVISO, "Aviso de llegada")]
     origen = models.CharField(max_length=10, choices=ORIGENES, default=MANUAL)
     retenida = models.BooleanField(default=False)
     liberada_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
@@ -155,11 +156,13 @@ class Importacion(models.Model):
 
     class Meta:
         ordering = ["-creada", "-id"]
-        constraints = [models.CheckConstraint(condition=Q(origen="carpeta") | Q(creada_por__isnull=False), name="importacion_con_responsable")]
+        constraints = [models.CheckConstraint(condition=Q(origen__in=("carpeta", "aviso")) | Q(creada_por__isnull=False), name="importacion_con_responsable")]
 
     @property
     def importo(self):
-        return self.creada_por if self.creada_por_id else "Carpeta vigilada"
+        if self.creada_por_id:
+            return self.creada_por
+        return self.get_origen_display()
 
     @property
     def requiere_revision(self):

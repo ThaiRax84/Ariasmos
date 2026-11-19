@@ -3,8 +3,8 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    {% now "l j \d\e F \d\e Y" as hoy %}<span class="antetitulo">{{ hoy|lower|capfirst }}</span>
-    <h1>Hola, {{ user.nombre }}</h1>
+    {% now "l j \d\e F \d\e Y" as hoy %}<span class="antetitulo">{{ hoy|lower|capfirst }}{% if turno_sesion %} · {{ turno_sesion.caja }} · Turno abierto {{ turno_sesion.abierto_en|time:"H:i" }}{% endif %}</span>
+    <h1>{{ saludo }}, {{ user.nombre }}</h1>
   </div>
   <div class="encabezado-lado">
     {% if turno_sesion %}<div class="recuadro-cifra"><span class="etiqueta">Turno abierto en {{ turno_sesion.caja }}</span><span class="valor">{{ cobros_turno }} cobro{{ cobros_turno|pluralize }} · desde {{ turno_sesion.abierto_en|time:"H:i" }}</span></div>{% endif %}
@@ -15,16 +15,18 @@
     {% if "ver_auditoria" in permisos %}<a class="boton secundario" href="{% url 'auditoria:lista' %}">Ver bitácora</a>{% endif %}
     {% if "aprobar_dispositivos" in permisos %}<a class="boton secundario" href="{% url 'conectar' %}">Conectar otra computadora</a>{% endif %}
     {% endif %}
+    {% if "registrar_pago_efectivo" in permisos %}<a class="boton grande" href="{% url 'cobros:buscar' %}">Cobrar</a>{% endif %}
+    {% include "comun/_como.html" with clave="inicio" %}
   </div>
 </div>
+{% include "comun/_como_pasos.html" with clave="inicio" %}
 {% include "actualizaciones/_aviso.html" %}
 {% include "banco/_cambios_topes.html" %}
-{% load rezagos %}{% avisos_rezago %}
 {% if cifras %}
-<div class="cifras tablero">
-  {% for c in cifras %}{% if c.enlace and not c.oculta %}<a href="{{ c.enlace }}"{% else %}<div{% endif %} class="cifra{% if c.aviso and not c.oculta %} aviso{% endif %}{% if c.oculta %} oculta{% endif %}" data-cifra="{{ c.clave }}">
+<div class="cifras tablero" id="cifras-inicio" data-vivo="cobros caja banco">
+  {% for c in cifras %}{% if c.enlace and not c.oculta %}<a href="{{ c.enlace }}"{% else %}<div{% endif %} class="cifra{% if c.aviso and not c.oculta %} aviso{% endif %}{% if c.oculta %} oculta{% endif %}" data-cifra="{{ c.clave }}" data-id="cifra-{{ c.clave }}">
     <span class="etiqueta">{{ c.etiqueta }}</span>
-    {% if c.oculta %}<span class="numero calma">—</span>{% elif c.importe is not None %}<span class="numero">{{ c.importe|dinero }}</span>{% else %}<span class="numero">{{ c.texto }}</span>{% endif %}
+    {% if c.oculta %}<span class="numero calma">—</span>{% elif c.importe is not None %}<span class="numero" data-cuenta="{{ c.importe }}">{{ c.importe|dinero }}</span>{% else %}<span class="numero"{% if c.texto.isdigit %} data-cuenta-entero="{{ c.texto }}"{% endif %}>{{ c.texto }}</span>{% endif %}
     <span class="detalle">{{ c.detalle }}</span>
   {% if c.enlace and not c.oculta %}</a>{% else %}</div>{% endif %}{% endfor %}
 </div>
@@ -42,16 +44,30 @@
   <a class="boton" href="{% url 'caja:inicio' %}">Ir a mi caja</a>
 </section>
 {% endif %}
+{% if semana or pagos %}
+<div class="columnas principal">
+  {% if semana %}<section class="panel" id="semana-inicio" data-vivo="cobros">
+    <div class="panel-cabeza"><h2>Cobranza de la semana</h2><div class="leyenda"><span><i class="ef"></i>Efectivo</span><span><i class="tr"></i>Transferencia</span></div></div>
+    <div class="grafica">{% for d in semana %}<button class="dia{% if d.hoy %} hoy{% endif %}" type="button" data-id="dia-{{ forloop.counter }}" data-alto-ef="{{ d.alto_efectivo }}" data-alto-tr="{{ d.alto_banco }}" aria-label="{{ d.nombre }}: efectivo {{ d.efectivo|dinero }}, transferencia {{ d.banco|dinero }}"><span class="dato-dia" aria-hidden="true">{{ d.nombre }}<br>Efectivo {{ d.efectivo|dinero }}<br>Transferencia {{ d.banco|dinero }}</span><span class="dia-columna"><span class="tramo tr"></span><span class="tramo ef"></span></span><span>{{ d.corto }}</span></button>{% endfor %}</div>
+  </section>{% endif %}
+  <div class="pila">
+    {% if avance %}<section class="panel" id="avance-inicio" data-vivo="cobros"><h2>Cobranza de {{ avance.mes }}</h2><div class="meta" data-id="avance"><svg class="anillo" viewBox="0 0 100 100" aria-hidden="true"><circle class="fondo" cx="50" cy="50" r="40"/><circle class="avance" cx="50" cy="50" r="40" data-porcentaje="{{ avance.porcentaje }}"/></svg><div><strong data-cuenta-por="{{ avance.porcentaje }}">{{ avance.porcentaje }} %</strong><span class="ayuda">{% if avance.esperado %}{{ avance.cobrado|dinero }} cobrados de {{ avance.esperado|dinero }} que vencen este mes{% else %}Este mes todavía no vence nada{% endif %}</span></div></div></section>{% endif %}
+    {% if pagos is not None %}<section class="panel"><h2 class="titulo-vivo"><span class="punto-vivo" aria-hidden="true"></span>Lo último que entró</h2>{% include "vivo/_ultimo.html" %}</section>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% if pendientes %}{% include "_inicio_solicitudes.html" with titulo="Por autorizar" %}{% endif %}
+<div id="rezagos-inicio" data-vivo="cobros titulares">{% load rezagos %}{% avisos_rezago %}</div>
 {% if perfil == "recepcion" %}
 <nav class="accesos" aria-label="Accesos rápidos">
-  {% if "registrar_pago_efectivo" in permisos %}<a class="acceso principal" href="{% url 'cobros:buscar' %}"><span class="acceso-titulo">Cobrar</span><span class="acceso-detalle">Registrar un pago en efectivo</span></a>{% endif %}
+  {% if "registrar_pago_efectivo" in permisos %}<a class="acceso principal" href="{% url 'cobros:buscar' %}"><span class="acceso-titulo">Cobrar</span><span class="acceso-detalle">Recibir un pago en efectivo</span></a>{% endif %}
   {% if "solicitar_alta_baja" in permisos or "alta_baja_directa" in permisos %}<a class="acceso" href="{% url 'titulares:nuevo' %}"><span class="acceso-titulo">Nueva alta</span><span class="acceso-detalle">Dar de alta a {{ voc.titular_min }}</span></a>{% endif %}
-  {% if "ver_titulares" in permisos %}<a class="acceso" href="{% url 'titulares:lista' %}"><span class="acceso-titulo">Buscar {{ voc.titular_min }}</span><span class="acceso-detalle">Ver datos, adeudo e historial</span></a><a class="acceso" href="{% url 'cobros:verificar' %}"><span class="acceso-titulo">Verificar recibo</span><span class="acceso-detalle">Comprobar un recibo con su código</span></a>{% endif %}
+  {% if "ver_titulares" in permisos %}<a class="acceso" href="{% url 'titulares:lista' %}"><span class="acceso-titulo">Buscar {{ voc.titular_min }}</span><span class="acceso-detalle">Ver sus datos, lo que debe y su historial</span></a><a class="acceso" href="{% url 'cobros:verificar' %}"><span class="acceso-titulo">Verificar recibo</span><span class="acceso-detalle">Comprobar un recibo con su código</span></a>{% endif %}
 </nav>
 {% endif %}
 {% if perfil == "coordinacion" %}
 <div class="columnas mitades">
-  {% if "aprobar_solicitudes" in permisos %}{% include "_inicio_bandeja.html" with titulo="Por autorizar" %}{% endif %}
+  {% if "aprobar_solicitudes" in permisos and not pendientes %}{% include "_inicio_bandeja.html" with titulo="Por autorizar" %}{% endif %}
   {% include "_inicio_avisos.html" with titulo="Por revisar" %}
 </div>
 {% if salud %}<div class="columnas mitades">{% include "_inicio_salud.html" %}</div>{% endif %}
@@ -60,7 +76,6 @@
   {% if salud %}{% include "_inicio_salud.html" %}{% endif %}
   {% include "_inicio_avisos.html" with titulo="Avisos de control" %}
 </div>
-{% if pendientes %}<div class="columnas mitades">{% include "_inicio_bandeja.html" with titulo="Por autorizar" %}</div>{% endif %}
 {% elif avisos or salud %}
 <div class="columnas mitades">
   {% if avisos %}{% include "_inicio_avisos.html" with titulo="Avisos" %}{% endif %}

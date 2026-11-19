@@ -49,7 +49,12 @@ class Caja(models.Model):
 
 
 class Denominacion(models.Model):
+    BILLETE = "billete"
+    MONEDA = "moneda"
+    TIPOS = [(BILLETE, "Billete"), (MONEDA, "Moneda")]
+
     valor = models.PositiveIntegerField(unique=True)
+    tipo = models.CharField(max_length=8, choices=TIPOS, default=BILLETE)
     activa = models.BooleanField(default=True)
 
     class Meta:

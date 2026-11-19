@@ -91,7 +91,7 @@ def visible(respuesta):
 def valores_json(dato):
     if isinstance(dato, dict):
         for clave, valor in dato.items():
-            if clave not in ("clave", "tipo", "accion", "permisos", "permiso_directo", "permiso_solicitar", "permiso_aprobar"):
+            if clave not in ("clave", "tipo", "url", "accion", "permisos", "permiso_directo", "permiso_solicitar", "permiso_aprobar"):
                 yield from valores_json(valor)
     elif isinstance(dato, list):
         for valor in dato:

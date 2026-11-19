@@ -60,8 +60,10 @@
     caja.querySelector(".dialogo-acciones .boton.secundario").focus();
   }
 
-  function prepararConfirmaciones() {
-    document.querySelectorAll("[data-confirmar]").forEach(function (boton) {
+  function prepararConfirmaciones(raiz) {
+    (raiz || document).querySelectorAll("[data-confirmar]").forEach(function (boton) {
+      if (boton.dataset.conConfirmacion) { return; }
+      boton.dataset.conConfirmacion = "1";
       boton.addEventListener("click", function (evento) {
         if (boton.dataset.confirmado === "1") { boton.dataset.confirmado = ""; return; }
         evento.preventDefault();
@@ -131,8 +133,8 @@
     return signo + simbolo + enteros + "." + resto;
   }
 
-  function prepararConteos() {
-    document.querySelectorAll("[data-conteo]").forEach(function (tabla) {
+  function prepararConteos(raiz) {
+    (raiz || document).querySelectorAll("[data-conteo]").forEach(function (tabla) {
       var simbolo = tabla.getAttribute("data-simbolo") || "$";
       var contenedor = tabla.closest("form") || document;
       var total = contenedor.querySelector("[data-contado]");
@@ -201,13 +203,17 @@
     try { return JSON.parse(texto); } catch (error) { return null; }
   }
 
-  function prepararDependencias() {
+  var atadas = new WeakSet();
+
+  function prepararDependencias(base) {
     var raices = [];
-    document.querySelectorAll("[data-depende-de]").forEach(function (elemento) {
+    (base || document).querySelectorAll("[data-depende-de]").forEach(function (elemento) {
       var raiz = elemento.closest("form") || document;
       if (raices.indexOf(raiz) === -1) { raices.push(raiz); }
     });
     raices.forEach(function (raiz) {
+      if (atadas.has(raiz)) { return; }
+      atadas.add(raiz);
       var dependientes = Array.prototype.slice.call(raiz.querySelectorAll("[data-depende-de]"));
       var etiquetaOriginal = new Map();
       dependientes.forEach(function (elemento) {
@@ -329,7 +335,7 @@
             if (numero !== vigente || texto === null) { return; }
             var nueva = new DOMParser().parseFromString(texto, "text/html").getElementById(region.id);
             if (!nueva) { return; }
-            region.replaceChildren.apply(region, Array.prototype.slice.call(nueva.childNodes).map(function (nodo) { return document.importNode(nodo, true); }));
+            if (window.Ariasmos && window.Ariasmos.sustituir) { window.Ariasmos.sustituir(region, nueva, { filtro: campo.value }); } else { region.replaceChildren.apply(region, Array.prototype.slice.call(nueva.childNodes).map(function (nodo) { return document.importNode(nodo, true); })); }
             if (window.history && window.history.replaceState) { window.history.replaceState(null, "", direccion + "?" + datos.toString()); }
             document.querySelectorAll("form.orden-formulario").forEach(function (orden) {
               var oculto = orden.querySelector('input[name="q"]');
@@ -351,6 +357,12 @@
       });
     });
   }
+
+  document.addEventListener("ariasmos:contenido", function (evento) {
+    prepararDependencias(evento.target);
+    prepararConfirmaciones(evento.target);
+    prepararConteos(evento.target);
+  });
 
   document.addEventListener("DOMContentLoaded", function () {
     prepararEnvioUnico();

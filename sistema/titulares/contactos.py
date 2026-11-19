@@ -102,6 +102,15 @@ def detalle(contacto):
     return filas
 
 
+def editables(contacto):
+    datos = {}
+    for campo in CampoContacto.objects.all():
+        valor = contacto.valor(campo)
+        if valor:
+            datos[campo.etiqueta] = {"clave": campo.clave, "crudo": valor, "tipo": campo.tipo}
+    return datos
+
+
 def principal(titular):
     if titular.familia_id:
         compartido = Contacto.objects.filter(familia_id=titular.familia_id, principal=True).select_related("relacion").first()

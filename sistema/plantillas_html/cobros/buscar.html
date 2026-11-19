@@ -2,10 +2,18 @@
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
-    <span class="antetitulo">Cobrar en efectivo</span>
+    <span class="antetitulo">{% if turno_sesion %}{{ turno_sesion.caja }} · Turno abierto {{ turno_sesion.abierto_en|time:"H:i" }}{% else %}Cobrar{% endif %}</span>
     <h1>Cobrar</h1>
+    <p class="subtitulo">Elige a la persona en la lista. Si no la ves, escribe su nombre.</p>
   </div>
+  <div class="encabezado-lado">{% include "comun/_como.html" with clave="cobrar" %}</div>
 </div>
-{% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
-{% include "comun/_lista_titulares.html" %}
+{% include "comun/_como_pasos.html" with clave="cobrar" %}
+{% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar en efectivo.</p>{% endif %}
+<div class="cobro-rejilla" data-cobro-rejilla>
+  <section class="panel lista-panel">
+    {% include "comun/_lista_titulares.html" %}
+  </section>
+  <aside class="panel-cobro" id="panel-cobro" aria-label="Cobro" data-vivo-no><button class="velo" type="button" data-accion="cerrar-panel" aria-label="Cerrar" tabindex="-1"></button><div class="panel" tabindex="-1"></div></aside>
+</div>
 {% endblock %}

@@ -18,7 +18,7 @@
   {% include "comun/_campo.html" with campo=formulario.control_denominaciones %}
   {% if denominaciones %}
   <p class="ayuda">Así se ven al abrir el turno, al cobrar y al cerrar: se toca cada billete o moneda para contarlo.</p>
-  <div class="piezas mosaicos muestra-piezas" aria-label="Denominaciones de la caja">{% for d in denominaciones %}<span class="mosaico"><span class="mosaico-valor">{{ d|denominacion_corta }}</span><span class="mosaico-cuenta">—</span></span>{% endfor %}</div>
+  <div class="piezas mosaicos muestra-piezas" aria-label="Denominaciones de la caja">{% for d in denominaciones %}<span class="mosaico{% if d.tipo == 'moneda' %} es-moneda{% endif %}"><span class="mosaico-valor">{{ d|denominacion_corta }}</span><span class="mosaico-cuenta">{{ d.get_tipo_display|lower }}</span></span>{% endfor %}</div>
   {% if enlace_denominaciones %}<p class="nota-pie"><a href="{% url 'configuracion:catalogo' 'denominaciones' %}">Cambiar las denominaciones</a></p>{% endif %}
   {% endif %}
   {% if piezas %}

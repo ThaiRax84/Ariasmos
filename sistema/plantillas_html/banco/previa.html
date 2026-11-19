@@ -4,7 +4,7 @@
 <div class="encabezado">
   <div class="encabezado-texto">
     <span class="antetitulo">Banco</span>
-    <h1>Vista previa de la importación</h1>
+    <h1>Esto es lo que trae el archivo</h1>
     <p class="subtitulo">{{ carga.nombre_archivo }} · {{ cuenta }}{% if estado %} · periodo {{ estado.periodo_inicio|date:"d/m/Y" }} a {{ estado.periodo_fin|date:"d/m/Y" }} · saldo inicial {{ estado.saldo_inicial|dinero }}, final {{ estado.saldo_final|dinero }}{% endif %}</p>
   </div>
 </div>
@@ -16,13 +16,13 @@
 </section>
 {% else %}
 <section class="panel">
-  <h2>Qué pasará</h2>
+  <h2>¿Qué va a pasar?</h2>
   <p>Clasificación: <strong>{{ clasificacion }}</strong>.</p>
   <ul class="lista">
     <li>{{ resumen.total }} movimientos en el archivo ({{ resumen.abonos|dinero }} en abonos, {{ resumen.cargos|dinero }} en cargos).</li>
-    <li><strong>{{ resumen.automaticos }}</strong> se aplicarán solos.</li>
+    <li><strong>{{ resumen.automaticos }}</strong> pagos se anotan solos porque se sabe de quién son.</li>
     <li><strong>{{ resumen.sugeridos }}</strong> quedarán por identificar con sugerencia.</li>
-    <li><strong>{{ resumen.sin_pista }}</strong> quedarán por identificar sin pista.</li>
+    <li><strong>{{ resumen.sin_pista }}</strong> quedarán por identificar: no se sabe de quién son.</li>
     <li><strong>{{ resumen.depositos }}</strong> depósitos se emparejarán con depósitos de caja.</li>
     <li>{{ resumen.informativos }} se guardan solo para cuadrar (cargos y devoluciones).</li>
     <li>{{ resumen.duplicados }} ya estaban importados y no se repetirán.</li>

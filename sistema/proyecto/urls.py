@@ -6,6 +6,7 @@ from . import vistas
 
 urlpatterns = [
     path("", vistas.inicio, name="inicio"),
+    path("", include("vivo.urls")),
     path("primeros-pasos/", vistas.primeros_pasos, name="primeros_pasos"),
     path("marca.css", vistas.marca_css, name="marca_css"),
     path("marca/vista.css", vistas.marca_vista_css, name="marca_vista_css"),

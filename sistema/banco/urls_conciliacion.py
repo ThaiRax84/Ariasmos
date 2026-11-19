@@ -13,6 +13,7 @@ urlpatterns = [
     path("importaciones/<int:pk>/revisada/", vistas.revisada, name="revisada"),
     path("importaciones/<int:pk>/liberar/", vistas.liberar, name="liberar"),
     path("cola/", vistas.cola, name="cola"),
+    path("cola/aplicar/", vistas.aplicar_varios, name="aplicar_varios"),
     path("topes/", vistas.topes, name="topes"),
     path("movimientos/<int:pk>/", vistas.movimiento, name="movimiento"),
     path("movimientos/<int:pk>/proponer/", vistas.proponer, name="proponer"),
