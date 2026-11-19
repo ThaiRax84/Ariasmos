@@ -91,6 +91,7 @@ def historial(titular, voc):
             "usuario": nombres.get(evento.usuario_id) or evento.usuario_texto or "Sistema",
             "descripcion": describir(evento),
             "cambios": cambios(evento, voc),
+            "tipo": "pago" if evento.accion.startswith("pago") else "alerta" if any(p in evento.accion for p in ("rezago", "baja", "rechaz", "revert", "cancel")) else "",
         }
         for evento in eventos
     ]

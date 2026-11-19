@@ -2,15 +2,18 @@
 {% load formato %}
 {% block contenido %}
 <div class="encabezado">
+  <span class="avatar grande" aria-hidden="true">{{ titular.nombre_completo|iniciales }}</span>
   <div class="encabezado-texto">
     <span class="antetitulo"><a href="{% url 'titulares:lista' %}">{{ voc.titulares }}</a> · Ficha</span>
     <h1>{{ titular.nombre_completo }}</h1>
     <p class="subtitulo">{{ voc.matricula }} <strong>{{ titular.matricula_formateada }}</strong>{% if titular.agrupacion %} · {{ titular.agrupacion }}{% endif %} · <span class="estado {{ titular.estado }}">{{ titular.get_estado_display }}</span></p>
   </div>
   <div class="encabezado-lado">
-    <div class="recuadro-cifra"><span class="etiqueta">Adeudo</span><span class="valor grande cifra-importe" aria-label="{{ estado.adeudo|dinero }}">{{ estado.adeudo|cifra }}</span></div>
+    <div class="recuadro-cifra" id="ficha-adeudo" data-vivo="cobros"><span class="etiqueta">Debe</span><span class="valor grande cifra-importe" aria-label="{{ estado.adeudo|dinero }}">{{ estado.adeudo|cifra }}</span></div>
+    {% include "comun/_como.html" with clave="ficha" %}
   </div>
 </div>
+{% include "comun/_como_pasos.html" with clave="ficha" %}
 <div class="atajos">
   {% if "registrar_pago_efectivo" in permisos and titular.estado != "rechazado" %}<a class="boton" href="{% url 'cobros:cobrar' titular.pk %}">Cobrar</a>{% endif %}
   <a class="boton secundario" href="{% url 'titulares:ficha_pago' titular.pk %}">Ficha de pago</a>
@@ -25,9 +28,9 @@
     {% if titular.estado == "baja" and not reactivacion_abierta %}<a class="boton secundario" href="{% url 'titulares:reactivar' titular.pk %}">Reactivar</a>{% endif %}
   {% endif %}
 </div>
-<nav class="pestanas" aria-label="Secciones de la ficha"><a href="{% url 'titulares:detalle' titular.pk %}" aria-current="page">Estado de cuenta</a><a href="{% url 'titulares:historial' titular.pk %}">Historial</a></nav>
+<nav class="pestanas" aria-label="Secciones de la ficha" data-pestanas><a href="{% url 'titulares:detalle' titular.pk %}" aria-current="page" data-pestana="cuenta">Estado de cuenta</a><a href="{% url 'titulares:historial' titular.pk %}" data-pestana="historial">Historial</a><a href="#ficha-datos" data-pestana="datos">Datos</a><span class="raya" aria-hidden="true"></span></nav>
 <div class="pila">
-<div class="pila">
+<div class="pila hoja-pestana" data-hoja="cuenta" id="ficha-cuenta" data-vivo="cobros solicitudes">
 {% load rezagos %}{% ficha_rezago titular %}
 {% include "cobros/_estado_cuenta.html" with varios=0 %}
 <section class="panel">
@@ -35,7 +38,8 @@
   <ul class="lista">{% for s in solicitudes %}<li><a href="{% url 'solicitudes:detalle' s.pk %}">{{ s.nombre_accion }} · {{ s.get_estado_display }}</a> <small>{{ s.creada|date:"d/m/Y H:i" }} · {{ s.solicitante }}{% if s.resuelta_por %} → {{ s.resuelta_por }} ({{ s.get_via_display }}){% endif %}</small></li>{% empty %}<li>Sin solicitudes.</li>{% endfor %}</ul>
 </section>
 </div>
-<div class="columnas mitades rejilla-fichas">
+<div class="hoja-pestana" data-hoja="historial" hidden></div>
+<div class="columnas mitades rejilla-fichas hoja-pestana" data-hoja="datos" id="ficha-datos" data-vivo="titulares">
 <section class="panel">
   <h2>Datos</h2>
   <dl class="datos">
@@ -53,10 +57,11 @@
   {% for contacto, filas in contactos %}
   <div class="contacto{% if contacto.principal %} principal{% endif %}">
     <strong>{{ contacto.nombre }}</strong>{% if contacto.relacion %} · {{ contacto.relacion }}{% endif %}{% if contacto.principal %} · <em>principal</em>{% endif %}
-    <ul>{% for etiqueta, valor, medio in filas %}<li>{{ etiqueta }}: {{ valor }}</li>{% endfor %}</ul>
+    <ul>{% for etiqueta, valor, medio in filas %}<li>{{ etiqueta }}: {% with dato=editables|obtener:contacto.pk|obtener:etiqueta %}{% if puede_capturar and dato %}<button class="editable" type="button" data-editar="{% url 'titulares:contacto_editar' titular.pk contacto.pk %}" data-campo="{{ dato.clave }}" data-valor="{{ dato.crudo }}" data-rotulo="{{ etiqueta }}" data-tipo="{{ dato.tipo }}">{{ valor }}<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>{% else %}{{ valor }}{% endif %}{% endwith %}</li>{% endfor %}</ul>
     {% if puede_capturar %}<a href="{% url 'titulares:contacto_editar' titular.pk contacto.pk %}">Editar</a>{% endif %}
   </div>
   {% empty %}<p>Sin contactos.</p>{% endfor %}
+  {% if puede_capturar and contactos %}<p class="nota-pie solo-con-js" hidden>Toca un dato para corregirlo ahí mismo. Al terminar, presiona <kbd>Enter</kbd>.</p>{% endif %}
   {% if puede_capturar %}<p><a class="boton secundario" href="{% url 'titulares:contacto_nuevo' titular.pk %}">Agregar contacto</a></p>{% endif %}
 </section>
 {% if planes %}

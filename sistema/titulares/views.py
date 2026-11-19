@@ -104,6 +104,7 @@ def detalle(request, pk):
         "planes": titular.planes.select_related("concepto"),
         "estado": estado_cuenta([titular]),
         "contacto_familia": contactos.principal(titular) if titular.familia_id else None,
+        "editables": {c.pk: contactos.editables(c) for c, _ in lista_contactos},
     }
     return render(request, "titulares/detalle.html", contexto)
 

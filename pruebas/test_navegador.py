@@ -217,3 +217,39 @@ def test_inicio_con_cifras_grafica_y_solicitudes_que_se_deshacen(sesion_navegado
     assert Solicitud.objects.get(pk=segunda.pk).estado == Solicitud.RECHAZADA
     assert Solicitud.objects.get(pk=segunda.pk).nota_resolucion == "Faltan datos"
     sin_errores(sesion_navegador)
+
+
+def test_ficha_con_pestanas_historial_y_correccion_con_deshacer(sesion_navegador):
+    from titulares.models import CampoContacto, Contacto
+    from auditoria.models import Evento
+
+    datos = preparar(con_turno=False)
+    ana = datos["titulares"][0]
+    campo = CampoContacto.objects.filter(tipo="telefono").first() or CampoContacto.objects.first()
+    contacto = Contacto.objects.filter(titular=ana).first()
+    valores = dict(contacto.valores)
+    valores[str(campo.pk)] = "5512345678" if campo.tipo == "telefono" else "dato@ejemplo.mx"
+    Contacto.objects.filter(pk=contacto.pk).update(valores=valores)
+    pagina = sesion_navegador.pagina(datos["op"])
+    sesion_navegador.ir(pagina, reverse("titulares:detalle", args=[ana.pk]))
+    assert pagina.locator("[data-hoja='datos']").is_hidden()
+    pagina.locator("[data-pestana='historial']").click()
+    pagina.wait_for_selector("[data-hoja='historial'] .linea-tiempo li")
+    sesion_navegador.captura(pagina, "ficha-historial")
+    pagina.locator("[data-pestana='datos']").click()
+    boton = pagina.locator(f"button[data-editar][data-campo='{campo.clave}']")
+    boton.click()
+    nuevo = "5598765432" if campo.tipo == "telefono" else "otro@ejemplo.mx"
+    entrada = pagina.locator(".edicion-en-linea")
+    entrada.fill(nuevo)
+    entrada.press("Enter")
+    pagina.wait_for_selector(".aviso-breve .accion-aviso")
+    contacto.refresh_from_db()
+    assert nuevo in contacto.valores[str(campo.pk)].replace(" ", "")
+    sesion_navegador.captura(pagina, "ficha-datos")
+    pagina.locator(".aviso-breve .accion-aviso", has_text="Deshacer").click()
+    pagina.wait_for_timeout(1500)
+    contacto.refresh_from_db()
+    assert contacto.valores[str(campo.pk)].replace(" ", "").endswith(valores[str(campo.pk)])
+    assert Evento.objects.filter(accion__icontains="contacto").count() >= 2
+    sin_errores(sesion_navegador)

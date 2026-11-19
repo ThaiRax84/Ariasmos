@@ -1007,3 +1007,153 @@
     }
   });
 }());
+
+(function () {
+  "use strict";
+
+  var A = window.Ariasmos;
+  var $ = A.$;
+  var $$ = A.$$;
+
+  function moverRaya(nav) {
+    var activa = $("[data-pestana][aria-current='page']", nav);
+    var raya = $(".raya", nav);
+    if (!activa || !raya) { return; }
+    raya.style.width = activa.offsetWidth + "px";
+    raya.style.transform = "translateX(" + activa.offsetLeft + "px)";
+  }
+
+  function escalonar(base) {
+    $$(".linea-tiempo > li", base).forEach(function (li, i) { li.style.animationDelay = Math.min(i, 20) * 70 + "ms"; });
+  }
+
+  function elegir(nav, enlace) {
+    var clave = enlace.getAttribute("data-pestana");
+    $$("[data-pestana]", nav).forEach(function (e) { if (e === enlace) { e.setAttribute("aria-current", "page"); } else { e.removeAttribute("aria-current"); } });
+    $$("[data-hoja]").forEach(function (hoja) {
+      var visible = hoja.getAttribute("data-hoja") === clave;
+      hoja.hidden = !visible;
+      if (visible) { A.reiniciar(hoja, "hoja-pestana"); }
+    });
+    moverRaya(nav);
+    if (clave === "historial") {
+      var hoja = $("[data-hoja='historial']");
+      if (hoja && !hoja.dataset.cargado) {
+        window.fetch(enlace.href, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+          .then(function (r) { return r.ok ? r.text() : null; })
+          .then(function (texto) {
+            if (!texto) { window.location.assign(enlace.href); return; }
+            var region = new DOMParser().parseFromString(texto, "text/html").getElementById("historial-region");
+            if (!region) { window.location.assign(enlace.href); return; }
+            hoja.dataset.cargado = "1";
+            hoja.replaceChildren(document.importNode(region, true));
+            escalonar(hoja);
+          })
+          .catch(function () { window.location.assign(enlace.href); });
+      }
+    }
+  }
+
+  function prepararPestanas() {
+    var nav = $("[data-pestanas]");
+    if (!nav) { escalonar(document); return; }
+    nav.setAttribute("role", "tablist");
+    $$("[data-hoja]").forEach(function (hoja) { hoja.hidden = hoja.getAttribute("data-hoja") !== "cuenta"; });
+    requestAnimationFrame(function () { moverRaya(nav); });
+    window.addEventListener("resize", function () { moverRaya(nav); });
+    nav.addEventListener("click", function (evento) {
+      var enlace = evento.target.closest("[data-pestana]");
+      if (!enlace || evento.ctrlKey || evento.metaKey || evento.shiftKey) { return; }
+      evento.preventDefault();
+      elegir(nav, enlace);
+    });
+  }
+
+  function textoError(documento) {
+    var errores = $$(".error, .errores p, .mensaje.error", documento).map(function (e) { return e.textContent.trim(); }).filter(Boolean);
+    return errores.length ? errores[0] : null;
+  }
+
+  function guardarDato(direccion, campo, valor) {
+    return window.fetch(direccion, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+      .then(function (r) { return r.ok ? r.text() : Promise.reject(new Error("abrir")); })
+      .then(function (texto) {
+        var documento = new DOMParser().parseFromString(texto, "text/html");
+        var entrada = documento.querySelector("form [name='" + campo + "']");
+        if (!entrada) { return Promise.reject(new Error("campo")); }
+        var formulario = entrada.closest("form");
+        entrada.value = valor;
+        var datos = new FormData(formulario);
+        return window.fetch(direccion, { method: "POST", body: datos, credentials: "same-origin", headers: { "X-Requested-With": "fetch" } });
+      })
+      .then(function (r) {
+        return r.text().then(function (texto) {
+          var documento = new DOMParser().parseFromString(texto, "text/html");
+          if (new URL(r.url).pathname === new URL(direccion, window.location.href).pathname) {
+            return Promise.reject(new Error(textoError(documento) || "No se pudo guardar."));
+          }
+          var error = $(".mensajes .mensaje.error", documento);
+          if (error) { return Promise.reject(new Error(error.textContent.trim())); }
+          return documento;
+        });
+      });
+  }
+
+  function refrescarDatos(documento) {
+    var region = $("#ficha-datos");
+    var nueva = documento && documento.getElementById("ficha-datos");
+    if (region && nueva) { A.sustituir(region, nueva, {}); }
+  }
+
+  function editar(boton) {
+    var dd = boton.parentElement;
+    var antes = boton.getAttribute("data-valor");
+    var direccion = boton.getAttribute("data-editar");
+    var campo = boton.getAttribute("data-campo");
+    var rotulo = boton.getAttribute("data-rotulo");
+    var entrada = A.crear("input");
+    entrada.type = boton.getAttribute("data-tipo") === "correo" ? "email" : "text";
+    entrada.value = antes;
+    entrada.setAttribute("aria-label", rotulo);
+    entrada.className = "edicion-en-linea";
+    var guardado = boton.cloneNode(true);
+    boton.replaceWith(entrada);
+    entrada.focus();
+    entrada.select();
+    var listo = false;
+    function cerrar(guardar) {
+      if (listo) { return; }
+      listo = true;
+      var nuevo = entrada.value.trim();
+      if (!guardar || !nuevo || nuevo === antes) { entrada.replaceWith(guardado); guardado.focus(); return; }
+      entrada.disabled = true;
+      guardarDato(direccion, campo, nuevo).then(function (documento) {
+        refrescarDatos(documento);
+        var marcado = $("[data-editar][data-campo='" + campo + "'][data-editar='" + direccion + "']");
+        if (marcado) { A.reiniciar(marcado.parentElement, "guardado"); }
+        A.aviso(rotulo + " actualizado", {
+          accion: "Deshacer",
+          alAccionar: function () {
+            guardarDato(direccion, campo, antes).then(function (otro) { refrescarDatos(otro); A.aviso(rotulo + ": se regresó el valor anterior"); })
+              .catch(function (error) { A.aviso(error.message || "No se pudo regresar el valor."); });
+          }
+        });
+      }).catch(function (error) {
+        entrada.replaceWith(guardado);
+        A.aviso(error && error.message && error.message.length > 8 ? error.message : "No se pudo guardar el cambio.", { ms: 8000 });
+      });
+    }
+    entrada.addEventListener("keydown", function (evento) {
+      if (evento.key === "Enter") { evento.preventDefault(); cerrar(true); }
+      if (evento.key === "Escape") { evento.preventDefault(); evento.stopPropagation(); cerrar(false); }
+    });
+    entrada.addEventListener("blur", function () { cerrar(true); });
+  }
+
+  document.addEventListener("click", function (evento) {
+    var boton = evento.target.closest && evento.target.closest("button[data-editar]");
+    if (boton) { editar(boton); }
+  });
+
+  A.alIniciar.push(prepararPestanas);
+}());
