@@ -11,7 +11,7 @@
 <ol class="linea-tiempo historial">
 {% for f in filas %}
   <li class="{{ f.tipo }}"><strong>{{ f.descripcion }}</strong><span>{{ f.momento|date:"d/m/Y H:i" }} · {{ f.usuario }}</span>
-    {% if f.cambios %}<ul class="cambios">{% for etiqueta, antes, despues in f.cambios %}<li>{{ etiqueta }}: {{ antes }} → {{ despues }}</li>{% endfor %}</ul>{% endif %}
+    {% if f.cambios %}<ul class="detalle-cambios">{% for etiqueta, antes, despues in f.cambios %}<li>{{ etiqueta }}: {{ antes }} → {{ despues }}</li>{% endfor %}</ul>{% endif %}
   </li>
 {% empty %}<li>Sin movimientos registrados.</li>{% endfor %}
 </ol>

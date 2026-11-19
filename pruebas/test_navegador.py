@@ -282,3 +282,29 @@ def test_configuracion_con_vista_previa_orden_arrastrable_y_cambios_sin_guardar(
     pagina.wait_for_load_state("networkidle")
     assert parametro("orden_reparto").split(",")[:2] == [antes[1], antes[0]]
     sin_errores(sesion_navegador)
+
+
+def test_abrir_turno_de_fabrica_con_mosaicos_dependencias_y_movimiento_reducido(sesion_navegador):
+    datos = preparar(con_turno=False)
+    pagina = sesion_navegador.pagina(datos["op"], movimiento="reduce")
+    sesion_navegador.ir(pagina, reverse("caja:inicio"))
+    pagina.locator("input[name='apertura'][value='cero']").check()
+    assert pagina.locator("[data-depende-de='apertura']").is_hidden()
+    pagina.locator("input[name='apertura'][value='efectivo']").check()
+    assert pagina.locator("[data-depende-de='apertura']").is_visible()
+    pagina.evaluate("() => { const b = document.querySelector('.pieza[data-centavos=\"10000\"] .mosaico'); b.click(); b.click(); }")
+    pagina.locator(".pieza[data-centavos='5000'] .mosaico").click()
+    assert "250.00" in pagina.locator("#fondo-total").inner_text()
+    sesion_navegador.captura(pagina, "abrir-turno")
+    with pagina.expect_navigation():
+        pagina.evaluate("() => { const b = document.querySelector('form[action$=\"/caja/abrir/\"] button[type=submit]'); b.click(); b.click(); b.click(); }")
+    pagina.wait_for_load_state("networkidle")
+    assert Turno.objects.filter(usuario=datos["op"], estado=Turno.ABIERTO).count() == 1
+    assert Turno.objects.get(usuario=datos["op"]).fondo_inicial == 25000
+    sesion_navegador.ir(pagina, reverse("cobros:buscar"))
+    pagina.locator(".renglon-titular").first.click()
+    pagina.wait_for_selector("#panel-cobro [data-cobro-efectivo]")
+    pagina.locator(".pieza[data-centavos='100000'] .mosaico").click()
+    assert pagina.locator("[data-recibido-cobro]").inner_text().startswith("$1,000.00")
+    assert pagina.locator(".vuela").count() == 0
+    sin_errores(sesion_navegador)

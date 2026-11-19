@@ -570,9 +570,9 @@
   var crear = A.crear;
   var estado = { items: [], indice: 0, pedido: 0, espera: null };
   function icono(tipo) {
-    var plantilla = $("#iconos-paleta");
-    var original = plantilla && (plantilla.content.querySelector("[data-icono='" + tipo + "']") || plantilla.content.querySelector("[data-icono='pantalla']"));
-    return original ? original.cloneNode(true) : crear("span");
+    var span = crear("span", "icono-svg icono-" + (["persona", "accion", "pantalla"].indexOf(tipo) !== -1 ? tipo : "pantalla"));
+    span.setAttribute("aria-hidden", "true");
+    return span;
   }
 
   function iniciales(texto) {

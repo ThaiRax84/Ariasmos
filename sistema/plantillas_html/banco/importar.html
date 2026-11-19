@@ -10,7 +10,7 @@
 </div>
 <form method="post" enctype="multipart/form-data" class="formulario" novalidate data-subida-banco>
   {% csrf_token %}
-  <div class="zona-soltar solo-con-js" data-zona-soltar hidden><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 16V5m0 0l-4 4m4-4l4 4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><h2>Arrastra aquí el estado de cuenta</h2><p class="ayuda">Sirve el archivo tal como lo da el banco: PDF, Excel o CSV.</p></div>
+  <div class="zona-soltar solo-con-js" data-zona-soltar hidden><span class="icono" aria-hidden="true"><span class="icono-svg icono-subir grande"></span></span><h2>Arrastra aquí el estado de cuenta</h2><p class="ayuda">Sirve el archivo tal como lo da el banco: PDF, Excel o CSV.</p></div>
   <div class="leyendo" data-leyendo hidden><h2>Leyendo el archivo…</h2><div class="barra-progreso"><span></span></div><p class="ayuda">Buscando de quién es cada depósito</p></div>
   {% include "comun/_campos.html" %}
   <div class="acciones"><button class="boton grande" type="submit">Leer el archivo</button><a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones anteriores</a></div>

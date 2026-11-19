@@ -57,7 +57,7 @@
   {% for contacto, filas in contactos %}
   <div class="contacto{% if contacto.principal %} principal{% endif %}">
     <strong>{{ contacto.nombre }}</strong>{% if contacto.relacion %} · {{ contacto.relacion }}{% endif %}{% if contacto.principal %} · <em>principal</em>{% endif %}
-    <ul>{% for etiqueta, valor, medio in filas %}<li>{{ etiqueta }}: {% with dato=editables|obtener:contacto.pk|obtener:etiqueta %}{% if puede_capturar and dato %}<button class="editable" type="button" data-editar="{% url 'titulares:contacto_editar' titular.pk contacto.pk %}" data-campo="{{ dato.clave }}" data-valor="{{ dato.crudo }}" data-rotulo="{{ etiqueta }}" data-tipo="{{ dato.tipo }}">{{ valor }}<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>{% else %}{{ valor }}{% endif %}{% endwith %}</li>{% endfor %}</ul>
+    <ul>{% for etiqueta, valor, medio in filas %}<li>{{ etiqueta }}: {% with dato=editables|obtener:contacto.pk|obtener:etiqueta %}{% if puede_capturar and dato %}<button class="editable" type="button" data-editar="{% url 'titulares:contacto_editar' titular.pk contacto.pk %}" data-campo="{{ dato.clave }}" data-valor="{{ dato.crudo }}" data-rotulo="{{ etiqueta }}" data-tipo="{{ dato.tipo }}">{{ valor }}<span class="icono-svg icono-lapiz" aria-hidden="true"></span></button>{% else %}{{ valor }}{% endif %}{% endwith %}</li>{% endfor %}</ul>
     {% if puede_capturar %}<a href="{% url 'titulares:contacto_editar' titular.pk contacto.pk %}">Editar</a>{% endif %}
   </div>
   {% empty %}<p>Sin contactos.</p>{% endfor %}
