@@ -4,7 +4,6 @@ from functools import wraps
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Q
 from django.forms.models import model_to_dict
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -22,9 +21,9 @@ from cobros.formularios import FormularioVerificarRecibo
 from cobros.models import Recibo
 from cobros.vistas_cobro import _verificaciones_bloqueadas, proponer_cambio
 from configuracion.models import parametro, vocabulario
+from configuracion.moneda import formatear
 from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
-from nucleo.matricula import normalizar
 from proyecto.orden import elegir
 from rezagos.servicios import sin_credito, solicitar_venta
 from titulares.models import Titular
@@ -108,16 +107,12 @@ def articulo_editar(request, pk):
 @requiere_permiso("vender_articulos")
 @encendido
 def vender(request):
-    consulta = request.GET.get("q", "").strip()[:60]
-    orden = elegir(request, "vender")
-    resultados = []
-    if consulta:
-        digitos = normalizar(consulta)
-        filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
-        if digitos:
-            filtro |= Q(matricula__startswith=digitos)
-        resultados = Titular.objects.filter(filtro).filter(estado__in=[Titular.ACTIVO, Titular.PENDIENTE]).select_related("familia", "agrupacion").order_by(*orden.campos)[:30]
-    return render(request, "inventario/vender.html", {"q": consulta, "resultados": resultados, "orden": orden})
+    from titulares import lista
+
+    contexto = lista.preparar(request, "vender", [Titular.ACTIVO])
+    contexto["completos"] = [t for t in contexto["completos"] if t.estado == Titular.PENDIENTE]
+    contexto.update({"destino": "inventario:vender_titular", "accion": "Vender", "titulo_lista": "vender"})
+    return render(request, "inventario/vender.html", contexto)
 
 
 def _puede_cobrar_ya(usuario):
@@ -180,6 +175,8 @@ def _pantalla_publico(request, formulario, turno, **extra):
 @requiere_permiso("vender_articulos")
 @encendido
 def vender_publico(request):
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "inventario:indice")
     turno = turno_abierto(request.user)
     formulario = FormularioVenta(request.POST if request.method == "POST" else None, con_modo=False)
     if request.method != "POST":
@@ -314,6 +311,8 @@ def devolver_venta(request, pk):
     if not servicios.en_plazo(objeto):
         messages.error(request, "La venta está fuera del plazo de devolución.")
         return redirect("inventario:venta", pk=pk)
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "inventario:ventas")
     renglones = list(objeto.renglones.select_related("articulo", "cargo"))
     formulario = FormularioDevolucion(request.POST if request.method == "POST" else None, renglones=renglones, disponibles=servicios.disponibles(objeto, incluir_pendientes=True), publico=objeto.titular.interno)
     if request.method == "POST" and formulario.is_valid():
@@ -321,6 +320,8 @@ def devolver_venta(request, pk):
         try:
             if datos["medio"] == Devolucion.EFECTIVO:
                 servicios.validar_devolucion(objeto, datos["cantidades"], incluir_pendientes=True)
+                if formulario.nombres_piezas and control_piezas.total(formulario.piezas()) != servicios.dinero_por_regresar(objeto, datos["cantidades"]):
+                    raise servicios.ErrorInventario(f"Las piezas que entregas deben sumar exactamente lo que regresa en efectivo: {formatear(servicios.dinero_por_regresar(objeto, datos['cantidades']))}.")
                 resultado = servicios.solicitar_efectivo(objeto, datos["cantidades"], request.user, datos["motivo"], formulario.piezas(), request)
                 messages.info(request, "La devolución en efectivo quedó como solicitud: la autoriza otra persona y el efectivo sale de tu turno al aprobarse.")
                 return redirect("solicitudes:detalle", pk=resultado.solicitud.pk)

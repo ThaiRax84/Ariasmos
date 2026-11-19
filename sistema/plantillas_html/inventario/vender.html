@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load rezagos %}
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
@@ -8,12 +7,5 @@
   </div>
   <div class="encabezado-lado">{% include "inventario/_a_quien.html" %}</div>
 </div>
-<form method="get" class="busqueda">
-  <input type="search" name="q" value="{{ q }}" placeholder="{{ voc.matricula }} o nombre" aria-label="Buscar" maxlength="60" autofocus>
-  <button class="boton" type="submit">Buscar</button>
-</form>
-{% if q %}{% include "comun/_orden_formulario.html" %}{% endif %}
-<ul class="lista">
-{% for t in resultados %}<li><a href="{% url 'inventario:vender_titular' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a>{% if t.familia %} <small>({{ voc.familia_min }} {{ t.familia }})</small>{% endif %} <span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span>{% marca_rezago t resultados %}</li>{% empty %}{% if q %}<li>Sin resultados.</li>{% endif %}{% endfor %}
-</ul>
+{% include "comun/_lista_titulares.html" %}
 {% endblock %}

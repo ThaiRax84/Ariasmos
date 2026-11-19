@@ -241,6 +241,10 @@ tr.revertido td:first-child, tr.revertido td:last-child { text-decoration: none;
 .lista-estado .renglon-texto { flex: 1; min-width: 0; }
 .lista-estado .renglon-titulo { font-weight: 800; display: block; }
 .lista-estado .renglon-detalle { font-size: 13px; color: var(--suave); display: block; }
+.lista-titulares .importe { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--suave); font-size: 14px; }
+.lista-titulares .importe.con-adeudo { color: var(--tinta); font-weight: 800; }
+.paginacion { margin-top: 12px; align-items: center; }
+[data-lista-viva].cargando { opacity: .6; }
 .datos { display: grid; grid-template-columns: max-content 1fr; gap: 0; margin: 0; }
 .datos dt, .datos dd { padding: 10px 0; border-bottom: 1px solid var(--borde); margin: 0; }
 .datos dt { color: var(--suave); padding-right: 16px; }

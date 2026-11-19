@@ -310,8 +310,51 @@
     window.addEventListener("pageshow", liberarTodo);
   }
 
+  function prepararFiltrosVivos() {
+    document.querySelectorAll("form[data-filtro-vivo]").forEach(function (formulario) {
+      var region = document.getElementById(formulario.getAttribute("data-filtro-vivo"));
+      var campo = formulario.querySelector('input[type="search"]');
+      if (!region || !campo || !window.fetch || !window.DOMParser) { return; }
+      var espera = null;
+      var vigente = 0;
+      function pedir() {
+        var datos = new URLSearchParams(new FormData(formulario));
+        var direccion = formulario.getAttribute("action") || window.location.pathname;
+        var numero = vigente + 1;
+        vigente = numero;
+        region.classList.add("cargando");
+        window.fetch(direccion + "?" + datos.toString(), { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+          .then(function (respuesta) { return respuesta.ok ? respuesta.text() : null; })
+          .then(function (texto) {
+            if (numero !== vigente || texto === null) { return; }
+            var nueva = new DOMParser().parseFromString(texto, "text/html").getElementById(region.id);
+            if (!nueva) { return; }
+            region.replaceChildren.apply(region, Array.prototype.slice.call(nueva.childNodes).map(function (nodo) { return document.importNode(nodo, true); }));
+            if (window.history && window.history.replaceState) { window.history.replaceState(null, "", direccion + "?" + datos.toString()); }
+            document.querySelectorAll("form.orden-formulario").forEach(function (orden) {
+              var oculto = orden.querySelector('input[name="q"]');
+              if (!oculto) {
+                oculto = document.createElement("input");
+                oculto.type = "hidden";
+                oculto.name = "q";
+                orden.insertBefore(oculto, orden.firstChild);
+              }
+              oculto.value = campo.value;
+            });
+          })
+          .catch(function () { return null; })
+          .then(function () { if (numero === vigente) { region.classList.remove("cargando"); } });
+      }
+      campo.addEventListener("input", function () {
+        window.clearTimeout(espera);
+        espera = window.setTimeout(pedir, 250);
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     prepararEnvioUnico();
+    prepararFiltrosVivos();
     prepararDependencias();
     prepararImprimir();
     prepararConfirmaciones();
