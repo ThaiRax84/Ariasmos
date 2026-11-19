@@ -49,7 +49,7 @@ def cifra(centavos):
 def denominacion_corta(etiqueta):
     from configuracion.moneda import actual
 
-    texto = re.sub(r"^.*?(piezas de|piezas que regresan:)\s*", "", str(etiqueta), count=1, flags=re.IGNORECASE)
+    texto = re.sub(r"^.*(piezas de|:)\s*", "", str(etiqueta), count=1, flags=re.IGNORECASE)
     texto = texto.replace(actual()["codigo"], "").strip()
     return texto[:-3] if texto.endswith(".00") else texto
 
@@ -64,3 +64,22 @@ def dinero_texto(valor):
         return formatear(a_centavos(str(valor or "0")))
     except (ErrorImporte, ValueError):
         return ""
+
+
+@register.filter
+def dependencia(campo):
+    from proyecto.dependencias import atributos
+
+    return atributos(getattr(campo, "depende", None))
+
+
+@register.filter
+def nota_dependencia(campo):
+    from proyecto.dependencias import nota
+
+    return nota(getattr(campo, "depende", None))
+
+
+@register.filter
+def piezas_de(formulario):
+    return [formulario[nombre] for nombre, campo in formulario.fields.items() if getattr(campo, "pieza", None)]

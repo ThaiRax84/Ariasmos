@@ -12,7 +12,8 @@ from cuentas.formularios import ContrasenaNueva
 from nucleo.dinero import ErrorImporte, a_centavos
 from proyecto.captura import CampoContrasena, CampoGuiadoTexto, CampoUsuario
 from proyecto.carpetas import con_carpetas
-from proyecto.plegables import ConPlegables, plegar, segun
+from proyecto.dependencias import ConDependencias, depende
+from proyecto.plegables import ConPlegables, plegar
 from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
@@ -339,7 +340,7 @@ class FormularioAsistenteInicio(ConPlegables, forms.Form):
         self.fields["moneda"].choices = moneda.opciones()
         if self.initial.get("plantilla") not in dict(self.fields["plantilla"].choices):
             self.initial.pop("plantilla", None)
-        segun(self, "plantilla", {"archivo": (IMPORTAR, "")})
+        depende(self, "archivo", "plantilla", [IMPORTAR])
 
     def clean_moneda(self):
         try:
@@ -373,10 +374,10 @@ class FormularioRevisarPlantilla(forms.Form):
         return datos
 
 
-class FormularioPersonalizar(forms.Form):
+class FormularioPersonalizar(ConDependencias, forms.Form):
     nuevo_nombre = forms.CharField(label="Agregar concepto: nombre", max_length=100, required=False)
     nuevo_tipo = forms.ChoiceField(label="Tipo", choices=ConceptoCobro.TIPOS, required=False)
-    nuevo_periodicidad = forms.ChoiceField(label="Periodicidad (solo recurrentes)", choices=[("", "—")] + ConceptoCobro.PERIODICIDADES, required=False)
+    nuevo_periodicidad = forms.ChoiceField(label="Periodicidad", choices=[("", "—")] + ConceptoCobro.PERIODICIDADES, required=False)
     nuevo_aplica_a = forms.ChoiceField(label="Aplica a", choices=[], required=False)
     nuevo_recargo = forms.BooleanField(label="Con recargo por pago tardío", required=False)
 
@@ -392,7 +393,7 @@ class FormularioPersonalizar(forms.Form):
             campos[f"quitar_{concepto.pk}"] = forms.BooleanField(label=f"Quitar «{concepto.nombre}» ({concepto.get_tipo_display().lower()})", required=False)
         campos.update(self.fields)
         self.fields = campos
-        segun(self, "nuevo_tipo", {"nuevo_periodicidad": (ConceptoCobro.RECURRENTE, "Periodicidad")})
+        depende(self, "nuevo_periodicidad", "nuevo_tipo", [ConceptoCobro.RECURRENTE])
 
     def clean(self):
         datos = super().clean()
@@ -408,7 +409,7 @@ class FormularioPersonalizar(forms.Form):
         return datos
 
 
-class FormularioAsistenteConceptos(forms.Form):
+class FormularioAsistenteConceptos(ConDependencias, forms.Form):
     def __init__(self, *args, conceptos=(), con_recargo=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.conceptos = list(conceptos)
@@ -422,10 +423,11 @@ class FormularioAsistenteConceptos(forms.Form):
                 sugerido = (con_recargo or {})[concepto.nombre] or {}
                 self.fields[f"recargo_tipo_{concepto.pk}"] = forms.ChoiceField(label=f"{concepto.nombre}: cómo se calcula el recargo", choices=ReglaRecargo.TIPOS, initial=sugerido.get("tipo", "fijo"), required=False, widget=forms.RadioSelect)
                 self.fields[f"recargo_tipo_{concepto.pk}"].en_fila = True
-                self.fields[f"recargo_importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe fijo del recargo (si el tipo es importe fijo)", required=False, help_text="Ejemplo: 150.00. Vacío, sin recargo.")
-                self.fields[f"recargo_porcentaje_{concepto.pk}"] = CampoPorcentaje(label=f"{concepto.nombre}: porcentaje del recargo (si el tipo es porcentaje)", required=False, help_text="Sobre el saldo del cargo. Ejemplo: 10. Vacío, sin recargo.")
+                self.fields[f"recargo_importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe del recargo", required=False, help_text="Ejemplo: 150.00. Vacío, sin recargo.")
+                self.fields[f"recargo_porcentaje_{concepto.pk}"] = CampoPorcentaje(label=f"{concepto.nombre}: porcentaje del recargo", required=False, help_text="Sobre el saldo del cargo. Ejemplo: 10. Vacío, sin recargo.")
                 self.fields[f"recargo_gracia_{concepto.pk}"] = forms.IntegerField(label=f"{concepto.nombre}: días de gracia", min_value=0, max_value=60, required=False, initial=sugerido.get("dias_gracia", 0), help_text="Días después del vencimiento en que todavía no se cobra.")
-                segun(self, f"recargo_tipo_{concepto.pk}", {f"recargo_importe_{concepto.pk}": (ReglaRecargo.FIJO, "Importe del recargo"), f"recargo_porcentaje_{concepto.pk}": (ReglaRecargo.PORCENTAJE, "Porcentaje del recargo")})
+                depende(self, f"recargo_importe_{concepto.pk}", f"recargo_tipo_{concepto.pk}", [ReglaRecargo.FIJO])
+                depende(self, f"recargo_porcentaje_{concepto.pk}", f"recargo_tipo_{concepto.pk}", [ReglaRecargo.PORCENTAJE])
 
     def grupos(self):
         resultado = []
@@ -468,7 +470,7 @@ class CampoHora(CampoGuiadoTexto):
 
 
 class FormularioCajaCortes(ConPlegables, forms.Form):
-    control_denominaciones = forms.BooleanField(label="Contar billetes y monedas en cada apertura, cobro, retiro y devolución", required=False, help_text="Así el programa sabe cuántas piezas de cada denominación debe haber en la caja y propone el cambio. Apagado, solo se escriben importes.")
+    control_denominaciones = forms.BooleanField(label="¿Contar billetes y monedas en cada movimiento de efectivo?", required=False, initial=True, help_text="Sí: al abrir, cobrar, dar cambio, vender, retirar, devolver, entregar, depositar y cerrar se cuentan las piezas, y el programa propone el cambio. No: solo se escriben importes.")
     periodo_retiros = forms.ChoiceField(label="Los topes de retiros se cuentan por", choices=[("dia", "Día"), ("semana", "Semana (lunes a domingo)")], widget=forms.RadioSelect)
     tope_retiro_individual = CampoImporte(label="Importe máximo de un retiro", help_text="Arriba de esto el retiro se vuelve solicitud y otra persona lo autoriza. Ejemplo: 500.00")
     tope_retiros_periodo = CampoImporte(label="Importe máximo de retiros en el periodo, por caja", help_text="Suma de todos los retiros del día o de la semana. Ejemplo: 1500.00")
@@ -603,7 +605,7 @@ class FormularioReglas(ConPlegables, forms.Form):
             if clave in self.fields:
                 self.fields[clave].initial = bool(valor) if isinstance(self.fields[clave], forms.BooleanField) else valor
         self.fields["tamano_hoja"].en_fila = True
-        segun(self, "pedir_consentimiento", {"texto_consentimiento": ("on", "")})
+        depende(self, "texto_consentimiento", "pedir_consentimiento")
 
     def clean(self):
         datos = super().clean()
@@ -695,6 +697,8 @@ class FormularioAsistenteCortes(FormularioCarpetaBanco):
         self.ayuda_avanzados = "Un estado de cuenta en PDF que continúa al anterior aplica sus pagos de inmediato. Un Excel o CSV los aplica solo mientras no pase de los topes del día y del acumulado; lo que no cabe queda retenido hasta que alguien con permiso de conciliación lo libere. Con los topes en 0, todo Excel o CSV queda retenido."
         avanzados = [nombre for nombre in self.fields if nombre.startswith("tope_") or nombre.startswith("nivel_") or nombre in ("actualizaciones_activas", "repositorio_canal", "clave_canal")]
         plegar(self, *avanzados)
+        depende(self, "repositorio_canal", "actualizaciones_activas")
+        depende(self, "clave_canal", "actualizaciones_activas")
 
     def _ruta(self, clave):
         from cortes.entrega import ErrorEntrega, validar_ruta

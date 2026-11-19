@@ -31,7 +31,7 @@ REVISA = "ver_auditoria"
 
 class FormularioSubida(forms.Form):
     archivo = forms.FileField(label="Estado de cuenta (PDF) o archivo de movimientos (Excel .xlsx o CSV)")
-    cuenta = forms.ModelChoiceField(label="Cuenta (obligatoria con Excel o CSV; con PDF se reconoce por su CLABE)", queryset=CuentaBancaria.objects.none(), required=False)
+    cuenta = forms.ModelChoiceField(label="Cuenta", queryset=CuentaBancaria.objects.none(), required=False, help_text="Con un Excel o CSV hay que elegirla; un estado en PDF la reconoce por su CLABE.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

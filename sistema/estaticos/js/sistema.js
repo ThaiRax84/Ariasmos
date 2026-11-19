@@ -178,7 +178,94 @@
     });
   }
 
+  function valorDeControl(raiz, nombre) {
+    var controles = Array.prototype.slice.call(raiz.querySelectorAll('[name="' + nombre + '"]'));
+    var valores = [];
+    controles.forEach(function (control) {
+      if (control.disabled) { return; }
+      if (control.type === "checkbox" || control.type === "radio") {
+        if (control.type === "checkbox" && controles.length === 1) { valores.push(control.checked ? "on" : ""); return; }
+        if (control.checked) { valores.push(control.value); }
+      } else if (control.tagName === "SELECT" && control.multiple) {
+        Array.prototype.forEach.call(control.selectedOptions, function (opcion) { valores.push(opcion.value); });
+      } else if (control.type !== "hidden" || controles.length === 1) {
+        valores.push(control.value);
+      }
+    });
+    return valores.length ? valores : [""];
+  }
+
+  function leerMapa(elemento, atributo) {
+    var texto = elemento.getAttribute(atributo);
+    if (!texto) { return null; }
+    try { return JSON.parse(texto); } catch (error) { return null; }
+  }
+
+  function prepararDependencias() {
+    var raices = [];
+    document.querySelectorAll("[data-depende-de]").forEach(function (elemento) {
+      var raiz = elemento.closest("form") || document;
+      if (raices.indexOf(raiz) === -1) { raices.push(raiz); }
+    });
+    raices.forEach(function (raiz) {
+      var dependientes = Array.prototype.slice.call(raiz.querySelectorAll("[data-depende-de]"));
+      var etiquetaOriginal = new Map();
+      dependientes.forEach(function (elemento) {
+        elemento.querySelectorAll("[data-nota-dependencia]").forEach(function (nota) { nota.hidden = true; });
+        var etiqueta = elemento.querySelector("label, .etiqueta");
+        if (etiqueta) { etiquetaOriginal.set(elemento, etiqueta.textContent); }
+      });
+
+      function pintarUno(elemento) {
+        var valores = valorDeControl(raiz, elemento.getAttribute("data-depende-de"));
+        var mostrarSi = elemento.getAttribute("data-mostrar-si");
+        var ocultarSi = elemento.getAttribute("data-ocultar-si");
+        var mostrar = true;
+        if (mostrarSi !== null) {
+          var lista = mostrarSi.split(" ");
+          mostrar = valores.some(function (valor) { return lista.indexOf(valor) !== -1; });
+        } else if (ocultarSi !== null) {
+          var excluidos = ocultarSi.split(" ");
+          mostrar = !valores.some(function (valor) { return excluidos.indexOf(valor) !== -1; });
+        }
+        var cambio = elemento.hidden === mostrar;
+        elemento.hidden = !mostrar;
+        elemento.querySelectorAll("input, select, textarea").forEach(function (campo) { campo.disabled = !mostrar; });
+        var etiquetas = leerMapa(elemento, "data-etiquetas");
+        var etiqueta = elemento.querySelector("label, .etiqueta");
+        if (etiquetas && etiqueta) {
+          var nueva = null;
+          valores.forEach(function (valor) { if (nueva === null && Object.prototype.hasOwnProperty.call(etiquetas, valor)) { nueva = etiquetas[valor]; } });
+          etiqueta.textContent = nueva !== null ? nueva : etiquetaOriginal.get(elemento);
+        }
+        var maximos = leerMapa(elemento, "data-maximos");
+        if (maximos) {
+          var maximo = null;
+          valores.forEach(function (valor) { if (maximo === null && Object.prototype.hasOwnProperty.call(maximos, valor)) { maximo = maximos[valor]; } });
+          elemento.querySelectorAll("input").forEach(function (campo) {
+            if (maximo !== null) { campo.setAttribute("max", String(maximo)); } else { campo.removeAttribute("max"); }
+          });
+        }
+        return cambio;
+      }
+
+      function pintar() {
+        for (var vuelta = 0; vuelta < 5; vuelta += 1) {
+          var hubo = false;
+          dependientes.forEach(function (elemento) { if (pintarUno(elemento)) { hubo = true; } });
+          if (!hubo) { break; }
+        }
+      }
+
+      raiz.addEventListener("change", pintar);
+      raiz.addEventListener("input", function (evento) { if (evento.target && evento.target.tagName === "SELECT") { pintar(); } });
+      window.addEventListener("pageshow", pintar);
+      pintar();
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    prepararDependencias();
     prepararImprimir();
     prepararConfirmaciones();
     prepararMenuMas();

@@ -1,6 +1,7 @@
-{% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+{% load formato %}{% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
 {% for campo in formulario.hidden_fields %}{{ campo }}{% endfor %}
-{% for campo in formulario.visible_fields %}{% if not campo.field.avanzado %}{% include "comun/_campo.html" %}{% endif %}{% endfor %}
+{% for campo in formulario.visible_fields %}{% if not campo.field.avanzado and not campo.field.pieza %}{% include "comun/_campo.html" %}{% endif %}{% endfor %}
+{% with piezas=formulario|piezas_de %}{% if piezas %}{% include "caja/_bloque_piezas.html" %}{% endif %}{% endwith %}
 {% if formulario.hay_avanzados %}<details class="mas-opciones" data-abrir-con-error{% if formulario.avanzados_con_error %} open{% endif %}>
   <summary>Más opciones</summary>
   {% if formulario.ayuda_avanzados %}<p class="ayuda">{{ formulario.ayuda_avanzados }}</p>{% endif %}

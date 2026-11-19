@@ -3,12 +3,15 @@ from django import forms
 from cobros.formularios import CampoImportePositivo, maximo_dia
 from cobros.models import ConceptoCobro
 from configuracion.models import vocabulario
+from proyecto.dependencias import ConDependencias, depende
 from titulares.models import Agrupacion
 
 from .models import CANTIDAD_TOPE, TarifaAgrupacion
 
+ETIQUETA_DIA = {"semanal": "1 lunes a 7 domingo", "quincenal": "1 a 15", "": "1 a 28"}
 
-class FormularioOpciones(forms.Form):
+
+class FormularioOpciones(ConDependencias, forms.Form):
     por_cantidad = forms.BooleanField(label="Se cobra por cantidad (al cargarlo se pide cuántos y el importe es cantidad × tarifa)", required=False)
     cantidad_maxima = forms.IntegerField(label="Cantidad máxima en un cargo", min_value=1, max_value=CANTIDAD_TOPE, initial=20)
     solo_con_tarifa = forms.BooleanField(label="", required=False)
@@ -21,6 +24,7 @@ class FormularioOpciones(forms.Form):
         if concepto is not None and concepto.tipo != ConceptoCobro.POR_EVENTO:
             self.fields.pop("por_cantidad")
             self.fields.pop("cantidad_maxima")
+        depende(self, "cantidad_maxima", "por_cantidad")
 
     def clean(self):
         datos = super().clean()
@@ -31,7 +35,7 @@ class FormularioOpciones(forms.Form):
         return datos
 
 
-class FormularioTarifa(forms.Form):
+class FormularioTarifa(ConDependencias, forms.Form):
     agrupacion = forms.ModelChoiceField(label="", queryset=Agrupacion.objects.none())
     importe_centavos = CampoImportePositivo(label="Importe")
     periodicidad = forms.ChoiceField(label="Periodicidad propia (vacío: la del concepto)", required=False)
@@ -55,6 +59,13 @@ class FormularioTarifa(forms.Form):
         else:
             self.fields.pop("periodicidad")
             self.fields["dia_vencimiento"].widget = forms.HiddenInput()
+        if "periodicidad" in self.fields:
+            propia = concepto.periodicidad
+            maximos = {clave: maximo_dia(clave) for clave, _ in ConceptoCobro.PERIODICIDADES}
+            maximos[""] = maximo_dia(propia)
+            etiquetas = {clave: f"Día de vencimiento propio ({ETIQUETA_DIA.get(clave, ETIQUETA_DIA[''])}; vacío: el del concepto)" for clave in maximos}
+            etiquetas[""] = f"Día de vencimiento propio ({ETIQUETA_DIA.get(propia, ETIQUETA_DIA[''])}; vacío: el del concepto)"
+            depende(self, "dia_vencimiento", "periodicidad", etiquetas=etiquetas, maximos=maximos)
 
     def clean(self):
         datos = super().clean()

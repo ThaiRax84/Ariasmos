@@ -1,5 +1,6 @@
-<div class="campo{% if campo.errors %} con-error{% endif %}{% if campo.widget_type == 'checkbox' %} casilla{% elif campo.widget_type == 'radioselect' %} opciones{% if campo.field.en_fila %} en-fila{% endif %}{% endif %}"{% if campo.field.mostrar_si %} data-mostrar-con="{{ campo.field.mostrar_si.0 }}" data-mostrar-valor="{{ campo.field.mostrar_si.1 }}"{% if campo.field.etiqueta_js %} data-etiqueta-js="{{ campo.field.etiqueta_js }}"{% endif %}{% endif %}>
+{% load formato %}<div class="campo{% if campo.errors %} con-error{% endif %}{% if campo.widget_type == 'checkbox' %} casilla{% elif campo.widget_type == 'radioselect' %} opciones{% if campo.field.en_fila %} en-fila{% endif %}{% endif %}"{{ campo.field|dependencia }}>
   {% if campo.widget_type == 'checkbox' %}{{ campo }} {{ campo.label_tag }}{% else %}{{ campo.label_tag }} {{ campo }}{% endif %}
   {% if campo.help_text %}<small>{{ campo.help_text }}</small>{% endif %}
+  {{ campo.field|nota_dependencia }}
   {% for e in campo.errors %}<p class="error">{{ e }}</p>{% endfor %}
 </div>

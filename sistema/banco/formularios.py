@@ -5,7 +5,8 @@ from django.core.validators import validate_email
 from nucleo import clabe as nucleo_clabe
 from configuracion.models import vocabulario
 from proyecto.captura import CampoDigitos
-from proyecto.plegables import ConPlegables, plegar, segun
+from proyecto.dependencias import depende
+from proyecto.plegables import ConPlegables, plegar
 from titulares.contactos import formatear_telefono, normalizar_telefono
 
 from .models import Banco, CuentaBancaria, MedioPago
@@ -28,9 +29,9 @@ class FormularioCuenta(ConPlegables, forms.Form):
     tipo = forms.ChoiceField(label="Cómo se identifica la cuenta", choices=[(CuentaBancaria.CLABE, "CLABE de 18 dígitos (México)"), (CuentaBancaria.OTRA, "Otra cuenta: número y banco escritos")], initial=CuentaBancaria.CLABE, required=False, widget=forms.RadioSelect)
     clabe = CampoDigitos(label="CLABE (18 dígitos)", max_length=30, maximo_tecleo=18, required=False, widget=forms.TextInput(attrs={"autocomplete": "off"}))
     banco = forms.ModelChoiceField(label="Banco", queryset=Banco.objects.none(), required=False, empty_label="Proponer según la CLABE")
-    banco_otro = forms.CharField(label="Otro banco (con otra cuenta, o si el prefijo de la CLABE no está en el catálogo)", max_length=80, required=False)
+    banco_otro = forms.CharField(label="Nombre del banco", max_length=80, required=False, help_text="Con CLABE solo hace falta si su prefijo no está en el catálogo de bancos.")
     beneficiario = forms.CharField(label="Beneficiario (como lo pide el banco)", max_length=150)
-    numero_cuenta = forms.CharField(label="Número de cuenta (obligatorio con otra cuenta)", max_length=34, required=False)
+    numero_cuenta = forms.CharField(label="Número de cuenta", max_length=34, required=False)
     convenio = forms.CharField(label="Convenio de cobranza referenciada (opcional)", max_length=30, required=False)
     medios = forms.ModelMultipleChoiceField(label="Medios aceptados", queryset=MedioPago.objects.none(), required=False, widget=forms.CheckboxSelectMultiple)
     referencia_en = forms.ChoiceField(label="Dónde se escribe el número de pago", choices=CuentaBancaria.REFERENCIA, initial=CuentaBancaria.AMBOS, widget=forms.RadioSelect)
@@ -68,7 +69,10 @@ class FormularioCuenta(ConPlegables, forms.Form):
             del self.fields["principal"]
             del self.fields["activa"]
         self.fields["tipo"].en_fila = True
-        segun(self, "tipo", {"clabe": (CuentaBancaria.CLABE, ""), "banco": (CuentaBancaria.CLABE, "")})
+        depende(self, "clabe", "tipo", [CuentaBancaria.CLABE])
+        depende(self, "banco", "tipo", [CuentaBancaria.CLABE])
+        depende(self, "banco_otro", "tipo", etiquetas={CuentaBancaria.CLABE: "Otro banco", CuentaBancaria.OTRA: "Nombre del banco"})
+        depende(self, "numero_cuenta", "tipo", etiquetas={CuentaBancaria.CLABE: "Número de cuenta (opcional)", CuentaBancaria.OTRA: "Número de cuenta"})
         plegar(self, "convenio", "nota_adicional", "referencia_en")
 
     def clean_numero_cuenta(self):

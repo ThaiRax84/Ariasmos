@@ -156,8 +156,8 @@ def test_cargo_por_cantidad_con_tarifa_se_calcula_en_el_servidor(base):
     extras.importe_centavos = 5000
     extras.save()
     OpcionConcepto.objects.create(concepto=extras, por_cantidad=False)
-    assert "no se cobra por cantidad" in _cargo_manual(base["op"], ana, extras, 2).content.decode()
-    assert _cargo_manual(base["op"], ana, extras, 1).status_code == 302
+    assert _cargo_manual(base["op"], ana, extras, 2).status_code == 302
+    assert Cargo.objects.filter(titular=ana, concepto=extras).get().cantidad == 1
 
 
 def test_concepto_solo_con_tarifa_no_se_carga_sin_tarifa(base):

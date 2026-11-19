@@ -132,6 +132,7 @@ code { font-size: .95em; }
 .boton:active { transform: translateY(1px); filter: brightness(.88); }
 .boton:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
 .boton:disabled, .boton[aria-disabled="true"] { opacity: .5; cursor: not-allowed; filter: none; transform: none; }
+.nota-dependencia { display: block; color: var(--suave); font-size: 13px; }
 .boton.grande { min-height: 54px; padding: 0 28px; font-size: 17px; }
 .boton.ancho { width: 100%; }
 .boton.chico { min-height: 44px; padding: 0 16px; font-size: 14px; }
