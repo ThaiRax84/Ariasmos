@@ -18,7 +18,7 @@
 <script src="{% static 'js/rica.js' %}" defer></script>
 {% block cabeza %}{% endblock %}
 </head>
-<body{% block clase_cuerpo %}{% endblock %} data-simbolo="{{ moneda.simbolo }}"{% if "registrar_pago_efectivo" in permisos %} data-cobrar="{% url 'cobros:buscar' %}"{% endif %}>
+<body{% block clase_cuerpo %}{% endblock %} data-simbolo="{{ moneda.simbolo }}"{% if user.is_authenticated %} data-pulso="{% url 'pulso' %}"{% endif %}{% if "registrar_pago_efectivo" in permisos %} data-cobrar="{% url 'cobros:buscar' %}"{% endif %}>
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <div class="franja"></div>
 {% block barra %}
@@ -44,7 +44,8 @@
   {% endif %}
   <div class="sesion">
     {% if "ver_titulares" in permisos or "registrar_pago_efectivo" in permisos %}<a class="ir-a" href="{% if "ver_titulares" in permisos %}{% url 'titulares:lista' %}{% else %}{% url 'cobros:buscar' %}{% endif %}" data-paleta="{% url 'ir' %}" aria-keyshortcuts="Control+K"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Buscar o ir a…</span><kbd class="solo-con-js" hidden>Ctrl K</kbd></a>{% else %}<button class="ir-a solo-con-js" type="button" data-paleta="{% url 'ir' %}" aria-keyshortcuts="Control+K" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Ir a…</span><kbd>Ctrl K</kbd></button>{% endif %}
-    <span class="quien"><span>{{ user.nombre }}{% if user.rol %} · {{ user.rol }}{% endif %}{% if turno_sesion %} · {{ turno_sesion.caja }} · Turno abierto {{ turno_sesion.abierto_en|time:"H:i" }}{% endif %}</span></span>
+    {% if "ver_titulares" in permisos or "registrar_pago_efectivo" in permisos %}<div class="campana-caja solo-con-js" hidden><button class="campana" type="button" aria-label="Lo último que entró" aria-expanded="false" aria-controls="campana-panel" data-campana="{% url 'ultimo' %}"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 16V11a6 6 0 1112 0v5l2 2H4l2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 20a2 2 0 004 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="globo" id="globo" hidden>0</span></button><div class="campana-panel" id="campana-panel" hidden><h3>Lo último que entró</h3><div id="campana-lista"></div><a class="enlace" href="{% url 'ultimo' %}">Ver más</a></div></div>{% endif %}
+    <span class="quien"><span class="punto-vivo solo-con-js" title="Conectado en vivo" hidden></span><span>{{ user.nombre }}{% if user.rol %} · {{ user.rol }}{% endif %}{% if turno_sesion %} · {{ turno_sesion.caja }} · Turno abierto {{ turno_sesion.abierto_en|time:"H:i" }}{% endif %}</span></span>
     <a href="{% url 'contrasena' %}">Contraseña</a>
     <form method="post" action="{% url 'salir' %}">{% csrf_token %}<button class="enlace" type="submit">Salir</button></form>
   </div>

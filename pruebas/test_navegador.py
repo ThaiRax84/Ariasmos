@@ -133,3 +133,44 @@ def test_buscar_o_ir_a_con_ctrl_k_abre_el_cobro_y_los_trucos_con_signo(sesion_na
     pagina.wait_for_selector("#atajos[open]")
     pagina.locator("#atajos [data-cerrar-dialogo]").click()
     sin_errores(sesion_navegador)
+
+
+def test_la_transferencia_que_llega_se_ve_sola_en_el_panel_y_en_la_lista(sesion_navegador, settings):
+    from banco import llegadas
+    from banco.llegadas import Aviso
+    from banco.models import TopeDiarioBanco
+    from configuracion.models import Parametro
+
+    from . import origen_pruebas
+    from .banco_ayudas import cuenta_principal
+
+    datos = preparar()
+    ana, beto = datos["titulares"][0], datos["titulares"][1]
+    settings.ORIGENES_TRANSFERENCIA = ["pruebas.origen_pruebas.OrigenDePruebas"]
+    cuenta_principal()
+    for dia in range(7):
+        TopeDiarioBanco.objects.update_or_create(dia=dia, defaults={"importe": 10 ** 9})
+    Parametro.objects.update_or_create(clave="tope_aplicado_sin_respaldo", defaults={"valor": str(10 ** 9)})
+    pagina = sesion_navegador.pagina(datos["op"])
+    sesion_navegador.ir(pagina, reverse("cobros:buscar"))
+    pagina.locator(f".renglon-titular[data-id='{ana.pk}']").click()
+    pagina.wait_for_selector("#panel-cobro [data-cobro-efectivo]")
+    pagina.locator("[data-metodos] button[data-metodo='transferencia']").click()
+    pagina.wait_for_selector("[data-espera-transferencia]", state="visible")
+    pagina.wait_for_timeout(400)
+    sesion_navegador.captura(pagina, "cobrar-transferencia")
+    origen_pruebas.PENDIENTES.append(Aviso(folio="N-1", fecha=hoy_negocio(), importe=185000, referencia=ana.referencia_bancaria))
+    llegadas.consultar_todos()
+    pagina.wait_for_selector("#panel-cobro [data-exito]", timeout=20000)
+    assert "Transferencia recibida y aplicada" in pagina.locator("#panel-cobro [data-exito]").inner_text()
+    pagina.wait_for_selector("#globo:not([hidden])")
+    pagina.wait_for_selector(".aviso-breve .accion-aviso")
+    sesion_navegador.captura(pagina, "cobrar-transferencia-llego")
+    pagina.locator("[data-accion='siguiente']").click()
+    origen_pruebas.PENDIENTES.append(Aviso(folio="N-2", fecha=hoy_negocio(), importe=185000, referencia=beto.referencia_bancaria))
+    llegadas.consultar_todos()
+    espera(pagina.locator(f".renglon-titular[data-id='{beto.pk}'] .adeudo")).to_have_text("Al corriente", timeout=20000)
+    pagina.locator("[data-campana]").click()
+    pagina.wait_for_selector("#campana-panel li[data-id]")
+    sesion_navegador.captura(pagina, "campana")
+    sin_errores(sesion_navegador)

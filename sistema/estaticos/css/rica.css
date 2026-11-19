@@ -338,3 +338,6 @@ a.ir-a { text-decoration: none; }
 a.paleta-item { text-decoration: none; }
 .paleta .vacio { padding: 18px 20px; margin: 0; }
 .sesion { gap: 10px 14px; }
+.clabe code, .clabe .ayuda { display: block; }
+.clabe .ayuda { margin-top: 4px; }
+.espera .ayuda { display: block; }

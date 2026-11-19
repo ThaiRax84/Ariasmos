@@ -634,6 +634,9 @@ def aplicar(movimiento, titular, usuario, request=None):
         hechos = MovimientoBancario.objects.filter(pk=fresco.pk, pago__isnull=True).update(estado=MovimientoBancario.APLICADO, pago=pago, resuelto_por=usuario, resuelto_en=timezone.now())
         if hechos != 1:
             raise ErrorConciliacion("El movimiento ya está resuelto.")
+        from . import llegadas
+
+        llegadas.transferencia_aplicada(pago)
         if fresco.retencion and fresco.liberado_en is None and usuario is not None:
             MovimientoBancario.objects.filter(pk=fresco.pk, liberado_en__isnull=True).update(liberado_por=usuario, liberado_en=timezone.now())
     return pago
@@ -726,7 +729,7 @@ def importar(cuenta, movimientos, adaptador, nombre, sha256, usuario, resumen=No
         raise ErrorConciliacion("Una importación manual necesita a la persona que la hace.")
     with transaction.atomic():
         clasificacion = continuidad(cuenta, adaptador, resumen)
-        vigilado = origen == Importacion.CARPETA and adaptador == Importacion.ARCHIVO
+        vigilado = origen in (Importacion.CARPETA, Importacion.AVISO) and adaptador == Importacion.ARCHIVO
         pdf_sin_cadena = origen == Importacion.CARPETA and adaptador == Importacion.ESTADO_PDF and clasificacion != Importacion.VERIFICADA
         importacion = Importacion.objects.create(
             continuidad=clasificacion, origen=origen, retenida=pdf_sin_cadena,

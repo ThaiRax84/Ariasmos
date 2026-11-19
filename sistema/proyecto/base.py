@@ -130,3 +130,4 @@ def base_de_datos(ruta):
     }
 
 FORM_RENDERER = "proyecto.captura.Renderizador"
+ORIGENES_TRANSFERENCIA = ()

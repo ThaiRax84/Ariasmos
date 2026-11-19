@@ -161,3 +161,157 @@ def test_ir_tiene_tope_y_limite_de_frecuencia_y_no_guarda_lo_buscado(personas, p
     codigos = [c.get(reverse("ir"), {"q": "x"}).status_code for _ in range(130)]
     assert 429 in codigos
     assert c.get(reverse("ir"), {"q": "y" * 500}).status_code in (200, 429)
+
+
+def test_pulso_solo_da_contadores_y_sube_en_la_misma_transaccion(personas, padron, turno):
+    from django.db import transaction
+
+    from vivo import pulso
+
+    c = cliente(personas["op"])
+    antes = c.get(reverse("pulso")).json()["t"]
+    assert set(antes) == {"cobros", "transferencias", "titulares", "solicitudes", "caja", "banco", "inventario"}
+    assert all(isinstance(v, int) for v in antes.values())
+    try:
+        with transaction.atomic():
+            libro.registrar_pago(padron["ana"], 1000, Pago.EFECTIVO, personas["op"], turno=turno, piezas={"recibidas": {"1000": 1}, "cambio": {}})
+            assert pulso.valores()["cobros"] > antes["cobros"]
+            raise RuntimeError
+    except RuntimeError:
+        pass
+    assert pulso.valores()["cobros"] == antes["cobros"]
+    libro.registrar_pago(padron["ana"], 1000, Pago.EFECTIVO, personas["op"], turno=turno, piezas={"recibidas": {"1000": 1}, "cambio": {}})
+    despues = c.get(reverse("pulso")).json()["t"]
+    assert despues["cobros"] > antes["cobros"]
+    assert b"Ana" not in c.get(reverse("pulso")).content
+
+
+def test_pulso_pide_sesion_y_equipo_y_tiene_limite(personas):
+    from cuentas.models import Dispositivo
+
+    from .conftest import equipo_aprobado
+
+    cache.clear()
+    assert cliente().get(reverse("pulso")).status_code == 302
+    credencial = equipo_aprobado()
+    c = cliente(personas["op"], credencial=credencial)
+    codigos = [c.get(reverse("pulso")).status_code for _ in range(45)]
+    assert codigos[0] == 200 and 429 in codigos
+    Dispositivo.objects.update(estado=Dispositivo.PENDIENTE)
+    assert c.get(reverse("pulso")).status_code in (302, 403)
+
+
+def test_pulso_y_las_recargas_en_vivo_no_cuentan_como_actividad(personas):
+    import time
+
+    c = cliente(personas["op"])
+    c.get(reverse("inicio"))
+    sesion = c.session
+    sesion["ultima_actividad"] = time.time() - 60
+    sesion.save()
+    marca = c.session["ultima_actividad"]
+    c.get(reverse("pulso"))
+    c.get(reverse("inicio"), HTTP_X_ARIASMOS_VIVO="1")
+    assert c.session["ultima_actividad"] == marca
+    c.get(reverse("inicio"))
+    assert c.session["ultima_actividad"] > marca
+
+
+def test_lo_ultimo_que_entro_respeta_permisos_e_importes(personas, padron, turno):
+    _panel(cliente(personas["op"]), padron["ana"], importe="1200", r_100000="1", r_10000="2")
+    con = cliente(personas["sup"]).get(reverse("ultimo")).content.decode()
+    assert "Ana Zamora" in con and "$1,200.00" in con
+    PermisoRol.objects.filter(rol=personas["op"].rol, permiso="ver_titulares").delete()
+    propio = cliente(personas["op"]).get(reverse("ultimo")).content.decode()
+    assert "Ana Zamora" in propio
+    nadie = cliente(personas["op2"]).get(reverse("ultimo")).content.decode()
+    assert "Ana Zamora" not in nadie and "1,200" not in nadie
+
+
+@pytest.fixture
+def con_origen(settings):
+    from banco.models import TopeDiarioBanco
+
+    from . import origen_pruebas
+    from .banco_ayudas import cuenta_principal
+
+    settings.ORIGENES_TRANSFERENCIA = ["pruebas.origen_pruebas.OrigenDePruebas"]
+    cuenta_principal()
+    for dia in range(7):
+        TopeDiarioBanco.objects.update_or_create(dia=dia, defaults={"importe": 10 ** 9})
+    Parametro.objects.update_or_create(clave="tope_aplicado_sin_respaldo", defaults={"valor": str(10 ** 9)})
+    origen_pruebas.PENDIENTES.clear()
+    return origen_pruebas.PENDIENTES
+
+
+def _aviso(titular, folio, importe=120000):
+    from banco.llegadas import Aviso
+    from configuracion.models import hoy_negocio
+
+    return Aviso(folio=folio, fecha=hoy_negocio(), importe=importe, referencia=titular.referencia_bancaria, concepto="PAGO")
+
+
+def test_la_puerta_de_llegada_aplica_con_las_reglas_del_banco_y_avisa(personas, padron, con_origen):
+    from banco import llegadas
+    from banco.models import Importacion, MovimientoBancario
+    from vivo import pulso
+
+    antes = pulso.valores()["transferencias"]
+    c = cliente(personas["op"])
+    espera = c.get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1", "metodo": "transferencia", "desde": "0"}).content.decode()
+    assert "Esperando la transferencia" in espera and "data-exito" not in espera
+    con_origen.append(_aviso(padron["ana"], "F-1"))
+    llegadas.consultar_todos()
+    pago = Pago.objects.get(medio=Pago.BANCO)
+    assert pago.titular_id == padron["ana"].pk and pago.importe == 120000
+    assert Importacion.objects.get().origen == Importacion.AVISO
+    assert pulso.valores()["transferencias"] == antes + 1
+    assert Evento.objects.filter(accion="importacion_bancaria").exists()
+    hecho = c.get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1", "metodo": "transferencia", "desde": "0"})
+    assert hecho.status_code == 200 and "Transferencia recibida y aplicada" in hecho.content.decode()
+    con_origen.append(_aviso(padron["ana"], "F-1"))
+    llegadas.consultar_todos()
+    assert Pago.objects.filter(medio=Pago.BANCO).count() == 1
+
+
+def test_la_puerta_de_llegada_respeta_topes_y_retenciones(personas, padron, con_origen):
+    from banco import llegadas
+    from banco.models import MovimientoBancario, TopeDiarioBanco
+
+    Parametro.objects.update_or_create(clave="tope_aplicado_sin_respaldo", defaults={"valor": "1000"})
+    con_origen.append(_aviso(padron["ana"], "F-0"))
+    llegadas.consultar_todos()
+    assert "tope_exposicion" in MovimientoBancario.objects.get(folio="F-0").retencion
+    Parametro.objects.update_or_create(clave="tope_aplicado_sin_respaldo", defaults={"valor": str(10 ** 9)})
+    TopeDiarioBanco.objects.update(importe=1000)
+    con_origen.append(_aviso(padron["ana"], "F-2"))
+    llegadas.consultar_todos()
+    assert not Pago.objects.filter(medio=Pago.BANCO).exists()
+    assert "tope_dia" in MovimientoBancario.objects.get(folio="F-2").retencion
+    con_origen.append(_aviso(padron["beto"], "F-3", importe=5000))
+    TopeDiarioBanco.objects.update(importe=10 ** 9)
+    llegadas.consultar_todos()
+    assert not Pago.objects.filter(medio=Pago.BANCO, titular=padron["beto"]).exists()
+    assert "excede_adeudo" in MovimientoBancario.objects.get(folio="F-3").retencion
+
+
+def test_la_puerta_de_llegada_rechaza_avisos_mal_formados(personas, padron, con_origen):
+    from banco import llegadas
+    from banco.llegadas import Aviso, ErrorLlegada
+    from configuracion.models import hoy_negocio
+
+    con_origen.append(Aviso(folio="", fecha=hoy_negocio(), importe=100))
+    with pytest.raises(ErrorLlegada):
+        llegadas.consultar_todos()
+    con_origen.clear()
+    con_origen.append(Aviso(folio="Z", fecha=hoy_negocio(), importe=-5))
+    with pytest.raises(ErrorLlegada):
+        llegadas.consultar_todos()
+    assert not Pago.objects.filter(medio=Pago.BANCO).exists()
+
+
+def test_sin_cuenta_del_negocio_el_panel_lo_dice_en_palabras_llanas(personas, padron, turno):
+    texto = cliente(personas["op"]).get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1"}).content.decode()
+    assert "Todavía no hay una cuenta del negocio para recibir transferencias" in texto
+    assert reverse("banco:nueva") not in texto
+    assert reverse("banco:nueva") in cliente(personas["dir"]).get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1"}).content.decode()

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% load formato %}
+{% block contenido %}
+<section class="panel">
+  <h1 class="titulo-vivo"><span class="punto-vivo" aria-hidden="true"></span>Lo último que entró</h1>
+  {% include "vivo/_ultimo.html" %}
+</section>
+{% endblock %}

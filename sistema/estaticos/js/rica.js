@@ -271,6 +271,20 @@
     if (A.alCerrarPanel) { A.alCerrarPanel(); }
     return true;
   }
+  A.panelConFormulario = function () {
+    var c = cajaPanel();
+    return !!c && $$("[data-panel-formulario]", c).some(function (f) { var cuerpo = f.closest("[data-metodo-cuerpo]"); return !cuerpo || !cuerpo.hidden; });
+  };
+  A.cajaPanelContiene = function (nodo) { var c = cajaPanel(); return !!(c && c.contains(nodo)); };
+  A.alPulso = function (cambiados) {
+    var caja = cajaPanel();
+    if (!caja || !A.panelAbierto()) { return; }
+    var espera = $("[data-espera-transferencia]", caja);
+    var cuerpo = espera && espera.closest("[data-metodo-cuerpo]");
+    if (!espera || (cuerpo && cuerpo.hidden)) { return; }
+    if (cambiados.indexOf("transferencias") === -1 && cambiados.indexOf("cobros") === -1) { return; }
+    pedirPanel(espera.getAttribute("data-direccion"), { conservarMetodo: true });
+  };
   A.panelAbierto = function () { var malla = rejilla(); return !!(malla && malla.classList.contains("abierta")); };
 
   function moverPastilla(grupo) {
@@ -676,5 +690,186 @@
       var renglon = $("[data-cobro-rejilla] .renglon-titular[data-id='" + abrirId + "'][data-abre-panel]");
       if (renglon) { renglon.click(); } else if ($("[data-cobro-rejilla]")) { A.pedirPanel(window.location.pathname + abrirId + "/?panel=1", { enfocar: true }); }
     }
+  });
+}());
+
+(function () {
+  "use strict";
+
+  var A = window.Ariasmos;
+  var $ = A.$;
+  var $$ = A.$$;
+  var INTERVALO = 5000;
+  var vivo = { valores: null, reloj: null, espera: INTERVALO, avisoPendiente: null, nuevos: 0, pidiendo: false };
+
+  function temasDePagina() {
+    var temas = {};
+    $$("[data-vivo][id]").forEach(function (region) {
+      (region.getAttribute("data-vivo") || "").split(/\s+/).forEach(function (t) { if (t) { temas[t] = true; } });
+    });
+    return temas;
+  }
+
+  function regionTocada() {
+    if ($("[data-vivo-pausa]")) { return true; }
+    if (A.panelAbierto && A.panelAbierto() && A.panelConFormulario()) { return true; }
+    var activo = document.activeElement;
+    if (activo && activo.closest && activo.closest("[data-vivo][id] form") && activo.matches("input, textarea, select")) { return true; }
+    return $$("[data-vivo][id] form").some(function (formulario) { return formulario.dataset.tocado === "1"; });
+  }
+
+  function avisarCambios() {
+    if (vivo.avisoPendiente) { return; }
+    vivo.avisoPendiente = A.aviso("Hay cambios", {
+      accion: "Actualizar",
+      ms: 120000,
+      vivo: true,
+      alAccionar: function () { actualizarPagina(true); },
+      alTerminar: function () { vivo.avisoPendiente = null; }
+    });
+  }
+
+  function pedirHtml(direccion) {
+    return window.fetch(direccion, { credentials: "same-origin", headers: { "X-Requested-With": "fetch", "X-Ariasmos-Vivo": "1" } })
+      .then(function (r) {
+        if (r.redirected && new URL(r.url).pathname !== new URL(direccion, window.location.href).pathname) { return null; }
+        return r.ok ? r.text() : null;
+      })
+      .then(function (texto) { return texto === null ? null : new DOMParser().parseFromString(texto, "text/html"); });
+  }
+
+  function actualizarPagina(forzar) {
+    if (!forzar && regionTocada()) { avisarCambios(); return; }
+    pedirHtml(window.location.href).then(function (documento) {
+      if (!documento) { return; }
+      $$("[data-vivo][id]").forEach(function (region) {
+        if (A.cajaPanelContiene && A.cajaPanelContiene(region)) { return; }
+        var nueva = documento.getElementById(region.id);
+        if (nueva) { A.sustituir(region, nueva, { destello: true }); }
+      });
+      document.dispatchEvent(new CustomEvent("ariasmos:vivo"));
+    }).catch(function () { return null; });
+  }
+
+  function globo(salta) {
+    var g = $("#globo");
+    if (!g) { return; }
+    g.hidden = !vivo.nuevos;
+    g.textContent = String(vivo.nuevos);
+    if (salta) {
+      A.reiniciar(g, "salta");
+      var c = $(".campana");
+      if (c) { A.reiniciar(c, "suena"); }
+    }
+  }
+
+  function pintarCampana() {
+    var boton = $("[data-campana]");
+    var lista = $("#campana-lista");
+    if (!boton || !lista) { return Promise.resolve(null); }
+    return pedirHtml(boton.getAttribute("data-campana")).then(function (documento) {
+      var region = documento && documento.getElementById("ultimo-region");
+      if (!region) { return null; }
+      var antes = new Map($$("li[data-id]", lista).map(function (li) { return [li.getAttribute("data-id"), true]; }));
+      lista.replaceChildren.apply(lista, A.importar(region.childNodes));
+      if (antes.size) { $$("li[data-id]", lista).forEach(function (li) { if (!antes.has(li.getAttribute("data-id"))) { li.classList.add("entra"); } }); }
+      return lista;
+    });
+  }
+
+  function alCambiarCobros(transferencia) {
+    vivo.nuevos += 1;
+    globo(true);
+    var panel = $("#campana-panel");
+    var abierto = panel && !panel.hidden;
+    if (abierto || transferencia) {
+      pintarCampana().then(function (lista) {
+        if (!lista || !transferencia) { return; }
+        var llegada = $("li[data-medio='banco']", lista);
+        if (!llegada) { return; }
+        var ver = llegada.getAttribute("data-ver");
+        A.aviso(llegada.getAttribute("data-aviso"), ver ? { vivo: true, accion: "Ver", ms: 6500, alAccionar: function () { window.location.assign(ver); } } : { vivo: true, ms: 6500 });
+      });
+    }
+  }
+
+  function comparar(nuevos) {
+    var previos = vivo.valores;
+    vivo.valores = nuevos;
+    if (!previos) { return; }
+    var cambiados = Object.keys(nuevos).filter(function (t) { return previos[t] !== nuevos[t]; });
+    if (!cambiados.length) { return; }
+    var transferencia = cambiados.indexOf("transferencias") !== -1;
+    if (cambiados.indexOf("cobros") !== -1 || transferencia) { alCambiarCobros(transferencia); }
+    if (A.alPulso) { A.alPulso(cambiados); }
+    var temas = temasDePagina();
+    if (cambiados.some(function (t) { return temas[t]; })) { actualizarPagina(false); }
+  }
+
+  function consultar() {
+    var direccion = document.body.getAttribute("data-pulso");
+    if (!direccion || document.hidden || vivo.pidiendo) { programar(); return; }
+    vivo.pidiendo = true;
+    window.fetch(direccion, { credentials: "same-origin", headers: { "Accept": "application/json", "X-Requested-With": "fetch" } })
+      .then(function (r) {
+        if (r.redirected) { window.location.reload(); return null; }
+        if (r.status === 429) { vivo.espera = Math.min(vivo.espera * 2, 60000); return null; }
+        vivo.espera = INTERVALO;
+        return r.ok ? r.json() : null;
+      })
+      .then(function (datos) { if (datos && datos.t) { comparar(datos.t); } })
+      .catch(function () { vivo.espera = Math.min(vivo.espera * 2, 60000); })
+      .then(function () { vivo.pidiendo = false; programar(); });
+  }
+
+  function programar() {
+    window.clearTimeout(vivo.reloj);
+    vivo.reloj = window.setTimeout(consultar, vivo.espera);
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) { window.clearTimeout(vivo.reloj); consultar(); }
+  });
+
+  document.addEventListener("input", function (evento) {
+    var formulario = evento.target.closest && evento.target.closest("[data-vivo][id] form");
+    if (formulario && !formulario.matches("[data-filtro-vivo]")) { formulario.dataset.tocado = "1"; }
+  });
+
+  document.addEventListener("click", function (evento) {
+    var boton = evento.target.closest && evento.target.closest("[data-campana]");
+    var panel = $("#campana-panel");
+    if (boton && panel) {
+      panel.hidden = !panel.hidden;
+      boton.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+      if (!panel.hidden) { pintarCampana(); vivo.nuevos = 0; globo(false); }
+      return;
+    }
+    if (panel && !panel.hidden && !(evento.target.closest && evento.target.closest(".campana-caja"))) {
+      panel.hidden = true;
+      var c = $("[data-campana]");
+      if (c) { c.setAttribute("aria-expanded", "false"); }
+    }
+  });
+
+  document.addEventListener("keydown", function (evento) {
+    var panel = $("#campana-panel");
+    if (evento.key === "Escape" && panel && !panel.hidden) {
+      panel.hidden = true;
+      var c = $("[data-campana]");
+      if (c) { c.setAttribute("aria-expanded", "false"); c.focus(); }
+    }
+  });
+
+  A.alCerrarPanel = function () {
+    if (vivo.avisoPendiente) {
+      vivo.avisoPendiente.cerrar("panel");
+      actualizarPagina(true);
+    }
+  };
+  A.vivo = vivo;
+  A.consultarPulso = consultar;
+  A.alIniciar.push(function () {
+    if (document.body.getAttribute("data-pulso") && window.fetch) { consultar(); }
   });
 }());
