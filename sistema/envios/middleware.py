@@ -1,5 +1,6 @@
 import re
 import secrets
+import threading
 import time
 from datetime import timedelta
 
@@ -19,6 +20,27 @@ REDIRECCIONES = (301, 302, 303, 307, 308)
 MENSAJE = "Esa operación ya se había enviado; no se repitió."
 ESPERA_MAXIMA = 30
 PAUSA = 0.05
+ESPERAS_POR_FICHA = 1
+ESPERAS_TOTALES = 3
+_candado = threading.Lock()
+_esperando = {}
+
+
+def _entrar(valor):
+    with _candado:
+        if _esperando.get(valor, 0) >= ESPERAS_POR_FICHA or sum(_esperando.values()) >= ESPERAS_TOTALES:
+            return False
+        _esperando[valor] = _esperando.get(valor, 0) + 1
+        return True
+
+
+def _salir(valor):
+    with _candado:
+        resto = _esperando.get(valor, 0) - 1
+        if resto > 0:
+            _esperando[valor] = resto
+        else:
+            _esperando.pop(valor, None)
 
 
 def nueva_ficha():
@@ -48,24 +70,34 @@ class FichaDeEnvio:
         if not PATRON.match(valor):
             return None
         limite = time.monotonic() + ESPERA_MAXIMA
-        while True:
-            reservada = self._reservar(valor, request.path)
-            if reservada:
-                request.ficha_envio = valor
-                return None
-            if reservada is None:
-                if time.monotonic() >= limite:
+        espera = False
+        try:
+            while True:
+                reservada = self._reservar(valor, request.path)
+                if reservada:
+                    request.ficha_envio = valor
                     return None
-                time.sleep(PAUSA)
-                continue
-            previo = EnvioUsado.objects.filter(ficha=valor).values_list("destino", flat=True).first()
-            if previo:
-                return self._repetido(request, previo)
-            if previo is None:
-                continue
-            if time.monotonic() >= limite:
-                return self._repetido(request, "")
-            time.sleep(PAUSA)
+                if reservada is None:
+                    if time.monotonic() >= limite:
+                        return None
+                    time.sleep(PAUSA)
+                    continue
+                while True:
+                    previo = EnvioUsado.objects.filter(ficha=valor).values_list("destino", flat=True).first()
+                    if previo:
+                        return self._repetido(request, previo)
+                    if previo is None:
+                        break
+                    if not espera:
+                        espera = _entrar(valor)
+                        if not espera:
+                            return self._repetido(request, "")
+                    if time.monotonic() >= limite:
+                        return self._repetido(request, "")
+                    time.sleep(PAUSA)
+        finally:
+            if espera:
+                _salir(valor)
 
     def _reservar(self, valor, ruta):
         try:
