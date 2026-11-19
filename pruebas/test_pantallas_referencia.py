@@ -23,7 +23,7 @@ from proyecto import tablero
 from solicitudes import motor
 
 from .conftest import cliente, nuevo_usuario
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de
+from .libro_ayudas import piezas_de, preparar_conceptos, titular_activo, turno_de
 
 CSS_EN_LINEA = re.compile(r"<style|\sstyle=|\son[a-z]+=|<script(?![^>]*\ssrc=)", re.I)
 
@@ -102,7 +102,7 @@ def test_venta_publico_con_el_mismo_catalogo(tienda):
     previa = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "3", f"cantidad_{libro_a.pk}": "0"})
     texto = previa.content.decode()
     assert previa.context["total"] == 15000 and f'name="cantidad_{cuaderno.pk}" value="3"' in texto and f'name="cantidad_{libro_a.pk}"' not in texto
-    respuesta = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "3", "paso": "confirmar", "ficha": previa.context["ficha"]})
+    respuesta = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "3", "paso": "confirmar", "ficha": previa.context["ficha"], "r_10000": "1", "r_5000": "1"})
     venta = Venta.objects.get()
     assert venta.pago.importe == 15000 and venta.pago.turno == turno and respuesta.url == reverse("cobros:recibo", args=[venta.pago.recibo.pk])
     ajeno = c.post(reverse("inventario:vender_publico"), {f"cantidad_{viejo.pk}": "1", "paso": "confirmar", "ficha": "f" * 30})
@@ -158,7 +158,7 @@ def test_custodia_agregada_coincide_con_el_servicio(movimientos):
     fijar("maximo_retiros_periodo", 50)
     turno = turno_de(personas["op"])
     libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=turno)
-    assert retiros.registrar_retiro(personas["op"], 3000, MotivoRetiro.objects.first()).retiro is not None
+    assert retiros.registrar_retiro(personas["op"], 3000, MotivoRetiro.objects.first(), piezas=piezas_de(3000)).retiro is not None
     turno_sup = turno_de(personas["sup"], "Caja 2")
     libro.registrar_pago(beto, 50000, Pago.EFECTIVO, personas["sup"], turno=turno_sup)
     agregadas = tablero.custodias()
@@ -176,9 +176,9 @@ def test_retiros_de_la_semana(movimientos):
     turno = turno_de(personas["op"])
     libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=turno)
     motivo = MotivoRetiro.objects.first()
-    retiros.registrar_retiro(personas["op"], 1000, motivo)
-    retiros.registrar_retiro(personas["op"], 2500, motivo)
-    viejo = retiros.registrar_retiro(personas["op"], 7000, motivo).retiro
+    retiros.registrar_retiro(personas["op"], 1000, motivo, piezas=piezas_de(1000))
+    retiros.registrar_retiro(personas["op"], 2500, motivo, piezas=piezas_de(2500))
+    viejo = retiros.registrar_retiro(personas["op"], 7000, motivo, piezas=piezas_de(7000)).retiro
     QuerySet.update(RetiroCaja.objects.filter(pk=viejo.pk), creado=retiros.periodo(None, "semana")[0] - timedelta(minutes=1))
     assert tablero.retiros_semana() == {"total": 3500, "cantidad": 2, "sin_comprobante": 2}
 
@@ -333,7 +333,7 @@ def test_ningun_aviso_que_existia_se_pierde(todos_los_avisos):
     pagina = respuesta.content.decode()
     assert respuesta.status_code == 200 and not CSS_EN_LINEA.search(pagina)
     assert ORIGINALES <= set(re.findall(r'data-aviso="([a-z_]+)"', pagina))
-    for texto in ("La bitácora no está íntegra", "Diferencia de arqueo", "Recibo A-1 cancelado", "ya usó", "declarado sin comprobante", "retenidas", "Pagos sin respaldo en el estado", "Pagos sin un estado que los respalde", "Importaciones bancarias por revisar", "existencia baja, quedan 2 de 10", "espera aprobación", "Corte diario pendiente", "Guarda la clave de recuperación", "No hay carpeta de respaldo", "entrega de cortes con problemas", "Corte mayor de", "Faltan las denominaciones de caja", "Faltan los datos de pago", "Avisos sobre tu código de autorización", "El certificado del servidor vence pronto", "por identificar"):
+    for texto in ("La bitácora no está íntegra", "Diferencia de arqueo", "Recibo A-1 cancelado", "ya usó", "declarado sin comprobante", "retenidas", "Pagos sin respaldo en el estado", "Pagos sin un estado que los respalde", "Importaciones bancarias por revisar", "existencia baja, quedan 2 de 10", "espera aprobación", "Corte diario pendiente", "Guarda la clave de recuperación", "No hay carpeta de respaldo", "entrega de cortes con problemas", "Corte mayor de", "Faltan los billetes y monedas de la caja", "Faltan los datos de pago", "Avisos sobre tu código de autorización", "El certificado del servidor vence pronto", "por identificar"):
         assert texto in pagina, texto
 
 

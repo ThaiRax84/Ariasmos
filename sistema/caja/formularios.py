@@ -4,6 +4,8 @@ from banco.models import CuentaBancaria
 from cobros.formularios import CampoImporte, CampoImportePositivo
 from cuentas.models import Usuario
 
+from proyecto.dependencias import ConDependencias, depende
+
 from . import piezas as control_piezas
 from .comprobantes import LIMITE as LIMITE_COMPROBANTE
 from .models import Caja, Denominacion, MotivoRetiro, RetiroCaja, Turno
@@ -13,6 +15,8 @@ class ConPiezas:
     prefijo = "p_"
     etiqueta = "Piezas de"
     piezas_requeridas = False
+    titulo_piezas = "Billetes y monedas"
+    ayuda_piezas = ""
 
     def agregar_piezas(self):
         self.nombres_piezas = control_piezas.campos(self, self.prefijo, self.etiqueta) if control_piezas.activo() else []
@@ -26,7 +30,7 @@ class ConPiezas:
         return [self[nombre] for nombre, _ in self.nombres_piezas]
 
 
-class FormularioAbrir(ConPiezas, forms.Form):
+class FormularioAbrir(ConPiezas, ConDependencias, forms.Form):
     CERO = "cero"
     EFECTIVO = "efectivo"
     prefijo = "f_"
@@ -45,6 +49,8 @@ class FormularioAbrir(ConPiezas, forms.Form):
         self.agregar_piezas()
         if self.nombres_piezas:
             del self.fields["fondo_inicial"]
+        for nombre in [n for n, _ in self.nombres_piezas] + ["fondo_inicial"]:
+            depende(self, nombre, "apertura", [self.EFECTIVO])
 
     def clean(self):
         datos = super().clean()
@@ -99,6 +105,8 @@ class FormularioCerrarConPrimero(forms.Form):
 
 
 class FormularioEntrega(ConPiezas, forms.Form):
+    titulo_piezas = "Billetes y monedas que entregas"
+    ayuda_piezas = "deben sumar el importe"
     destino = forms.ModelChoiceField(label="Entregar a", queryset=Usuario.objects.none())
     importe = CampoImportePositivo(label="Importe")
     nota = forms.CharField(label="Nota", max_length=300, required=False)
@@ -111,6 +119,8 @@ class FormularioEntrega(ConPiezas, forms.Form):
 
 
 class FormularioDeposito(ConPiezas, forms.Form):
+    titulo_piezas = "Billetes y monedas que depositas"
+    ayuda_piezas = "deben sumar el importe depositado"
     cuenta = forms.ModelChoiceField(label="Cuenta bancaria", queryset=CuentaBancaria.objects.filter(activa=True))
     importe = CampoImportePositivo(label="Importe depositado")
     fecha = forms.DateField(label="Fecha del depósito", widget=forms.DateInput(attrs={"type": "date"}))
@@ -149,13 +159,19 @@ class FormularioSinComprobante(forms.Form):
     motivo = forms.CharField(label="Por qué no hay comprobante", max_length=300)
 
 
-class FormularioRevision(forms.Form):
+class FormularioRevision(ConDependencias, forms.Form):
     resultado = forms.ChoiceField(label="Resultado", choices=[(RetiroCaja.REVISADO, "Revisado"), (RetiroCaja.OBSERVADO, "Observado")])
-    nota = forms.CharField(label="Nota (obligatoria si queda observado)", max_length=300, required=False)
+    nota = forms.CharField(label="Nota", max_length=300, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        depende(self, "nota", "resultado", etiquetas={RetiroCaja.REVISADO: "Nota (opcional)", RetiroCaja.OBSERVADO: "Qué se observó (obligatorio)"})
 
 
 class FormularioRevertirRetiro(ConPiezas, forms.Form):
     etiqueta = "Piezas que regresan:"
+    titulo_piezas = "Billetes y monedas que regresan a la caja"
+    ayuda_piezas = "deben sumar el importe del retiro"
     motivo = forms.CharField(label="Motivo de la reversión", max_length=300)
 
     def __init__(self, *args, **kwargs):
@@ -169,8 +185,24 @@ class FormularioMotivoRetiro(forms.ModelForm):
         fields = ["nombre", "activo"]
 
 
-class FormularioConfirmar(forms.Form):
+class FormularioConfirmar(ConPiezas, forms.Form):
+    titulo_piezas = "Billetes y monedas que recibiste"
+    ayuda_piezas = "cuéntalos al recibirlos"
     importe = CampoImportePositivo(label="Importe que recibiste")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.agregar_piezas()
+        if self.nombres_piezas:
+            del self.fields["importe"]
+
+    def clean(self):
+        datos = super().clean()
+        if self.nombres_piezas and not self.errors:
+            datos["importe"] = control_piezas.total(self.piezas())
+            if datos["importe"] <= 0:
+                raise forms.ValidationError("Cuenta los billetes y monedas que recibiste.")
+        return datos
 
 
 class FormularioRechazar(forms.Form):

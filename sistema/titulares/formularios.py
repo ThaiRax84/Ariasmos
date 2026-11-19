@@ -2,6 +2,7 @@ from django import forms
 
 from cobros.models import ConceptoCobro
 from configuracion.models import parametro, vocabulario
+from proyecto.dependencias import ConDependencias, depende
 
 from .contactos import FormularioContacto
 from .models import Agrupacion, Familia, MotivoBaja, Titular
@@ -88,7 +89,7 @@ class FormularioEditarContacto(FormularioContacto):
         return {"nombre": self.cleaned_data["contacto_nombre"], "relacion": self.cleaned_data.get("contacto_relacion"), "valores": self.valores()}
 
 
-class FormularioCambioFamilia(forms.Form):
+class FormularioCambioFamilia(ConDependencias, forms.Form):
     modo = forms.ChoiceField(label="Qué hacer", choices=[("ligar", "Ligar a una existente"), ("crear", "Crear una nueva y ligar"), ("desligar", "Desligar")], widget=forms.RadioSelect)
     familia = forms.ModelChoiceField(label="Existente", queryset=Familia.objects.none(), required=False)
     nombre = forms.CharField(label="Nombre de la nueva", max_length=100, required=False)
@@ -97,6 +98,8 @@ class FormularioCambioFamilia(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["familia"].queryset = Familia.objects.filter(activa=True)
         self.fields["familia"].label = f"{vocabulario()['familia']} existente"
+        depende(self, "familia", "modo", ["ligar"])
+        depende(self, "nombre", "modo", ["crear"])
 
     def datos(self):
         datos = self.cleaned_data

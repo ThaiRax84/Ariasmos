@@ -27,7 +27,13 @@ from solicitudes import motor
 from solicitudes.models import Solicitud
 
 from .conftest import cliente, codigo_actual
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de
+from .libro_ayudas import campos_piezas, cobro_en_piezas, piezas_de, preparar_conceptos, titular_activo, turno_de
+
+
+def retirar(usuario, importe, motivo, *args, **kwargs):
+    if type(importe) is int and importe > 0 and len(args) < 2:
+        kwargs.setdefault("piezas", piezas_de(importe))
+    return retiros.registrar_retiro(usuario, importe, motivo, *args, **kwargs)
 
 
 def topes(individual=100000, periodo=300000, cantidad=5, tipo="dia"):
@@ -41,7 +47,7 @@ def base(personas):
     topes()
     ana = titular_activo(personas["op"], personas["sup"], "Ana")
     turno = turno_de(personas["op"])
-    libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=turno)
+    libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=turno, piezas=cobro_en_piezas(200000))
     return personas, ana, turno, MotivoRetiro.objects.get(nombre="Compra de insumos")
 
 
@@ -119,12 +125,12 @@ def pdf_cifrado():
 
 def test_dentro_de_los_topes_se_registra_y_sale_del_esperado(base):
     personas, ana, turno, motivo = base
-    resultado = retiros.registrar_retiro(personas["op"], 30000, motivo, "Papelería")
+    resultado = retirar(personas["op"], 30000, motivo, "Papelería")
     retiro = resultado.retiro
     assert retiro is not None and resultado.solicitud is None and str(retiro) == "R-1"
     assert caja.esperado_de(turno) == 170000 and caja.custodia(personas["op"]) == 170000
     assert retiro.revision == RetiroCaja.POR_REVISAR and retiro.comprobante == RetiroCaja.PENDIENTE
-    assert retiros.registrar_retiro(personas["op"], 1000, motivo).retiro.folio == 2
+    assert retirar(personas["op"], 1000, motivo).retiro.folio == 2
     assert Evento.objects.filter(accion="retiro_registrado").count() == 2
     retiro.importe = 1
     with pytest.raises(RegistroInmutable):
@@ -137,15 +143,15 @@ def test_dentro_de_los_topes_se_registra_y_sale_del_esperado(base):
 
 @pytest.mark.parametrize(
     "importe, previos, motivo_esperado",
-    [(100001, [], "importe_individual"), (60000, [100000, 100000, 50000], "importe_periodo"), (100, [100] * 5, "cantidad_periodo")],
+    [(100050, [], "importe_individual"), (60000, [100000, 100000, 50000], "importe_periodo"), (100, [100] * 5, "cantidad_periodo")],
     ids=["individual", "periodo", "cantidad"],
 )
 def test_fuera_de_topes_se_vuelve_solicitud(base, importe, previos, motivo_esperado):
     personas, ana, turno, motivo = base
     libro.registrar_pago(ana, 400000, Pago.EFECTIVO, personas["op"], turno=turno)
     for previo in previos:
-        assert retiros.registrar_retiro(personas["op"], previo, motivo).retiro is not None
-    resultado = retiros.registrar_retiro(personas["op"], importe, motivo, "Grande")
+        assert retirar(personas["op"], previo, motivo).retiro is not None
+    resultado = retirar(personas["op"], importe, motivo, "Grande")
     assert resultado.retiro is None and resultado.solicitud is not None and motivo_esperado in resultado.motivos
     solicitud = resultado.solicitud
     assert solicitud.accion == "retiro_caja" and solicitud.titular is None and solicitud.solicitante == personas["op"]
@@ -160,7 +166,7 @@ def test_supervision_tampoco_rebasa_topes_sin_otra_persona(base):
     personas, ana, turno, motivo = base
     turno_sup = turno_de(personas["sup"], "Caja 2")
     libro.registrar_pago(ana, 500000, Pago.EFECTIVO, personas["sup"], turno=turno_sup)
-    resultado = retiros.registrar_retiro(personas["sup"], 200000, motivo)
+    resultado = retirar(personas["sup"], 200000, motivo)
     assert resultado.solicitud is not None and resultado.retiro is None
     with pytest.raises(motor.ErrorSolicitud):
         motor.aprobar(resultado.solicitud, personas["sup"])
@@ -173,21 +179,21 @@ def test_supervision_tampoco_rebasa_topes_sin_otra_persona(base):
 def test_topes_por_caja_y_periodo_semanal(base):
     personas, ana, turno, motivo = base
     topes(periodo=150000, tipo="semana")
-    primero = retiros.registrar_retiro(personas["op"], 100000, motivo).retiro
+    primero = retirar(personas["op"], 100000, motivo).retiro
     retiros.sin_comprobante(primero, personas["op"], "sin ticket")
     caja.cerrar_turno(turno, personas["op"], {"100000": 1}, "conteo")
     nuevo = turno_de(personas["op"])
     libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=nuevo)
-    assert retiros.registrar_retiro(personas["op"], 60000, motivo).solicitud is not None
+    assert retirar(personas["op"], 60000, motivo).solicitud is not None
     otro = turno_de(personas["op2"], "Caja 2")
     libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op2"], turno=otro)
-    assert retiros.registrar_retiro(personas["op2"], 60000, motivo).retiro is not None
+    assert retirar(personas["op2"], 60000, motivo).retiro is not None
 
 
 def test_sin_efectivo_suficiente_rechaza_sin_decir_cuanto_y_al_tercero_pide_autorizacion(base):
     personas, ana, turno, motivo = base
     op = cliente(personas["op"])
-    datos = {"importe": "2000.01", "motivo": motivo.pk, "nota": ""}
+    datos = {"importe": "2000.50", "motivo": motivo.pk, "nota": "", **campos_piezas(200050)}
     topes(individual=1000000, periodo=10000000, cantidad=100)
     for intento in range(3):
         respuesta = op.post(reverse("caja:retiro_nuevo"), datos)
@@ -198,10 +204,10 @@ def test_sin_efectivo_suficiente_rechaza_sin_decir_cuanto_y_al_tercero_pide_auto
     assert Evento.objects.filter(accion="retiro_rechazado").count() == 3
     turno.refresh_from_db()
     assert turno.rechazos_retiro == 3
-    respuesta = op.post(reverse("caja:retiro_nuevo"), {"importe": "10", "motivo": motivo.pk})
+    respuesta = op.post(reverse("caja:retiro_nuevo"), {"importe": "10", "motivo": motivo.pk, "p_1000": "1"})
     solicitud = Solicitud.objects.get(accion="retiro_caja")
     assert respuesta.url == reverse("solicitudes:detalle", args=[solicitud.pk]) and "rechazos" in solicitud.datos["excede"]
-    grande = Solicitud.objects.create(accion="retiro_caja", titular=None, solicitante=personas["op"], caduca_en=solicitud.caduca_en, datos={**solicitud.datos, "importe": 300000, "ficha": "otra-ficha"})
+    grande = Solicitud.objects.create(accion="retiro_caja", titular=None, solicitante=personas["op"], caduca_en=solicitud.caduca_en, datos={**solicitud.datos, "importe": 300000, "piezas": piezas_de(300000), "ficha": "otra-ficha"})
     with pytest.raises(motor.ErrorSolicitud, match="no tiene efectivo suficiente"):
         motor.aprobar(grande, personas["sup"])
     assert not RetiroCaja.objects.exists()
@@ -211,7 +217,7 @@ def test_retiro_no_sale_del_fondo(base):
     personas, ana, turno, motivo = base
     caja.cerrar_turno(turno, personas["op"], {"100000": 2}, "")
     caja.abrir_turno(personas["op"], turno.caja, 50000)
-    assert retiros.registrar_retiro(personas["op"], 100, motivo).rechazado
+    assert retirar(personas["op"], 100, motivo).rechazado
 
 
 def test_topes_simultaneos_no_se_rebasan(transactional_db):
@@ -233,16 +239,16 @@ def test_topes_simultaneos_no_se_rebasan(transactional_db):
     barrera = threading.Barrier(6)
     errores = []
 
-    def retirar():
+    def trabajar():
         try:
             barrera.wait()
-            retiros.registrar_retiro(op, 10000, motivo.pk)
+            retirar(op, 10000, motivo.pk)
         except Exception as error:
             errores.append(error)
         finally:
             connection.close()
 
-    hilos = [threading.Thread(target=retirar) for _ in range(6)]
+    hilos = [threading.Thread(target=trabajar) for _ in range(6)]
     for hilo in hilos:
         hilo.start()
     for hilo in hilos:
@@ -257,7 +263,7 @@ def test_comprobante_jpeg_se_recodifica_sin_ubicacion_y_se_guarda_fuera(base):
     personas, ana, turno, motivo = base
     original = jpeg_con_ubicacion()
     assert Image.open(BytesIO(original)).getexif().get(0x8825)
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo, archivo=original).retiro
+    retiro = retirar(personas["op"], 5000, motivo, archivo=original).retiro
     retiro.refresh_from_db()
     archivo = retiro.archivo_comprobante
     assert retiro.comprobante == RetiroCaja.ADJUNTO and archivo.tipo == "jpeg"
@@ -276,7 +282,7 @@ def test_comprobante_jpeg_se_recodifica_sin_ubicacion_y_se_guarda_fuera(base):
 @pytest.mark.parametrize("contenido, tipo", [(png(), "png"), (pdf_sano(), "pdf")], ids=["png", "pdf"])
 def test_comprobantes_validos(base, contenido, tipo):
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo).retiro
+    retiro = retirar(personas["op"], 5000, motivo).retiro
     retiros.adjuntar(retiro, personas["op"], contenido)
     assert ComprobanteRetiro.objects.get().tipo == tipo
 
@@ -301,7 +307,7 @@ MALICIOSOS = {
 @pytest.mark.parametrize("nombre", sorted(MALICIOSOS))
 def test_comprobantes_maliciosos_se_rechazan(base, nombre):
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo).retiro
+    retiro = retirar(personas["op"], 5000, motivo).retiro
     with pytest.raises(comprobantes.ComprobanteInvalido):
         retiros.adjuntar(retiro, personas["op"], MALICIOSOS[nombre])
     retiro.refresh_from_db()
@@ -332,7 +338,7 @@ def test_imagen_gigante_y_archivo_grande_se_rechazan(base):
 def test_tipo_por_contenido_no_por_nombre(base):
     personas, ana, turno, motivo = base
     op = cliente(personas["op"])
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo).retiro
+    retiro = retirar(personas["op"], 5000, motivo).retiro
     disfrazado = SimpleUploadedFile("ticket.jpg", MALICIOSOS["html"], content_type="image/jpeg")
     op.post(reverse("caja:retiro_comprobante", args=[retiro.pk]), {"archivo": disfrazado})
     assert not ComprobanteRetiro.objects.exists() and Evento.objects.filter(accion="comprobante_rechazado").exists()
@@ -343,7 +349,7 @@ def test_tipo_por_contenido_no_por_nombre(base):
 
 def test_descarga_con_cabeceras_y_permisos(base):
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo, archivo=pdf_sano()).retiro
+    retiro = retirar(personas["op"], 5000, motivo, archivo=pdf_sano()).retiro
     url = reverse("caja:retiro_descargar", args=[retiro.pk])
     respuesta = cliente(personas["op"]).get(url)
     assert respuesta.status_code == 200 and respuesta["Content-Type"] == "application/pdf"
@@ -362,7 +368,7 @@ def test_descarga_con_cabeceras_y_permisos(base):
 
 def test_turno_no_cierra_con_comprobantes_pendientes(base):
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo).retiro
+    retiro = retirar(personas["op"], 5000, motivo).retiro
     op = cliente(personas["op"])
     pagina = op.get(reverse("caja:cerrar", args=[turno.pk])).content.decode()
     assert "comprobante pendiente" in pagina and 'name="d_100000"' not in pagina
@@ -384,11 +390,11 @@ def test_turno_no_cierra_con_comprobantes_pendientes(base):
 
 def test_revision_por_otra_persona(base):
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo).retiro
+    retiro = retirar(personas["op"], 5000, motivo).retiro
     assert cliente(personas["op"]).post(reverse("caja:retiro_revisar", args=[retiro.pk]), {"resultado": "revisado"}).status_code == 403
     turno_sup = turno_de(personas["sup"], "Caja 2")
     libro.registrar_pago(ana, 50000, Pago.EFECTIVO, personas["sup"], turno=turno_sup)
-    propio = retiros.registrar_retiro(personas["sup"], 1000, motivo).retiro
+    propio = retirar(personas["sup"], 1000, motivo).retiro
     assert cliente(personas["sup"]).post(reverse("caja:retiro_revisar", args=[propio.pk]), {"resultado": "revisado"}).status_code == 403
     with pytest.raises(retiros.RevisionPropia):
         retiros.revisar(propio, personas["sup"], RetiroCaja.REVISADO)
@@ -405,9 +411,9 @@ def test_revision_por_otra_persona(base):
 
 def test_reversion_solo_por_solicitud_y_regresa_al_turno_de_quien_la_pide(base):
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 30000, motivo).retiro
+    retiro = retirar(personas["op"], 30000, motivo).retiro
     op = cliente(personas["op"])
-    respuesta = op.post(reverse("caja:retiro_revertir", args=[retiro.pk]), {"motivo": "Se devolvió la compra"})
+    respuesta = op.post(reverse("caja:retiro_revertir", args=[retiro.pk]), {"motivo": "Se devolvió la compra", **campos_piezas(30000)})
     solicitud = Solicitud.objects.get(accion="revertir_retiro")
     assert respuesta.url == reverse("solicitudes:detalle", args=[solicitud.pk]) and not ReversionRetiro.objects.exists()
     turno_op2 = turno_de(personas["op2"], "Caja 2")
@@ -417,8 +423,8 @@ def test_reversion_solo_por_solicitud_y_regresa_al_turno_de_quien_la_pide(base):
     reversion = ReversionRetiro.objects.get()
     assert reversion.turno == turno and reversion.autorizada_por == personas["sup"]
     assert caja.esperado_de(turno) == 200000 and caja.custodia(personas["op"]) == 200000
-    segunda = retiros.registrar_retiro(personas["op"], 1000, motivo).retiro
-    motor.ejecutar("revertir_retiro", personas["op2"], None, {"retiro": segunda.pk, "motivo": "error"})
+    segunda = retirar(personas["op"], 1000, motivo).retiro
+    motor.ejecutar("revertir_retiro", personas["op2"], None, {"retiro": segunda.pk, "motivo": "error", "piezas": piezas_de(1000)})
     pendiente = Solicitud.objects.get(accion="revertir_retiro", estado="pendiente")
     with pytest.raises(motor.ErrorSolicitud, match="él mismo"):
         motor.aprobar(pendiente, personas["op"])
@@ -429,7 +435,7 @@ def test_reversion_solo_por_solicitud_y_regresa_al_turno_de_quien_la_pide(base):
 
 def test_retiros_en_corte_diario_y_mayor(base):
     personas, ana, turno, motivo = base
-    retiros.registrar_retiro(personas["op"], 30000, motivo, "Papelería", archivo=png())
+    retirar(personas["op"], 30000, motivo, "Papelería", archivo=png())
     caja.cerrar_turno(turno, personas["op"], {"100000": 1, "50000": 1, "20000": 1}, "")
     corte = Corte.objects.get(tipo=DIARIO)
     filas = {s["clave"]: s["filas"] for s in corte.cifras["secciones"]}
@@ -450,7 +456,6 @@ def test_mayor_no_cuenta_turnos_abiertos(base):
 
 def test_piezas_del_retiro_cuando_hay_control(base):
     personas, ana, turno, motivo = base
-    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "1"})
     with pytest.raises(caja.ErrorCaja, match="exactamente"):
         retiros.registrar_retiro(personas["op"], 30000, motivo, piezas={"20000": 1})
     retiro = retiros.registrar_retiro(personas["op"], 30000, motivo, piezas={"20000": 1, "10000": 1}).retiro
@@ -460,7 +465,7 @@ def test_piezas_del_retiro_cuando_hay_control(base):
 def test_avisos_de_tope_y_sin_revisar(base):
     personas, ana, turno, motivo = base
     topes(periodo=100000, cantidad=10)
-    retiros.registrar_retiro(personas["op"], 80000, motivo)
+    retirar(personas["op"], 80000, motivo)
     texto = cliente(personas["sup"]).get(reverse("inicio")).content.decode()
     assert "ya usó" in texto and "800.00" in texto
     assert "ya usó" not in cliente(personas["op"]).get(reverse("inicio")).content.decode()
@@ -470,7 +475,7 @@ def test_comprobantes_viajan_en_el_respaldo(base, tmp_path):
     from respaldos import servicios as respaldos
 
     personas, ana, turno, motivo = base
-    retiro = retiros.registrar_retiro(personas["op"], 5000, motivo, archivo=png()).retiro
+    retiro = retirar(personas["op"], 5000, motivo, archivo=png()).retiro
     from configuracion.models import Negocio
 
     Negocio.objects.filter(pk=1).update(carpeta_respaldo=str(tmp_path / "respaldos"))

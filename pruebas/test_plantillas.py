@@ -131,7 +131,7 @@ def test_exportacion_se_puede_volver_a_importar(personas):
 def test_plantillas_traen_caja_motivos_y_permisos_de_retiros(nombre):
     with open(settings.PLANTILLAS_NEGOCIO / f"{nombre}.json", "rb") as archivo:
         datos = esquema.desde_bytes(archivo.read())
-    assert datos["caja"]["calendario_corte"] == {str(d): "18:00" for d in range(6)} and datos["caja"]["control_denominaciones"] is False
+    assert datos["caja"]["calendario_corte"] == {str(d): "18:00" for d in range(6)} and datos["caja"]["control_denominaciones"] is True
     assert datos["motivos_retiro"] and {"retiro_caja", "revertir_retiro"} <= {p["accion"] for p in datos["politicas"]}
     permisos = {r["nombre"]: set(r["permisos"]) for r in datos["roles"]}
     assert "retirar_efectivo" in permisos["Operación"] and not {"revisar_retiros", "administrar_motivos_retiro"} & permisos["Operación"]

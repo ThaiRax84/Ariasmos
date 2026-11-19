@@ -39,6 +39,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "envios.middleware.FichaDeEnvio",
+    "envios.middleware.BaseOcupada",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "configuracion.middleware.Instalacion",
     "cuentas.middleware.ControlDispositivo",

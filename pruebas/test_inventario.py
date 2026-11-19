@@ -28,7 +28,7 @@ from solicitudes.models import PoliticaAccion, Solicitud
 from titulares.models import Familia, Titular
 
 from .conftest import cliente, configurar, nuevo_usuario
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de, verificar_sumas
+from .libro_ayudas import campos_piezas, piezas_de, preparar_conceptos, titular_activo, turno_de, verificar_sumas
 from .test_retiros import MALICIOSOS, jpeg_con_ubicacion
 
 
@@ -61,7 +61,7 @@ def renglones(venta):
 
 
 def cobrar_venta(c, titular, venta, importe):
-    return c.post(reverse("cobros:cobrar", args=[titular.pk]), {"paso": "confirmar", "importe": str(importe), "ficha": f"ficha-de-prueba-{venta.pk:08d}", "venta": str(venta.pk)})
+    return c.post(reverse("cobros:cobrar", args=[titular.pk]), {"paso": "confirmar", "importe": str(importe), "ficha": f"ficha-de-prueba-{venta.pk:08d}", "venta": str(venta.pk), **campos_piezas(importe, "r_")})
 
 
 def test_existencia_es_suma_de_movimientos_inmutables(base):
@@ -179,13 +179,16 @@ def test_venta_publico_en_una_transaccion_y_cuenta_oculta(base):
     turno = turno_de(personas["op"])
     previa = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2"})
     assert previa.context["total"] == 10000 and not Venta.objects.exists()
-    respuesta = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"], "precio": "1"})
+    assert "data-mosaicos" in previa.content.decode() and 'name="r_10000"' in previa.content.decode()
+    sin_piezas = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"]})
+    assert sin_piezas.status_code == 200 and not Venta.objects.exists()
+    respuesta = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"], "precio": "1", "r_10000": "1"})
     venta = Venta.objects.get()
     publico = venta.titular
     assert publico.interno and venta.pago.importe == 10000 and venta.pago.turno == turno
     assert respuesta.url == reverse("cobros:recibo", args=[venta.pago.recibo.pk])
     assert sum(p.saldo for p in libro.pendientes_de([publico.pk])) == 0
-    otra = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"]})
+    otra = c.post(reverse("inventario:vender_publico"), {f"cantidad_{cuaderno.pk}": "2", "paso": "confirmar", "ficha": previa.context["ficha"], "r_10000": "1"})
     assert Venta.objects.count() == 1 and otra.url == respuesta.url
     assert not Titular.objects.filter(pk=publico.pk).exists() and Titular.todos.filter(pk=publico.pk).exists()
     assert "Público" not in cliente(personas["sup"]).get(reverse("titulares:lista")).content.decode()
@@ -240,7 +243,7 @@ def test_revertir_pago_publico_cancela_sus_cargos_y_pregunta_si_regreso(base):
     pantalla = cliente(personas["sup"]).get(reverse("cobros:revertir", args=[venta.pago.pk])).content.decode()
     assert "¿Regresó Libro A × 1?" in pantalla
     filas = renglones(venta)
-    respuesta = cliente(personas["sup"]).post(reverse("cobros:revertir", args=[venta.pago.pk]), {"motivo": "cliente se arrepintió", f"regreso_{filas['LIB-A'].pk}": "on"})
+    respuesta = cliente(personas["sup"]).post(reverse("cobros:revertir", args=[venta.pago.pk]), {"motivo": "cliente se arrepintió", f"regreso_{filas['LIB-A'].pk}": "on", **campos_piezas(venta.pago.importe)})
     assert respuesta.status_code == 302 and "/titulares/" not in respuesta.url
     assert ReversionPago.objects.filter(pago=venta.pago).exists()
     assert sum(p.saldo for p in libro.pendientes_de([venta.titular_id])) == 0
@@ -262,7 +265,7 @@ def test_reversion_de_venta_a_titular_regresa_solo_lo_que_volvio(base):
     venta.refresh_from_db()
     filas = renglones(venta)
     libro.registrar_pago(ana, 100000, Pago.EFECTIVO, personas["sup"], turno=turno_de(personas["sup"], "Caja 2"))
-    cliente(personas["sup"]).post(reverse("cobros:revertir", args=[venta.pago.pk]), {"motivo": "error", f"regreso_{filas['CUA-1'].pk}": "on"})
+    cliente(personas["sup"]).post(reverse("cobros:revertir", args=[venta.pago.pk]), {"motivo": "error", f"regreso_{filas['CUA-1'].pk}": "on", **campos_piezas(venta.pago.importe)})
     assert libro.saldo_de(filas["CUA-1"].cargo) == 0 and libro.saldo_de(filas["LIB-A"].cargo) == 35000
     assert inventario.existencias()[cuaderno.pk] == 20 and inventario.existencias()[libro_a.pk] == 9
 
@@ -378,7 +381,10 @@ def test_devolucion_en_efectivo_siempre_por_solicitud_de_otra_persona(base):
     renglon = venta.renglones.get()
     with pytest.raises(inventario.ErrorInventario, match="siempre se solicita"):
         inventario.devolver(venta, {str(renglon.pk): [1, True]}, Devolucion.EFECTIVO, personas["dir"], "x", turno=turno_sup)
-    respuesta = cliente(personas["op"]).post(reverse("inventario:devolver_venta", args=[venta.pk]), {f"cantidad_{renglon.pk}": "1", "medio": "efectivo", "motivo": "no lo quiso"})
+    datos = {f"cantidad_{renglon.pk}": "1", "medio": "efectivo", "motivo": "no lo quiso"}
+    sin_piezas = cliente(personas["op"]).post(reverse("inventario:devolver_venta", args=[venta.pk]), datos)
+    assert sin_piezas.status_code == 200 and "data-mosaicos" in sin_piezas.content.decode() and not Solicitud.objects.filter(accion="devolucion_efectivo").exists()
+    respuesta = cliente(personas["op"]).post(reverse("inventario:devolver_venta", args=[venta.pk]), {**datos, "p_5000": "1"})
     solicitud = Solicitud.objects.get(accion="devolucion_efectivo")
     assert respuesta.url == reverse("solicitudes:detalle", args=[solicitud.pk]) and not Devolucion.objects.exists()
     pagina = cliente(personas["op"]).get(respuesta.url).content.decode()
@@ -400,7 +406,7 @@ def test_devolucion_en_efectivo_sin_efectivo_suficiente_no_dice_cuanto(base):
     turno_sup = turno_de(personas["sup"], "Caja 2")
     venta = inventario.vender_publico([(libro_a.pk, 1)], personas["sup"], turno_sup, "h" * 20)
     renglon = venta.renglones.get()
-    inventario.solicitar_efectivo(venta, {renglon.pk: [1, True]}, personas["op"], "no le sirvió")
+    inventario.solicitar_efectivo(venta, {renglon.pk: [1, True]}, personas["op"], "no le sirvió", piezas=piezas_de(35000))
     solicitud = Solicitud.objects.get(accion="devolucion_efectivo")
     with pytest.raises(motor.ErrorSolicitud) as error:
         motor.aprobar(solicitud, personas["dir"])
@@ -419,7 +425,6 @@ def test_devolucion_en_efectivo_sin_efectivo_suficiente_no_dice_cuanto(base):
 
 def test_devolucion_en_efectivo_con_piezas_y_en_el_corte(base):
     personas, ana, libro_a, cuaderno = base
-    fijar("control_denominaciones", 1)
     turno_op = turno_de(personas["op"])
     libro.registrar_pago(ana, 50000, Pago.EFECTIVO, personas["op"], turno=turno_op, piezas={"recibidas": {"50000": 1}, "cambio": {}})
     turno_sup = turno_de(personas["sup"], "Caja 2")

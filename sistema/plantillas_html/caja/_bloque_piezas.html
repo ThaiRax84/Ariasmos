@@ -1,0 +1,7 @@
+{% load formato %}<div class="campo"{{ piezas.0.field|dependencia }}>
+  <span class="etiqueta">{{ formulario.titulo_piezas|default:"Billetes y monedas" }}</span>
+  <span class="ayuda" data-ayuda-sin-js>Escribe cuántas piezas hay de cada billete o moneda{% if formulario.ayuda_piezas %}; {{ formulario.ayuda_piezas }}{% endif %}.</span>
+  <span class="ayuda" data-ayuda-con-js hidden>Toca cada billete o moneda; con «−» quitas una{% if formulario.ayuda_piezas %}; {{ formulario.ayuda_piezas }}{% endif %}. Llevas <strong id="piezas-total">{{ 0|dinero }}</strong>.</span>
+  {{ piezas.0.field|nota_dependencia }}
+  {% include "caja/_piezas.html" with campos=piezas prefijo="Piezas de" mosaicos=True total="piezas-total" %}
+</div>

@@ -64,9 +64,12 @@ def _fecha(valor, formato="d/m/Y"):
     return dateformat.format(valor, formato)
 
 
-def renglon(clave, titulo, detalle, estado, enlaces=()):
+def renglon(clave, titulo, detalle, estado, enlaces=(), accion=None):
     texto, tono = ESTADOS[estado]
-    return {"clave": clave, "titulo": titulo, "detalle": detalle, "estado": estado, "pastilla": texto, "tono": tono, "enlaces": [{"texto": t, "url": u} for t, u in enlaces]}
+    fila = {"clave": clave, "titulo": titulo, "detalle": detalle, "estado": estado, "pastilla": texto, "tono": tono, "enlaces": [{"texto": t, "url": u} for t, u in enlaces]}
+    if accion is not None:
+        fila["accion"] = {"texto": accion[0], "url": accion[1]}
+    return fila
 
 
 def mes_en_curso(ahora=None):
@@ -416,8 +419,11 @@ def avisos_control(usuario, certificado=None, diarios=None):
         for c in Corte.objects.filter(tipo=MAYOR, estado=Corte.BORRADOR).order_by("fecha"):
             filas.append(renglon("corte_mayor_borrador", f"Corte mayor de {_fecha(c.fecha, 'm/Y')}", "En borrador: falta cerrarlo y entregarlo.", "por_hacer", [("Ver", reverse("cortes:detalle", args=[c.pk]))]))
     if tiene("administrar_configuracion"):
+        if parametro("aviso_control_denominaciones"):
+            estado = "encendido" if parametro("control_denominaciones") else "apagado"
+            filas.append(renglon("control_denominaciones_encendido", "El efectivo ahora se cuenta por billetes y monedas", f"La actualización encendió el conteo de piezas en cada movimiento de efectivo (ahora está {estado}). Si prefieres escribir solo importes, apágalo en Caja y cortes.", "revisar", [("Revisar en Caja y cortes", reverse("configuracion:caja"))], accion=("Enterado", reverse("configuracion:aviso_piezas"))))
         if not Denominacion.objects.filter(activa=True).exists():
-            filas.append(renglon("faltan_denominaciones", "Faltan las denominaciones de caja", "No hay billetes ni monedas capturados para la moneda del negocio: el arqueo de caja no podrá contar el efectivo.", "por_hacer", [("Capturar denominaciones", reverse("configuracion:catalogo", args=["denominaciones"]))]))
+            filas.append(renglon("faltan_denominaciones", "Faltan los billetes y monedas de la caja", "No hay billetes ni monedas capturados para la moneda del negocio: no se puede abrir turno, cobrar en efectivo ni cerrar la caja.", "por_hacer", [("Capturar billetes y monedas", reverse("configuracion:catalogo", args=["denominaciones"]))]))
         if CuentaBancaria.principal_activa() is None:
             filas.append(renglon("falta_cuenta", "Faltan los datos de pago", "No hay una cuenta bancaria principal: la ficha de pago no muestra a dónde pagar.", "por_hacer", [("Agregar cuenta", reverse("banco:nueva"))]))
     revisar_codigos = por_revisar(usuario).exists()

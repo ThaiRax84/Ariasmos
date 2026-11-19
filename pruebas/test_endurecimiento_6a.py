@@ -10,7 +10,7 @@ from solicitudes import motor
 from solicitudes.models import Solicitud
 
 from .conftest import cliente
-from .libro_ayudas import turno_de
+from .libro_ayudas import piezas_de, turno_de
 from .test_inventario import base, cobrar_venta, fijar
 
 
@@ -49,7 +49,7 @@ def test_venta_publico_devuelta_en_efectivo_no_se_cobra_otra_vez_al_revertir_el_
     venta = inventario.vender_publico([(cuaderno.pk, 2)], personas["op"], turno_abierto(personas["op"]), "f" * 20)
     renglon = venta.renglones.get()
     antes = neto_de(turno_op)
-    resultado = inventario.solicitar_efectivo(venta, {str(renglon.pk): [2, True]}, personas["op"], "no lo quiso")
+    resultado = inventario.solicitar_efectivo(venta, {str(renglon.pk): [2, True]}, personas["op"], "no lo quiso", piezas=piezas_de(10000))
     motor.aprobar(resultado.solicitud, personas["dir"])
     assert neto_de(turno_op) == antes - 10000
     with pytest.raises(Exception):
@@ -66,7 +66,7 @@ def test_venta_a_titular_devuelta_en_efectivo_no_deja_revertir_el_pago_completo(
     cobrar_venta(cliente(personas["sup"]), ana, venta, 10000)
     libro.registrar_pago(ana, 50000, Pago.EFECTIVO, personas["op"], turno=turno_op)
     renglon = venta.renglones.get()
-    resultado = inventario.solicitar_efectivo(venta, {str(renglon.pk): [2, True]}, personas["op"], "no lo quiso")
+    resultado = inventario.solicitar_efectivo(venta, {str(renglon.pk): [2, True]}, personas["op"], "no lo quiso", piezas=piezas_de(10000))
     motor.aprobar(resultado.solicitud, personas["dir"])
     venta.refresh_from_db()
     with pytest.raises(Exception):

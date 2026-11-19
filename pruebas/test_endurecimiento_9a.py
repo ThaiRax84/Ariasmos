@@ -19,7 +19,8 @@ from .test_endurecimiento_5a import rutas
 @pytest.mark.parametrize("con_piezas", [True, False], ids=["con-piezas", "sin-piezas"])
 def test_abrir_con_efectivo_sin_contar_nada_no_abre_en_cero_a_escondidas(personas, con_piezas):
     cache.clear()
-    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "1" if con_piezas else "0"})
+    if not con_piezas:
+        Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "0"})
     unica = Caja.objects.get_or_create(nombre="Caja 1")[0]
     c = cliente(personas["op"])
     respuesta = c.post(reverse("caja:abrir"), {"caja": unica.pk, "apertura": "efectivo"})
@@ -31,7 +32,6 @@ def test_abrir_con_efectivo_sin_contar_nada_no_abre_en_cero_a_escondidas(persona
 
 def test_con_piezas_el_fondo_es_la_suma_y_no_lo_que_se_mande_escrito(personas):
     cache.clear()
-    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "1"})
     unica = Caja.objects.get_or_create(nombre="Caja 1")[0]
     c = cliente(personas["op"])
     pagina = c.get(reverse("caja:inicio")).content.decode()
@@ -45,7 +45,6 @@ def test_con_piezas_el_fondo_es_la_suma_y_no_lo_que_se_mande_escrito(personas):
 
 def test_las_pantallas_de_caja_no_revelan_lo_esperado_con_el_turno_abierto(personas):
     cache.clear()
-    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "1"})
     preparar_conceptos()
     ana = titular_activo(personas["op"], personas["sup"], "Ana")
     turno = caja.abrir_turno(personas["op"], Caja.objects.get_or_create(nombre="Caja 1")[0], 77777)

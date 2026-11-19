@@ -3,6 +3,7 @@ from django import forms
 from cobros.formularios import CampoImporte, CampoImportePositivo
 from configuracion.models import hoy_negocio, opciones_vocabulario, vocabulario
 from nucleo.matricula import normalizar
+from proyecto.dependencias import ConDependencias, depende
 from titulares.models import Agrupacion, Titular
 
 from . import tras_alta
@@ -16,17 +17,19 @@ ETIQUETAS_ACCIONES = {
 }
 
 
-class _Limites(forms.Form):
+class _Limites(ConDependencias, forms.Form):
     modos = MODOS_NEGOCIO
     modo_importe = forms.ChoiceField(label="Importe máximo de adeudo vencido", widget=forms.RadioSelect)
-    importe_maximo = CampoImporte(label="Hasta cuánto (si elegiste un valor)", required=False, maximo=TOPE_IMPORTE)
+    importe_maximo = CampoImporte(label="Hasta cuánto de adeudo vencido", required=False, maximo=TOPE_IMPORTE)
     modo_dias = forms.ChoiceField(label="Días máximos de atraso (desde el vencimiento más antiguo con saldo)", widget=forms.RadioSelect)
-    dias_maximos = forms.IntegerField(label="Hasta cuántos días (si elegiste un valor)", required=False, min_value=0, max_value=TOPE_DIAS)
+    dias_maximos = forms.IntegerField(label="Hasta cuántos días de atraso", required=False, min_value=0, max_value=TOPE_DIAS)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["modo_importe"].choices = self.modos
         self.fields["modo_dias"].choices = self.modos
+        depende(self, "importe_maximo", "modo_importe", [VALOR])
+        depende(self, "dias_maximos", "modo_dias", [VALOR])
 
     def clean(self):
         datos = super().clean()
@@ -53,9 +56,13 @@ class FormularioExcepcion(_Limites):
         super().__init__(*args, **kwargs)
         if not existente:
             self.fields.pop("quitar")
-        elif self.data.get("quitar"):
-            for campo in self.fields.values():
-                campo.required = False
+        else:
+            if self.data.get("quitar"):
+                for campo in self.fields.values():
+                    campo.required = False
+            for nombre in ("modo_importe", "importe_maximo", "modo_dias", "dias_maximos", "motivo", "vigente_hasta"):
+                if not getattr(self.fields[nombre], "depende", None):
+                    depende(self, nombre, "quitar", negar=True)
 
     def clean(self):
         if self.data.get("quitar") and "quitar" in self.fields:
@@ -70,7 +77,7 @@ class FormularioExcepcion(_Limites):
         return datos
 
 
-class FormularioRegla(forms.Form):
+class FormularioRegla(ConDependencias, forms.Form):
     nombre = forms.CharField(label="Nombre de la regla", max_length=100)
     texto = forms.CharField(label=f"Texto que se muestra (hasta {LARGO_TEXTO} caracteres; por ejemplo «No puede pasar»)", max_length=LARGO_TEXTO)
     alcance = forms.ChoiceField(label="A quién aplica", widget=forms.RadioSelect)
@@ -90,9 +97,11 @@ class FormularioRegla(forms.Form):
         voc = vocabulario()
         self.fields["alcance"].choices = opciones_vocabulario(ReglaRezago.ALCANCES, voc)
         self.fields["alcance"].help_text = f"Las reglas por {voc['agrupacion_min']} o por persona mandan sobre las generales en la misma acción: sirven para ser más estricto o más tolerante con alguien."
-        self.fields["agrupacion"].label = f"{voc['agrupacion']} (si aplica a una)"
+        self.fields["agrupacion"].label = voc["agrupacion"]
         self.fields["agrupacion"].queryset = Agrupacion.objects.filter(activa=True)
-        self.fields["matricula"].label = f"{voc['matricula']} (si aplica a una sola persona)"
+        self.fields["matricula"].label = f"{voc['matricula']} de la persona"
+        depende(self, "agrupacion", "alcance", [ReglaRezago.AGRUPACION])
+        depende(self, "matricula", "alcance", [ReglaRezago.TITULAR])
 
     def clean(self):
         datos = super().clean()

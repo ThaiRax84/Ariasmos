@@ -7,7 +7,7 @@ from django import forms
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -25,7 +25,6 @@ from configuracion.models import hoy_negocio, parametro, vocabulario
 from cuentas.permisos import quienes
 from cuentas.decoradores import requiere_permiso
 from configuracion.moneda import formatear
-from nucleo.matricula import normalizar
 from rezagos import servicios as rezagos
 from solicitudes import motor
 from tarifas import servicios as tarifas
@@ -34,7 +33,6 @@ from titulares.models import Titular
 
 from . import libro, qr
 from .estado import estado_cuenta
-from proyecto.orden import elegir
 
 from .formularios import (
     FormularioBeca,
@@ -57,16 +55,11 @@ def _miembros(titular):
 
 @requiere_permiso("registrar_pago_efectivo")
 def buscar(request):
-    consulta = request.GET.get("q", "").strip()
-    orden = elegir(request, "cobrar")
-    resultados = []
-    if consulta:
-        digitos = normalizar(consulta)
-        filtro = Q(nombre__icontains=consulta) | Q(apellidos__icontains=consulta)
-        if digitos:
-            filtro |= Q(matricula__startswith=digitos)
-        resultados = Titular.objects.filter(filtro).exclude(estado=Titular.RECHAZADO).select_related("familia", "agrupacion").order_by(*orden.campos)[:30]
-    return render(request, "cobros/buscar.html", {"q": consulta, "resultados": resultados, "orden": orden, "turno": turno_abierto(request.user)})
+    from titulares import lista
+
+    contexto = lista.preparar(request, "cobrar", [Titular.ACTIVO])
+    contexto.update({"turno": turno_abierto(request.user), "destino": "cobros:cobrar", "accion": "Cobrar", "titulo_lista": "cobrar"})
+    return render(request, "cobros/buscar.html", contexto)
 
 
 def _venta(request, titular):
@@ -165,6 +158,8 @@ def cobrar(request, pk):
     titular = get_object_or_404(Titular.objects.select_related("familia"), pk=pk)
     if titular.estado == Titular.RECHAZADO:
         raise PermissionDenied
+    if control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request, "cobros:buscar")
     turno = turno_abierto(request.user)
     if request.method != "POST":
         return _pantalla_cobro(request, titular, FormularioPago())
@@ -554,7 +549,11 @@ def cancelar(request, pk):
 def revertir(request, pk):
     pago = get_object_or_404(Pago.objects.select_related("titular", "recibo"), pk=pk)
     formulario = FormularioReversion(request.POST if request.method == "POST" else None)
+    if pago.medio == Pago.EFECTIVO and control_piezas.faltan_para_contar():
+        return control_piezas.pantalla_faltan(request)
     nombres = control_piezas.campos(formulario, "p_", "Piezas que devuelves:") if pago.medio == Pago.EFECTIVO and control_piezas.activo() else []
+    formulario.titulo_piezas = "Billetes y monedas que devuelves"
+    formulario.ayuda_piezas = f"deben sumar {formatear(pago.importe)}"
     renglones = []
     venta = getattr(pago, "venta", None) if hasattr(pago, "venta") else None
     if venta is not None:

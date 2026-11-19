@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Efectivo</span>
+    <h1>Faltan los billetes y monedas</h1>
+    <p class="subtitulo">El efectivo se cuenta por piezas, pero la moneda del negocio todavía no tiene sus billetes y monedas capturados.</p>
+  </div>
+</div>
+<div class="aviso-pantalla">
+  <div class="aviso-texto">
+    <span class="aviso-titulo">{% if puede_capturar %}Captura los billetes y monedas de la moneda del negocio{% else %}Pide a {{ quienes }} que capture los billetes y monedas{% endif %}</span>
+    <p>Mientras no estén, no se puede abrir turno, cobrar en efectivo, retirar, devolver ni cerrar la caja.</p>
+  </div>
+  {% if puede_capturar %}<a class="boton" href="{% url 'configuracion:catalogo' 'denominaciones' %}">Capturar billetes y monedas</a>{% endif %}
+</div>
+{% if volver %}<div class="acciones"><a class="boton secundario" href="{% url volver %}">Volver</a></div>{% endif %}
+{% endblock %}

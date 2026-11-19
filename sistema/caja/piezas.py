@@ -20,6 +20,23 @@ def denominaciones():
     return list(Denominacion.objects.filter(activa=True))
 
 
+def faltan():
+    return not Denominacion.objects.filter(activa=True).exists()
+
+
+def faltan_para_contar():
+    return activo() and faltan()
+
+
+def pantalla_faltan(request, volver=None):
+    from django.shortcuts import render
+
+    from cuentas.permisos import quienes
+
+    contexto = {"puede_capturar": request.user.tiene_permiso("administrar_configuracion"), "quienes": quienes("administrar_configuracion"), "volver": volver}
+    return render(request, "caja/faltan_denominaciones.html", contexto)
+
+
 def validar(piezas):
     if piezas is None:
         return {}
@@ -90,7 +107,9 @@ def campos(formulario, prefijo, etiqueta, requerido=False):
     nombres = []
     for denominacion in denominaciones():
         nombre = f"{prefijo}{denominacion.valor}"
-        formulario.fields[nombre] = forms.IntegerField(label=f"{etiqueta} {denominacion}", min_value=0, max_value=MAXIMO_PIEZAS, required=requerido, initial=0)
+        campo = forms.IntegerField(label=f"{etiqueta} {denominacion}", min_value=0, max_value=MAXIMO_PIEZAS, required=requerido, initial=0)
+        campo.pieza = denominacion.valor
+        formulario.fields[nombre] = campo
         nombres.append((nombre, denominacion.valor))
     return nombres
 

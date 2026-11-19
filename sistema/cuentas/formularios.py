@@ -3,6 +3,7 @@ from django.contrib.auth import password_validation
 
 from configuracion.models import parametro
 from proyecto.captura import CampoContrasena, CampoDigitos, CampoGuiadoTexto, CampoUsuario
+from proyecto.dependencias import ConDependencias, depende
 
 from .models import Rol, Usuario
 from .permisos import DELEGABLES, PERMISOS, etiqueta, opciones
@@ -77,7 +78,7 @@ class FormularioActivacion(ContrasenaNueva):
     field_order = ["usuario", "codigo", "contrasena1", "contrasena2"]
 
 
-class FormularioRol(forms.ModelForm):
+class FormularioRol(ConDependencias, forms.ModelForm):
     permisos = forms.MultipleChoiceField(label="Permisos", choices=list(PERMISOS.items()), required=False, widget=forms.CheckboxSelectMultiple)
 
     class Meta:
@@ -86,7 +87,7 @@ class FormularioRol(forms.ModelForm):
         labels = {
             "nivel": "Nivel",
             "minutos_inactividad": "Minutos de inactividad antes de cerrar sesión",
-            "requiere_totp": "Exigir autenticador (obligatorio si aprueba)",
+            "requiere_totp": "Exigir autenticador",
         }
 
     def __init__(self, *args, **kwargs):
@@ -94,6 +95,8 @@ class FormularioRol(forms.ModelForm):
         self.fields["permisos"].choices = opciones()
         if self.instance.pk:
             self.initial["permisos"] = sorted(self.instance.permisos())
+        self.fields["requiere_totp"].help_text = "Obligatorio para un rol que aprueba solicitudes."
+        depende(self, "requiere_totp", "permisos", etiquetas={"aprobar_solicitudes": "Exigir autenticador (este rol aprueba solicitudes: es obligatorio)"})
 
     def clean(self):
         datos = super().clean()

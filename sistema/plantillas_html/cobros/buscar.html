@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load rezagos %}
 {% block contenido %}
 <div class="encabezado">
   <div class="encabezado-texto">
@@ -8,17 +7,5 @@
   </div>
 </div>
 {% if not turno %}<p class="mensaje warning">No tienes un turno abierto. <a href="{% url 'caja:inicio' %}">Abre tu turno</a> para cobrar.</p>{% endif %}
-<form method="get" class="buscador" role="search">
-  <label class="solo-lectores" for="buscar-cobro">Buscar</label>
-  <input id="buscar-cobro" type="search" name="q" value="{{ q }}" placeholder="Buscar {{ voc.titular_min }} por {{ voc.matricula_min }} o nombre" aria-label="Buscar" autofocus>
-  <button class="boton chico" type="submit">Buscar</button>
-</form>
-{% if resultados or q %}
-{% include "comun/_orden_formulario.html" %}
-<section class="panel">
-  <ul class="lista-estado">
-  {% for t in resultados %}<li><span class="renglon-texto"><a class="renglon-titulo" href="{% url 'cobros:cobrar' t.pk %}">{{ t.matricula_formateada }} · {{ t.nombre_completo }}</a>{% if t.agrupacion or t.familia %}<span class="renglon-detalle">{% if t.agrupacion %}{{ t.agrupacion }}{% endif %}{% if t.agrupacion and t.familia %} · {% endif %}{% if t.familia %}{{ voc.familia }} {{ t.familia }}{% endif %}</span>{% endif %}</span><span class="estado {{ t.estado }}">{{ t.get_estado_display }}</span>{% marca_rezago t resultados %}<a class="boton chico" href="{% url 'cobros:cobrar' t.pk %}">Cobrar</a></li>{% empty %}<li>Sin resultados.</li>{% endfor %}
-  </ul>
-</section>
-{% endif %}
+{% include "comun/_lista_titulares.html" %}
 {% endblock %}

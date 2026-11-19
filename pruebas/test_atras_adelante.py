@@ -19,7 +19,7 @@ from solicitudes.models import Solicitud
 
 from .banco_ayudas import cuenta_principal, estado, pdf, spei
 from .conftest import cliente
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de, verificar_sumas
+from .libro_ayudas import cobro_en_piezas, preparar_conceptos, titular_activo, turno_de, verificar_sumas
 
 class Formularios(HTMLParser):
     def __init__(self, ruta):
@@ -102,11 +102,14 @@ def test_cobro_reenviado_no_cobra_dos_veces(base):
     pagina = op.get(ruta)
     previa, otra_previa = dos_veces(op, pagina, ruta, {"importe": "500"})
     assert previa.status_code == 200 and otra_previa.status_code == 200 and not Pago.objects.exists()
-    primera, segunda = dos_veces(op, previa, ruta, {}, con="ficha")
+    cambio, _ = dos_veces(op, previa, ruta, {"r_50000": "1"}, con="ficha")
+    assert cambio.status_code == 200 and not Pago.objects.exists()
+    previa = cambio
+    primera, segunda = dos_veces(op, previa, ruta, {"r_50000": "1"}, con="ficha")
     assert Pago.objects.count() == 1
     assert primera.status_code == 302 and segunda.status_code == 302 and primera.url == segunda.url
     assert MENSAJE in op.get(segunda.url).content.decode()
-    sin_ficha = formulario(previa, ruta, con="ficha")["datos"]
+    sin_ficha = {**formulario(previa, ruta, con="ficha")["datos"], "r_50000": "1"}
     sin_ficha.pop(CAMPO)
     sin_ficha.pop("csrfmiddlewaretoken", None)
     op.post(ruta, sin_ficha)
@@ -126,7 +129,8 @@ def test_venta_reenviada_no_vende_dos_veces(base):
     ruta = reverse("inventario:vender_publico")
     previa, _ = dos_veces(op, op.get(ruta), ruta, {f"cantidad_{cuaderno.pk}": "2"})
     assert previa.status_code == 200 and not Venta.objects.exists()
-    primera, segunda = dos_veces(op, previa, ruta, {f"cantidad_{cuaderno.pk}": "2"}, con="ficha")
+    cambio, _ = dos_veces(op, previa, ruta, {f"cantidad_{cuaderno.pk}": "2", "r_10000": "1"}, con="ficha")
+    primera, segunda = dos_veces(op, cambio, ruta, {f"cantidad_{cuaderno.pk}": "2", "r_10000": "1"}, con="ficha")
     assert Venta.objects.count() == 1 and primera.url == segunda.url
     assert inventario.existencias()[cuaderno.pk] == 18
     venta = inventario.vender(ana, [(cuaderno.pk, 1)], Venta.ADEUDO, personas["op"])
@@ -143,11 +147,11 @@ def test_retiro_reenviado_no_retira_dos_veces(base):
     for clave, valor in (("tope_retiro_individual", 100000), ("tope_retiros_periodo", 300000), ("maximo_retiros_periodo", 5), ("periodo_retiros", "dia")):
         fijar(clave, valor)
     turno = turno_de(personas["op"])
-    libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=turno)
+    libro.registrar_pago(ana, 200000, Pago.EFECTIVO, personas["op"], turno=turno, piezas=cobro_en_piezas(200000))
     motivo = MotivoRetiro.objects.get(nombre="Compra de insumos")
     op = cliente(personas["op"])
     ruta = reverse("caja:retiro_nuevo")
-    primera, segunda = dos_veces(op, op.get(ruta), ruta, {"importe": "100", "motivo": motivo.pk, "nota": ""})
+    primera, segunda = dos_veces(op, op.get(ruta), ruta, {"importe": "100", "motivo": motivo.pk, "nota": "", "p_10000": "1"})
     assert RetiroCaja.objects.count() + Solicitud.objects.filter(accion="retiro_caja").count() == 1
     assert primera.status_code == 302 and segunda.url == primera.url
 
@@ -223,7 +227,9 @@ def test_redireccion_a_otro_sitio_no_se_repite(base):
     personas, ana = base
     EnvioUsado.objects.create(ficha="r" * 43, ruta="/x/", destino="https://otro.ejemplo/")
     respuesta = cliente(personas["op"]).post(reverse("caja:abrir"), {CAMPO: "r" * 43})
-    assert respuesta.status_code == 302 and respuesta.url == reverse("caja:abrir")
+    assert respuesta.status_code == 302 and respuesta.url == "/"
+    respuesta = cliente(personas["op"]).post(reverse("caja:abrir"), {CAMPO: "r" * 43}, HTTP_REFERER="http://testserver/caja/")
+    assert respuesta.status_code == 302 and respuesta.url == "http://testserver/caja/"
 
 
 def test_operaciones_de_datos_terminan_en_redireccion(personas, roles):

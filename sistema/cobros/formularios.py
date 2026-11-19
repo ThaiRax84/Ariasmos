@@ -4,7 +4,8 @@ from django import forms
 
 from nucleo.dinero import ErrorImporte, a_centavos, a_texto
 from proyecto.captura import CampoGuiadoTexto, EntradaDinero, EntradaPorcentaje
-from proyecto.plegables import ConPlegables, plegar, segun
+from proyecto.dependencias import ConDependencias, depende
+from proyecto.plegables import ConPlegables, plegar
 from titulares.models import Agrupacion, Titular
 
 from configuracion.models import opciones_vocabulario, vocabulario
@@ -88,14 +89,25 @@ class FormularioPago(forms.Form):
     importe = CampoImportePositivo(label="Importe recibido")
 
 
-class FormularioCargoManual(forms.Form):
+class FormularioCargoManual(ConDependencias, forms.Form):
     concepto = forms.ModelChoiceField(label="Concepto", queryset=ConceptoCobro.objects.none())
     cantidad = forms.IntegerField(label="Cantidad", min_value=1, max_value=1000, initial=1)
     importe_unitario = CampoImportePositivo(label="Importe por unidad (vacío = el del concepto)", required=False)
 
     def __init__(self, *args, **kwargs):
+        from tarifas.servicios import cantidad_maxima
+
         super().__init__(*args, **kwargs)
         self.fields["concepto"].queryset = ConceptoCobro.objects.filter(activo=True, tipo=ConceptoCobro.POR_EVENTO)
+        maximos = {c.pk: cantidad_maxima(c) for c in self.fields["concepto"].queryset}
+        por_cantidad = [pk for pk, maximo in maximos.items() if maximo > 1]
+        depende(self, "cantidad", "concepto", por_cantidad, maximos={pk: maximos[pk] for pk in por_cantidad})
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get("cantidad") is None and "cantidad" not in self.errors:
+            datos["cantidad"] = 1
+        return datos
 
 
 class FormularioBeca(forms.Form):
@@ -161,8 +173,8 @@ def valor_de_recargo(tipo, importe, porcentaje):
 
 
 class FormularioRegla(ConPlegables, forms.ModelForm):
-    valor_importe = CampoImporte(label="Importe fijo del recargo (si el tipo es importe fijo)", required=False, help_text="Ejemplo: 150.00")
-    valor_porcentaje = CampoPorcentaje(label="Porcentaje del recargo (si el tipo es porcentaje)", required=False, help_text="Sobre el saldo del cargo. Ejemplo: 10")
+    valor_importe = CampoImporte(label="Importe del recargo", required=False, help_text="Ejemplo: 150.00")
+    valor_porcentaje = CampoPorcentaje(label="Porcentaje del recargo", required=False, help_text="Sobre el saldo del cargo. Ejemplo: 10")
     tope_centavos = CampoImporte(label="Tope del recargo (opcional)", required=False, help_text="El recargo nunca pasa de esta cantidad. Vacío, sin tope.")
 
     class Meta:
@@ -177,7 +189,8 @@ class FormularioRegla(ConPlegables, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["tipo"].en_fila = True
-        segun(self, "tipo", {"valor_importe": (ReglaRecargo.FIJO, "Importe del recargo"), "valor_porcentaje": (ReglaRecargo.PORCENTAJE, "Porcentaje del recargo")})
+        depende(self, "valor_importe", "tipo", [ReglaRecargo.FIJO])
+        depende(self, "valor_porcentaje", "tipo", [ReglaRecargo.PORCENTAJE])
         plegar(self, "se_repite", "tope_centavos")
         if self.instance.pk:
             clave = "valor_porcentaje" if self.instance.tipo == ReglaRecargo.PORCENTAJE else "valor_importe"
@@ -198,18 +211,25 @@ def maximo_dia(periodicidad):
     return {"semanal": 7, "quincenal": 15}.get(periodicidad, 28)
 
 
-class FormularioConcepto(forms.ModelForm):
+ETIQUETAS_DIA = {
+    "semanal": "Día de la semana en que vence (1 lunes a 7 domingo)",
+    "quincenal": "Día en que vence la primera quincena (1 a 15)",
+    "": "Día de vencimiento (1 a 28)",
+}
+
+
+class FormularioConcepto(ConDependencias, forms.ModelForm):
     importe_centavos = CampoImporte(label="Importe por defecto")
 
     class Meta:
         model = ConceptoCobro
         fields = ["nombre", "tipo", "importe_centavos", "periodicidad", "dia_vencimiento", "regla_recargo", "aplica_a", "agrupacion", "prioridad", "activo"]
         labels = {
-            "periodicidad": "Periodicidad (solo recurrentes)",
-            "dia_vencimiento": "Día de vencimiento (1 a 28; semanal: 1 lunes a 7 domingo; quincenal: 1 a 15 para la primera quincena)",
+            "periodicidad": "Periodicidad",
+            "dia_vencimiento": "Día de vencimiento (1 a 28)",
             "regla_recargo": "Regla de recargo",
             "aplica_a": "Aplica a",
-            "agrupacion": "{agrupacion} (si aplica a una)",
+            "agrupacion": "{agrupacion}",
             "prioridad": "Prioridad de aplicación",
         }
 
@@ -217,9 +237,13 @@ class FormularioConcepto(forms.ModelForm):
         super().__init__(*args, **kwargs)
         voc = vocabulario()
         self.fields["agrupacion"].queryset = Agrupacion.objects.filter(activa=True)
-        self.fields["agrupacion"].label = f"{voc['agrupacion']} (si aplica a una)"
+        self.fields["agrupacion"].label = voc["agrupacion"]
         self.fields["aplica_a"].choices = opciones_vocabulario(ConceptoCobro.APLICA, voc)
         self.fields["regla_recargo"].queryset = ReglaRecargo.objects.filter(activa=True)
+        periodicidades = [clave for clave, _ in ConceptoCobro.PERIODICIDADES]
+        depende(self, "periodicidad", "tipo", [ConceptoCobro.RECURRENTE])
+        depende(self, "dia_vencimiento", "periodicidad", periodicidades, etiquetas={clave: ETIQUETAS_DIA.get(clave, ETIQUETAS_DIA[""]) for clave in periodicidades}, maximos={clave: maximo_dia(clave) for clave in periodicidades})
+        depende(self, "agrupacion", "aplica_a", [ConceptoCobro.AGRUPACION])
 
     def clean(self):
         datos = super().clean()

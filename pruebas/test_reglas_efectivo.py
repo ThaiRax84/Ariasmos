@@ -8,7 +8,7 @@ from solicitudes import motor
 from solicitudes.models import Solicitud
 
 from .conftest import cliente, codigo_actual
-from .libro_ayudas import preparar_conceptos, titular_activo, turno_de
+from .libro_ayudas import campos_piezas, preparar_conceptos, titular_activo, turno_de
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def test_quien_cobro_no_autoriza_por_codigo_su_reversion(base):
     turno = turno_de(personas["sup"])
     pago = libro.registrar_pago(ana, 50000, Pago.EFECTIVO, personas["sup"], turno=turno)
     turno_de(personas["op"], "Caja 2")
-    cliente(personas["op"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "error"})
+    cliente(personas["op"]).post(reverse("cobros:revertir", args=[pago.pk]), {"motivo": "error", **campos_piezas(pago.importe)})
     solicitud = Solicitud.objects.get(accion="revertir_pago")
     with pytest.raises(motor.ErrorSolicitud):
         motor.autorizar_con_codigo(solicitud, personas["op"], personas["sup"], codigo_actual(personas["sup"]))

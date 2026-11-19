@@ -24,8 +24,8 @@ from .libro_ayudas import preparar_conceptos, titular_activo
 from .test_asistente import paso_inicio
 
 
-def encender_piezas():
-    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "1"})
+def apagar_piezas():
+    Parametro.objects.update_or_create(clave="control_denominaciones", defaults={"valor": "0"})
 
 
 def una_caja():
@@ -102,8 +102,8 @@ def test_zona_de_la_computadora_solo_si_es_canonica(monkeypatch):
 def test_el_signo_sigue_al_tipo_en_reglas_de_recargo(personas):
     d = cliente(personas["dir"])
     pagina = d.get(reverse("cobros:regla_nueva")).content.decode()
-    importe = re.search(r'<div class="campo" data-mostrar-con="tipo" data-mostrar-valor="fijo"[^>]*>(.*?)</div>', pagina, re.S).group(1)
-    porcentaje = re.search(r'<div class="campo" data-mostrar-con="tipo" data-mostrar-valor="porcentaje"[^>]*>(.*?)</div>', pagina, re.S).group(1)
+    importe = re.search(r'<div class="campo" data-depende-de="tipo" data-mostrar-si="fijo"[^>]*>(.*?)</div>', pagina, re.S).group(1)
+    porcentaje = re.search(r'<div class="campo" data-depende-de="tipo" data-mostrar-si="porcentaje"[^>]*>(.*?)</div>', pagina, re.S).group(1)
     assert 'name="valor_importe"' in importe and ">$<" in importe and "%" not in importe
     assert 'name="valor_porcentaje"' in porcentaje and ">%<" in porcentaje and ">$<" not in porcentaje
     assert 'type="radio" name="tipo"' in pagina
@@ -117,19 +117,18 @@ def test_el_signo_sigue_al_tipo_en_reglas_de_recargo(personas):
 
 def test_cada_eleccion_de_porcentaje_o_importe_tiene_sus_dos_campos_dependientes(roles):
     formulario = FormularioRegla()
-    assert formulario.fields["valor_importe"].mostrar_si == ("tipo", ReglaRecargo.FIJO)
-    assert formulario.fields["valor_porcentaje"].mostrar_si == ("tipo", ReglaRecargo.PORCENTAJE)
+    assert (formulario.fields["valor_importe"].depende["control"], formulario.fields["valor_importe"].depende["valores"]) == ("tipo", [ReglaRecargo.FIJO])
+    assert (formulario.fields["valor_porcentaje"].depende["control"], formulario.fields["valor_porcentaje"].depende["valores"]) == ("tipo", [ReglaRecargo.PORCENTAJE])
     from cobros.models import ConceptoCobro
     from configuracion.formularios import FormularioAsistenteConceptos
 
     concepto = ConceptoCobro.objects.get(nombre="Colegiatura")
     asistente = FormularioAsistenteConceptos(conceptos=[concepto], con_recargo={concepto.nombre: {"tipo": "fijo"}})
-    assert asistente.fields[f"recargo_importe_{concepto.pk}"].mostrar_si == (f"recargo_tipo_{concepto.pk}", ReglaRecargo.FIJO)
-    assert asistente.fields[f"recargo_porcentaje_{concepto.pk}"].mostrar_si == (f"recargo_tipo_{concepto.pk}", ReglaRecargo.PORCENTAJE)
+    assert asistente.fields[f"recargo_importe_{concepto.pk}"].depende["valores"] == [ReglaRecargo.FIJO]
+    assert asistente.fields[f"recargo_porcentaje_{concepto.pk}"].depende["control"] == f"recargo_tipo_{concepto.pk}"
 
 
 def test_abrir_turno_pide_las_piezas_y_el_fondo_es_la_suma(personas):
-    encender_piezas()
     caja_1 = una_caja()
     op = cliente(personas["op"])
     pagina = op.get(reverse("caja:inicio")).content.decode()
@@ -144,7 +143,6 @@ def test_abrir_turno_pide_las_piezas_y_el_fondo_es_la_suma(personas):
 
 
 def test_abrir_en_cero_es_un_solo_paso(personas):
-    encender_piezas()
     op = cliente(personas["op"])
     assert op.post(reverse("caja:abrir"), {"caja": una_caja().pk, "apertura": "cero", "f_50000": "3"}).status_code == 302
     turno = Turno.objects.get()
@@ -152,6 +150,7 @@ def test_abrir_en_cero_es_un_solo_paso(personas):
 
 
 def test_sin_control_de_piezas_se_pide_solo_el_importe(personas):
+    apagar_piezas()
     op = cliente(personas["op"])
     pagina = op.get(reverse("caja:inicio")).content.decode()
     assert 'name="fondo_inicial"' in pagina and 'name="f_50000"' not in pagina
@@ -161,7 +160,6 @@ def test_sin_control_de_piezas_se_pide_solo_el_importe(personas):
 
 
 def test_abrir_con_piezas_invalidas_no_abre_y_conserva_lo_capturado(personas):
-    encender_piezas()
     op = cliente(personas["op"])
     respuesta = op.post(reverse("caja:abrir"), {"caja": una_caja().pk, "apertura": "efectivo", "f_50000": "-2", "f_10000": "3"})
     assert respuesta.status_code == 200 and not Turno.objects.exists()
@@ -171,7 +169,6 @@ def test_abrir_con_piezas_invalidas_no_abre_y_conserva_lo_capturado(personas):
 def test_con_fondo_en_piezas_el_cierre_sigue_siendo_ciego(personas):
     preparar_conceptos()
     ana = titular_activo(personas["op"], personas["sup"], "Ana")
-    encender_piezas()
     op = cliente(personas["op"])
     op.post(reverse("caja:abrir"), {"caja": una_caja().pk, "apertura": "efectivo", "f_20000": "3"})
     turno = Turno.objects.get()
@@ -189,7 +186,6 @@ def test_con_fondo_en_piezas_el_cierre_sigue_siendo_ciego(personas):
 
 
 def test_retiro_con_mosaicos_y_topes_a_la_vista(personas):
-    encender_piezas()
     op = cliente(personas["op"])
     op.post(reverse("caja:abrir"), {"caja": una_caja().pk, "apertura": "efectivo", "f_20000": "3"})
     pagina = op.get(reverse("caja:retiro_nuevo")).content.decode()
@@ -312,7 +308,7 @@ def test_consentimiento_oculto_no_borra_el_texto_guardado(roles):
     formulario = FormularioReglas({"prefijo_pais_telefono": "52", "digitos_telefono_nacional": "10", "tamano_hoja": "carta"}, valores={"texto_consentimiento": "Texto propio del negocio"})
     assert formulario.is_valid()
     assert formulario.valores()["texto_consentimiento"] == "Texto propio del negocio"
-    assert formulario.fields["texto_consentimiento"].mostrar_si == ("pedir_consentimiento", "on")
+    assert (formulario.fields["texto_consentimiento"].depende["control"], formulario.fields["texto_consentimiento"].depende["valores"]) == ("pedir_consentimiento", ["on"])
 
 
 def test_configuracion_explica_y_pliega(personas):

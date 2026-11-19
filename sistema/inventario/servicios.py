@@ -272,6 +272,14 @@ def _por_regresar(renglon, valor, cancelado):
     return max(0, min(valor - cancelado, pagado - regresado))
 
 
+def dinero_por_regresar(venta, cantidades):
+    total = 0
+    for renglon, cantidad, _ in validar_devolucion(venta, cantidades, incluir_pendientes=True).values():
+        valor = renglon.precio_unitario * cantidad
+        total += _por_regresar(renglon, valor, min(libro.saldo_de(renglon.cargo), valor))
+    return total
+
+
 def _regresar(devolucion, renglon, cantidad, buen_estado, usuario, dinero=0):
     RenglonDevolucion.objects.create(devolucion=devolucion, renglon=renglon, cantidad=cantidad, buen_estado=buen_estado, importe_dinero=dinero)
     MovimientoInventario.objects.create(articulo=renglon.articulo, tipo=MovimientoInventario.DEVOLUCION, cantidad=cantidad, usuario=usuario, devolucion=devolucion)

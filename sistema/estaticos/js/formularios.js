@@ -72,40 +72,6 @@
     }
   }
 
-  function prepararSegunTipo(formulario) {
-    var dependientes = Array.prototype.slice.call(formulario.querySelectorAll("[data-mostrar-con]"));
-    if (!dependientes.length) { return; }
-    var nombres = {};
-    dependientes.forEach(function (elemento) { nombres[elemento.getAttribute("data-mostrar-con")] = true; });
-
-    function valorDe(nombre) {
-      var marcado = formulario.querySelector('[name="' + nombre + '"]:checked');
-      if (marcado) { return marcado.value; }
-      var campo = formulario.querySelector('select[name="' + nombre + '"]');
-      return campo ? campo.value : "";
-    }
-
-    function pintar() {
-      dependientes.forEach(function (elemento) {
-        var mostrar = valorDe(elemento.getAttribute("data-mostrar-con")) === elemento.getAttribute("data-mostrar-valor");
-        elemento.hidden = !mostrar;
-        elemento.querySelectorAll("input, select, textarea").forEach(function (campo) { campo.disabled = !mostrar; });
-      });
-    }
-
-    dependientes.forEach(function (elemento) {
-      var corta = elemento.getAttribute("data-etiqueta-js");
-      var etiqueta = elemento.querySelector("label");
-      if (corta && etiqueta) { etiqueta.textContent = corta; }
-    });
-    Object.keys(nombres).forEach(function (nombre) {
-      formulario.querySelectorAll('[name="' + nombre + '"]').forEach(function (control) {
-        control.addEventListener("change", pintar);
-      });
-    });
-    pintar();
-  }
-
   function prepararEnvioAlCambiar() {
     document.querySelectorAll("[data-enviar-al-cambiar]").forEach(function (control) {
       var formulario = control.form;
@@ -125,7 +91,6 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("select[data-buscar-zona]").forEach(prepararZona);
-    document.querySelectorAll("form").forEach(prepararSegunTipo);
     prepararEnvioAlCambiar();
     prepararPlegables();
   });
