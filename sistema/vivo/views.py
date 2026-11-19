@@ -47,6 +47,8 @@ def pulso(request):
 def ultimo(request):
     from django.shortcuts import render
 
+    if not _equipo_aprobado(request):
+        return _json({"error": "equipo"}, status=403)
     if excedida(request, "ultimo", PULSO_POR_MINUTO, 60):
         return _json({"error": "espera"}, status=429)
     return render(request, "vivo/ultimo.html", {"pagos": pagos_recientes(request.user, ULTIMOS)})
