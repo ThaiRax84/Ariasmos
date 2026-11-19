@@ -81,9 +81,9 @@ def _logico(valor, ruta):
 
 def _denominacion(valor, ruta):
     if isinstance(valor, int) and not isinstance(valor, bool):
-        return {"valor": _entero(valor, ruta, 1, 100000000), "tipo": "billete"}
-    _objeto(valor, ruta, ("valor", "tipo"), ("valor",))
-    return {"valor": _entero(valor["valor"], f"{ruta}.valor", 1, 100000000), "tipo": _opcion(valor.get("tipo", "billete"), f"{ruta}.tipo", ("billete", "moneda"))}
+        return {"centavos": _entero(valor, ruta, 1, 100000000), "tipo": "billete"}
+    _objeto(valor, ruta, ("centavos", "tipo"), ("centavos",))
+    return {"centavos": _entero(valor["centavos"], f"{ruta}.centavos", 1, 100000000), "tipo": _opcion(valor.get("tipo", "billete"), f"{ruta}.tipo", ("billete", "moneda"))}
 
 
 def _opcion(valor, ruta, opciones):
@@ -310,7 +310,7 @@ def validar(datos):
     limpia["inventario"] = _inventario(datos.get("inventario", {}), "inventario")
     denominaciones = _lista(datos.get("denominaciones", []), "denominaciones", "denominaciones")
     limpia["denominaciones"] = [_denominacion(v, f"denominaciones[{i}]") for i, v in enumerate(denominaciones)]
-    if len({d["valor"] for d in limpia["denominaciones"]}) != len(limpia["denominaciones"]):
+    if len({d["centavos"] for d in limpia["denominaciones"]}) != len(limpia["denominaciones"]):
         _falla("denominaciones", "valor repetido")
     campos = _lista(datos.get("campos_contacto", []), "campos_contacto", "campos_contacto")
     limpia["campos_contacto"] = [_campo(c, f"campos_contacto[{i}]") for i, c in enumerate(campos)]

@@ -398,7 +398,7 @@ def test_billete_o_moneda_es_dato_de_cada_denominacion(personas, turno, padron):
     from configuracion import plantillas
 
     for nombre in ("escuela", "academia", "gimnasio", "rentas", "servicios", "generico"):
-        tipos = {d["valor"]: d["tipo"] for d in plantillas.leer(nombre)["denominaciones"]}
+        tipos = {d["centavos"]: d["tipo"] for d in plantillas.leer(nombre)["denominaciones"]}
         assert "moneda" in tipos.values() and "billete" in tipos.values()
     Denominacion.objects.filter(valor=1000).update(tipo=Denominacion.MONEDA)
     texto = cliente(personas["op"]).get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1"}).content.decode()
