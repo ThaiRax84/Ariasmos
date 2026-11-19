@@ -408,8 +408,8 @@ def caja(request):
         with transaction.atomic():
             guardar_caja(nuevos)
             if piezas is not None:
-                for valor in piezas.cleaned_data["denominaciones"]:
-                    Denominacion.objects.get_or_create(valor=valor)
+                for valor, tipo in piezas.piezas():
+                    Denominacion.objects.get_or_create(valor=valor, defaults={"tipo": tipo})
                 registrar("asistente_denominaciones", datos={"moneda": negocio.moneda, "denominaciones": piezas.cleaned_data["denominaciones"]}, request=request)
             registrar("asistente_caja", datos={"cambios": diferencias(antes, valores_caja()), "origen": "asistente"}, request=request)
         return redirect("asistente:reglas")

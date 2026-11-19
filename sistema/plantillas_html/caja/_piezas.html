@@ -1,5 +1,5 @@
 {% load formato %}<div class="piezas"{% if mosaicos %} data-mosaicos data-simbolo="{{ moneda.simbolo }}" data-moneda="{{ moneda.codigo }}"{% endif %}{% if total %} data-total="{{ total }}"{% endif %}>{% for campo in campos %}
-  <div class="pieza{% if campo.errors %} con-error{% endif %}" data-centavos="{{ campo.name|slice:'2:' }}">
+  <div class="pieza{% if campo.errors %} con-error{% endif %}" data-centavos="{{ campo.name|slice:'2:' }}" data-tipo="{{ campo.field.tipo_pieza }}" data-rotulo="{{ campo.field.rotulo_pieza }}">
     <label class="denominacion" for="{{ campo.id_for_label }}"><span class="solo-lectores">{{ prefijo }} </span>{{ campo.label|denominacion_corta }}</label>
     {{ campo }}
     {% for e in campo.errors %}<p class="error">{{ e }}</p>{% endfor %}

@@ -333,3 +333,89 @@ def test_aplicar_varios_depositos_con_las_mismas_reglas_que_uno(personas, padron
     assert respuesta.status_code == 302
     assert Pago.objects.filter(medio=Pago.BANCO).count() == 2
     assert Evento.objects.filter(accion="movimiento_confirmado").count() == 2
+
+
+@pytest.fixture
+def con_rezago(personas, padron):
+    from datetime import timedelta
+
+    from configuracion.models import hoy_negocio
+    from rezagos.models import ReglaRezago
+
+    if not ReglaRezago.objects.filter(activa=True).exists():
+        ReglaRezago.objects.create(nombre="Atraso general", texto="Pago atrasado", dias_minimos=5, aviso_inicio=True, marca=True, cobranza=True)
+    carla = alta(personas, "Carla", "Atrasada")
+    concepto = ConceptoCobro.objects.get(nombre="Inscripción")
+    libro.crear_cargo(carla, concepto, 90000, hoy_negocio() - timedelta(days=45), Cargo.MANUAL, usuario=personas["sup"])
+    return carla
+
+
+def test_filtros_de_cobrar_con_cuenta_y_permisos(personas, padron, con_rezago):
+    c = cliente(personas["sup"])
+    texto = c.get(reverse("cobros:buscar")).content.decode()
+    assert 'data-estado=""' in texto and 'data-estado="adeudo"' in texto and 'data-estado="rezago"' in texto
+    adeudo = c.get(reverse("cobros:buscar"), {"estado": "adeudo"}).content.decode()
+    assert "Ana Zamora" in adeudo and "Carla Atrasada" in adeudo and "Beto Alcalá" not in adeudo
+    rezago = c.get(reverse("cobros:buscar"), {"estado": "rezago"}).content.decode()
+    assert "Carla Atrasada" in rezago and "Ana Zamora" not in rezago
+    PermisoRol.objects.filter(rol=personas["op"].rol, permiso="ver_titulares").delete()
+    sin = cliente(personas["op"])
+    texto = sin.get(reverse("cobros:buscar")).content.decode()
+    assert 'data-estado="adeudo"' not in texto and 'data-estado="rezago"' in texto
+    ignorado = sin.get(reverse("cobros:buscar"), {"estado": "adeudo"}).content.decode()
+    assert "Beto Alcalá" in ignorado and "Ana Zamora" in ignorado
+
+
+def test_filtros_de_cobrar_sin_una_consulta_por_renglon(personas, padron, con_rezago):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    c = cliente(personas["sup"])
+    c.get(reverse("cobros:buscar"), {"estado": "adeudo"})
+    with CaptureQueriesContext(connection) as pocas:
+        c.get(reverse("cobros:buscar"), {"estado": "adeudo"})
+    for numero in range(15):
+        titular = alta(personas, f"Extra{numero:02d}", "Deudor")
+        libro.crear_cargo(titular, ConceptoCobro.objects.get(nombre="Inscripción"), 1000, Titular.objects.get(pk=titular.pk).creado.date(), Cargo.MANUAL, usuario=personas["sup"])
+    with CaptureQueriesContext(connection) as muchas:
+        c.get(reverse("cobros:buscar"), {"estado": "adeudo"})
+    assert len(muchas.captured_queries) <= len(pocas.captured_queries) + 2
+
+
+def test_paleta_vacia_muestra_tres_rezagados_con_adeudo_segun_permiso(personas, padron, con_rezago):
+    datos = cliente(personas["sup"]).get(reverse("ir"), {"q": ""}).json()["resultados"]
+    rezagados = [r for r in datos if r["grupo"] == "Rezagados"]
+    assert [r["titulo"] for r in rezagados] == ["Carla Atrasada"] and "900.00" in rezagados[0]["lado"]
+    PermisoRol.objects.filter(rol=personas["op"].rol, permiso="ver_titulares").delete()
+    sin = cliente(personas["op"]).get(reverse("ir"), {"q": ""}).json()["resultados"]
+    assert [r["titulo"] for r in sin if r["grupo"] == "Rezagados"] == ["Carla Atrasada"]
+    assert all("lado" not in r for r in sin)
+
+
+def test_billete_o_moneda_es_dato_de_cada_denominacion(personas, turno, padron):
+    from caja.models import Denominacion
+
+    from configuracion import plantillas
+
+    for nombre in ("escuela", "academia", "gimnasio", "rentas", "servicios", "generico"):
+        tipos = {d["valor"]: d["tipo"] for d in plantillas.leer(nombre)["denominaciones"]}
+        assert "moneda" in tipos.values() and "billete" in tipos.values()
+    Denominacion.objects.filter(valor=1000).update(tipo=Denominacion.MONEDA)
+    texto = cliente(personas["op"]).get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1"}).content.decode()
+    assert 'data-centavos="1000" data-tipo="moneda" data-rotulo="moneda"' in texto
+    assert 'data-centavos="50000" data-tipo="billete" data-rotulo="billete"' in texto
+    d = cliente(personas["dir"])
+    pk = Denominacion.objects.get(valor=1000).pk
+    pagina = d.get(reverse("configuracion:catalogo_editar", args=["denominaciones", pk])).content.decode()
+    assert "¿Es billete o moneda?" in pagina
+
+
+def test_la_migracion_deja_billete_en_lo_que_ya_existe():
+    import importlib
+
+    from caja.models import Denominacion
+
+    campo = Denominacion._meta.get_field("tipo")
+    assert campo.default == Denominacion.BILLETE
+    migracion = importlib.import_module("caja.migrations.0006_tipo_denominacion")
+    assert migracion.Migration.operations[0].field.default == "billete"

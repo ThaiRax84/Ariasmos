@@ -298,10 +298,11 @@ class FormularioCaja(forms.ModelForm):
 
 class FormularioDenominacion(forms.ModelForm):
     valor = CampoImporte(label="Valor")
+    tipo = forms.ChoiceField(label="¿Es billete o moneda?", choices=[("billete", "Billete"), ("moneda", "Moneda")], initial="billete", widget=forms.RadioSelect)
 
     class Meta:
         model = Denominacion
-        fields = ["valor", "activa"]
+        fields = ["valor", "tipo", "activa"]
 
     def clean_valor(self):
         valor = self.cleaned_data["valor"]
@@ -584,6 +585,7 @@ def denominaciones_de_texto(texto):
 
 class FormularioDenominacionesMoneda(forms.Form):
     denominaciones = forms.CharField(label="Billetes y monedas de tu moneda, separados por comas (por ejemplo: 100, 50, 20, 10, 5, 1, 0.50)", max_length=300)
+    monedas = forms.CharField(label="¿Cuáles de esos son monedas? Escríbelos igual, separados por comas; los demás se toman como billetes", max_length=300, required=False)
 
     def __init__(self, *args, codigo="", **kwargs):
         super().__init__(*args, **kwargs)
@@ -595,6 +597,20 @@ class FormularioDenominacionesMoneda(forms.Form):
         if not valores:
             raise forms.ValidationError("Escribe al menos una denominación.")
         return valores
+
+    def clean_monedas(self):
+        texto = self.cleaned_data.get("monedas", "")
+        return denominaciones_de_texto(texto) if texto.strip() else []
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get("denominaciones") and set(datos.get("monedas") or []) - set(datos["denominaciones"]):
+            self.add_error("monedas", "Escribe solo valores que estén en la lista de arriba.")
+        return datos
+
+    def piezas(self):
+        monedas = set(self.cleaned_data.get("monedas") or [])
+        return [(valor, "moneda" if valor in monedas else "billete") for valor in self.cleaned_data["denominaciones"]]
 
 
 TAMANOS_HOJA = (("carta", "Carta"), ("a4", "A4"))

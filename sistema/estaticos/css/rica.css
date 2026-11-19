@@ -371,3 +371,10 @@ form[data-cola-banco] .barra-flotante { align-self: center; }
 .editable .icono-lapiz { opacity: 0; transition: opacity var(--t-ui) ease; color: var(--suave); }
 .editable:hover .icono-lapiz, .editable:focus-visible .icono-lapiz { opacity: 1; }
 .campana.suena .icono-svg { animation: suena 700ms ease; transform-origin: 50% 10%; }
+a.filtro[aria-pressed] { cursor: pointer; transition: border-color var(--t-ui) ease, background var(--t-ui) ease; }
+a.filtro[aria-pressed]:hover { border-color: var(--tinta); }
+a.filtro[aria-pressed="true"] { border-color: var(--primario); background: var(--tinte); }
+[data-lista-viva] > .chips { margin-bottom: 8px; }
+.pieza.es-moneda .mosaico, .mosaico.es-moneda { border-radius: 34px; }
+.pieza.es-moneda .mosaico-quitar { border-radius: 34px 0 0 34px; }
+.pieza.es-moneda.elegida .mosaico { border-radius: 0 34px 34px 0; }

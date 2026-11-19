@@ -496,6 +496,18 @@
       abrirPanel(renglon);
       return;
     }
+    var chip = objetivo.closest && objetivo.closest("[data-lista-viva] a.filtro[data-estado]");
+    if (chip && !(evento.ctrlKey || evento.metaKey || evento.shiftKey)) {
+      var oculto = $("[data-estado-lista]");
+      var buscador = oculto && oculto.form && $("input[type='search']", oculto.form);
+      if (oculto && buscador && window.fetch) {
+        evento.preventDefault();
+        oculto.value = chip.getAttribute("data-estado");
+        $$("a.filtro[data-estado]", chip.parentElement).forEach(function (c) { c.setAttribute("aria-pressed", c === chip ? "true" : "false"); });
+        buscador.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+    }
     var recargar = objetivo.closest && objetivo.closest("[data-recargar-panel]");
     if (recargar && cajaPanel() && cajaPanel().contains(recargar)) {
       evento.preventDefault();

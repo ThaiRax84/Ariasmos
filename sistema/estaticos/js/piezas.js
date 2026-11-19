@@ -76,13 +76,15 @@
       quitar.type = "button";
       quitar.setAttribute("aria-label", "Quitar una pieza de " + nombre);
       pieza.classList.add("con-mosaico");
+      if (pieza.getAttribute("data-tipo") === "moneda") { pieza.classList.add("es-moneda"); }
+      var rotulo = pieza.getAttribute("data-rotulo") || "\u2014";
       pieza.insertBefore(tocar, pieza.firstChild);
       pieza.appendChild(quitar);
       var tecleo = 0;
 
       function pintar() {
         var piezasActuales = leer(campo);
-        cuenta.textContent = piezasActuales > 0 ? "\u00d7 " + piezasActuales : "\u2014";
+        cuenta.textContent = piezasActuales > 0 ? "\u00d7 " + piezasActuales : rotulo;
         tocar.setAttribute("aria-label", "Agregar una pieza de " + nombre + ". Llevas " + piezasActuales);
         pieza.classList.toggle("elegida", piezasActuales > 0);
         quitar.tabIndex = piezasActuales > 0 ? 0 : -1;

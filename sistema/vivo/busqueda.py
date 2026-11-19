@@ -54,14 +54,33 @@ def _pantallas(permisos, voc, buscado):
     return resultado
 
 
+MAXIMO_REZAGADOS = 3
+
+
+def _rezagados(usuario):
+    from rezagos import calculo
+    from rezagos.presentacion import ve_dirigidas
+
+    dirigidas = ve_dirigidas(usuario)
+    situaciones = sorted((s for s in calculo.evaluar().values() if s.aviso or s.marcas(dirigidas)), key=lambda s: (-s.dias, -s.vencido, s.titular_id))
+    ids = [s.titular_id for s in situaciones[: MAXIMO_REZAGADOS * 3]]
+    por_id = {t.pk: t for t in Titular.objects.filter(pk__in=ids, estado=Titular.ACTIVO).select_related("agrupacion")}
+    return [por_id[pk] for pk in ids if pk in por_id][:MAXIMO_REZAGADOS]
+
+
 def _personas(usuario, permisos, voc, texto):
     cobra = "registrar_pago_efectivo" in permisos
     mira = "ver_titulares" in permisos
-    if not texto or not (cobra or mira):
+    if not (cobra or mira):
         return []
+    if not texto:
+        return [dict(fila, grupo="Rezagados") for fila in _filas(usuario, cobra, voc, _rezagados(usuario))]
     estados = [Titular.ACTIVO] if not mira else [e for e, _ in Titular.ESTADOS if e != Titular.RECHAZADO]
     consulta = lista.filtrar(Titular.objects.filter(estado__in=estados).select_related("agrupacion"), texto).order_by("apellidos", "nombre", "id")[:MAXIMO_PERSONAS]
-    filas = list(consulta)
+    return _filas(usuario, cobra, voc, list(consulta))
+
+
+def _filas(usuario, cobra, voc, filas):
     saldos = ve_saldos(usuario)
     deudas = lista.adeudos([t.pk for t in filas]) if saldos else {}
     resultado = []

@@ -1124,7 +1124,10 @@ Origen: prototipo aprobado por el dueño el 18/11/2026. Se parte de la interfaz 
 
 ### 26.8 Lo que quedó fuera de la fase 11
 
-- Los filtros «Todos / Con adeudo / Rezagados» de la lista de cobrar (el orden sigue siendo el guardado de §23.4, con su selector).
-- La forma redonda de las monedas en los mosaicos: no hay un dato configurable que diga qué denominación es moneda y no se fija en el código.
-- Rezagados en la paleta cuando no se ha escrito nada.
 - Ninguna ruta de avisos entrantes de proveedores: la interfaz `leer_aviso` existe, pero abrir una ruta pública se decide cuando haya proveedor.
+
+### 26.9 Cierre para quedar igual que el prototipo
+
+- **Filtros de Cobrar** («Todos / Con adeudo / Rezagados» con su cuenta): parámetro `estado` por GET en `titulares/lista.py`, también con el filtro en vivo y con los renglones que se reacomodan. «Rezagados» son quienes tienen aviso o marca de rezago visible para esa persona y lo ve todo el que cobra. «Con adeudo» y su cuenta solo para quien ve saldos; a los demás no se les muestra y el parámetro se ignora. Consultas agregadas, sin una por renglón.
+- **Billete o moneda** es un dato de cada denominación (`Denominacion.tipo`), con migración que deja «billete» en lo existente. Va en las seis plantillas, se edita en Configuración › Denominaciones («¿Es billete o moneda?») y el asistente lo pregunta cuando la moneda no es la de la plantilla. Los mosaicos de moneda son redondos y, sin piezas, dicen «billete» o «moneda».
+- **Buscar o ir a** con la caja vacía muestra los tres primeros rezagados; el adeudo solo a quien ve saldos.

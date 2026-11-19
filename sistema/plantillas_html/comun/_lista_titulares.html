@@ -4,21 +4,23 @@
   <input id="filtro-{{ titulo_lista }}" type="search" name="q" value="{{ q }}" maxlength="60" placeholder="Escribe un nombre para encontrarlo más rápido" title="Puedes escribir nombre, apellidos, {{ voc.matricula_min }}, {{ voc.agrupacion_min }} o {{ voc.familia_min }}" aria-label="Filtrar la lista" aria-controls="lista-{{ titulo_lista }}" autocomplete="off" autofocus data-filtro-lista>
   <input type="hidden" name="{{ orden.parametro }}" value="{{ orden.clave }}">
   <input type="hidden" name="{{ orden.parametro_sentido }}" value="{{ orden.sentido }}">
+  {% if filtros %}<input type="hidden" name="estado" value="{{ estado }}" data-estado-lista>{% endif %}
   <kbd class="solo-con-js" hidden>/</kbd>
   <button class="boton chico" type="submit" data-solo-sin-js>Buscar</button>
 </form>
 {% include "comun/_orden_formulario.html" %}
 </div>
 <div id="lista-{{ titulo_lista }}" data-lista-viva data-vivo="titulares cobros" aria-live="polite">
+  {% if filtros %}<nav class="chips" aria-label="Mostrar">{% for f in filtros %}<a class="filtro" href="?q={{ q|urlencode }}&amp;{{ orden.parametro }}={{ orden.clave }}&amp;{{ orden.parametro_sentido }}={{ orden.sentido }}{% if f.clave != 'todos' %}&amp;estado={{ f.clave }}{% endif %}" data-estado="{% if f.clave != 'todos' %}{{ f.clave }}{% endif %}" aria-pressed="{% if f.clave == estado or f.clave == 'todos' and not estado %}true{% else %}false{% endif %}">{% if f.clave == "todos" %}Todos{% elif f.clave == "adeudo" %}Con adeudo{% else %}Rezagados{% endif %}<span class="cuenta">{{ f.cuenta }}</span></a>{% endfor %}</nav>{% endif %}
   <p class="ayuda">{% if q %}Coinciden con «{{ q }}»: {{ pagina.paginator.count }}.{% else %}En la lista: {{ pagina.paginator.count }}.{% endif %} Toca a quien quieras {{ accion|lower }}.</p>
   <ul class="lista-titulares" data-q="{{ q }}">
   {% for t in filas %}<li><a class="renglon-titular" href="{% url destino t.pk %}" data-id="{{ t.pk }}"{% if con_panel %} data-abre-panel="{% url destino t.pk %}?panel=1"{% endif %}><span class="avatar" aria-hidden="true">{{ t.nombre_completo|iniciales }}</span><span class="renglon-texto"><span class="nombre" data-resaltar>{{ t.nombre_completo }}</span><span class="datos-linea"><span data-resaltar>{{ voc.matricula }} {{ t.matricula_formateada }}</span>{% if t.agrupacion %} · <span data-resaltar>{{ t.agrupacion }}</span>{% endif %}{% if t.familia %} · <span data-resaltar>{{ voc.familia }} {{ t.familia }}</span>{% endif %}</span></span><span class="estado-renglon">{% marca_rezago t filas %}</span>{% if ve_saldos %}<span class="adeudo{% if not t.adeudo %} cero{% endif %}">{% if t.adeudo %}Debe {{ t.adeudo|dinero }}{% else %}Al corriente{% endif %}</span>{% endif %}<span class="va" aria-hidden="true"></span><span class="solo-lectores">{{ accion }}</span></a></li>
   {% empty %}<li class="vacio"><span class="renglon-titulo">{% if q %}Nadie de la lista coincide con «{{ q }}».{% else %}Todavía no hay {{ voc.titulares_min }} en la lista.{% endif %}</span>{% if q %} <button class="enlace solo-con-js" type="button" data-accion="paleta" hidden>Buscar entre todos</button>{% endif %}</li>{% endfor %}
   </ul>
   {% if pagina.has_other_pages %}<nav class="paginacion fila entre" aria-label="Páginas">
-    {% if pagina.has_previous %}<a class="boton secundario chico" href="?q={{ q|urlencode }}&amp;{{ orden.parametro }}={{ orden.clave }}&amp;{{ orden.parametro_sentido }}={{ orden.sentido }}&amp;pagina={{ pagina.previous_page_number }}">Anterior</a>{% else %}<span></span>{% endif %}
+    {% if pagina.has_previous %}<a class="boton secundario chico" href="?q={{ q|urlencode }}&amp;{{ orden.parametro }}={{ orden.clave }}&amp;{{ orden.parametro_sentido }}={{ orden.sentido }}{% if estado %}&amp;estado={{ estado }}{% endif %}&amp;pagina={{ pagina.previous_page_number }}">Anterior</a>{% else %}<span></span>{% endif %}
     <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
-    {% if pagina.has_next %}<a class="boton secundario chico" href="?q={{ q|urlencode }}&amp;{{ orden.parametro }}={{ orden.clave }}&amp;{{ orden.parametro_sentido }}={{ orden.sentido }}&amp;pagina={{ pagina.next_page_number }}">Siguiente</a>{% else %}<span></span>{% endif %}
+    {% if pagina.has_next %}<a class="boton secundario chico" href="?q={{ q|urlencode }}&amp;{{ orden.parametro }}={{ orden.clave }}&amp;{{ orden.parametro_sentido }}={{ orden.sentido }}{% if estado %}&amp;estado={{ estado }}{% endif %}&amp;pagina={{ pagina.next_page_number }}">Siguiente</a>{% else %}<span></span>{% endif %}
   </nav>{% endif %}
   <div class="pie-lista solo-con-js" hidden><span>{{ filas|length }} de {{ pagina.paginator.count }}</span><span>También puedes moverte con <kbd>↑</kbd> <kbd>↓</kbd> y abrir con <kbd>Enter</kbd></span></div>
 {% if completos %}<section class="panel">

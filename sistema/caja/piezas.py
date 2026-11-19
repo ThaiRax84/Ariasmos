@@ -109,6 +109,8 @@ def campos(formulario, prefijo, etiqueta, requerido=False):
         nombre = f"{prefijo}{denominacion.valor}"
         campo = forms.IntegerField(label=f"{etiqueta} {denominacion}", min_value=0, max_value=MAXIMO_PIEZAS, required=requerido, initial=0)
         campo.pieza = denominacion.valor
+        campo.tipo_pieza = denominacion.tipo
+        campo.rotulo_pieza = denominacion.get_tipo_display().lower()
         formulario.fields[nombre] = campo
         nombres.append((nombre, denominacion.valor))
     return nombres

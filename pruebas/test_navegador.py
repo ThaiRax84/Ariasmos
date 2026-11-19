@@ -181,7 +181,6 @@ def test_inicio_con_cifras_grafica_y_solicitudes_que_se_deshacen(sesion_navegado
 
     datos = preparar(con_turno=False)
     caja.abrir_turno(datos["op"], Caja.objects.filter(activa=True).first(), 37000, piezas={"10000": 2, "5000": 2, "2000": 5, "1000": 5, "500": 4})
-    turno = Turno.objects.get(usuario=datos["op"])
     libro.registrar_pago(datos["titulares"][2], 50000, Pago.EFECTIVO, datos["op"], turno=turno, piezas={"recibidas": {"50000": 1}, "cambio": {}})
     solicitudes = []
     for nombre in ("Eva", "Fede"):
@@ -307,4 +306,71 @@ def test_abrir_turno_de_fabrica_con_mosaicos_dependencias_y_movimiento_reducido(
     pagina.locator(".pieza[data-centavos='100000'] .mosaico").click()
     assert pagina.locator("[data-recibido-cobro]").inner_text().startswith("$1,000.00")
     assert pagina.locator(".vuela").count() == 0
+    sin_errores(sesion_navegador)
+
+
+def test_ventana_angosta_cajon_con_velo_y_filtros_que_reacomodan(sesion_navegador):
+    from datetime import timedelta
+
+    from rezagos.models import ReglaRezago
+
+    datos = preparar()
+    if not ReglaRezago.objects.filter(activa=True).exists():
+        ReglaRezago.objects.create(nombre="Atraso general", texto="Pago atrasado", dias_minimos=5, aviso_inicio=True, marca=True, cobranza=True)
+    dario = datos["titulares"][3]
+    libro.crear_cargo(dario, ConceptoCobro.objects.filter(activo=True).first(), 50000, hoy_negocio() - timedelta(days=40), Cargo.MANUAL, descripcion="Atrasado")
+    pagina = sesion_navegador.pagina(datos["op"], ancho=820, alto=900)
+    sesion_navegador.ir(pagina, reverse("cobros:buscar"))
+    espera(pagina.locator(".lista-titulares .renglon-titular")).to_have_count(4)
+    pagina.locator("a.filtro[data-estado='rezago']").click()
+    espera(pagina.locator(".lista-titulares .renglon-titular")).to_have_count(1)
+    assert pagina.locator("a.filtro[data-estado='rezago']").get_attribute("aria-pressed") == "true"
+    assert "estado=rezago" in pagina.url
+    pagina.locator("a.filtro[data-estado='']").click()
+    espera(pagina.locator(".lista-titulares .renglon-titular")).to_have_count(4)
+    pagina.locator(".renglon-titular").first.click()
+    pagina.wait_for_selector("#panel-cobro [data-cobro-efectivo]")
+    pagina.wait_for_timeout(400)
+    sesion_navegador.captura(pagina, "cajon-angosto")
+    caja_panel = pagina.locator("#panel-cobro > .panel").bounding_box()
+    assert caja_panel["x"] + caja_panel["width"] <= 821 and caja_panel["x"] >= 300
+    assert pagina.locator("#panel-cobro .velo").is_visible()
+    pagina.keyboard.press("Escape")
+    pagina.wait_for_timeout(400)
+    assert "abierta" not in pagina.locator("[data-cobro-rejilla]").get_attribute("class")
+    pagina.locator(".renglon-titular").first.click()
+    pagina.wait_for_selector("#panel-cobro [data-cobro-efectivo]")
+    pagina.mouse.click(40, 600)
+    pagina.wait_for_timeout(400)
+    assert "abierta" not in pagina.locator("[data-cobro-rejilla]").get_attribute("class")
+    sin_errores(sesion_navegador)
+
+
+def test_soltar_el_archivo_del_banco_en_la_zona(sesion_navegador):
+    from .banco_ayudas import cuenta_principal
+
+    correr_asistente("escuela")
+    director = nuevo_usuario("director", Rol.objects.get(nombre="Dirección"))
+    cuenta_principal()
+    pagina = sesion_navegador.pagina(director)
+    sesion_navegador.ir(pagina, reverse("conciliacion:importar"))
+    if "confirmar" in pagina.url:
+        pagina.locator("input[type='password']").fill("Contrasena-de-prueba-2026")
+        pagina.locator("form button[type='submit']").first.click()
+        pagina.wait_for_load_state("networkidle")
+    zona = pagina.locator("[data-zona-soltar]")
+    assert zona.is_visible()
+    pagina.locator("select[name='cuenta']").select_option(index=1)
+    sesion_navegador.captura(pagina, "banco-soltar")
+    with pagina.expect_navigation():
+        pagina.evaluate("""() => {
+            const dt = new DataTransfer();
+            dt.items.add(new File(["Fecha,Concepto,Abono,Cargo\\n10/11/2026,PAGO,1850.00,\\n"], "movimientos.csv", { type: "text/csv" }));
+            const zona = document.querySelector("[data-zona-soltar]");
+            zona.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true }));
+            zona.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+        }""")
+    pagina.wait_for_load_state("networkidle")
+    sesion_navegador.captura(pagina, "banco-soltado")
+    assert "/banco/importar/" in pagina.url and pagina.url.rstrip("/") != (sesion_navegador.servidor + reverse("conciliacion:importar")).rstrip("/")
     sin_errores(sesion_navegador)

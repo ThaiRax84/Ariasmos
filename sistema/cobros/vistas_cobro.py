@@ -58,7 +58,7 @@ def _miembros(titular):
 def buscar(request):
     from titulares import lista
 
-    contexto = lista.preparar(request, "cobrar", [Titular.ACTIVO])
+    contexto = lista.preparar(request, "cobrar", [Titular.ACTIVO], con_filtros=True)
     contexto.update({"turno": turno_abierto(request.user), "destino": "cobros:cobrar", "accion": "Cobrar", "titulo_lista": "cobrar", "con_panel": True})
     return render(request, "cobros/buscar.html", contexto)
 
