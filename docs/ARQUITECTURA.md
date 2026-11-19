@@ -1,6 +1,6 @@
 # Arquitectura — Sistema de cobro y control de titulares
 
-Versión 0.21 · 18/11/2026 · Estado: fases 1 a 8b construidas (0.9.0); fase 9a (configurador y caja más cómodos, §23) en construcción; fase 9b (tarifas por agrupación, límites de adeudo y rezagados) en diseño; fase 6b (facturación, §17) diseñada.
+Versión 0.22 · 18/11/2026 · Estado: fases 1 a 9b construidas (0.9.1); fase 10 (efectivo siempre contado, formularios que se adaptan, cobrar con lista y pantallas en vivo, §25) en construcción; fase 6b (facturación, §17) diseñada.
 
 Este documento es la especificación. Quien construye sigue lo que dice aquí; cualquier cambio de diseño se propone primero y se implementa después.
 
@@ -500,6 +500,7 @@ instancia/         (ignorada) claves, base, configuración local
 | 8b | Nada fijo de un negocio: vocabulario completo, reportes, banco, reglas configurables y cobros semanales y quincenales (§22) |
 | 9a | Configurador y caja más cómodos: zona horaria en lista, signo según el tipo, apertura de turno con piezas, orden en los buscadores, pantallas de caja como el diseño aprobado (§23) |
 | 9b | Tarifas y cargos por agrupación, recargos tras el alta, límites de adeudo y rezagados con reglas propias (§24) |
+| 10 | Conteo de piezas de fábrica en todo movimiento de efectivo, formularios que se adaptan a lo elegido, botones a prueba de clics repetidos, cobrar con la lista a la vista y pantallas que se actualizan solas (§25) |
 
 ## 14. Pendientes de decisión
 
@@ -1005,3 +1006,53 @@ Regla de la fase: quien configura o cobra no escribe lo que puede elegir, y no v
 ### 24.5 Rendimiento
 
 El cálculo de atraso y adeudo vencido de todos los titulares se hace con consultas agregadas (nunca una por titular) y debe responder con 5,000 titulares y 100,000 cargos sin que el inicio lo note; se prueba con el número de consultas.
+
+## 25. Versión 0.22: lo que el cliente ve desde el primer día (fase 10)
+
+Origen: pruebas del dueño sobre una instalación real. Regla de la fase: **todo se prueba como lo recibe un cliente**, con los valores de fábrica de cada plantilla, sin encender nada a mano.
+
+### 25.1 El efectivo siempre se cuenta por piezas
+
+- `control_denominaciones` pasa a venir **encendido de fábrica**: en el valor por omisión del parámetro y en todas las plantillas. El asistente lo pregunta en el paso de caja con palabras llanas («¿Contar billetes y monedas en cada movimiento de efectivo?»), ya marcado en sí.
+- Al actualizar una instalación existente que lo tenga apagado, la migración lo enciende y deja un evento que Dirección ve en su inicio, con el enlace para apagarlo si así lo decide.
+- Con el control encendido, **todo movimiento de efectivo pide las piezas** con los mismos mosaicos: abrir turno, cobrar (lo recibido y el cambio), venta de contado y venta sin matrícula, retiro de caja, devolución en efectivo, entrega y recepción de efectivo entre personas, depósito al banco y cierre. Ninguno acepta solo un importe.
+- Si faltan denominaciones para la moneda del negocio, el programa lo dice y lleva a capturarlas, en lugar de pedir un importe.
+- El arqueo ciego (§15.2) no cambia.
+
+### 25.2 Formularios que se adaptan a lo elegido
+
+- Ningún campo queda a la vista si una elección anterior lo hace innecesario, y ninguno conserva una forma fija si la elección la cambia: aparece, desaparece o cambia de signo, de límites o de etiqueta según lo elegido. Aplica a **todos** los formularios (ejemplos: «Hasta un valor» en los límites de adeudo; «A quién aplica» en las reglas de rezago; periodicidad y vencimiento; tipo de cuenta de depósito; tipo de destino).
+- Un solo mecanismo declarativo (atributos de datos en el campo que dicen de qué elección depende y con qué valores se muestra) y un solo JS propio. Sin JavaScript se ven todos los campos con su etiqueta condicional.
+- El servidor ignora lo que venga en un campo que no aplica a la elección recibida y valida el que sí aplica.
+- Una prueba recorre todos los formularios y falla si encuentra una etiqueta condicional («si elegiste…», «si aplica…») en un campo sin dependencia declarada.
+
+### 25.3 Botones a prueba de clics repetidos
+
+- Todo botón que envía un formulario se bloquea al primer clic y muestra que está trabajando; se libera si la página vuelve con errores. Los enlaces de acción hacen lo mismo.
+- En el servidor, envíos repetidos o simultáneos del mismo formulario nunca producen un error: el segundo espera o recibe el resultado del primero (§21.8). La base ocupada se reintenta en lugar de fallar.
+- Prueba: diez envíos simultáneos de cada operación principal (abrir turno, cobrar, vender, retirar, cerrar, aprobar una solicitud) producen una sola operación y ninguna respuesta de error.
+
+### 25.4 Cobrar con la lista a la vista
+
+- Al entrar a Cobrar aparece la lista de titulares activos, paginada, con el orden que eligió la persona (§23.4), su agrupación, su marca de rezago y su adeudo si quien mira puede ver saldos. Un clic lleva a cobrarle.
+- Arriba, un filtro que reduce la lista mientras se escribe (nombre, apellidos, matrícula, agrupación o familia); la búsqueda completa queda para cuando el filtro no encuentra a nadie.
+- Lo mismo en Vender a un titular.
+- Con muchos titulares la lista no se carga entera: página de 50 y consultas agregadas (sin una consulta por renglón).
+
+### 25.5 Pantallas que se actualizan solas
+
+- Cuando en cualquier computadora aprobada se registra un movimiento (pago, venta, retiro, alta, solicitud, importación del banco), las demás pantallas abiertas lo reflejan en segundos sin recargar: inicio, lista de cobrar, ficha, solicitudes, banco y existencias.
+- Mecanismo: cada página consulta cada pocos segundos una ruta ligera (`/pulso`) que devuelve solo contadores de cambio por tema; cuando un contador cambia, la página vuelve a pedir **la misma pantalla** y sustituye sus regiones marcadas como vivas. No hay conexión permanente ni puente nuevo.
+- Reglas:
+  - `/pulso` exige sesión y equipo aprobado y no devuelve datos: solo números que suben. No revela importes ni quién hizo qué.
+  - Lo que se muestra al actualizar pasa por la misma vista y los mismos permisos que al abrir la pantalla.
+  - Nunca se sustituye una región donde la persona está escribiendo, un formulario a medias ni una pantalla de conteo; ahí aparece un aviso discreto «Hay cambios — Actualizar».
+  - Las pantallas de cobrar con piezas, conteo y cierre no se actualizan solas.
+  - Sin JavaScript todo funciona como hoy.
+  - La consulta se pausa cuando la ventana no está a la vista y tiene límite de frecuencia.
+- Los contadores suben dentro de la misma transacción que el movimiento.
+
+### 25.6 Pruebas de fábrica
+
+- Una prueba de punta a punta por cada plantilla: corre el asistente con los valores de fábrica y recorre un día completo (abrir turno, cobrar con cambio, vender, retirar, devolver, cerrar), comprobando que cada paso pide las piezas y que ninguna pantalla falla.
+- Las pruebas de pantallas dejan de encender parámetros a mano, salvo cuando prueban justo el caso apagado.
