@@ -144,6 +144,7 @@ MATRIZ = {
     "conciliacion:movimiento": ("sugerir_conciliacion", "conciliar_banco"),
     "conciliacion:proponer": ("sugerir_conciliacion", "conciliar_banco"),
     "conciliacion:confirmar": ("conciliar_banco",),
+    "conciliacion:aplicar_varios": ("conciliar_banco",),
     "conciliacion:no_cobro": ("conciliar_banco",),
     "conciliacion:emparejar": ("conciliar_banco",),
     "cortes:lista": ("turno_caja", "ver_cortes"),

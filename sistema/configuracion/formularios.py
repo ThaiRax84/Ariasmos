@@ -131,6 +131,13 @@ class FormularioVocabulario(forms.Form):
             self.fields[clave] = forms.CharField(label=etiquetas[clave], max_length=60, initial=(textos or VOCABULARIO_BASE)[clave], required=clave not in OPCIONALES_VOCABULARIO)
 
 
+ETIQUETAS_ORDEN = {
+    "recargos": "Primero los recargos por atraso",
+    "vencimiento": "Lo que vence antes",
+    "prioridad": "Según la prioridad de cada concepto",
+}
+
+
 class FormularioParametros(forms.Form):
     def __init__(self, *args, valores=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -143,6 +150,10 @@ class FormularioParametros(forms.Form):
                 self.fields[clave] = forms.CharField(label=descripcion, max_length=200, initial=inicial)
             else:
                 self.fields[clave] = forms.IntegerField(label=descripcion, min_value=0, max_value=10 ** 11, initial=inicial)
+        if "orden_reparto" in self.fields:
+            import json
+
+            self.fields["orden_reparto"].widget.attrs["data-orden"] = json.dumps(ETIQUETAS_ORDEN, ensure_ascii=False)
 
     def clean_tramos_cartera(self):
         from cortes.calculo import MAXIMO_TRAMOS, limites_tramos

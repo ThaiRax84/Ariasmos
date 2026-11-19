@@ -353,3 +353,8 @@ nav.pestanas[data-pestanas] a { position: relative; }
 .linea-tiempo .cambios { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--suave); }
 .encabezado > .avatar.grande { align-self: center; }
 html.con-js .pestanas[data-pestanas] a::after { display: none; }
+.zona-soltar[data-zona-soltar] { cursor: pointer; margin-bottom: 16px; }
+.leyendo .barra-progreso { width: min(420px, 100%); }
+.tabla-banco tbody tr[data-mov] { cursor: pointer; }
+.tabla-banco .detalle { display: block; font-size: 13px; color: var(--suave); }
+form[data-cola-banco] .barra-flotante { align-self: center; }

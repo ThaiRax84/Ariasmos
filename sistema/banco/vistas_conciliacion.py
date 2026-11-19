@@ -25,6 +25,7 @@ from .formularios import NOMBRES_DIAS
 from .models import HORAS_CARGA, CargaTemporal, CuentaBancaria, Importacion, MovimientoBancario, depurar_cargas
 
 CONCILIA = "conciliar_banco"
+MAXIMO_COLA = 300
 VEN_COLA = ("sugerir_conciliacion", "conciliar_banco")
 REVISA = "ver_auditoria"
 
@@ -219,8 +220,34 @@ def liberar(request, pk):
 
 @requiere_permiso(*VEN_COLA)
 def cola(request):
-    pendientes = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).select_related("cuenta__banco", "propuesta").order_by("fecha", "id")
-    return render(request, "banco/cola.html", {"movimientos": pendientes[:300]})
+    pendientes = list(MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).select_related("cuenta__banco", "propuesta").order_by("fecha", "id")[:MAXIMO_COLA])
+    for m in pendientes:
+        m.de_quien, m.seguridad = conciliacion.de_quien(m, Titular)
+    return render(request, "banco/cola.html", {"movimientos": pendientes, "concilia": request.user.tiene_permiso(CONCILIA)})
+
+
+@requiere_permiso(CONCILIA)
+@require_POST
+def aplicar_varios(request):
+    ids = [int(v) for v in request.POST.getlist("movimiento") if v.isdigit() and len(v) < 19][:MAXIMO_COLA]
+    aplicados, errores = 0, []
+    for objeto in MovimientoBancario.objects.filter(pk__in=ids, estado=MovimientoBancario.POR_IDENTIFICAR).order_by("fecha", "id"):
+        titular, _ = conciliacion.de_quien(objeto, Titular)
+        if titular is None:
+            errores.append(f"{objeto.fecha:%d/%m/%Y} · no se supo de quién es")
+            continue
+        try:
+            conciliacion.confirmar(objeto, titular, request.user, request)
+            aplicados += 1
+        except conciliacion.ErrorConciliacion as error:
+            errores.append(f"{objeto.fecha:%d/%m/%Y} · {error}")
+    if aplicados:
+        messages.success(request, f"{aplicados} pago{'s' if aplicados != 1 else ''} aplicado{'s' if aplicados != 1 else ''}.")
+    if errores:
+        messages.error(request, "No se aplicaron: " + "; ".join(errores[:10]))
+    if not aplicados and not errores:
+        messages.info(request, "No elegiste ningún depósito.")
+    return redirect("conciliacion:cola")
 
 
 @requiere_permiso(*VEN_COLA)

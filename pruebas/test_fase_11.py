@@ -315,3 +315,21 @@ def test_sin_cuenta_del_negocio_el_panel_lo_dice_en_palabras_llanas(personas, pa
     assert "Todavía no hay una cuenta del negocio para recibir transferencias" in texto
     assert reverse("banco:nueva") not in texto
     assert reverse("banco:nueva") in cliente(personas["dir"]).get(reverse("cobros:cobrar", args=[padron["ana"].pk]), {"panel": "1"}).content.decode()
+
+
+def test_aplicar_varios_depositos_con_las_mismas_reglas_que_uno(personas, padron, con_origen):
+    from banco import llegadas
+    from banco.models import MovimientoBancario
+
+    Parametro.objects.update_or_create(clave="tope_aplicado_sin_respaldo", defaults={"valor": "1"})
+    con_origen.extend([_aviso(padron["ana"], "V-1"), _aviso(padron["beto"], "V-2", importe=5000)])
+    llegadas.consultar_todos()
+    assert MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).count() == 2
+    texto = cliente(personas["sup"]).get(reverse("conciliacion:cola")).content.decode()
+    assert "¿De quién es?" in texto and "¿Qué tan seguro?" in texto and "Ana Zamora" in texto
+    ids = list(MovimientoBancario.objects.values_list("pk", flat=True))
+    assert cliente(personas["op"]).post(reverse("conciliacion:aplicar_varios"), {"movimiento": ids}).status_code == 403
+    respuesta = cliente(personas["dir"]).post(reverse("conciliacion:aplicar_varios"), {"movimiento": ids})
+    assert respuesta.status_code == 302
+    assert Pago.objects.filter(medio=Pago.BANCO).count() == 2
+    assert Evento.objects.filter(accion="movimiento_confirmado").count() == 2

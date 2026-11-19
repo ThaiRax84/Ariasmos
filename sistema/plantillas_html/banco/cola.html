@@ -4,14 +4,31 @@
 <div class="encabezado">
   <div class="encabezado-texto">
     <span class="antetitulo">Banco</span>
-    <h1>Movimientos por identificar</h1>
+    <h1>Depósitos por identificar</h1>
+    <p class="subtitulo">El programa te dice de quién cree que es cada depósito. Tú decides cuáles aplicar.</p>
   </div>
+  <div class="encabezado-lado">{% include "comun/_como.html" with clave="banco" %}</div>
 </div>
-{% if "conciliar_banco" in permisos or "configurar_topes_banco" in permisos %}<div class="atajos">{% if "conciliar_banco" in permisos %}<a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones</a>{% endif %}{% if "configurar_topes_banco" in permisos %}<a class="boton secundario" href="{% url 'conciliacion:topes' %}">Topes</a>{% endif %}</div>{% endif %}
+{% include "comun/_como_pasos.html" with clave="banco" %}
+{% if "conciliar_banco" in permisos or "configurar_topes_banco" in permisos %}<div class="atajos">{% if "conciliar_banco" in permisos %}<a class="boton" href="{% url 'conciliacion:importar' %}">Subir el estado de cuenta</a><a class="boton secundario" href="{% url 'conciliacion:importaciones' %}">Importaciones</a>{% endif %}{% if "configurar_topes_banco" in permisos %}<a class="boton secundario" href="{% url 'conciliacion:topes' %}">Topes</a>{% endif %}</div>{% endif %}
 <div id="cola-region" data-vivo="banco">
-<table class="tabla">
-<thead><tr><th>Fecha</th><th>Importe</th><th>Referencia</th><th>Concepto</th><th>Pagador</th><th>Sugerencia</th><th>Propuesta</th></tr></thead>
-<tbody>{% for m in movimientos %}<tr data-id="{{ m.pk }}"><td><a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a></td><td>{{ m.importe|dinero }}</td><td>{{ m.referencia }}</td><td>{{ m.concepto|default:m.descripcion }}</td><td>{{ m.nombre_pagador }}</td><td>{{ m.sugerencia }}{% if m.posible_duplicado %} · posible duplicado{% endif %}</td><td>{% if m.propuesta %}{{ m.propuesta.matricula_formateada }}{% endif %}</td></tr>{% empty %}<tr><td colspan="7">No hay movimientos por identificar.</td></tr>{% endfor %}</tbody>
-</table>
+<form method="post" action="{% url 'conciliacion:aplicar_varios' %}" class="pila" data-cola-banco>
+{% csrf_token %}
+<section class="panel">
+  <div class="panel-cabeza"><h2>{{ movimientos|length }} depósito{{ movimientos|length|pluralize }} por identificar</h2>{% if concilia and movimientos %}<span class="ayuda">Los seguros ya vienen marcados.</span>{% endif %}</div>
+  <div class="desplazable"><table class="tabla tabla-banco">
+  <thead><tr>{% if concilia %}<th><span class="solo-lectores">Elegir</span></th>{% endif %}<th>Fecha</th><th>Movimiento</th><th class="importe">Importe</th><th>¿De quién es?</th><th>¿Qué tan seguro?</th></tr></thead>
+  <tbody>{% for m in movimientos %}<tr data-id="{{ m.pk }}" data-mov{% if concilia and m.seguridad == "seguro" %} class="elegida"{% endif %}>
+    {% if concilia %}<td><input type="checkbox" name="movimiento" value="{{ m.pk }}" data-importe="{{ m.importe }}" aria-label="Aplicar el depósito del {{ m.fecha|date:'d/m/Y' }} por {{ m.importe|dinero }}"{% if m.seguridad == "seguro" %} checked{% endif %}{% if not m.de_quien %} disabled{% endif %}></td>{% endif %}
+    <td><a href="{% url 'conciliacion:movimiento' m.pk %}">{{ m.fecha|date:"d/m/Y" }}</a></td>
+    <td>{{ m.concepto|default:m.descripcion|default:m.referencia }}{% if m.nombre_pagador %}<span class="detalle">{{ m.nombre_pagador }}</span>{% endif %}</td>
+    <td class="importe saldo">{{ m.importe|dinero }}</td>
+    <td>{% if m.de_quien %}<span class="coincide"><span class="avatar chico" aria-hidden="true">{{ m.de_quien.nombre_completo|iniciales }}</span><span><strong>{{ m.de_quien.nombre_completo }}</strong><span class="detalle">{{ voc.matricula }} {{ m.de_quien.matricula_formateada }}{% if m.propuesta %} · lo propuso {{ m.propuesta_por }}{% elif m.coincide_importe %} · coincide el importe{% endif %}{% if m.posible_duplicado %} · se parece a otro depósito{% endif %}</span></span></span>{% else %}<span class="estado pendiente">No se supo de quién es</span><span class="detalle">Ábrelo para buscar a la persona</span>{% endif %}</td>
+    <td>{% if m.de_quien %}<span class="confianza{% if m.seguridad != 'seguro' %} media{% endif %}"><i><b data-ancho="{% if m.seguridad == 'seguro' %}95{% else %}60{% endif %}"></b></i>{% if m.seguridad == "seguro" %}Seguro{% else %}Revísalo{% endif %}</span>{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="6">No hay depósitos por identificar.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% if concilia and movimientos %}<div class="barra-flotante" data-flotante data-uno="pago elegido" data-varios="pagos elegidos"><span data-flotante-texto>Aplica los depósitos que marcaste</span><button class="boton chico" type="submit">Aplicar pagos</button></div>{% endif %}
+</form>
 </div>
 {% endblock %}

@@ -870,3 +870,20 @@ def no_es_cobro(movimiento, motivo, usuario, request=None):
         if hechos != 1:
             raise ErrorConciliacion("El movimiento ya está resuelto.")
         registrar("movimiento_no_cobro", usuario=usuario, objeto=movimiento, datos={"importe": movimiento.importe, "motivo": motivo}, request=request)
+
+
+SEGURO = "seguro"
+REVISAR = "revisar"
+SIN_PISTA = "sin_pista"
+
+
+def de_quien(movimiento, modelo_titular):
+    if movimiento.propuesta_id:
+        return movimiento.propuesta, SEGURO
+    if not movimiento.sugerencia:
+        return None, SIN_PISTA
+    titular = modelo_titular.objects.filter(matricula=movimiento.sugerencia).exclude(estado=modelo_titular.RECHAZADO).first()
+    if titular is None:
+        return None, SIN_PISTA
+    claro = movimiento.coincide_importe and not movimiento.alternativas and not movimiento.posible_duplicado and not movimiento.retencion
+    return titular, SEGURO if claro else REVISAR

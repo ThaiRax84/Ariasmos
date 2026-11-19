@@ -1157,3 +1157,369 @@
 
   A.alIniciar.push(prepararPestanas);
 }());
+
+(function () {
+  "use strict";
+
+  var A = window.Ariasmos;
+  var $ = A.$;
+  var $$ = A.$$;
+
+  function pintarFlotante(formulario) {
+    var barra = $("[data-flotante]", formulario);
+    if (!barra) { return; }
+    var elegidas = $$("input[name='movimiento']:checked", formulario);
+    var total = elegidas.reduce(function (s, c) { return s + (Number(c.getAttribute("data-importe")) || 0); }, 0);
+    barra.hidden = !elegidas.length;
+    $("[data-flotante-texto]", barra).textContent = elegidas.length + " " + (elegidas.length === 1 ? barra.getAttribute("data-uno") : barra.getAttribute("data-varios")) + " · " + A.dinero(total);
+  }
+
+  function prepararCola(base) {
+    $$("form[data-cola-banco]", base).forEach(function (formulario) {
+      $$(".tabla-banco tbody tr", formulario).forEach(function (fila, i) { fila.style.animationDelay = Math.min(i, 15) * 70 + "ms"; });
+      requestAnimationFrame(function () { requestAnimationFrame(function () { $$("[data-ancho]", formulario).forEach(function (b) { b.style.width = b.getAttribute("data-ancho") + "%"; }); }); });
+      pintarFlotante(formulario);
+    });
+  }
+
+  document.addEventListener("click", function (evento) {
+    var fila = evento.target.closest && evento.target.closest("form[data-cola-banco] tr[data-mov]");
+    if (fila && !evento.target.closest("a, input, button, label")) {
+      var casilla = $("input[name='movimiento']", fila);
+      if (casilla && !casilla.disabled) {
+        casilla.checked = !casilla.checked;
+        casilla.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+    var zona = evento.target.closest && evento.target.closest("[data-zona-soltar]");
+    if (zona) {
+      var entrada = $("input[type='file']", zona.closest("form"));
+      if (entrada) { entrada.click(); }
+    }
+  });
+
+  document.addEventListener("change", function (evento) {
+    var casilla = evento.target;
+    if (casilla.matches && casilla.matches("form[data-cola-banco] input[name='movimiento']")) {
+      casilla.closest("tr").classList.toggle("elegida", casilla.checked);
+      pintarFlotante(casilla.closest("form"));
+      if (casilla.form) { casilla.form.dataset.tocado = "1"; }
+    }
+  });
+
+  document.addEventListener("submit", function (evento) {
+    var formulario = evento.target;
+    if (formulario.matches && formulario.matches("form[data-subida-banco]")) {
+      var leyendo = $("[data-leyendo]", formulario);
+      var zona = $("[data-zona-soltar]", formulario);
+      if (leyendo) {
+        leyendo.hidden = false;
+        if (zona) { zona.hidden = true; }
+        requestAnimationFrame(function () { requestAnimationFrame(function () { var b = $(".barra-progreso span", leyendo); if (b) { b.style.width = "100%"; } }); });
+      }
+    }
+    if (formulario.matches && formulario.matches("form[data-cola-banco]") && !evento.defaultPrevented) {
+      $$("tr.elegida", formulario).forEach(function (fila) { fila.style.animationDelay = "0ms"; fila.classList.add("sale"); });
+    }
+  });
+
+  document.addEventListener("dragover", function (evento) {
+    var zona = evento.target.closest && evento.target.closest("[data-zona-soltar]");
+    if (zona) { evento.preventDefault(); zona.classList.add("encima"); }
+  });
+  document.addEventListener("dragleave", function (evento) {
+    var zona = evento.target.closest && evento.target.closest("[data-zona-soltar]");
+    if (zona && !zona.contains(evento.relatedTarget)) { zona.classList.remove("encima"); }
+  });
+  document.addEventListener("drop", function (evento) {
+    var zona = evento.target.closest && evento.target.closest("[data-zona-soltar]");
+    if (!zona) { return; }
+    evento.preventDefault();
+    zona.classList.remove("encima");
+    var formulario = zona.closest("form");
+    var entrada = $("input[type='file']", formulario);
+    if (!entrada || !evento.dataTransfer || !evento.dataTransfer.files.length) { return; }
+    entrada.files = evento.dataTransfer.files;
+    if (formulario.requestSubmit) { formulario.requestSubmit(); } else { formulario.submit(); }
+  });
+
+  document.addEventListener("ariasmos:contenido", function (evento) { prepararCola(evento.target); });
+  A.alIniciar.push(function () { prepararCola(document); });
+}());
+
+(function () {
+  "use strict";
+
+  var A = window.Ariasmos;
+  var $ = A.$;
+  var $$ = A.$$;
+  var crear = A.crear;
+  var raiz = document.documentElement;
+  var VARIABLES = ["--primario", "--acento", "--tinte", "--boton-texto", "--boton-fondo"];
+  var estado = { formulario: null, barra: null, arrastrado: null };
+
+  function luz(hex) {
+    var v = [1, 3, 5].map(function (i) { return parseInt(hex.slice(i, i + 2), 16) / 255; }).map(function (c) { return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+
+  function hexValido(texto) { return /^#[0-9A-Fa-f]{6}$/.test(texto || ""); }
+
+  function vistaColores(principal, acento) {
+    if (!hexValido(principal) || !hexValido(acento)) { return; }
+    raiz.style.setProperty("--primario", principal);
+    raiz.style.setProperty("--boton-fondo", principal);
+    raiz.style.setProperty("--acento", acento);
+    raiz.style.setProperty("--tinte", "color-mix(in srgb, " + principal + " 13%, #fff)");
+    raiz.style.setProperty("--boton-texto", luz(principal) > 0.5 ? "#1F1813" : "#FFFFFF");
+  }
+
+  function quitarVista() { VARIABLES.forEach(function (v) { raiz.style.removeProperty(v); }); }
+
+  function coloresDe(imagen) {
+    var k = 64;
+    var lienzo = document.createElement("canvas");
+    lienzo.width = k;
+    lienzo.height = k;
+    var x = lienzo.getContext("2d", { willReadFrequently: true });
+    x.drawImage(imagen, 0, 0, k, k);
+    var d = x.getImageData(0, 0, k, k).data;
+    var m = new Map();
+    for (var i = 0; i < d.length; i += 4) {
+      var r = d[i], g = d[i + 1], b = d[i + 2];
+      if (d[i + 3] < 128) { continue; }
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mn > 232 || mx < 30) { continue; }
+      var clave = (r >> 4) << 8 | (g >> 4) << 4 | (b >> 4);
+      var e = m.get(clave) || { peso: 0, n: 0, r: 0, g: 0, b: 0 };
+      e.peso += 1 + (mx - mn) / mx * 4; e.n += 1; e.r += r; e.g += g; e.b += b;
+      m.set(clave, e);
+    }
+    var lista = Array.from(m.values()).map(function (e) { return { peso: e.peso, r: e.r / e.n, g: e.g / e.n, b: e.b / e.n }; }).sort(function (a, b) { return b.peso - a.peso; });
+    if (!lista.length) { return null; }
+    var hex = function (c) { return "#" + [c.r, c.g, c.b].map(function (v) { return Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0"); }).join("").toUpperCase(); };
+    var lejos = function (a, b) { return Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b); };
+    var uno = lista[0];
+    var dos = lista.find(function (c) { return lejos(c, uno) > 110; }) || { r: uno.r * 0.6 + 100, g: uno.g * 0.6 + 100, b: uno.b * 0.6 + 100 };
+    return [hex(uno), hex(dos)].sort(function (a, b) { return luz(a) - luz(b); });
+  }
+
+  function camposColor() {
+    return { principal: $("input[name='color_principal']"), acento: $("input[name='color_acento']") };
+  }
+
+  function aplicarDeCampos() {
+    var c = camposColor();
+    if (c.principal && c.acento) { vistaColores(c.principal.value.toUpperCase(), c.acento.value.toUpperCase()); }
+  }
+
+  function vistaLogo(archivo) {
+    if (!archivo || !/^image\/(png|jpeg)$/.test(archivo.type)) { return; }
+    var lector = new FileReader();
+    lector.onload = function () {
+      var imagen = new Image();
+      imagen.onload = function () {
+        var destino = $(".marca-negocio .logo-negocio");
+        if (!destino) {
+          destino = crear("img", "logo-negocio");
+          destino.width = 56;
+          destino.height = 56;
+          destino.alt = "";
+          var caja = $(".marca-negocio");
+          if (caja) { caja.insertBefore(destino, caja.firstChild); }
+        }
+        if (!destino.dataset.original) { destino.dataset.original = destino.getAttribute("src") || ""; }
+        destino.src = lector.result;
+        var par = coloresDe(imagen);
+        var c = camposColor();
+        if (par && c.principal && c.acento) {
+          c.principal.value = par[0];
+          c.acento.value = par[1];
+          c.principal.dispatchEvent(new Event("input", { bubbles: true }));
+          c.acento.dispatchEvent(new Event("input", { bubbles: true }));
+          A.aviso("Colores tomados de tu logotipo: se ven aquí, pero se guardan hasta que lo confirmes.");
+        }
+      };
+      imagen.src = lector.result;
+    };
+    lector.readAsDataURL(archivo);
+  }
+
+  function quitarVistaLogo() {
+    var destino = $(".marca-negocio .logo-negocio");
+    if (destino && destino.dataset.original !== undefined) {
+      if (destino.dataset.original) { destino.src = destino.dataset.original; } else { destino.remove(); }
+    }
+  }
+
+  function restaurar(formulario) {
+    $$("input, textarea, select", formulario).forEach(function (campo) {
+      if (campo.type === "hidden" || campo.type === "color" || campo.type === "submit" || campo.type === "button") { return; }
+      if (campo.type === "checkbox" || campo.type === "radio") { campo.checked = campo.defaultChecked; return; }
+      if (campo.type === "file") { campo.value = ""; return; }
+      if (campo.tagName === "SELECT") { Array.prototype.forEach.call(campo.options, function (o) { o.selected = o.defaultSelected; }); return; }
+      campo.value = campo.defaultValue;
+    });
+    $$("input.selector-color", formulario).forEach(function (selector) {
+      var texto = selector.previousElementSibling;
+      if (texto && hexValido(texto.value)) { selector.value = texto.value; }
+    });
+  }
+
+  function barra() {
+    if (estado.barra) { return estado.barra; }
+    var caja = crear("div", "sin-guardar");
+    caja.setAttribute("role", "region");
+    caja.setAttribute("aria-label", "Cambios sin guardar");
+    caja.appendChild(crear("span", "", "Tienes cambios sin guardar"));
+    var descartar = crear("button", "boton chico secundario", "Descartar");
+    descartar.type = "button";
+    var guardar = crear("button", "boton chico", "Guardar");
+    guardar.type = "button";
+    caja.appendChild(descartar);
+    caja.appendChild(guardar);
+    caja.hidden = true;
+    ($("main") || document.body).appendChild(caja);
+    descartar.addEventListener("click", function () {
+      var formulario = estado.formulario;
+      if (formulario) {
+        restaurar(formulario);
+        $$("input[data-orden]", formulario).forEach(function (e) { pintarOrden(e); });
+        formulario.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      quitarVista();
+      quitarVistaLogo();
+      estado.formulario = null;
+      caja.hidden = true;
+      A.aviso("Cambios descartados");
+    });
+    guardar.addEventListener("click", function () {
+      var formulario = estado.formulario;
+      if (!formulario) { return; }
+      if (formulario.requestSubmit) { formulario.requestSubmit(); } else { formulario.submit(); }
+    });
+    estado.barra = caja;
+    return caja;
+  }
+
+  function esConfiguracion(formulario) {
+    if (!formulario || (formulario.method || "").toLowerCase() !== "post") { return false; }
+    var ruta = window.location.pathname;
+    if (ruta.indexOf("/configuracion/") !== 0 && ruta.indexOf("/rezagos/") !== 0 && ruta.indexOf("/banco/topes") !== 0) { return false; }
+    return $$("input:not([type=hidden]), select, textarea", formulario).length > 1 || !!$("input[type=file], input[data-acepta='color']", formulario);
+  }
+
+  function hayCambios(formulario) {
+    if (!esConfiguracion(formulario)) { return; }
+    estado.formulario = formulario;
+    barra().hidden = false;
+  }
+
+  function pintarOrden(entrada) {
+    var etiquetas = {};
+    try { etiquetas = JSON.parse(entrada.getAttribute("data-orden")) || {}; } catch (error) { etiquetas = {}; }
+    var lista = entrada.nextElementSibling && entrada.nextElementSibling.matches("ol.orden-lista") ? entrada.nextElementSibling : null;
+    if (!lista) {
+      lista = crear("ol", "orden-lista");
+      entrada.insertAdjacentElement("afterend", lista);
+      entrada.hidden = true;
+    }
+    var claves = entrada.value.split(",").map(function (p) { return p.trim(); }).filter(Boolean);
+    var nodos = claves.map(function (clave, i) {
+      var item = crear("li", "orden-item");
+      item.draggable = true;
+      item.setAttribute("data-id", clave);
+      var asa = crear("span", "asa");
+      asa.setAttribute("aria-hidden", "true");
+      for (var n = 0; n < 6; n += 1) { asa.appendChild(crear("i")); }
+      item.appendChild(asa);
+      item.appendChild(crear("span", "", (i + 1) + ". " + (etiquetas[clave] || clave)));
+      var mover = crear("span", "mover");
+      [["subir", "↑", "Subir "], ["bajar", "↓", "Bajar "]].forEach(function (d) {
+        var b = crear("button", "", d[1]);
+        b.type = "button";
+        b.setAttribute("data-orden-mover", d[0]);
+        b.setAttribute("aria-label", d[2] + (etiquetas[clave] || clave));
+        b.disabled = d[0] === "subir" ? i === 0 : i === claves.length - 1;
+        mover.appendChild(b);
+      });
+      item.appendChild(mover);
+      return item;
+    });
+    lista.replaceChildren.apply(lista, nodos);
+  }
+
+  function moverOrden(entrada, clave, destino) {
+    var claves = entrada.value.split(",").map(function (p) { return p.trim(); }).filter(Boolean);
+    var desde = claves.indexOf(clave);
+    if (desde < 0 || destino < 0 || destino >= claves.length || destino === desde) { return false; }
+    claves.splice(destino, 0, claves.splice(desde, 1)[0]);
+    var lista = entrada.nextElementSibling;
+    A.mover(lista, ".orden-item", function () { entrada.value = claves.join(","); pintarOrden(entrada); });
+    entrada.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  document.addEventListener("click", function (evento) {
+    var boton = evento.target.closest && evento.target.closest("[data-orden-mover]");
+    if (!boton) { return; }
+    var item = boton.closest(".orden-item");
+    var entrada = item.parentElement.previousElementSibling;
+    var clave = item.getAttribute("data-id");
+    var indice = Array.prototype.indexOf.call(item.parentElement.children, item);
+    var subir = boton.getAttribute("data-orden-mover") === "subir";
+    if (moverOrden(entrada, clave, indice + (subir ? -1 : 1))) {
+      var nuevo = $(".orden-item[data-id='" + clave + "'] [data-orden-mover='" + (subir ? "subir" : "bajar") + "']", entrada.nextElementSibling);
+      if (nuevo && !nuevo.disabled) { nuevo.focus(); } else { var otro = $(".orden-item[data-id='" + clave + "'] [data-orden-mover]:not(:disabled)", entrada.nextElementSibling); if (otro) { otro.focus(); } }
+    }
+  });
+
+  document.addEventListener("dragstart", function (evento) {
+    var item = evento.target.closest && evento.target.closest(".orden-item");
+    if (!item) { return; }
+    estado.arrastrado = item.getAttribute("data-id");
+    evento.dataTransfer.effectAllowed = "move";
+    evento.dataTransfer.setData("text/plain", estado.arrastrado);
+    requestAnimationFrame(function () { item.classList.add("arrastra"); });
+  });
+  document.addEventListener("dragover", function (evento) {
+    var item = evento.target.closest && evento.target.closest(".orden-item");
+    if (!estado.arrastrado || !item) { return; }
+    evento.preventDefault();
+    if (item.getAttribute("data-id") === estado.arrastrado) { return; }
+    var lista = item.parentElement;
+    var entrada = lista.previousElementSibling;
+    var caja = item.getBoundingClientRect();
+    var despues = evento.clientY > caja.top + caja.height / 2;
+    var claves = entrada.value.split(",").map(function (p) { return p.trim(); });
+    var de = claves.indexOf(estado.arrastrado);
+    var a = claves.indexOf(item.getAttribute("data-id")) + (despues ? 1 : 0);
+    if (de < a) { a -= 1; }
+    if (moverOrden(entrada, estado.arrastrado, a)) {
+      var nuevo = $(".orden-item[data-id='" + estado.arrastrado + "']", lista);
+      if (nuevo) { nuevo.classList.add("arrastra"); }
+    }
+  });
+  document.addEventListener("dragend", function () {
+    if (!estado.arrastrado) { return; }
+    var item = $(".orden-item[data-id='" + estado.arrastrado + "']");
+    estado.arrastrado = null;
+    if (item) { item.classList.remove("arrastra"); item.classList.add("suelta"); window.setTimeout(function () { item.classList.remove("suelta"); }, 500); }
+  });
+
+  document.addEventListener("input", function (evento) {
+    var campo = evento.target;
+    if (!campo.form) { return; }
+    if (campo.matches("input[name='color_principal'], input[name='color_acento'], input.selector-color")) { aplicarDeCampos(); }
+    hayCambios(campo.form);
+  });
+  document.addEventListener("change", function (evento) {
+    var campo = evento.target;
+    if (!campo.form || campo.matches("[data-filtro-lista]")) { return; }
+    if (campo.type === "file" && campo.form.querySelector("input[name='accion'][value='logo']")) { vistaLogo(campo.files && campo.files[0]); }
+    if (evento.isTrusted) { hayCambios(campo.form); }
+  });
+  document.addEventListener("submit", function () { if (estado.barra) { estado.barra.hidden = true; } });
+
+  A.alIniciar.push(function () { $$("input[data-orden]").forEach(pintarOrden); });
+}());

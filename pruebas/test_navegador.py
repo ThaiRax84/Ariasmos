@@ -253,3 +253,32 @@ def test_ficha_con_pestanas_historial_y_correccion_con_deshacer(sesion_navegador
     assert contacto.valores[str(campo.pk)].replace(" ", "").endswith(valores[str(campo.pk)])
     assert Evento.objects.filter(accion__icontains="contacto").count() >= 2
     sin_errores(sesion_navegador)
+
+
+def test_configuracion_con_vista_previa_orden_arrastrable_y_cambios_sin_guardar(sesion_navegador):
+    from configuracion.models import parametro
+
+    correr_asistente("escuela")
+    director = nuevo_usuario("director", Rol.objects.get(nombre="Dirección"))
+    pagina = sesion_navegador.pagina(director)
+    sesion_navegador.ir(pagina, reverse("configuracion:marca"))
+    pagina.locator("input[name='color_principal']").fill("#1F3A8A")
+    pagina.locator("input[name='color_acento']").fill("#2F9E8F")
+    pagina.wait_for_selector(".sin-guardar:not([hidden])")
+    assert pagina.evaluate("() => document.documentElement.style.getPropertyValue('--primario')") == "#1F3A8A"
+    sesion_navegador.captura(pagina, "configuracion-marca")
+    pagina.locator(".sin-guardar button", has_text="Descartar").click()
+    assert pagina.evaluate("() => document.documentElement.style.getPropertyValue('--primario')") == ""
+    sesion_navegador.ir(pagina, reverse("configuracion:parametros"))
+    if "confirmar" in pagina.url:
+        pagina.locator("input[type='password']").fill("Contrasena-de-prueba-2026")
+        pagina.locator("form button[type='submit']").first.click()
+        pagina.wait_for_load_state("networkidle")
+    antes = parametro("orden_reparto").split(",")
+    pagina.locator(f".orden-item[data-id='{antes[0]}'] [data-orden-mover='bajar']").click()
+    pagina.wait_for_selector(".sin-guardar:not([hidden])")
+    sesion_navegador.captura(pagina, "configuracion-orden")
+    pagina.locator(".sin-guardar button", has_text="Guardar").click()
+    pagina.wait_for_load_state("networkidle")
+    assert parametro("orden_reparto").split(",")[:2] == [antes[1], antes[0]]
+    sin_errores(sesion_navegador)
