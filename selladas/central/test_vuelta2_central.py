@@ -18,6 +18,7 @@ from selladas.central.test_central import (  # noqa: F401  fixtures de la primer
     hora,
     negocio,
     negocio_pagado,
+    pago_pendiente,
     peticion,
     renovar,
 )
@@ -50,7 +51,7 @@ def test_activacion_a_medias_se_puede_repetir_solo_por_el_mismo_equipo(api, hora
             if pagado:
                 assert abrir(repetida.json()["documento"], [llave.publica()], "licencia")["instalacion"] == equipo.huella
             else:
-                assert repetida.json() == {"resultado": "pago_pendiente"}
+                assert pago_pendiente(repetida, equipo)
         assert (Instalacion.objects.count(), Rechazo.objects.count()) == (instalaciones, rechazos)
         assert CodigoActivacion.objects.get(negocio=empresa).instalacion.huella == equipo.huella
 
@@ -112,10 +113,13 @@ def test_renovada_y_activada_traen_acuse_de_central(api, hora, db):
 
     moroso = Equipo()
     sin_pago = servicios.crear_negocio("Negocio sin pago")
-    assert activar(api, moroso, servicios.crear_codigo(sin_pago), hora.momento).json() == {"resultado": "pago_pendiente"}
-    assert renovar(api, moroso, hora.momento).json() == {"resultado": "pago_pendiente"}
+    assert pago_pendiente(activar(api, moroso, servicios.crear_codigo(sin_pago), hora.momento), moroso)
+    assert pago_pendiente(renovar(api, moroso, hora.momento), moroso)
     servicios.revocar(negocio)
-    assert set(renovar(api, equipo, hora.momento).json()) == {"resultado", "documento"}
+    revocada = renovar(api, equipo, hora.momento)
+    assert set(revocada.json()) == {"resultado", "documento", "acuse"} and revocada.json()["resultado"] == "revocada"
+    assert abrir(revocada.json()["documento"], [llave.publica()], "revocacion")["instalacion"] == equipo.huella
+    assert abrir(revocada.json()["acuse"], [llave.publica()], "acuse")["instalacion"] == equipo.huella
 
     salud = api.get("/v1/salud")
     assert salud.status_code == 200 and salud.json() == {"estado": "ok", "hora": texto_de(hora.momento)}
