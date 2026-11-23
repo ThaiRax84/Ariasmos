@@ -39,7 +39,8 @@ def enviar(ruta, cuerpo):
         with abridor.open(peticion, timeout=TIEMPO_LIMITE) as respuesta:
             estado, crudos = respuesta.status, respuesta.read(LIMITE_RESPUESTA + 1)
     except urllib.error.HTTPError as error:
-        estado, crudos = error.code, error.read(LIMITE_RESPUESTA + 1)
+        error.close()
+        return error.code, {}
     except (OSError, ValueError, http.client.HTTPException) as error:
         raise SinConexion(str(error))
     if len(crudos) > LIMITE_RESPUESTA:

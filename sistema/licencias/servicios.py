@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.utils import timezone
 
@@ -123,8 +124,17 @@ def _sin_licencia(fila):
     return Situacion("solo_consulta", "sin_licencia", None, limite)
 
 
+def _llaves():
+    try:
+        return llaves.publicas()
+    except ImproperlyConfigured:
+        return None
+
+
 def situacion():
-    claves = llaves.publicas()
+    claves = _llaves()
+    if claves is None:
+        return Situacion("solo_consulta", "llaves", None, None)
     if not claves:
         return Situacion("libre", "", None, None)
     fila = instalacion()
@@ -154,7 +164,7 @@ def _abrir_propio(fila, documento, tipo, claves):
 
 def _guardar_licencia(documento):
     fila = instalacion()
-    claves = llaves.publicas()
+    claves = _llaves() or ()
     carga = _abrir_propio(fila, documento, "licencia", claves)
     revocacion = _guardado(fila.revocacion, "revocacion", claves)
     if revocacion is not None and _antes(revocacion["emitida"], carga["emitida"]):
@@ -177,7 +187,7 @@ def instalar(documento):
 
 def _guardar_revocacion(documento):
     fila = instalacion()
-    claves = llaves.publicas()
+    claves = _llaves() or ()
     _abrir_propio(fila, documento, "revocacion", claves)
     fila.revocacion = json.dumps(documento, sort_keys=True)
     fila.save(update_fields=["revocacion"])
@@ -228,7 +238,7 @@ def _recibir_renovacion(estado, respuesta):
 
 
 def renovar():
-    if not llaves.publicas():
+    if not _llaves():
         return "apagada"
     huella, privada = identidad()
     cuerpo = {"instalacion": huella, **_peticion("renovacion", huella, privada)}
@@ -255,7 +265,7 @@ def _recibir_activacion(estado, respuesta):
 
 
 def activar(codigo):
-    if not llaves.publicas():
+    if not _llaves():
         return "apagada"
     huella, privada = identidad()
     llave_publica = base64.b64encode(_bytes_publicos(privada)).decode("ascii")
@@ -268,7 +278,7 @@ def activar(codigo):
 
 
 def tarea_renovar(hoy):
-    if not llaves.publicas():
+    if not _llaves():
         return "licencias apagadas en este programa"
     fila = instalacion()
     if not fila.activada:

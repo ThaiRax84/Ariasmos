@@ -37,7 +37,7 @@ class Candado:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.method not in METODOS_DE_CONSULTA and not servicios.permite_escribir() and not _es_libre(request):
+        if request.method not in METODOS_DE_CONSULTA and not _es_libre(request) and not servicios.permite_escribir():
             respuesta = HttpResponse(TEXTO, status=403, content_type="text/plain; charset=utf-8")
             respuesta[CABECERA] = "solo-consulta"
             respuesta["Cache-Control"] = "no-store"

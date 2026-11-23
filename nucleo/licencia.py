@@ -26,6 +26,9 @@ PATRON_INSTALACION = re.compile(r"[0-9a-f]{64}")
 PATRON_SELLO = re.compile(r"[0-9a-f]{32}")
 PATRON_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 FORMATO_FECHA = "%Y-%m-%dT%H:%M:%SZ"
+ANIO_MAXIMO = 9000
+GRACIA_MAXIMA = 366
+SERIE_MAXIMA = 2**53
 
 
 class LicenciaInvalida(Exception):
@@ -56,7 +59,10 @@ def texto_de(momento):
 def momento_de(texto):
     if not isinstance(texto, str) or PATRON_FECHA.fullmatch(texto) is None:
         raise ValueError("fecha no válida")
-    return datetime.strptime(texto, FORMATO_FECHA).replace(tzinfo=timezone.utc)
+    momento = datetime.strptime(texto, FORMATO_FECHA).replace(tzinfo=timezone.utc)
+    if momento.year > ANIO_MAXIMO:
+        raise ValueError("fecha fuera de rango")
+    return momento
 
 
 def _sin_repetidos(pares):
@@ -129,12 +135,12 @@ def _validar(carga, tipo):
     patrones = (("instalacion", PATRON_INSTALACION), ("sello", PATRON_SELLO), ("version", PATRON_VERSION))
     if any(campo in carga and patron.fullmatch(carga[campo]) is None for campo, patron in patrones):
         raise LicenciaInvalida("campos")
-    for campo in FECHAS:
-        if campo in carga:
-            try:
-                momento_de(carga[campo])
-            except ValueError:
-                raise LicenciaInvalida("campos")
+    try:
+        fechas = {campo: momento_de(carga[campo]) for campo in FECHAS if campo in carga}
+    except ValueError:
+        raise LicenciaInvalida("campos")
+    if tipo == "licencia" and not (carga["dias_gracia"] <= GRACIA_MAXIMA and carga["serie"] <= SERIE_MAXIMA and fechas["vence"] >= fechas["emitida"]):
+        raise LicenciaInvalida("campos")
 
 
 def abrir(documento, llaves_publicas, tipo):

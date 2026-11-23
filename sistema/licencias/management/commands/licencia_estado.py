@@ -13,6 +13,7 @@ ESTADOS = {
 MOTIVOS = {
     "revocada": "La licencia fue cancelada. El programa solo permite consultar, descargar y respaldar.",
     "vencida": "La licencia venció y el plazo de gracia terminó. El programa solo permite consultar, descargar y respaldar.",
+    "llaves": "El archivo con las llaves de la licencia está dañado, por seguridad el programa solo permite consultar, descargar y respaldar. Pide ayuda a quien te dio el programa.",
     "sin_licencia": "No se activó la licencia a tiempo. El programa solo permite consultar, descargar y respaldar.",
 }
 RESULTADOS = {
