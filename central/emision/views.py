@@ -12,6 +12,7 @@ from . import ajustes, origen, reloj, servicios
 from .models import CodigoActivacion, Instalacion, Rechazo, Sello
 
 LIMITE_CUERPO = 16 * 1024
+LARGO_RUTA = 100
 LARGO_LLAVE_BASE64 = 44
 LARGO_CODIGO_MAXIMO = 40
 CAMPOS_ACTIVAR = ("codigo", "llave_publica", "carga", "firma")
@@ -19,6 +20,7 @@ CAMPOS_RENOVAR = ("instalacion", "carga", "firma")
 RESPUESTAS = {
     400: {"error": "peticion"},
     403: {"error": "rechazada"},
+    404: {"error": "peticion"},
     405: {"error": "peticion"},
     413: {"error": "peticion"},
     429: {"error": "espera"},
@@ -43,14 +45,19 @@ def _negar(estado):
     return _responder(RESPUESTAS[estado], estado)
 
 
+def _purgar_rechazos():
+    Rechazo.objects.filter(momento__lt=reloj.ahora() - timedelta(hours=1)).delete()
+
+
 def _anotar_rechazo(request, error):
     sitio = origen.de(request)
     with transaction.atomic():
         Rechazo.objects.create(origen=sitio, momento=reloj.ahora())
-        servicios.anotar("rechazo", error.negocio, sitio, causa=error.causa, estado=error.estado, ruta=request.path)
+        servicios.anotar("rechazo", error.negocio, sitio, causa=error.causa, estado=error.estado, ruta=request.path[:LARGO_RUTA])
 
 
 def _demasiados_rechazos(request):
+    _purgar_rechazos()
     desde = reloj.ahora() - timedelta(hours=1)
     return Rechazo.objects.filter(origen=origen.de(request), momento__gt=desde).count() >= ajustes.valor("rechazos_por_hora")
 
@@ -221,3 +228,17 @@ def activar(cuerpo):
     except IntegrityError:
         raise Denegado(403, "huella_repetida")
     return {"resultado": "activada", "documento": documento}
+
+
+def _fuera_de_ruta(request, estado, causa):
+    _purgar_rechazos()
+    _anotar_rechazo(request, Denegado(estado, causa))
+    return _negar(estado)
+
+
+def no_encontrada(request, exception=None):
+    return _fuera_de_ruta(request, 404, "ruta_inexistente")
+
+
+def peticion_invalida(request, exception=None):
+    return _fuera_de_ruta(request, 400, "peticion_invalida")

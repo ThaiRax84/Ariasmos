@@ -17,8 +17,8 @@ def ruta_archivo(base=None):
     return (base or carpeta()) / ARCHIVO
 
 
-def leer():
-    ruta = ruta_archivo()
+def leer(base=None):
+    ruta = ruta_archivo(base)
     if not ruta.exists():
         return None
     with ruta.open(encoding="utf-8") as archivo:
@@ -31,7 +31,7 @@ def nueva(base, hosts=()):
         "clave_django": secrets.token_urlsafe(50),
         "base_datos": str(base / "central.sqlite3"),
         "hosts": list(dict.fromkeys(nombre for nombre in nombres if nombre)),
-        "proxies_confiables": ["127.0.0.1", "::1"],
+        "proxies_confiables": [],
         "llave_licencias": str(base / LLAVE),
     }
 

@@ -7,8 +7,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from django.test import Client
 
-from emision import llave, reloj, servicios
-from emision.models import Bitacora, Instalacion, Rechazo
+from emision import ajustes, llave, origen, reloj, servicios
+from emision.models import Ajuste, Bitacora, Instalacion, Rechazo
 from nucleo import licencia
 
 
@@ -86,3 +86,29 @@ def test_entradas_hostiles_dan_4xx_sin_filtrar_nada_y_el_origen_se_bloquea(negoc
     for _ in range(40):
         cliente.post("/v1/renovar", b"{", content_type="application/json")
     assert cliente.post("/v1/renovar", b"{", content_type="application/json").status_code == 429
+
+
+def test_ajustes_absurdos_se_ignoran_y_las_rutas_ajenas_responden_json(negocio):
+    Ajuste.objects.create(clave="dias_vigencia", valor=10**12)
+    Ajuste.objects.create(clave="minutos_tolerancia", valor=0)
+    assert ajustes.valor("dias_vigencia") == 30 and ajustes.valor("minutos_tolerancia") == 10
+    assert Equipo().activar(servicios.crear_codigo(negocio)).status_code == 200
+    for ruta, extra in (("/nada", {}), ("/v1/activar/", {}), ("/v1/salud", {"HTTP_HOST": "malo.example"})):
+        respuesta = Client().get(ruta, **extra)
+        assert respuesta.status_code in (400, 404) and respuesta.json() == {"error": "peticion"}
+        assert respuesta["Cache-Control"] == "no-store"
+    Rechazo.objects.update(momento=reloj.ahora() - timedelta(hours=2))
+    Equipo().renovar()
+    assert Rechazo.objects.filter(momento__lt=reloj.ahora() - timedelta(hours=1)).count() == 0
+
+
+def test_origen_valida_el_reenviado_y_agrupa_ipv6(settings):
+    class Peticion:
+        def __init__(self, remoto, reenviado=""):
+            self.META = {"REMOTE_ADDR": remoto, "HTTP_X_FORWARDED_FOR": reenviado}
+
+    settings.PROXIES_CONFIABLES = ["10.0.0.1"]
+    assert origen.de(Peticion("10.0.0.1", "9.9.9.9, 1.2.3.4")) == "1.2.3.4"
+    assert origen.de(Peticion("10.0.0.1", "1.2.3.4:80")) == "10.0.0.1"
+    assert origen.de(Peticion("7.7.7.7", "1.2.3.4")) == "7.7.7.7"
+    assert origen.de(Peticion("2001:db8::1")) == origen.de(Peticion("2001:db8::ffff")) == "2001:db8::/64"
