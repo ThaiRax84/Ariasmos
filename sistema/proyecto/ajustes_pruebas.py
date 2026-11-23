@@ -34,3 +34,4 @@ _ruta = os.path.join(tempfile.gettempdir(), f"cobro-pruebas-{os.getpid()}.sqlite
 DATABASES = base_de_datos(_ruta)
 DATABASES["default"]["TEST"] = {"NAME": _ruta}
 COOKIE_DISPOSITIVO_SEGURA = True
+CENTRAL_URL = "https://central.invalid"

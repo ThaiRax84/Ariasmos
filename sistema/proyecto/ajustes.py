@@ -27,6 +27,7 @@ if _datos is None:
     RUTA_ACTUALIZACIONES = ""
     DATABASES = base_de_datos(":memory:")
     ALLOWED_HOSTS = []
+    CENTRAL_URL = ""
 else:
     SECRET_KEY = _datos["clave_django"]
     CLAVE_MATRICULA = bytes.fromhex(_datos["clave_matricula"])
@@ -49,6 +50,7 @@ else:
     HTTPS_ACTIVO = bool(_datos.get("https", True))
     CERTIFICADO_SERVIDOR = str(_datos.get("certificado_servidor", ""))
     PUERTO_HTTPS = int(_datos.get("puerto", 443))
+    CENTRAL_URL = str(_datos.get("central", ""))
     if _datos.get("https", True):
         from . import equipo as _equipo
 
