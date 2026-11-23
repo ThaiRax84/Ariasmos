@@ -1131,3 +1131,218 @@ Origen: prototipo aprobado por el dueño el 18/11/2026. Se parte de la interfaz 
 - **Filtros de Cobrar** («Todos / Con adeudo / Rezagados» con su cuenta): parámetro `estado` por GET en `titulares/lista.py`, también con el filtro en vivo y con los renglones que se reacomodan. «Rezagados» son quienes tienen aviso o marca de rezago visible para esa persona y lo ve todo el que cobra. «Con adeudo» y su cuenta solo para quien ve saldos; a los demás no se les muestra y el parámetro se ignora. Consultas agregadas, sin una por renglón.
 - **Billete o moneda** es un dato de cada denominación (`Denominacion.tipo`), con migración que deja «billete» en lo existente. Va en las seis plantillas, se edita en Configuración › Denominaciones («¿Es billete o moneda?») y el asistente lo pregunta cuando la moneda no es la de la plantilla. Los mosaicos de moneda son redondos y, sin piezas, dicen «billete» o «moneda».
 - **Buscar o ir a** con la caja vacía muestra los tres primeros rezagados; el adeudo solo a quien ve saldos.
+
+## Versión 1.0: licencias y Ariasmos Central (fase 1a)
+
+### Qué se construye
+
+- **Ariasmos Central**: servidor pequeño y aparte (carpeta `central/`), que da de alta negocios, entrega códigos de activación y emite, renueva y revoca licencias. Solo API y comandos del dueño. Sin pantallas, sin sesiones, sin administrador web.
+- **En el programa** (app nueva `sistema/licencias/`): identidad de la instalación, verificación de licencia, renovación automática, protección contra retroceso del reloj y candado de solo consulta. **Sin pantallas ni rutas nuevas** (van en la fase 1b).
+- La conexión siempre la inicia el programa. Central nunca llama al negocio.
+- `central/` no entra al instalador (este solo copia `sistema`, `nucleo`, `datos`, `plantillas`).
+
+### Documento firmado: `nucleo/licencia.py` (puro, sin Django)
+
+Un **documento** es `{"carga": "<base64>", "firma": "<base64>"}`. `carga` son los bytes exactos de un JSON; `firma` es Ed25519 (64 bytes) sobre esos bytes.
+
+```
+FORMATO = 1
+PRODUCTO = "ariasmos"
+LIMITE = 8192                      # bytes de la carga ya decodificada
+CAMPOS = {
+  "licencia":   ("formato","producto","tipo","negocio","instalacion","plan","modulos","serie","emitida","vence","dias_gracia"),
+  "revocacion": ("formato","producto","tipo","negocio","instalacion","emitida"),
+  "renovacion": ("formato","producto","tipo","instalacion","momento","sello","version"),
+  "activacion": ("formato","producto","tipo","instalacion","momento","sello","version"),
+}
+class LicenciaInvalida(Exception):  # atributo .motivo
+serializar(carga: dict) -> bytes    # json sort_keys, separadores (",",":"), ensure_ascii=False, UTF-8
+firmar(carga: dict, llave_privada) -> dict                 # Ed25519PrivateKey de cryptography
+abrir(documento, llaves_publicas, tipo: str) -> dict        # llaves: iterable de bytes crudos (32)
+huella(llave_publica: bytes) -> str                         # sha256 en hex (64) de los 32 bytes
+texto_de(momento: datetime) -> str                          # "YYYY-MM-DDTHH:MM:SSZ" (UTC, sin fracción)
+momento_de(texto: str) -> datetime                          # estricto, devuelve aware en UTC; si no, ValueError
+```
+
+`abrir`, en este orden, y cualquier fallo lanza `LicenciaInvalida(motivo)`:
+1. `documento` es dict con exactamente `carga` y `firma`, ambos texto; base64 estricto (`validate=True`); carga ≤ `LIMITE`; firma de 64 bytes → si no, motivo `formato`.
+2. La firma verifica con alguna de las llaves → si no (o si no hay llaves), motivo `firma`. **Nada se interpreta antes de verificar.**
+3. JSON estricto (objeto; rechaza claves repetidas) → `formato`.
+4. Claves exactamente `CAMPOS[tipo]`; `formato == 1`; `producto == "ariasmos"`; `tipo` igual al pedido; textos son `str`; `serie` y `dias_gracia` enteros ≥ 0 (no `bool`); `modulos` lista de `str`; `instalacion` 64 hex minúsculas; `sello` 32 hex minúsculas; `version` `^\d+\.\d+\.\d+$`; `emitida`, `vence`, `momento` pasan `momento_de` → si no, motivo `campos`.
+Devuelve la carga como dict (fechas como texto).
+
+Cargas:
+- licencia: `{"formato":1,"producto":"ariasmos","tipo":"licencia","negocio":"<uuid>","instalacion":"<huella>","plan":"base","modulos":[],"serie":7,"emitida":"…Z","vence":"…Z","dias_gracia":14}`
+- revocacion: `{…,"tipo":"revocacion","negocio":"<uuid>","instalacion":"<huella>","emitida":"…Z"}`
+- renovacion / activacion (las firma la instalación): `{…,"tipo":"renovacion","instalacion":"<huella>","momento":"…Z","sello":"<32 hex al azar>","version":"X.Y.Z"}`
+
+### Programa: app `licencias` (`sistema/licencias/`)
+
+Se agrega a `INSTALLED_APPS` y su candado al **final** de `MIDDLEWARE` (en `base.py`).
+
+| Archivo | Contenido |
+|---|---|
+| `llaves.json` | `{"licencias": []}` (lista de llaves públicas de Central en base64; se entrega vacía) |
+| `llaves.py` | `RUTA` (ruta de `llaves.json`); `publicas() -> tuple[bytes, ...]` lee `RUTA` en cada llamada. Estricto: solo la clave `licencias`, máx. 4 llaves de 32 bytes, archivo < 4 KB; si no, `ImproperlyConfigured` |
+| `politica.py` | `DIAS_PARA_ACTIVAR = 14`, `HORAS_ENTRE_RENOVACIONES = 12`, `TOLERANCIA_RELOJ = timedelta(hours=1)`, `PASO_RELOJ = timedelta(minutes=5)`. Son política del programa: **no** van en `PARAMETROS` (el negocio no debe poder cambiarlas) |
+| `reloj.py` | `ahora()` → `timezone.now()`. Única fuente de hora de la app; se llama siempre como `reloj.ahora()` |
+| `models.py` | `Instalacion` (única, pk=1): `llave_cifrada`, `huella` (64), `activada` (bool, falso), `primer_arranque`, `mayor_momento`, `documento` (texto JSON, vacío si no hay), `revocacion` (texto JSON, vacío si no hay), `ultimo_intento` (nulo), `ultimo_resultado` (≤40, vacío) |
+| `cliente.py` | `class SinConexion(Exception)`; `enviar(ruta: str, cuerpo: dict) -> tuple[int, dict]` |
+| `servicios.py` | ver abajo |
+| `middleware.py` | `Candado` |
+| `management/commands/licencia_activar.py`, `licencia_estado.py` | comandos |
+| `migrations/0001_initial.py` | solo la tabla nueva |
+
+La llave privada de la instalación (Ed25519) se genera al crear la fila y se guarda cifrada con el mismo mecanismo que ya cifra secretos en el programa (el de `CLAVE_SECRETOS`, usado para TOTP). Nunca sale del equipo ni se registra.
+
+#### `servicios.py`
+
+```
+@dataclass(frozen=True)
+class Situacion: estado: str; motivo: str; vence: datetime | None; limite: datetime | None
+
+instalacion() -> Instalacion          # la crea si falta: llave nueva, primer_arranque = mayor_momento = reloj.ahora()
+identidad() -> tuple[str, Ed25519PrivateKey]     # (huella, llave privada)
+momento_efectivo() -> datetime
+situacion() -> Situacion
+permite_escribir() -> bool            # situacion().estado != "solo_consulta"
+instalar(documento: dict) -> Situacion
+anotar_revocacion(documento: dict) -> None
+activar(codigo: str) -> str
+renovar() -> str
+tarea_renovar(...)                    # con la firma que usan las funciones de TAREAS
+```
+
+**Hora efectiva** (`momento_efectivo`): `a = reloj.ahora()`. Si `a > mayor_momento + PASO_RELOJ`, guarda `mayor_momento = a`. Si `a < mayor_momento - TOLERANCIA_RELOJ`, registra en auditoría `reloj_atrasado` (como máximo una vez cada 6 h). Devuelve `max(a, mayor_momento)`. Así, atrasar el reloj nunca regala tiempo.
+
+**`situacion()`**, en orden (sin caché entre llamadas; vuelve a verificar la firma de lo guardado cada vez):
+1. `llaves.publicas()` vacío → `libre` (programa sin llaves: las licencias están apagadas).
+2. Hay `revocacion` guardada, válida (`abrir(..., "revocacion")`), con `instalacion == huella` local y `emitida` ≥ la `emitida` de la licencia guardada (si hay) → `solo_consulta`, motivo `revocada`.
+3. Hay `documento` válido (`abrir(..., "licencia")`) con `instalacion == huella` local. Con `t = momento_efectivo()`, `vence`, y `limite = vence + dias_gracia días`: `t ≤ vence` → `vigente`; `t ≤ limite` → `gracia`; si no → `solo_consulta`, motivo `vencida`.
+4. Sin documento válido: `limite = primer_arranque + DIAS_PARA_ACTIVAR días`; `t ≤ limite` → `por_activar`; si no → `solo_consulta`, motivo `sin_licencia`.
+`motivo` es `""` fuera de `solo_consulta`. Un documento guardado que ya no verifica (alterado en la base) cuenta como que no hay.
+
+**`instalar(documento)`**: `abrir(documento, llaves.publicas(), "licencia")`; además `LicenciaInvalida("ajena")` si `instalacion` no es la huella local y `LicenciaInvalida("antigua")` si su `emitida` es anterior a la de la licencia ya guardada. Si se rechaza: no cambia nada guardado y registra `licencia_rechazada` con `{"motivo": …}`. Si se acepta: guarda el documento, `mayor_momento = max(mayor_momento, emitida)`, borra la `revocacion` guardada si su `emitida` es anterior, registra `licencia_instalada` y devuelve `situacion()`.
+
+**`anotar_revocacion(documento)`**: `abrir(..., "revocacion")`; `ajena` si no es de esta instalación; `antigua` si su `emitida` es anterior a la de la licencia guardada. Rechazo: nada cambia y `licencia_rechazada`. Aceptada: se guarda y `licencia_revocada`.
+
+**`cliente.enviar(ruta, cuerpo)`**: POST JSON a `settings.CENTRAL_URL + ruta` con `urllib.request` y `ssl.create_default_context()`, tiempo límite 15 s, respuesta ≤ 64 KB y debe ser un objeto JSON. `CENTRAL_URL` sale de la clave `central` de `configuracion.json` de la instancia (por omisión `""`); solo se acepta `https://`. Vacía, sin https, error de red, tiempo, tamaño o JSON inválido → `SinConexion`. En `ajustes_pruebas`: `CENTRAL_URL = "https://central.invalid"`. `servicios` lo llama siempre como `cliente.enviar(...)` (las pruebas lo sustituyen).
+
+**Petición firmada** (para ambas rutas): carga de tipo `renovacion` o `activacion` con `instalacion = huella`, `momento = texto_de(reloj.ahora())`, `sello = secrets.token_hex(16)`, `version` = versión instalada; se firma con la llave de la instalación.
+
+**`renovar()`** devuelve uno de: `apagada` (sin llaves públicas), `sin_conexion`, `renovada`, `pago_pendiente`, `revocada`, `rechazada`. Envía a `/v1/renovar` `{"instalacion": huella, "carga": …, "firma": …}`. Guarda `ultimo_intento` y `ultimo_resultado`. Respuesta 200 con `resultado`: `renovada` → `instalar(documento)`; `revocada` → `anotar_revocacion(documento)`; `pago_pendiente` → nada. Si el documento recibido no pasa (`LicenciaInvalida`) o el estado no es 200 → `rechazada`. Nunca deja salir una excepción.
+
+**`activar(codigo)`** devuelve `apagada`, `sin_conexion`, `activada`, `pago_pendiente` o `rechazada`. Envía a `/v1/activar` `{"codigo": codigo, "llave_publica": "<base64 de los 32 bytes>", "carga": …, "firma": …}` (carga de tipo `activacion`). `activada` → `instalar(documento)`. Con `activada` o `pago_pendiente` se guarda `Instalacion.activada = True`.
+
+**`tarea_renovar`**: se agrega a `TAREAS` de `configuracion/trabajador.py` como `("licencia", …, False)`. Llama a `renovar()` solo si la instalación ya se activó en Central (`activada`) y `ultimo_intento` es nulo o tiene más de `HORAS_ENTRE_RENOVACIONES`.
+
+#### Candado: `licencias.middleware.Candado`
+
+Si `not permite_escribir()`, el método no es `GET`, `HEAD` ni `OPTIONS`, y la ruta resuelta no está en `LIBRES`: responde **403**, `Content-Type: text/plain; charset=utf-8`, cabecera **`X-Ariasmos-Licencia: solo-consulta`** y un texto en palabras llanas (la licencia venció; se puede consultar y exportar; no se pueden registrar movimientos; cómo reactivar). En cualquier otro caso deja pasar y no añade la cabecera.
+
+`LIBRES` (conjunto de nombres de ruta, en `middleware.py`): solo lo indispensable para entrar y salir (inicio de sesión, segundo paso con código, cerrar sesión, confirmar contraseña, registro del equipo si hace falta para entrar) y para sacar los datos: `respaldos:respaldar` y `respaldos:probar`. Nada de cobros, altas, ediciones, caja, banco, inventario ni configuración. Todo lo que se descarga por GET sigue funcionando.
+
+#### Trabajador
+
+En `configuracion/trabajador.py`: si `not licencias.servicios.permite_escribir()`, el ciclo **omite** (sin marcarlas como falla) las tareas que escriben datos del negocio: `generar_cargos`, `generar_recargos`, `carpeta_banco`, `generar_cortes_mayores`, `cerrar_cortes_vencidos`, `entregar_cortes`, `caducar_solicitudes`. Siguen corriendo: `respaldo`, `prueba_respaldo`, `verificar_bitacora`, `actualizaciones`, `licencia`, `depurar_*`, `cifrar_secretos`, `lista_cobranza`.
+
+#### Auditoría (con `auditoria.servicios.registrar`)
+
+`licencia_instalada` (`serie`, `vence`), `licencia_rechazada` (`motivo`), `licencia_revocada`, `reloj_atrasado`. Nunca llaves, códigos ni documentos completos.
+
+#### Comandos
+
+- `python manage.py licencia_activar <código>`: llama a `activar` y dice el resultado en palabras llanas.
+- `python manage.py licencia_estado`: estado, vencimiento y fin de la gracia en palabras llanas.
+
+### Ariasmos Central: carpeta `central/`
+
+Proyecto Django aparte. `central/manage.py` mete la raíz del repo en `sys.path` (para `nucleo`) igual que `sistema/manage.py`. `pytest.ini`: `pythonpath = . sistema central`.
+
+| Ruta | Contenido |
+|---|---|
+| `central/proyecto_central/` | `ajustes.py`, `ajustes_pruebas.py`, `urls.py`, `wsgi.py`, `instancia.py` |
+| `central/emision/` | app: `models.py`, `ajustes.py`, `llave.py`, `reloj.py`, `origen.py`, `servicios.py`, `views.py`, `urls.py`, `migrations/`, `management/commands/` |
+| `central/requirements.txt` | Django, cryptography y waitress con las mismas versiones fijas del programa (más sus dependencias) |
+
+**Ajustes.** `INSTALLED_APPS = ["emision"]`; middleware mínimo (`SecurityMiddleware`, `CommonMiddleware`); sin sesiones, sin auth, sin admin, sin CSRF (no hay cookies; todo va firmado). `DEBUG = False` siempre. La instancia vive en la carpeta de la variable `CENTRAL_INSTANCIA`, con `configuracion.json`: `clave_django`, `base_datos`, `hosts`, `proxies_confiables`, `llave_licencias` (ruta del archivo PEM PKCS8 de la llave privada; por omisión `<instancia>/llave-licencias.pem`, permisos 0600). SQLite con los mismos ajustes que el programa (WAL, IMMEDIATE, llaves foráneas). Ajustes expuestos: `RUTA_LLAVE_LICENCIAS`, `PROXIES_CONFIABLES`. `ajustes_pruebas.py`: base temporal por PID, llave efímera generada al importar en carpeta temporal, `ALLOWED_HOSTS = ["testserver"]`, `PROXIES_CONFIABLES = []`.
+
+**`emision/llave.py`**: `privada()` (lee `settings.RUTA_LLAVE_LICENCIAS`), `publica() -> bytes` (32 crudos). **`emision/reloj.py`**: `ahora()`, única fuente de hora, llamada siempre como `reloj.ahora()`.
+
+**`emision/ajustes.py`**: modelo `Ajuste(clave, valor)` + catálogo `AJUSTES = {"dias_vigencia": 30, "dias_gracia": 14, "dias_codigo": 7, "minutos_tolerancia": 10, "rechazos_por_hora": 30}`; `valor(clave) -> int` (guardado o el de catálogo). Nada de esto va fijo en otra parte.
+
+**Modelos (`emision/models.py`)**
+
+| Modelo | Campos |
+|---|---|
+| `Negocio` | `id` UUID (pk), `nombre` (≤120), `contacto` (≤200, vacío), `plan` (≤40, `"base"`), `modulos` (JSON, lista), `instalaciones_permitidas` (entero, 1), `pagado_hasta` (fecha, nulo), `revocado` (bool), `creado` |
+| `CodigoActivacion` | `negocio` FK, `resumen` (sha256 hex del código normalizado, único), `vence`, `usado` (nulo) |
+| `Instalacion` | `negocio` FK, `huella` (64, única), `llave_publica` (base64), `activada`, `revocada` (bool), `serie` (entero, 0), `ultima_renovacion` (nulo), `ultima_version` (≤20, vacío) |
+| `Sello` | `instalacion` FK, `valor` (32), `momento`; único (`instalacion`, `valor`) |
+| `Rechazo` | `origen` (≤64, con índice), `momento` (con índice) |
+| `Bitacora` | `momento`, `accion` (≤40), `negocio` FK nulo, `origen` (≤64, vacío), `datos` JSON |
+| `Ajuste` | `clave` única, `valor` entero |
+
+**`emision/servicios.py`**
+
+```
+crear_negocio(nombre, contacto="", plan="base", modulos=(), instalaciones=1) -> Negocio
+crear_codigo(negocio) -> str            # devuelve el código una sola vez; guarda solo su resumen
+registrar_pago(negocio, hasta: date) -> None
+revocar(negocio, huella=None, deshacer=False) -> None   # sin huella: todo el negocio
+emitir(instalacion) -> dict             # documento de licencia firmado
+```
+
+- **Código de activación**: 20 caracteres del alfabeto `0123456789ABCDEFGHJKMNPQRSTVWXYZ` generados con `secrets`, mostrados `XXXXX-XXXXX-XXXXX-XXXXX`. Normalizar = mayúsculas y quitar guiones y espacios. Vence a los `dias_codigo` días. Un solo uso.
+- **`emitir`**: `serie = instalacion.serie + 1` (se guarda); `emitida = reloj.ahora()`; `vence = min(emitida + dias_vigencia días, las 23:59:59 UTC de pagado_hasta)`; `dias_gracia` del ajuste; `plan` y `modulos` del negocio; firma con `llave.privada()`; anota `licencia_emitida` en la bitácora.
+- **Pago al corriente** = `pagado_hasta` no nulo y ≥ la fecha UTC de hoy.
+
+**API (`emision/views.py`, `urls.py`)** — todas responden JSON con `Cache-Control: no-store`.
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /v1/salud` | 200 `{"estado":"ok"}` |
+| `POST /v1/activar` | activa una instalación con un código |
+| `POST /v1/renovar` | renueva la licencia de una instalación |
+
+Reglas comunes a las dos POST, en este orden:
+1. Otro método → 405.
+2. Origen (`origen.de(request)`: `REMOTE_ADDR`; si es un proxy de `PROXIES_CONFIABLES`, el último salto no confiable de `X-Forwarded-For`) con `rechazos_por_hora` o más filas en `Rechazo` en la última hora → **429** `{"error":"espera"}`, sin procesar nada más.
+3. Cuerpo > 16 KB → **413** `{"error":"peticion"}`. No es un objeto JSON, faltan o sobran campos, o tipos equivocados → **400** `{"error":"peticion"}`.
+4. Cualquier otro rechazo → **403** `{"error":"rechazada"}`, **idéntico sea cual sea la causa**.
+5. Toda respuesta 400, 403 y 413 agrega una fila a `Rechazo` y una entrada de bitácora con la causa (sin códigos, llaves ni cuerpos).
+6. Ninguna entrada hostil produce 500 ni devuelve trazas, rutas internas o la llave privada.
+
+`POST /v1/renovar` — cuerpo `{"instalacion","carga","firma"}`:
+- Busca `Instalacion` por `instalacion`; `abrir({"carga","firma"}, [su llave pública], "renovacion")`; la `instalacion` de la carga debe ser la misma; `momento` a no más de `minutos_tolerancia` minutos de `reloj.ahora()`; inserta el `Sello` (si ya existía → repetición). Cualquier fallo → 403. Borra sellos con más del doble de la tolerancia.
+- Instalación o negocio revocados → 200 `{"resultado":"revocada","documento":<revocación firmada con emitida = ahora>}`.
+- Sin pago al corriente → 200 `{"resultado":"pago_pendiente"}`.
+- Si no → 200 `{"resultado":"renovada","documento":<licencia>}`; guarda `ultima_renovacion` y `ultima_version`.
+
+`POST /v1/activar` — cuerpo `{"codigo","llave_publica","carga","firma"}` (`codigo` texto ≤ 40; `llave_publica` base64 de 32 bytes):
+- `abrir({"carga","firma"}, [llave_publica], "activacion")`; la `instalacion` de la carga debe ser `huella(llave_publica)`; `momento` dentro de la tolerancia.
+- El resumen del código normalizado existe, no está usado ni vencido; el negocio no está revocado; la huella no existe ya; las instalaciones no revocadas del negocio son menos que `instalaciones_permitidas`. Cualquier fallo → 403.
+- En una sola transacción: marca el código usado (actualización condicional `usado IS NULL`, que debe afectar 1 fila) y crea la `Instalacion`. Dos peticiones a la vez con el mismo código: solo una gana.
+- Con pago al corriente → 200 `{"resultado":"activada","documento":<licencia>}`; sin pago → 200 `{"resultado":"pago_pendiente"}` (la instalación queda creada y el código gastado).
+
+**Comandos del dueño** (`central/emision/management/commands/`), con salida en palabras llanas:
+`inicializar_central --carpeta <ruta>` (crea la instancia, la configuración y el par de llaves; imprime la llave **pública** en base64 para `sistema/licencias/llaves.json`; si ya existe, no la pisa) · `negocio_nuevo --nombre … [--contacto …] [--plan …] [--instalaciones N]` · `codigo_activacion <id del negocio>` · `registrar_pago <id> --hasta AAAA-MM-DD` · `revocar <id> [--instalacion <huella>] [--deshacer]` · `negocios` (lista: nombre, pagado hasta, instalaciones, última renovación, versión).
+
+### Lista cerrada de ataques (la fase debe aguantar los 10)
+
+1. **Licencia alterada**: cambiar `vence`, `plan` o `modulos` de una licencia válida → se rechaza y nada cambia.
+2. **Licencia con otra llave**: bien formada pero firmada con una llave que no es de Central → se rechaza.
+3. **Licencia ajena**: licencia auténtica de otra instalación u otro negocio → se rechaza.
+4. **Reloj atrasado**: con la licencia vencida y la gracia agotada, atrasar el reloj del equipo no devuelve el permiso de escribir; queda en auditoría.
+5. **Saltarse el candado**: en solo consulta, las rutas que escriben (cobro, alta, edición) llamadas directo responden 403 con la cabecera del candado y no escriben nada; consultar, descargar, entrar y respaldar siguen funcionando. En gracia todo funciona.
+6. **Renovación falsificada**: firma inválida, firma de otra instalación, petición repetida (mismo sello) o con hora vieja → 403 sin emitir.
+7. **Renovar sin derecho**: sin pago al corriente o revocado, Central no emite licencia; y una «revocación» sin firma válida de Central no bloquea al negocio.
+8. **Código de activación**: inventado, vencido o reutilizado → 403; tras muchos rechazos desde el mismo origen → 429.
+9. **Entradas hostiles a Central**: cuerpo gigante, JSON roto, tipos equivocados, campos de más, texto de inyección → 4xx, nunca 500, y la llave privada no aparece en respuestas ni en la bitácora.
+10. **Más instalaciones de las permitidas**: un segundo equipo con otro código del mismo negocio, con el tope en 1 → 403.
+
+### Plan de datos
+
+- No se mueve ni cambia ningún dato del MVP. Migración única: tabla nueva de `licencias`.
+- Un programa sin llaves en `llaves.json` queda `libre`: actualizar el MVP no puede bloquear a nadie por accidente.
+- La llave pública real de Central la pone Máximo después de correr `inicializar_central` en su servidor. La privada nunca sale de Central ni entra al repositorio.

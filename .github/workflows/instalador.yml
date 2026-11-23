@@ -10,6 +10,8 @@ on:
       - "datos/**"
       - "plantillas/**"
       - "pruebas/**"
+      - "central/**"
+      - "selladas/**"
       - "requirements*.txt"
       - "VERSION"
       - ".github/workflows/instalador.yml"
@@ -36,7 +38,10 @@ jobs:
       - name: Dependencias
         run: python -m pip install --disable-pip-version-check -r requirements-pruebas.txt
       - name: Pruebas
-        run: python -m pytest -q
+        run: |
+          python -m pytest -q
+          python -m pytest -q selladas/producto
+          python -m pytest -q --ds=proyecto_central.ajustes_pruebas central/pruebas selladas/central
 
   pruebas-windows:
     runs-on: windows-latest
