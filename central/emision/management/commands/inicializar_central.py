@@ -22,11 +22,28 @@ def _llave_nueva(base):
     return llave, True
 
 
-def _llave_existente(datos):
-    ruta = Path(datos["llave_licencias"])
-    if not ruta.exists():
-        raise CommandError(f"Central ya tiene configuración, pero falta el archivo de la llave ({ruta}). No se creó ninguna llave nueva para no invalidar las licencias ya entregadas: recupera el archivo desde tu respaldo.")
-    return load_pem_private_key(ruta.read_bytes(), password=None)
+def _datos_existentes(base):
+    try:
+        datos = instancia.leer(base)
+    except (OSError, ValueError):
+        raise CommandError(f"No se pudo leer la configuración de Central en {base}. Revisa que el archivo esté completo; no se creó ninguna llave.")
+    if not isinstance(datos, dict):
+        raise CommandError(f"La configuración de Central en {base} no es válida; no se creó ninguna llave.")
+    return datos
+
+
+def _llave_existente(base, datos):
+    ruta = datos.get("llave_licencias") or base / instancia.LLAVE
+    problema = f"Central ya tiene configuración, pero no se puede usar el archivo de la llave ({ruta}). No se creó ninguna llave nueva para no invalidar las licencias ya entregadas: recupera el archivo desde tu respaldo."
+    if not isinstance(ruta, (str, Path)) or not Path(ruta).is_file():
+        raise CommandError(problema)
+    try:
+        llave = load_pem_private_key(Path(ruta).read_bytes(), password=None)
+    except (OSError, ValueError, TypeError):
+        raise CommandError(problema)
+    if not isinstance(llave, Ed25519PrivateKey):
+        raise CommandError(problema)
+    return llave
 
 
 def _publica(llave):
@@ -41,10 +58,10 @@ class Command(BaseCommand):
         parser.add_argument("--host", action="append", default=[], help="Nombre con el que se llegará a Central (se puede repetir)")
 
     def _preparar(self, base, hosts):
-        datos = instancia.leer(base)
-        if datos is not None:
+        if instancia.ruta_archivo(base).exists():
+            llave = _llave_existente(base, _datos_existentes(base))
             self.stdout.write("Central ya estaba preparada en esa carpeta; no se cambió su configuración ni sus llaves.")
-            return _llave_existente(datos)
+            return llave
         base.mkdir(parents=True, exist_ok=True)
         llave, nueva = _llave_nueva(base)
         instancia.escribir(base, instancia.nueva(base, hosts))

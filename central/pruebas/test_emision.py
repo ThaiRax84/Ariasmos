@@ -48,7 +48,7 @@ def test_activar_y_renovar_emiten_licencia_verificable_y_cierran_la_puerta_a_rep
     assert respuesta.status_code == 200 and respuesta.json()["resultado"] == "activada"
     carga = licencia.abrir(respuesta.json()["documento"], [llave.publica()], "licencia")
     assert carga["instalacion"] == equipo.huella and carga["serie"] == 1
-    assert equipo.activar(codigo, sello="b" * 32).status_code == 403
+    assert Equipo().activar(codigo).status_code == 403
     assert Equipo().activar(servicios.crear_codigo(negocio)).status_code == 403
     assert equipo.renovar().json()["resultado"] == "renovada"
     assert equipo.renovar().status_code == 403
@@ -112,3 +112,23 @@ def test_origen_valida_el_reenviado_y_agrupa_ipv6(settings):
     assert origen.de(Peticion("10.0.0.1", "1.2.3.4:80")) == "10.0.0.1"
     assert origen.de(Peticion("7.7.7.7", "1.2.3.4")) == "7.7.7.7"
     assert origen.de(Peticion("2001:db8::1")) == origen.de(Peticion("2001:db8::ffff")) == "2001:db8::/64"
+
+
+def test_activacion_repetida_acuse_y_renovacion_autentica_sobre_el_limite(negocio):
+    equipo = Equipo()
+    codigo = servicios.crear_codigo(negocio)
+    primera = equipo.activar(codigo).json()
+    repetida = equipo.activar(codigo, sello="b" * 32)
+    assert repetida.status_code == 200 and repetida.json()["resultado"] == "activada"
+    assert Instalacion.objects.count() == 1 and Rechazo.objects.count() == 0
+    acuse = licencia.abrir(repetida.json()["acuse"], [llave.publica()], "acuse")
+    assert acuse["sello"] == "b" * 32 and acuse["instalacion"] == equipo.huella
+    assert primera["documento"] != repetida.json()["documento"]
+    assert Client().get("/v1/salud").json()["hora"] == licencia.texto_de(reloj.ahora())
+    Ajuste.objects.create(clave="rechazos_por_hora", valor=1)
+    Rechazo.objects.create(origen="127.0.0.1", momento=reloj.ahora())
+    bitacoras = Bitacora.objects.count()
+    assert Client().get("/nada").status_code == 429
+    assert Client().post("/v1/renovar", b"{", content_type="application/json").status_code == 429
+    assert Rechazo.objects.count() == 1 and Bitacora.objects.count() == bitacoras
+    assert equipo.renovar(sello="c" * 32).json()["resultado"] == "renovada"

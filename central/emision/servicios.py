@@ -112,3 +112,15 @@ def revocacion_de(instalacion):
         "emitida": licencia.texto_de(reloj.ahora()),
     }
     return licencia.firmar(carga, llave.privada())
+
+
+def acuse_de(huella, sello):
+    carga = {
+        "formato": licencia.FORMATO,
+        "producto": licencia.PRODUCTO,
+        "tipo": "acuse",
+        "instalacion": huella,
+        "sello": sello,
+        "hora": licencia.texto_de(reloj.ahora()),
+    }
+    return licencia.firmar(carga, llave.privada())

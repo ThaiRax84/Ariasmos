@@ -84,16 +84,22 @@ def _campos(request, esperados):
     return cuerpo
 
 
-def _post(campos):
+def _post(campos, autentica=None):
     def decorador(proceso):
         def vista(request):
             if request.method != "POST":
                 return _negar(405)
-            if _demasiados_rechazos(request):
+            sobre_el_limite = _demasiados_rechazos(request)
+            if sobre_el_limite and autentica is None:
                 return _negar(429)
             try:
-                return _responder(proceso(_campos(request, campos)))
+                cuerpo = _campos(request, campos)
+                if sobre_el_limite:
+                    autentica(cuerpo)
+                return _responder(proceso(cuerpo))
             except Denegado as error:
+                if sobre_el_limite:
+                    return _negar(429)
                 _anotar_rechazo(request, error)
                 return _negar(error.estado)
 
@@ -142,11 +148,10 @@ def _anotar_renovacion(instalacion, version):
 def salud(request):
     if request.method not in ("GET", "HEAD"):
         return _negar(405)
-    return _responder({"estado": "ok"})
+    return _responder({"estado": "ok", "hora": licencia.texto_de(reloj.ahora())})
 
 
-@_post(CAMPOS_RENOVAR)
-def renovar(cuerpo):
+def _autenticar_renovacion(cuerpo):
     huella = cuerpo["instalacion"]
     if licencia.PATRON_INSTALACION.fullmatch(huella) is None:
         raise Denegado(400, "huella_invalida")
@@ -159,19 +164,32 @@ def renovar(cuerpo):
         raise Denegado(403, "instalacion_distinta", negocio)
     tolerancia = _tolerancia()
     _momento_reciente(carga, tolerancia, negocio)
+    if Sello.objects.filter(instalacion=instalacion, valor=carga["sello"]).exists():
+        raise Denegado(403, "peticion_repetida", negocio)
+    return instalacion, carga, tolerancia
+
+
+@_post(CAMPOS_RENOVAR, autentica=_autenticar_renovacion)
+def renovar(cuerpo):
+    instalacion, carga, tolerancia = _autenticar_renovacion(cuerpo)
+    negocio = instalacion.negocio
     with transaction.atomic():
         _, nuevo = Sello.objects.get_or_create(instalacion=instalacion, valor=carga["sello"], defaults={"momento": reloj.ahora()})
         if not nuevo:
             raise Denegado(403, "peticion_repetida", negocio)
         Sello.objects.filter(momento__lt=reloj.ahora() - 2 * tolerancia).delete()
         if instalacion.revocada or negocio.revocado:
-            servicios.anotar("revocada_avisada", negocio, instalacion=huella)
+            servicios.anotar("revocada_avisada", negocio, instalacion=instalacion.huella)
             return {"resultado": "revocada", "documento": servicios.revocacion_de(instalacion)}
         if not servicios.pago_al_corriente(negocio):
             return {"resultado": "pago_pendiente"}
-        documento = servicios.emitir(instalacion)
-        _anotar_renovacion(instalacion, carga["version"])
-    return {"resultado": "renovada", "documento": documento}
+        return _licencia_nueva("renovada", instalacion, carga)
+
+
+def _licencia_nueva(resultado, instalacion, carga):
+    documento = servicios.emitir(instalacion)
+    _anotar_renovacion(instalacion, carga["version"])
+    return {"resultado": resultado, "documento": documento, "acuse": servicios.acuse_de(instalacion.huella, carga["sello"])}
 
 
 def _validar_codigo(cuerpo):
@@ -185,8 +203,7 @@ def _validar_codigo(cuerpo):
 
 def _comprobar_permiso(codigo, huella):
     negocio = codigo.negocio
-    ahora = reloj.ahora()
-    if codigo.usado is not None or codigo.vence <= ahora:
+    if codigo.vence <= reloj.ahora():
         raise Denegado(403, "codigo_gastado_o_vencido", negocio)
     if negocio.revocado:
         raise Denegado(403, "negocio_revocado", negocio)
@@ -199,10 +216,19 @@ def _comprobar_permiso(codigo, huella):
 
 def _crear_instalacion(codigo, huella, llave_texto):
     negocio = _comprobar_permiso(codigo, huella)
-    if not CodigoActivacion.objects.filter(pk=codigo.pk, usado__isnull=True).update(usado=reloj.ahora()):
-        raise Denegado(403, "codigo_gastado_o_vencido", negocio)
     instalacion = Instalacion.objects.create(negocio=negocio, huella=huella, llave_publica=llave_texto, activada=True)
+    if not CodigoActivacion.objects.filter(pk=codigo.pk, usado__isnull=True).update(usado=reloj.ahora(), instalacion=instalacion):
+        raise Denegado(403, "codigo_gastado_o_vencido", negocio)
     servicios.anotar("instalacion_activada", negocio, instalacion=huella)
+    return instalacion
+
+
+def _instalacion_repetida(codigo, huella):
+    instalacion = codigo.instalacion
+    negocio = codigo.negocio
+    if instalacion is None or instalacion.huella != huella or codigo.vence <= reloj.ahora() or instalacion.revocada or negocio.revocado:
+        raise Denegado(403, "codigo_gastado_o_vencido", negocio)
+    instalacion.negocio = negocio
     return instalacion
 
 
@@ -217,28 +243,30 @@ def activar(cuerpo):
     _momento_reciente(carga, _tolerancia())
     try:
         with transaction.atomic():
-            codigo = CodigoActivacion.objects.select_related("negocio").filter(resumen=resumen).first()
+            codigo = CodigoActivacion.objects.select_related("negocio", "instalacion").filter(resumen=resumen).first()
             if codigo is None:
                 raise Denegado(403, "codigo_desconocido")
-            instalacion = _crear_instalacion(codigo, huella, cuerpo["llave_publica"])
+            if codigo.usado is None:
+                instalacion = _crear_instalacion(codigo, huella, cuerpo["llave_publica"])
+            else:
+                instalacion = _instalacion_repetida(codigo, huella)
             if not servicios.pago_al_corriente(codigo.negocio):
                 return {"resultado": "pago_pendiente"}
-            documento = servicios.emitir(instalacion)
-            _anotar_renovacion(instalacion, carga["version"])
+            return _licencia_nueva("activada", instalacion, carga)
     except IntegrityError:
         raise Denegado(403, "huella_repetida")
-    return {"resultado": "activada", "documento": documento}
 
 
-def _fuera_de_ruta(request, estado, causa):
-    _purgar_rechazos()
-    _anotar_rechazo(request, Denegado(estado, causa))
+def _fuera_de_ruta(request, estado):
+    if _demasiados_rechazos(request):
+        return _negar(429)
+    Rechazo.objects.create(origen=origen.de(request), momento=reloj.ahora())
     return _negar(estado)
 
 
 def no_encontrada(request, exception=None):
-    return _fuera_de_ruta(request, 404, "ruta_inexistente")
+    return _fuera_de_ruta(request, 404)
 
 
 def peticion_invalida(request, exception=None):
-    return _fuera_de_ruta(request, 400, "peticion_invalida")
+    return _fuera_de_ruta(request, 400)

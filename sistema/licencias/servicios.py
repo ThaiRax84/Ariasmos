@@ -49,6 +49,7 @@ def _fila_nueva():
         huella=licencia.huella(_bytes_publicos(privada)),
         primer_arranque=ahora,
         mayor_momento=ahora,
+        ultimo_reloj=ahora,
     )
 
 
@@ -66,20 +67,22 @@ def identidad():
     return fila.huella, Ed25519PrivateKey.from_private_bytes(base64.b64decode(secreto))
 
 
-def _avisar_reloj_atrasado(actual, mayor):
+def _avisar_reloj_atrasado(actual, anterior):
     desde = timezone.now() - timedelta(hours=HORAS_ENTRE_AVISOS_DE_RELOJ)
     if not Evento.objects.filter(accion="reloj_atrasado", momento__gte=desde).exists():
-        registrar("reloj_atrasado", datos={"reloj": licencia.texto_de(actual), "mayor_visto": licencia.texto_de(mayor)})
+        registrar("reloj_atrasado", datos={"reloj": licencia.texto_de(actual), "ultimo_reloj": licencia.texto_de(anterior)})
 
 
 def _efectivo(fila):
     actual = reloj.ahora()
-    if actual > fila.mayor_momento + politica.PASO_RELOJ:
-        Instalacion.objects.filter(pk=1, mayor_momento__lt=actual).update(mayor_momento=actual)
-        fila.mayor_momento = actual
-    elif actual < fila.mayor_momento - politica.TOLERANCIA_RELOJ:
-        _avisar_reloj_atrasado(actual, fila.mayor_momento)
-    return max(actual, fila.mayor_momento)
+    avance = actual - fila.ultimo_reloj
+    efectivo = fila.mayor_momento + max(avance, timedelta(0))
+    if avance < -politica.TOLERANCIA_RELOJ:
+        _avisar_reloj_atrasado(actual, fila.ultimo_reloj)
+    if avance >= politica.PASO_RELOJ or avance < timedelta(0):
+        Instalacion.objects.filter(pk=1, ultimo_reloj=fila.ultimo_reloj).update(mayor_momento=efectivo, ultimo_reloj=actual)
+        fila.mayor_momento, fila.ultimo_reloj = efectivo, actual
+    return efectivo
 
 
 def momento_efectivo():
@@ -170,8 +173,10 @@ def _guardar_licencia(documento):
     if revocacion is not None and _antes(revocacion["emitida"], carga["emitida"]):
         fila.revocacion = ""
     fila.documento = json.dumps(documento, sort_keys=True)
-    fila.mayor_momento = max(fila.mayor_momento, licencia.momento_de(carga["emitida"]))
-    fila.save(update_fields=["documento", "revocacion", "mayor_momento"])
+    emitida = licencia.momento_de(carga["emitida"])
+    if emitida > fila.mayor_momento:
+        fila.mayor_momento, fila.ultimo_reloj = emitida, reloj.ahora()
+    fila.save(update_fields=["documento", "revocacion", "mayor_momento", "ultimo_reloj"])
     registrar("licencia_instalada", datos={"serie": carga["serie"], "vence": carga["vence"]})
 
 
@@ -203,86 +208,113 @@ def anotar_revocacion(documento):
         raise
 
 
-def _peticion(tipo, huella, privada):
-    carga = {
-        "formato": licencia.FORMATO,
-        "producto": licencia.PRODUCTO,
-        "tipo": tipo,
-        "instalacion": huella,
-        "momento": licencia.texto_de(reloj.ahora()),
-        "sello": secrets.token_hex(16),
-        "version": version.actual(),
-    }
-    return licencia.firmar(carga, privada)
-
-
 def _anotar_intento(resultado):
     Instalacion.objects.filter(pk=1).update(ultimo_intento=reloj.ahora(), ultimo_resultado=resultado)
     return resultado
 
 
-def _recibir_renovacion(estado, respuesta):
+def _intentar(ruta, tipo, huella, privada, adicional, momento):
+    sello = secrets.token_hex(16)
+    carga = {
+        "formato": licencia.FORMATO,
+        "producto": licencia.PRODUCTO,
+        "tipo": tipo,
+        "instalacion": huella,
+        "momento": licencia.texto_de(momento),
+        "sello": sello,
+        "version": version.actual(),
+    }
+    estado, respuesta = cliente.enviar(ruta, {**adicional, **licencia.firmar(carga, privada)})
+    return estado, respuesta, sello
+
+
+def _enviar_firmado(ruta, tipo, huella, privada, adicional):
+    momento = momento_efectivo()
+    estado, respuesta, sello = _intentar(ruta, tipo, huella, privada, adicional, momento)
+    if estado == 403:
+        hora = cliente.hora_central()
+        if hora is not None and abs(hora - momento) > politica.DESFASE_PARA_REINTENTO:
+            estado, respuesta, sello = _intentar(ruta, tipo, huella, privada, adicional, hora)
+    return estado, respuesta, sello
+
+
+def _aplicar_acuse(acuse, sello, huella):
+    try:
+        carga = licencia.abrir(acuse, _llaves() or (), "acuse")
+        if carga["instalacion"] != huella or carga["sello"] != sello:
+            raise licencia.LicenciaInvalida("acuse")
+    except licencia.LicenciaInvalida:
+        registrar("licencia_rechazada", datos={"motivo": "acuse"})
+        return
+    hora = licencia.momento_de(carga["hora"])
+    with transaction.atomic():
+        fila = instalacion()
+        antes = _efectivo(fila)
+        Instalacion.objects.filter(pk=1).update(mayor_momento=hora, ultimo_reloj=reloj.ahora())
+        if abs(hora - antes) > politica.TOLERANCIA_RELOJ:
+            registrar("reloj_ajustado", datos={"antes": licencia.texto_de(antes), "despues": licencia.texto_de(hora)})
+
+
+def _recibir(estado, respuesta, sello, huella, exitosa):
     if estado != 200:
         return "rechazada"
-    resultado, documento = respuesta.get("resultado"), respuesta.get("documento")
+    Instalacion.objects.filter(pk=1).update(activada=True)
+    if "acuse" in respuesta:
+        _aplicar_acuse(respuesta["acuse"], sello, huella)
+    resultado = respuesta.get("resultado")
     try:
-        if resultado == "renovada":
-            instalar(documento)
-        elif resultado == "revocada":
-            anotar_revocacion(documento)
+        if resultado == exitosa:
+            instalar(respuesta.get("documento"))
+        elif resultado == "revocada" and exitosa == "renovada":
+            anotar_revocacion(respuesta.get("documento"))
         elif resultado != "pago_pendiente":
             return "rechazada"
     except licencia.LicenciaInvalida:
         return "rechazada"
     return resultado
+
+
+def _sin_llaves():
+    claves = _llaves()
+    return "llaves" if claves is None else "apagada" if not claves else None
 
 
 def renovar():
-    if not _llaves():
-        return "apagada"
+    if (motivo := _sin_llaves()) is not None:
+        return motivo
     huella, privada = identidad()
-    cuerpo = {"instalacion": huella, **_peticion("renovacion", huella, privada)}
     try:
-        estado, respuesta = cliente.enviar("/v1/renovar", cuerpo)
+        estado, respuesta, sello = _enviar_firmado("/v1/renovar", "renovacion", huella, privada, {"instalacion": huella})
     except cliente.SinConexion:
         return _anotar_intento("sin_conexion")
-    return _anotar_intento(_recibir_renovacion(estado, respuesta))
-
-
-def _recibir_activacion(estado, respuesta):
-    if estado != 200:
-        return "rechazada"
-    resultado = respuesta.get("resultado")
-    try:
-        if resultado == "activada":
-            instalar(respuesta.get("documento"))
-        elif resultado != "pago_pendiente":
-            return "rechazada"
-    except licencia.LicenciaInvalida:
-        return "rechazada"
-    Instalacion.objects.filter(pk=1).update(activada=True)
-    return resultado
+    return _anotar_intento(_recibir(estado, respuesta, sello, huella, "renovada"))
 
 
 def activar(codigo):
-    if not _llaves():
-        return "apagada"
+    if (motivo := _sin_llaves()) is not None:
+        return motivo
     huella, privada = identidad()
     llave_publica = base64.b64encode(_bytes_publicos(privada)).decode("ascii")
-    cuerpo = {"codigo": codigo, "llave_publica": llave_publica, **_peticion("activacion", huella, privada)}
     try:
-        estado, respuesta = cliente.enviar("/v1/activar", cuerpo)
+        estado, respuesta, sello = _enviar_firmado("/v1/activar", "activacion", huella, privada, {"codigo": codigo, "llave_publica": llave_publica})
     except cliente.SinConexion:
         return "sin_conexion"
-    return _recibir_activacion(estado, respuesta)
+    return _recibir(estado, respuesta, sello, huella, "activada")
+
+
+def _toca_renovar(fila):
+    ahora = reloj.ahora()
+    if fila.ultimo_intento is None or ahora < fila.ultimo_intento:
+        return True
+    return ahora - fila.ultimo_intento >= timedelta(hours=politica.HORAS_ENTRE_RENOVACIONES)
 
 
 def tarea_renovar(hoy):
-    if not _llaves():
-        return "licencias apagadas en este programa"
+    if (motivo := _sin_llaves()) is not None:
+        return "licencias apagadas en este programa" if motivo == "apagada" else "el archivo de llaves de la licencia está dañado"
     fila = instalacion()
     if not fila.activada:
         return "la licencia todavía no se activa en Central"
-    if fila.ultimo_intento is not None and reloj.ahora() - fila.ultimo_intento < timedelta(hours=politica.HORAS_ENTRE_RENOVACIONES):
+    if not _toca_renovar(fila):
         return "todavía no toca renovar la licencia"
     return f"renovación de la licencia: {renovar()}"

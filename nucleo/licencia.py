@@ -17,10 +17,11 @@ CAMPOS = {
     "revocacion": ("formato", "producto", "tipo", "negocio", "instalacion", "emitida"),
     "renovacion": ("formato", "producto", "tipo", "instalacion", "momento", "sello", "version"),
     "activacion": ("formato", "producto", "tipo", "instalacion", "momento", "sello", "version"),
+    "acuse": ("formato", "producto", "tipo", "instalacion", "sello", "hora"),
 }
 ENTEROS = ("serie", "dias_gracia")
-FECHAS = ("emitida", "vence", "momento")
-TEXTOS = ("producto", "tipo", "negocio", "instalacion", "plan", "emitida", "vence", "momento", "sello", "version")
+FECHAS = ("emitida", "vence", "momento", "hora")
+TEXTOS = ("producto", "tipo", "negocio", "instalacion", "plan", "emitida", "vence", "momento", "hora", "sello", "version")
 PATRON_FECHA = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 PATRON_INSTALACION = re.compile(r"[0-9a-f]{64}")
 PATRON_SELLO = re.compile(r"[0-9a-f]{32}")

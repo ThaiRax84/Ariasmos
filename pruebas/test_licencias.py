@@ -30,7 +30,21 @@ class Central:
         monkeypatch.setattr(llaves, "RUTA", archivo)
         monkeypatch.setattr(reloj, "ahora", lambda: self.ahora)
         self.respuestas = []
-        monkeypatch.setattr(cliente, "enviar", lambda ruta, cuerpo: self.respuestas.pop(0))
+        self.hora_central = None
+        monkeypatch.setattr(cliente, "enviar", self._responder)
+        monkeypatch.setattr(cliente, "hora_central", lambda: self.hora_central)
+
+    def _responder(self, ruta, cuerpo):
+        respuesta = self.respuestas.pop(0)
+        return respuesta(cuerpo) if callable(respuesta) else respuesta
+
+    def acuse(self, cuerpo, firmante=None, hora=None, sello=None):
+        enviada = json.loads(base64.b64decode(cuerpo["carga"]))
+        carga = {
+            "formato": 1, "producto": "ariasmos", "tipo": "acuse", "instalacion": enviada["instalacion"],
+            "sello": sello or enviada["sello"], "hora": licencia.texto_de(hora or self.ahora),
+        }
+        return licencia.firmar(carga, firmante or self.privada)
 
     def licencia(self, dias=30, gracia=14, firmante=None, huella=None, emitida=None):
         emitida = emitida or self.ahora
@@ -131,7 +145,7 @@ def test_llaves_danadas_no_tumban_el_programa_ni_el_acceso(central, roles, tmp_p
     assert servicios.situacion().motivo == "llaves"
     assert "X-Ariasmos-Licencia" not in web.post(reverse("respaldos:probar"))
     assert web.post(reverse("usuario_nuevo"), {})["X-Ariasmos-Licencia"] == "solo-consulta"
-    assert servicios.renovar() == "apagada"
+    assert servicios.renovar() == "llaves"
     informe = {nombre: texto for nombre, _, texto in trabajador.ejecutar_ciclo()}
     assert informe["generar_cargos"].startswith("omitida")
 
@@ -158,3 +172,63 @@ def test_firma_valida_con_valores_absurdos_se_rechaza(central):
         with pytest.raises(licencia.LicenciaInvalida) as error:
             servicios.instalar(licencia.firmar(carga, central.privada))
         assert error.value.motivo == "campos"
+
+
+def test_la_cuenta_propia_solo_suma_avances(central):
+    servicios.instalar(central.licencia(dias=1, gracia=0))
+    inicio = central.ahora
+    for _ in range(30):
+        central.ahora -= timedelta(minutes=50)
+        servicios.situacion()
+        central.ahora += timedelta(minutes=25)
+        servicios.situacion()
+    assert servicios.momento_efectivo() == inicio + timedelta(minutes=25 * 30)
+    assert servicios.situacion().estado == "vigente"
+    central.ahora += timedelta(days=1)
+    assert servicios.situacion().motivo == "vencida"
+
+
+def test_solo_un_acuse_autentico_corrige_la_cuenta(central):
+    servicios.instalar(central.licencia())
+    real = central.ahora
+    central.ahora = real + timedelta(days=20)
+    adelantada = servicios.momento_efectivo()
+    central.ahora = real + timedelta(days=1)
+
+    def responder(**opciones):
+        return lambda cuerpo: (200, {"resultado": "pago_pendiente", "acuse": central.acuse(cuerpo, **opciones)})
+
+    for opciones in ({"firmante": Ed25519PrivateKey.generate()}, {"sello": "f" * 32}):
+        central.respuestas = [responder(**opciones)]
+        servicios.renovar()
+        assert servicios.momento_efectivo() >= adelantada
+    assert Evento.objects.filter(accion="licencia_rechazada", datos__motivo="acuse").count() == 2
+    central.respuestas = [responder()]
+    servicios.renovar()
+    assert servicios.momento_efectivo() < real + timedelta(days=2)
+    assert Evento.objects.filter(accion="reloj_ajustado").exists()
+
+
+def test_con_la_hora_mal_puesta_se_reintenta_una_vez_con_la_hora_de_central(central):
+    desfasada = central.ahora + timedelta(days=3)
+    enviadas = []
+
+    def rechazar(cuerpo):
+        enviadas.append(json.loads(base64.b64decode(cuerpo["carga"]))["momento"])
+        return 403, {}
+
+    def aceptar(cuerpo):
+        enviadas.append(json.loads(base64.b64decode(cuerpo["carga"]))["momento"])
+        return 200, {"resultado": "pago_pendiente"}
+
+    central.hora_central = desfasada
+    central.respuestas = [rechazar, aceptar]
+    assert servicios.renovar() == "pago_pendiente"
+    assert enviadas == [licencia.texto_de(central.ahora), licencia.texto_de(desfasada)]
+    assert Instalacion.objects.get().activada
+    central.respuestas = [rechazar, rechazar, aceptar]
+    assert servicios.renovar() == "rechazada"
+    assert len(central.respuestas) == 1
+    Instalacion.objects.update(ultimo_intento=central.ahora + timedelta(days=2))
+    central.respuestas = [aceptar]
+    assert servicios.tarea_renovar(None).endswith("pago_pendiente")

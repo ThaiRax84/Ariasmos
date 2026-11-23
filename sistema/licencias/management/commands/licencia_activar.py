@@ -7,6 +7,7 @@ MENSAJES = {
     "pago_pendiente": "El código es correcto y este equipo quedó registrado, pero el pago de la licencia aún no está al corriente. Cuando se registre el pago, el programa activará la licencia solo.",
     "rechazada": "Central no aceptó el código. Revisa que esté bien escrito y que no haya vencido ni se haya usado antes; si sigue fallando, pide uno nuevo.",
     "sin_conexion": "No se pudo hablar con Central. Revisa la conexión a internet de este equipo y vuelve a intentarlo.",
+    "llaves": "El archivo con las llaves de la licencia está dañado, así que no se puede activar. Pide ayuda a quien te dio el programa.",
     "apagada": "Este programa no usa licencia, así que no hay nada que activar.",
 }
 

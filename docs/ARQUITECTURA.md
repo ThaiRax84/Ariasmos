@@ -1186,7 +1186,7 @@ Se agrega a `INSTALLED_APPS` y su candado al **final** de `MIDDLEWARE` (en `base
 | `llaves.py` | `RUTA` (ruta de `llaves.json`); `publicas() -> tuple[bytes, ...]` lee `RUTA` en cada llamada. Estricto: solo la clave `licencias`, máx. 4 llaves de 32 bytes, archivo < 4 KB; si no, `ImproperlyConfigured`. Si falla, `situacion()` no lanza: devuelve `solo_consulta` con motivo `llaves` (falla cerrada) |
 | `politica.py` | `DIAS_PARA_ACTIVAR = 14`, `HORAS_ENTRE_RENOVACIONES = 12`, `TOLERANCIA_RELOJ = timedelta(hours=1)`, `PASO_RELOJ = timedelta(minutes=5)`. Son política del programa: **no** van en `PARAMETROS` (el negocio no debe poder cambiarlas) |
 | `reloj.py` | `ahora()` → `timezone.now()`. Única fuente de hora de la app; se llama siempre como `reloj.ahora()` |
-| `models.py` | `Instalacion` (única, pk=1): `llave_cifrada`, `huella` (64), `activada` (bool, falso), `primer_arranque`, `mayor_momento`, `documento` (texto JSON, vacío si no hay), `revocacion` (texto JSON, vacío si no hay), `ultimo_intento` (nulo), `ultimo_resultado` (≤40, vacío) |
+| `models.py` | `Instalacion` (única, pk=1): `llave_cifrada`, `huella` (64), `activada` (bool, falso), `primer_arranque`, `mayor_momento` (la cuenta propia del programa), `ultimo_reloj` (última lectura del reloj del equipo), `documento` (texto JSON, vacío si no hay), `revocacion` (texto JSON, vacío si no hay), `ultimo_intento` (nulo), `ultimo_resultado` (≤40, vacío) |
 | `cliente.py` | `class SinConexion(Exception)`; `enviar(ruta: str, cuerpo: dict) -> tuple[int, dict]` |
 | `servicios.py` | ver abajo |
 | `middleware.py` | `Candado` |
@@ -1201,7 +1201,7 @@ La llave privada de la instalación (Ed25519) se genera al crear la fila y se gu
 @dataclass(frozen=True)
 class Situacion: estado: str; motivo: str; vence: datetime | None; limite: datetime | None
 
-instalacion() -> Instalacion          # la crea si falta: llave nueva, primer_arranque = mayor_momento = reloj.ahora()
+instalacion() -> Instalacion          # la crea si falta: llave nueva, primer_arranque = mayor_momento = ultimo_reloj = reloj.ahora()
 identidad() -> tuple[str, Ed25519PrivateKey]     # (huella, llave privada)
 momento_efectivo() -> datetime
 situacion() -> Situacion
@@ -1213,7 +1213,7 @@ renovar() -> str
 tarea_renovar(...)                    # con la firma que usan las funciones de TAREAS
 ```
 
-**Hora efectiva** (`momento_efectivo`): `a = reloj.ahora()`. Si `a > mayor_momento + PASO_RELOJ`, guarda `mayor_momento = a`. Si `a < mayor_momento - TOLERANCIA_RELOJ`, registra en auditoría `reloj_atrasado` (como máximo una vez cada 6 h). Devuelve `max(a, mayor_momento)`. Así, atrasar el reloj nunca regala tiempo.
+**Reloj propio** (`momento_efectivo`): el programa lleva su propia cuenta del tiempo, `mayor_momento`, que suma solo avances del reloj del equipo. `a = reloj.ahora()`, `avance = a - ultimo_reloj`, `efectivo = mayor_momento + max(avance, 0)`. Un atraso no resta ni congela: la cuenta sigue desde donde iba. Si `avance < -TOLERANCIA_RELOJ`, auditoría `reloj_atrasado` (a lo más una cada 6 h). Si `avance >= PASO_RELOJ` o `avance < 0`, guarda `mayor_momento = efectivo` y `ultimo_reloj = a`. Devuelve `efectivo`. Así, atrasar el reloj nunca regala tiempo ni lo congela.
 
 **`situacion()`**, en orden (sin caché entre llamadas; vuelve a verificar la firma de lo guardado cada vez):
 1. `llaves.publicas()` vacío → `libre` (programa sin llaves: las licencias están apagadas).
@@ -1222,13 +1222,13 @@ tarea_renovar(...)                    # con la firma que usan las funciones de T
 4. Sin documento válido: `limite = primer_arranque + DIAS_PARA_ACTIVAR días`; `t ≤ limite` → `por_activar`; si no → `solo_consulta`, motivo `sin_licencia`.
 `motivo` es `""` fuera de `solo_consulta`. Un documento guardado que ya no verifica (alterado en la base) cuenta como que no hay.
 
-**`instalar(documento)`**: `abrir(documento, llaves.publicas(), "licencia")`; además `LicenciaInvalida("ajena")` si `instalacion` no es la huella local y `LicenciaInvalida("antigua")` si su `emitida` es anterior a la de la licencia ya guardada. Si se rechaza: no cambia nada guardado y registra `licencia_rechazada` con `{"motivo": …}`. Si se acepta: guarda el documento, `mayor_momento = max(mayor_momento, emitida)`, borra la `revocacion` guardada si su `emitida` es anterior, registra `licencia_instalada` y devuelve `situacion()`.
+**`instalar(documento)`**: `abrir(documento, llaves.publicas(), "licencia")`; además `LicenciaInvalida("ajena")` si `instalacion` no es la huella local y `LicenciaInvalida("antigua")` si su `emitida` es anterior a la de la licencia ya guardada. Si se rechaza: no cambia nada guardado y registra `licencia_rechazada` con `{"motivo": …}`. Si se acepta: guarda el documento, `mayor_momento = max(mayor_momento, emitida)` (y, si la cuenta sube, `ultimo_reloj = reloj.ahora()`), borra la `revocacion` guardada si su `emitida` es anterior, registra `licencia_instalada` y devuelve `situacion()`.
 
 **`anotar_revocacion(documento)`**: `abrir(..., "revocacion")`; `ajena` si no es de esta instalación; `antigua` si su `emitida` es anterior a la de la licencia guardada. Rechazo: nada cambia y `licencia_rechazada`. Aceptada: se guarda y `licencia_revocada`.
 
 **`cliente.enviar(ruta, cuerpo)`**: POST JSON a `settings.CENTRAL_URL + ruta` con `urllib.request` y `ssl.create_default_context()`, tiempo límite 15 s, respuesta ≤ 64 KB y debe ser un objeto JSON. `CENTRAL_URL` sale de la clave `central` de `configuracion.json` de la instancia (por omisión `""`); solo se acepta `https://`. Vacía, sin https, error de red, tiempo, tamaño o JSON inválido → `SinConexion`. En `ajustes_pruebas`: `CENTRAL_URL = "https://central.invalid"`. `servicios` lo llama siempre como `cliente.enviar(...)` (las pruebas lo sustituyen).
 
-**Petición firmada** (para ambas rutas): carga de tipo `renovacion` o `activacion` con `instalacion = huella`, `momento = texto_de(reloj.ahora())`, `sello = secrets.token_hex(16)`, `version` = versión instalada; se firma con la llave de la instalación.
+**Petición firmada** (para ambas rutas): carga de tipo `renovacion` o `activacion` con `instalacion = huella`, `momento = texto_de(momento_efectivo())` (la cuenta propia), `sello = secrets.token_hex(16)`, `version` = versión instalada; se firma con la llave de la instalación.
 
 **`renovar()`** devuelve uno de: `apagada` (sin llaves públicas), `sin_conexion`, `renovada`, `pago_pendiente`, `revocada`, `rechazada`. Envía a `/v1/renovar` `{"instalacion": huella, "carga": …, "firma": …}`. Guarda `ultimo_intento` y `ultimo_resultado`. Respuesta 200 con `resultado`: `renovada` → `instalar(documento)`; `revocada` → `anotar_revocacion(documento)`; `pago_pendiente` → nada. Si el documento recibido no pasa (`LicenciaInvalida`) o el estado no es 200 → `rechazada`. Nunca deja salir una excepción.
 
@@ -1293,7 +1293,7 @@ revocar(negocio, huella=None, deshacer=False) -> None   # sin huella: todo el ne
 emitir(instalacion) -> dict             # documento de licencia firmado
 ```
 
-- **Código de activación**: 20 caracteres del alfabeto `0123456789ABCDEFGHJKMNPQRSTVWXYZ` generados con `secrets`, mostrados `XXXXX-XXXXX-XXXXX-XXXXX`. Normalizar = mayúsculas y quitar guiones y espacios. Vence a los `dias_codigo` días. Un solo uso.
+- **Código de activación**: 20 caracteres del alfabeto `0123456789ABCDEFGHJKMNPQRSTVWXYZ` generados con `secrets`, mostrados `XXXXX-XXXXX-XXXXX-XXXXX`. Normalizar = mayúsculas y quitar guiones y espacios. Vence a los `dias_codigo` días. Un solo uso, salvo la repetición del mismo equipo (ver «Activación repetible»).
 - **`emitir`**: `serie = instalacion.serie + 1` (se guarda); `emitida = reloj.ahora()`; `vence = min(emitida + dias_vigencia días, las 23:59:59 UTC de pagado_hasta)`; `dias_gracia` del ajuste; `plan` y `modulos` del negocio; firma con `llave.privada()`; anota `licencia_emitida` en la bitácora.
 - **Pago al corriente** = `pagado_hasta` no nulo y ≥ la fecha UTC de hoy.
 
@@ -1301,7 +1301,7 @@ emitir(instalacion) -> dict             # documento de licencia firmado
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /v1/salud` | 200 `{"estado":"ok"}` |
+| `GET /v1/salud` | 200 `{"estado":"ok","hora":"…Z"}` (hora de Central, sin firma) |
 | `POST /v1/activar` | activa una instalación con un código |
 | `POST /v1/renovar` | renueva la licencia de una instalación |
 
@@ -1328,7 +1328,27 @@ Reglas comunes a las dos POST, en este orden:
 **Comandos del dueño** (`central/emision/management/commands/`), con salida en palabras llanas:
 `inicializar_central --carpeta <ruta>` (crea la instancia, la configuración y el par de llaves; imprime la llave **pública** en base64 para `sistema/licencias/llaves.json`; si ya existe, no la pisa) · `negocio_nuevo --nombre … [--contacto …] [--plan …] [--instalaciones N]` · `codigo_activacion <id del negocio>` · `registrar_pago <id> --hasta AAAA-MM-DD` · `revocar <id> [--instalacion <huella>] [--deshacer]` · `negocios` (lista: nombre, pagado hasta, instalaciones, última renovación, versión).
 
-### Lista cerrada de ataques (la fase debe aguantar los 10)
+### Reloj propio, acuse y hora de Central
+
+- **Acuse de Central**: documento firmado de tipo `acuse` con `("formato","producto","tipo","instalacion","sello","hora")`. Central lo incluye como `"acuse"` en toda respuesta 200 `renovada` o `activada` (con la huella de quien pide, el sello de esa petición y su hora). `pago_pendiente` trae solo `resultado`; `revocada` solo `resultado` y `documento`.
+- **El programa aplica el acuse** antes de instalar el documento, solo si abre con la llave de Central, es de esta instalación y trae el mismo sello que se acaba de enviar: la cuenta propia pasa a la hora de Central (hacia adelante o hacia atrás) y, si el cambio supera `TOLERANCIA_RELOJ`, se registra `reloj_ajustado` con `{"antes","despues"}`. Sin acuse no cambia nada; con un acuse que no pasa no se toca la cuenta, se registra `licencia_rechazada` con motivo `acuse` y el resto de la respuesta se procesa igual. Solo un acuse puede bajar la cuenta.
+- **Equipo con la hora mal puesta**: si Central contesta 403, el programa pide `cliente.hora_central()` (GET a `/v1/salud`, 5 s; cualquier falla da `None`). Si la hora difiere del `momento` enviado en más de `DESFASE_PARA_REINTENTO` (2 min), reenvía **una sola vez** con esa hora y un sello nuevo. Esa hora no está firmada: solo fecha la petición y nunca toca la cuenta.
+- `renovar()` y `activar()` marcan `activada = True` cuando Central contesta 200. La tarea de renovación intenta si la instalación está activada y no hay `ultimo_intento`, o este está en el futuro, o pasaron `HORAS_ENTRE_RENOVACIONES`.
+- Con `llaves.json` dañado, `renovar()`, `activar()` y la tarea responden `llaves`, y los comandos lo explican en palabras llanas.
+
+### Activación repetible y límite de rechazos (Central)
+
+- **Activación repetible**: `CodigoActivacion.instalacion` se llena al usarse el código. Si el mismo equipo (misma huella, firma y hora válidas) repite la activación con su código, aún no vencido, y ni la instalación ni el negocio están revocados, Central responde como la primera vez (licencia nueva con `serie` mayor y acuse, o `pago_pendiente`) sin crear otra instalación ni contar un rechazo. Otro equipo, código vencido o revocación: 403.
+- **Una renovación auténtica no se frena por el límite**: en `/v1/renovar`, si el origen está sobre el límite se comprueba primero que la petición sea auténtica (cuerpo bien formado, instalación conocida, firma, hora y sello nuevo); si lo es, se atiende normal; si no, 429 sin escribir nada. `/v1/activar` conserva el 429 primero.
+- **Rutas ajenas** (inexistentes, variantes de barra, `Host` no permitido): bajo el límite, 4xx con una fila en `Rechazo` y nada en `Bitacora`; sobre el límite, 429 sin escribir nada.
+- `inicializar_central` calcula la ruta de la llave igual que los ajustes (clave ausente o vacía: la ruta por omisión). Con configuración ilegible, JSON roto o una ruta que no es un archivo de llave, termina con un aviso en palabras llanas y no genera llaves.
+
+### Límites conocidos
+
+- Restaurar un respaldo en otra computadora copia la identidad del equipo (dos equipos, un cupo). Se avisará en el panel del dueño (fase 1b).
+- Quien controla por completo el equipo (base de datos, archivos del programa, red) puede saltarse la licencia o estirar el plazo sin conexión apagando el servicio y atrasando el reloj; con conexión, cada renovación vuelve a poner la hora de Central.
+
+### Lista cerrada de ataques (la fase debe aguantar los 17)
 
 1. **Licencia alterada**: cambiar `vence`, `plan` o `modulos` de una licencia válida → se rechaza y nada cambia.
 2. **Licencia con otra llave**: bien formada pero firmada con una llave que no es de Central → se rechaza.
@@ -1340,6 +1360,13 @@ Reglas comunes a las dos POST, en este orden:
 8. **Código de activación**: inventado, vencido o reutilizado → 403; tras muchos rechazos desde el mismo origen → 429.
 9. **Entradas hostiles a Central**: cuerpo gigante, JSON roto, tipos equivocados, campos de más, texto de inyección → 4xx, nunca 500, y la llave privada no aparece en respuestas ni en la bitácora.
 10. **Más instalaciones de las permitidas**: un segundo equipo con otro código del mismo negocio, con el tope en 1 → 403.
+11. **Congelar la licencia**: atrasar el reloj (una vez mucho o muchas veces poco) no impide que la licencia venza cuando el reloj vuelve a avanzar lo que faltaba.
+12. **Acuse falso**: un acuse firmado con otra llave, de otra instalación o con un sello distinto al enviado no mueve la cuenta; uno auténtico sí cura un adelanto por error del reloj.
+13. **Hora mal puesta**: un equipo con el reloj equivocado renueva al segundo intento con la hora de Central, y la tarea intenta aunque `ultimo_intento` esté en el futuro.
+14. **Activación a medias**: el mismo equipo repite la activación con el mismo código y recibe la misma respuesta, sin instalación nueva; otro equipo con ese código sigue rechazado.
+15. **Límite de rechazos**: desde un origen sobre el límite, una renovación auténtica pasa; una falsa recibe 429 y no escribe nada.
+16. **Acuse de Central**: `renovada` y `activada` traen un acuse con la llave de Central, el sello de la petición y su hora; `pago_pendiente` no cambia; `/v1/salud` trae la hora.
+17. **Llenar el disco**: las rutas inexistentes desde un origen sobre el límite reciben 429 sin filas nuevas; las rutas ajenas nunca escriben en `Bitacora`.
 
 ### Plan de datos
 

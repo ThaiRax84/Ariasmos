@@ -17,6 +17,8 @@ Ariasmos Central es el servidor aparte que da de alta a tus clientes, les entreg
 
 Central no confía en ningún proxy de forma predeterminada. Si pones un proxy delante (por ejemplo para el HTTPS), agrega su dirección a `proxies_confiables` en el `configuracion.json` de la carpeta de Central; si no, todas las peticiones parecerán venir de él y compartirán el mismo límite de rechazos.
 
+Si la configuración está dañada o la ruta de la llave no apunta a un archivo de llave válido, se detiene con un aviso y no crea llaves.
+
 Si corres `inicializar_central` otra vez sobre la misma carpeta, no cambia la configuración ni las llaves y vuelve a imprimir la llave pública. Si la configuración existe pero falta el archivo de la llave, se detiene con un aviso y no crea una llave nueva (recupérala de tu respaldo).
 
 ## Dar de alta un negocio
@@ -33,7 +35,7 @@ Imprime el identificador del negocio. `--instalaciones` es cuántos equipos pued
 python manage.py codigo_activacion <identificador>
 ```
 
-El código se muestra una sola vez, sirve una sola vez y vence a los 7 días. Entrégaselo al cliente.
+El código se muestra una sola vez y vence a los 7 días. Sirve para un solo equipo: si la activación se interrumpe a medias, ese mismo equipo puede repetirla con el mismo código mientras no venza; otro equipo no puede usarlo. Entrégaselo al cliente.
 
 ## Registrar un pago
 
@@ -63,3 +65,7 @@ python manage.py licencia_estado
 ```
 
 El primero activa la licencia; el segundo cuenta en palabras llanas cómo está. El programa da 14 días desde su primer arranque para activarlo. Después se renueva solo, cada vez que puede hablar con Central.
+
+## Si el reloj de un equipo está mal
+
+El programa lleva su propia cuenta del tiempo, así que atrasar el reloj del equipo no alarga la licencia. Si un reloj mal puesto hace que Central rechace una renovación, el programa reintenta una vez con la hora de Central. Cada renovación correcta vuelve a poner la cuenta en la hora de Central.

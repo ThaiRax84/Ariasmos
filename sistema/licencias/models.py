@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.db.models import Q
 
 
@@ -8,6 +9,7 @@ class Instalacion(models.Model):
     activada = models.BooleanField(default=False)
     primer_arranque = models.DateTimeField()
     mayor_momento = models.DateTimeField()
+    ultimo_reloj = models.DateTimeField(default=timezone.now)
     documento = models.TextField(blank=True)
     revocacion = models.TextField(blank=True)
     ultimo_intento = models.DateTimeField(null=True, blank=True)
