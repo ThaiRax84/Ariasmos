@@ -205,23 +205,30 @@ def renovar(cuerpo):
             servicios.anotar(
                 "revocada_avisada", negocio, instalacion=instalacion.huella
             )
-            return {
-                "resultado": "revocada",
-                "documento": servicios.revocacion_de(instalacion),
-            }
+            return _con_acuse(
+                {
+                    "resultado": "revocada",
+                    "documento": servicios.revocacion_de(instalacion),
+                },
+                instalacion,
+                carga,
+            )
         if not servicios.pago_al_corriente(negocio):
-            return {"resultado": "pago_pendiente"}
+            return _con_acuse({"resultado": "pago_pendiente"}, instalacion, carga)
         return _licencia_nueva("renovada", instalacion, carga)
+
+
+def _con_acuse(respuesta, instalacion, carga):
+    respuesta["acuse"] = servicios.acuse_de(instalacion.huella, carga["sello"])
+    return respuesta
 
 
 def _licencia_nueva(resultado, instalacion, carga):
     documento = servicios.emitir(instalacion)
     _anotar_renovacion(instalacion, carga["version"])
-    return {
-        "resultado": resultado,
-        "documento": documento,
-        "acuse": servicios.acuse_de(instalacion.huella, carga["sello"]),
-    }
+    return _con_acuse(
+        {"resultado": resultado, "documento": documento}, instalacion, carga
+    )
 
 
 def _validar_codigo(cuerpo):
@@ -302,7 +309,7 @@ def activar(cuerpo):
             else:
                 instalacion = _instalacion_repetida(codigo, huella)
             if not servicios.pago_al_corriente(codigo.negocio):
-                return {"resultado": "pago_pendiente"}
+                return _con_acuse({"resultado": "pago_pendiente"}, instalacion, carga)
             return _licencia_nueva("activada", instalacion, carga)
     except IntegrityError:
         raise Denegado(403, "huella_repetida")

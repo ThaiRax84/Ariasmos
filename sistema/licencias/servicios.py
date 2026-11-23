@@ -22,6 +22,8 @@ from .models import Instalacion
 CONTEXTO_LLAVE = "licencias|llave"
 HORAS_ENTRE_AVISOS_DE_RELOJ = 6
 
+ultimo_intento_real = None
+
 
 @dataclass(frozen=True)
 class Situacion:
@@ -87,7 +89,7 @@ def _efectivo(fila):
     efectivo = fila.mayor_momento + max(avance, timedelta(0))
     if avance < -politica.TOLERANCIA_RELOJ:
         _avisar_reloj_atrasado(actual, fila.ultimo_reloj)
-    if avance >= politica.PASO_RELOJ or avance < timedelta(0):
+    if avance > politica.PASO_RELOJ or avance < timedelta(0):
         Instalacion.objects.filter(pk=1, ultimo_reloj=fila.ultimo_reloj).update(
             mayor_momento=efectivo, ultimo_reloj=actual
         )
@@ -340,6 +342,11 @@ def activar(codigo):
     return _recibir(estado, respuesta, sello, huella, "activada")
 
 
+def _paso_tiempo_real(transcurrido):
+    segundos = politica.HORAS_ENTRE_RENOVACIONES * 3600
+    return transcurrido - ultimo_intento_real >= segundos
+
+
 def _toca_renovar(fila):
     ahora = reloj.ahora()
     if fila.ultimo_intento is None or ahora < fila.ultimo_intento:
@@ -356,9 +363,14 @@ def tarea_renovar(hoy):
             if motivo == "apagada"
             else "el archivo de llaves de la licencia está dañado"
         )
+    global ultimo_intento_real
+    transcurrido = reloj.transcurrido()
+    if ultimo_intento_real is None:
+        ultimo_intento_real = transcurrido
     fila = instalacion()
     if not fila.activada:
         return "la licencia todavía no se activa en Central"
-    if not _toca_renovar(fila):
+    if not (_toca_renovar(fila) or _paso_tiempo_real(transcurrido)):
         return "todavía no toca renovar la licencia"
+    ultimo_intento_real = transcurrido
     return f"renovación de la licencia: {renovar()}"

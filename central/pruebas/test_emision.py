@@ -9,6 +9,7 @@ from django.test import Client
 
 from emision import ajustes, llave, origen, reloj, servicios
 from emision.models import Ajuste, Bitacora, Instalacion, Rechazo
+from emision.servicios import TopeDeInstalaciones
 from nucleo import licencia
 
 
@@ -82,10 +83,15 @@ def test_sin_pago_o_revocado_central_no_emite(negocio):
     equipo = Equipo()
     assert equipo.activar(servicios.crear_codigo(negocio)).status_code == 200
     servicios.registrar_pago(negocio, date(2000, 1, 1))
-    assert equipo.renovar(sello="1" * 32).json() == {"resultado": "pago_pendiente"}
+    pendiente = equipo.renovar(sello="1" * 32).json()
+    assert set(pendiente) == {"resultado", "acuse"}
+    assert pendiente["resultado"] == "pago_pendiente"
+    acuse = licencia.abrir(pendiente["acuse"], [llave.publica()], "acuse")
+    assert acuse["sello"] == "1" * 32
     servicios.revocar(negocio)
     respuesta = equipo.renovar(sello="2" * 32).json()
     assert respuesta["resultado"] == "revocada"
+    assert set(respuesta) == {"resultado", "documento", "acuse"}
     assert (
         licencia.abrir(respuesta["documento"], [llave.publica()], "revocacion")[
             "instalacion"
@@ -202,3 +208,16 @@ def test_activacion_repetida_acuse_y_renovacion_autentica_sobre_el_limite(negoci
     )
     assert Rechazo.objects.count() == 1 and Bitacora.objects.count() == bitacoras
     assert equipo.renovar(sello="c" * 32).json()["resultado"] == "renovada"
+
+
+def test_deshacer_una_cancelacion_respeta_el_tope_de_instalaciones(negocio):
+    primero, segundo = Equipo(), Equipo()
+    assert primero.activar(servicios.crear_codigo(negocio)).status_code == 200
+    servicios.revocar(negocio, primero.huella)
+    assert segundo.activar(servicios.crear_codigo(negocio)).status_code == 200
+    with pytest.raises(TopeDeInstalaciones):
+        servicios.revocar(negocio, primero.huella, deshacer=True)
+    assert Instalacion.objects.get(huella=primero.huella).revocada
+    servicios.revocar(negocio, segundo.huella)
+    servicios.revocar(negocio, primero.huella, deshacer=True)
+    assert not Instalacion.objects.get(huella=primero.huella).revocada

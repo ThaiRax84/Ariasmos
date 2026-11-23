@@ -295,3 +295,31 @@ def test_con_la_hora_mal_puesta_se_reintenta_una_vez_con_la_hora_de_central(cent
     Instalacion.objects.update(ultimo_intento=central.ahora + timedelta(days=2))
     central.respuestas = [aceptar]
     assert servicios.tarea_renovar(None).endswith("pago_pendiente")
+
+
+def test_un_reloj_oscilante_no_detiene_la_cuenta(central):
+    servicios.instalar(central.licencia(dias=1, gracia=1))
+    inicio = servicios.momento_efectivo()
+    for _ in range(100):
+        central.ahora += timedelta(minutes=3)
+        servicios.situacion()
+        central.ahora -= timedelta(minutes=2)
+        servicios.situacion()
+    assert servicios.momento_efectivo() == inicio + timedelta(minutes=300)
+
+
+def test_la_tarea_pregunta_por_tiempo_real_aunque_el_reloj_este_detenido(
+    central, monkeypatch
+):
+    transcurrido = [1000.0]
+    monkeypatch.setattr(reloj, "transcurrido", lambda: transcurrido[0])
+    monkeypatch.setattr(servicios, "ultimo_intento_real", None)
+    servicios.instalacion()
+    Instalacion.objects.update(activada=True, ultimo_intento=central.ahora)
+    assert servicios.tarea_renovar(None).startswith("todavía no")
+    transcurrido[0] += 12 * 3600 - 1
+    assert servicios.tarea_renovar(None).startswith("todavía no")
+    transcurrido[0] += 1
+    central.respuestas = [(200, {"resultado": "pago_pendiente"})]
+    assert servicios.tarea_renovar(None).endswith("pago_pendiente")
+    assert servicios.ultimo_intento_real == transcurrido[0]

@@ -81,13 +81,31 @@ def registrar_pago(negocio, hasta):
         anotar("pago_registrado", negocio, hasta=hasta.isoformat())
 
 
+class TopeDeInstalaciones(Exception):
+    pass
+
+
+def _devolver_instalacion(negocio, huella):
+    instalacion = Instalacion.objects.filter(negocio=negocio, huella=huella).first()
+    if instalacion is None:
+        raise LookupError("Ese negocio no tiene una instalación con esa huella.")
+    activas = Instalacion.objects.filter(negocio=negocio, revocada=False).count()
+    if instalacion.revocada and activas >= negocio.instalaciones_permitidas:
+        raise TopeDeInstalaciones(
+            "El negocio ya tiene todos los equipos que puede activar."
+        )
+    Instalacion.objects.filter(pk=instalacion.pk).update(revocada=False)
+
+
 def revocar(negocio, huella=None, deshacer=False):
     with transaction.atomic():
         if huella is None:
             Negocio.objects.filter(pk=negocio.pk).update(revocado=not deshacer)
             negocio.revocado = not deshacer
+        elif deshacer:
+            _devolver_instalacion(negocio, huella)
         elif not Instalacion.objects.filter(negocio=negocio, huella=huella).update(
-            revocada=not deshacer
+            revocada=True
         ):
             raise LookupError("Ese negocio no tiene una instalación con esa huella.")
         anotar(

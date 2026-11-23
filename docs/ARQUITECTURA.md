@@ -1213,7 +1213,7 @@ renovar() -> str
 tarea_renovar(...)                    # con la firma que usan las funciones de TAREAS
 ```
 
-**Reloj propio** (`momento_efectivo`): el programa lleva su propia cuenta del tiempo, `mayor_momento`, que suma solo avances del reloj del equipo. `a = reloj.ahora()`, `avance = a - ultimo_reloj`, `efectivo = mayor_momento + max(avance, 0)`. Un atraso no resta ni congela: la cuenta sigue desde donde iba. Si `avance < -TOLERANCIA_RELOJ`, auditoría `reloj_atrasado` (a lo más una cada 6 h). Si `avance >= PASO_RELOJ` o `avance < 0`, guarda `mayor_momento = efectivo` y `ultimo_reloj = a`. Devuelve `efectivo`. Así, atrasar el reloj nunca regala tiempo ni lo congela.
+**Reloj propio** (`momento_efectivo`): el programa lleva su propia cuenta del tiempo, `mayor_momento`, que suma solo avances del reloj del equipo. `a = reloj.ahora()`, `avance = a - ultimo_reloj`, `efectivo = mayor_momento + max(avance, 0)`. Un atraso no resta ni congela: la cuenta sigue desde donde iba. Si `avance < -TOLERANCIA_RELOJ`, auditoría `reloj_atrasado` (a lo más una cada 6 h). Si `avance != 0` (`PASO_RELOJ` vale cero: se guarda en cada lectura con hora distinta, con actualización condicional para que dos lecturas a la vez no se pisen), guarda `mayor_momento = efectivo` y `ultimo_reloj = a`. Devuelve `efectivo`. Así, atrasar el reloj nunca regala tiempo ni lo congela.
 
 **`situacion()`**, en orden (sin caché entre llamadas; vuelve a verificar la firma de lo guardado cada vez):
 1. `llaves.publicas()` vacío → `libre` (programa sin llaves: las licencias están apagadas).
@@ -1330,25 +1330,27 @@ Reglas comunes a las dos POST, en este orden:
 
 ### Reloj propio, acuse y hora de Central
 
-- **Acuse de Central**: documento firmado de tipo `acuse` con `("formato","producto","tipo","instalacion","sello","hora")`. Central lo incluye como `"acuse"` en toda respuesta 200 `renovada` o `activada` (con la huella de quien pide, el sello de esa petición y su hora). `pago_pendiente` trae solo `resultado`; `revocada` solo `resultado` y `documento`.
+- **Acuse de Central**: documento firmado de tipo `acuse` con `("formato","producto","tipo","instalacion","sello","hora")`. Central lo incluye como `"acuse"` en toda respuesta 200 de `/v1/renovar` y `/v1/activar` (con la huella de quien pide, el sello de esa petición y su hora). Claves por resultado: `renovada` y `activada` traen `resultado`, `documento` y `acuse`; `pago_pendiente`, `resultado` y `acuse`; `revocada`, `resultado`, `documento` y `acuse`. Así un cliente que no paga también recibe la hora firmada. El programa aplica el acuse igual con cualquier resultado, antes de procesar el resto.
 - **El programa aplica el acuse** antes de instalar el documento, solo si abre con la llave de Central, es de esta instalación y trae el mismo sello que se acaba de enviar: la cuenta propia pasa a la hora de Central (hacia adelante o hacia atrás) y, si el cambio supera `TOLERANCIA_RELOJ`, se registra `reloj_ajustado` con `{"antes","despues"}`. Sin acuse no cambia nada; con un acuse que no pasa no se toca la cuenta, se registra `licencia_rechazada` con motivo `acuse` y el resto de la respuesta se procesa igual. Solo un acuse puede bajar la cuenta.
 - **Equipo con la hora mal puesta**: si Central contesta 403, el programa pide `cliente.hora_central()` (GET a `/v1/salud`, 5 s; cualquier falla da `None`). Si la hora difiere del `momento` enviado en más de `DESFASE_PARA_REINTENTO` (2 min), reenvía **una sola vez** con esa hora y un sello nuevo. Esa hora no está firmada: solo fecha la petición y nunca toca la cuenta.
-- `renovar()` y `activar()` marcan `activada = True` cuando Central contesta 200. La tarea de renovación intenta si la instalación está activada y no hay `ultimo_intento`, o este está en el futuro, o pasaron `HORAS_ENTRE_RENOVACIONES`.
+- `renovar()` y `activar()` marcan `activada = True` cuando Central contesta 200. La tarea de renovación intenta si la instalación está activada y no hay `ultimo_intento`, o este está en el futuro, o pasaron `HORAS_ENTRE_RENOVACIONES`, o pasaron esas horas de **tiempo real** del proceso (`reloj.transcurrido()`, un reloj monotónico, contra `servicios.ultimo_intento_real`, que vale `None` al arrancar: la primera llamada solo lo fija). Así un reloj detenido no impide seguir preguntando a Central.
 - Con `llaves.json` dañado, `renovar()`, `activar()` y la tarea responden `llaves`, y los comandos lo explican en palabras llanas.
 
 ### Activación repetible y límite de rechazos (Central)
 
 - **Activación repetible**: `CodigoActivacion.instalacion` se llena al usarse el código. Si el mismo equipo (misma huella, firma y hora válidas) repite la activación con su código, aún no vencido, y ni la instalación ni el negocio están revocados, Central responde como la primera vez (licencia nueva con `serie` mayor y acuse, o `pago_pendiente`) sin crear otra instalación ni contar un rechazo. Otro equipo, código vencido o revocación: 403.
 - **Una renovación auténtica no se frena por el límite**: en `/v1/renovar`, si el origen está sobre el límite se comprueba primero que la petición sea auténtica (cuerpo bien formado, instalación conocida, firma, hora y sello nuevo); si lo es, se atiende normal; si no, 429 sin escribir nada. `/v1/activar` conserva el 429 primero.
+- **Deshacer una cancelación respeta el tope**: `revocar(..., deshacer=True)` de un equipo lanza `TopeDeInstalaciones`, sin cambiar nada, si el negocio quedaría con más equipos activos de los permitidos; el comando lo explica en palabras llanas.
 - **Rutas ajenas** (inexistentes, variantes de barra, `Host` no permitido): bajo el límite, 4xx con una fila en `Rechazo` y nada en `Bitacora`; sobre el límite, 429 sin escribir nada.
 - `inicializar_central` calcula la ruta de la llave igual que los ajustes (clave ausente o vacía: la ruta por omisión). Con configuración ilegible, JSON roto o una ruta que no es un archivo de llave, termina con un aviso en palabras llanas y no genera llaves.
 
 ### Límites conocidos
 
 - Restaurar un respaldo en otra computadora copia la identidad del equipo (dos equipos, un cupo). Se avisará en el panel del dueño (fase 1b).
+- Quien tiene permisos de administrador en la computadora (los mismos que hacen falta para cambiar la hora del sistema) puede todavía sincronizar regresos del reloj con las lecturas del programa, detener el servicio o vaciar el archivo de llaves. La defensa real es que Central deja de renovar y de dar actualizaciones.
 - Quien controla por completo el equipo (base de datos, archivos del programa, red) puede saltarse la licencia o estirar el plazo sin conexión apagando el servicio y atrasando el reloj; con conexión, cada renovación vuelve a poner la hora de Central.
 
-### Lista cerrada de ataques (la fase debe aguantar los 17)
+### Lista cerrada de ataques (la fase debe aguantar los 21)
 
 1. **Licencia alterada**: cambiar `vence`, `plan` o `modulos` de una licencia válida → se rechaza y nada cambia.
 2. **Licencia con otra llave**: bien formada pero firmada con una llave que no es de Central → se rechaza.
@@ -1367,6 +1369,10 @@ Reglas comunes a las dos POST, en este orden:
 15. **Límite de rechazos**: desde un origen sobre el límite, una renovación auténtica pasa; una falsa recibe 429 y no escribe nada.
 16. **Acuse de Central**: `renovada` y `activada` traen un acuse con la llave de Central, el sello de la petición y su hora; `pago_pendiente` no cambia; `/v1/salud` trae la hora.
 17. **Llenar el disco**: las rutas inexistentes desde un origen sobre el límite reciben 429 sin filas nuevas; las rutas ajenas nunca escriben en `Bitacora`.
+18. **Reloj oscilante**: regresar el reloj cada pocos minutos, muchas veces, no detiene la cuenta; lo que el reloj avanzó entre regresos se suma.
+19. **Sin pago y en línea**: Central manda acuse en `pago_pendiente` y en `revocada`; un acuse auténtico pone la cuenta a la hora de Central y uno falso no la mueve.
+20. **Reloj detenido**: con el reloj sin avanzar, la tarea vuelve a preguntar a Central cuando pasan las horas de tiempo real.
+21. **Deshacer sobre el tope**: con tope 1, cancelar el equipo A, activar el B y deshacer la cancelación de A se rechaza y todo queda igual.
 
 ### Plan de datos
 

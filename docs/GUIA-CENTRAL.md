@@ -53,7 +53,7 @@ python manage.py revocar <identificador> --instalacion <huella>
 python manage.py revocar <identificador> --deshacer
 ```
 
-Sin `--instalacion` se cancela todo el negocio; con ella, un solo equipo. `--deshacer` restablece lo cancelado. El programa del cliente se entera en su siguiente renovación automática y queda en solo consulta: se puede ver, descargar y respaldar, pero no registrar cobros.
+Sin `--instalacion` se cancela todo el negocio; con ella, un solo equipo. `--deshacer` restablece lo cancelado; si el negocio ya tiene activados todos los equipos que permite, no restablece un equipo y avisa (cancela otro equipo primero). El programa del cliente se entera en su siguiente renovación automática y queda en solo consulta: se puede ver, descargar y respaldar, pero no registrar cobros.
 
 ## Activar el programa del cliente
 

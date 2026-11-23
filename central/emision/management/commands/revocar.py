@@ -24,6 +24,10 @@ class Command(BaseCommand):
         negocio = negocio_de(opciones["negocio"])
         try:
             servicios.revocar(negocio, opciones["instalacion"], opciones["deshacer"])
+        except servicios.TopeDeInstalaciones:
+            raise CommandError(
+                "No se puede restablecer ese equipo: el negocio ya tiene activados todos los equipos que permite. Cancela otro equipo primero."
+            )
         except LookupError as error:
             raise CommandError(str(error))
         alcance = (
