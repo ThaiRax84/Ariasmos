@@ -88,11 +88,8 @@ def test_candado_en_solo_consulta_deja_consultar_y_respaldar_pero_no_escribir(ce
     assert bloqueada["X-Ariasmos-Licencia"] == "solo-consulta"
     assert "X-Ariasmos-Licencia" not in web.get(reverse("inicio"))
     assert "X-Ariasmos-Licencia" not in web.post(reverse("respaldos:probar"))
-
-
-def test_candado_no_estorba_con_licencia_en_gracia(central, roles):
-    web = cliente_web(nuevo_usuario("direccion", roles["Dirección"]))
-    servicios.instalar(central.licencia(dias=1, gracia=10))
+    central.ahora -= timedelta(days=2)
+    servicios.instalar(central.licencia(dias=1, gracia=10, emitida=central.ahora + timedelta(minutes=1)))
     central.ahora += timedelta(days=5)
     assert servicios.situacion().estado == "gracia"
     assert "X-Ariasmos-Licencia" not in web.post(reverse("usuario_nuevo"), {})
