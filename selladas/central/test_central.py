@@ -130,6 +130,11 @@ def test_renovacion_falsificada_no_emite(api, hora, activo):
     assert serie(activo) == serie_antes + 1 and emitidas() == emitidas_antes + 1
 
 
+def pago_pendiente(respuesta, equipo):
+    datos = respuesta.json()
+    return respuesta.status_code == 200 and set(datos) == {"resultado", "acuse"} and datos["resultado"] == "pago_pendiente" and abrir(datos["acuse"], [llave.publica()], "acuse")["instalacion"] == equipo.huella
+
+
 def test_sin_pago_o_revocado_central_no_emite(api, negocio, hora, activo):
     sin_pago = servicios.crear_negocio("Negocio sin pago")
     servicios.registrar_pago(sin_pago, hora.momento.date() - timedelta(days=1))
@@ -140,11 +145,11 @@ def test_sin_pago_o_revocado_central_no_emite(api, negocio, hora, activo):
     nuevo = Equipo()
     emitidas_antes = emitidas()
 
-    assert activar(api, moroso, servicios.crear_codigo(sin_pago), hora.momento).json() == {"resultado": "pago_pendiente"}
-    assert renovar(api, moroso, hora.momento).json() == {"resultado": "pago_pendiente"}
+    assert pago_pendiente(activar(api, moroso, servicios.crear_codigo(sin_pago), hora.momento), moroso)
+    assert pago_pendiente(renovar(api, moroso, hora.momento), moroso)
     hoy = hora.momento
     hora.momento = hoy + timedelta(days=91)
-    assert renovar(api, activo, hora.momento).json() == {"resultado": "pago_pendiente"}
+    assert pago_pendiente(renovar(api, activo, hora.momento), activo)
     hora.momento = hoy
 
     for alcance in ({"huella": activo.huella}, {}):
