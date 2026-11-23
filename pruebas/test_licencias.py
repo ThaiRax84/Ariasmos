@@ -121,3 +121,40 @@ def test_trabajador_omite_sin_fallar_lo_que_escribe_en_solo_consulta(central):
     assert all(informe[nombre][0] for nombre in omitidas)
     assert not Evento.objects.filter(accion="tarea_fallida", datos__tarea__in=omitidas).exists()
     assert not Tarea.objects.filter(nombre__in=omitidas).exists()
+
+
+def test_llaves_danadas_no_tumban_el_programa_ni_el_acceso(central, roles, tmp_path, monkeypatch):
+    web = cliente_web(nuevo_usuario("direccion", roles["Dirección"]))
+    rota = tmp_path / "rota.json"
+    rota.write_text("{")
+    monkeypatch.setattr(llaves, "RUTA", rota)
+    assert servicios.situacion().motivo == "llaves"
+    assert "X-Ariasmos-Licencia" not in web.post(reverse("respaldos:probar"))
+    assert web.post(reverse("usuario_nuevo"), {})["X-Ariasmos-Licencia"] == "solo-consulta"
+    assert servicios.renovar() == "apagada"
+    informe = {nombre: texto for nombre, _, texto in trabajador.ejecutar_ciclo()}
+    assert informe["generar_cargos"].startswith("omitida")
+
+
+def test_cliente_nunca_deja_salir_una_excepcion_de_red(settings, monkeypatch):
+    class Cuerpo:
+        def read(self, *_):
+            raise TimeoutError("sin cuerpo")
+
+        def close(self):
+            pass
+
+    def abrir(self, peticion, timeout=None):
+        raise cliente.urllib.error.HTTPError("https://central.invalid/x", 403, "no", {}, Cuerpo())
+
+    monkeypatch.setattr(cliente.urllib.request.OpenerDirector, "open", abrir)
+    assert cliente.enviar("/v1/renovar", {}) == (403, {})
+
+
+def test_firma_valida_con_valores_absurdos_se_rechaza(central):
+    for cambio in ({"dias_gracia": 10**9}, {"serie": 2**70}, {"vence": "2000-01-01T00:00:00Z"}, {"vence": "9999-12-31T23:59:59Z"}):
+        carga = json.loads(base64.b64decode(central.licencia()["carga"]))
+        carga.update(cambio)
+        with pytest.raises(licencia.LicenciaInvalida) as error:
+            servicios.instalar(licencia.firmar(carga, central.privada))
+        assert error.value.motivo == "campos"

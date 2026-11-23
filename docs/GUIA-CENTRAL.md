@@ -15,7 +15,9 @@ Ariasmos Central es el servidor aparte que da de alta a tus clientes, les entreg
 3. Copia esa llave pública dentro de la lista `licencias` del archivo `sistema/licencias/llaves.json` del programa que entregas. Mientras esa lista esté vacía, el programa funciona sin licencia.
 4. Antes de los demás comandos, avisa dónde está la carpeta: pon su ruta en la variable de entorno `CENTRAL_INSTANCIA`.
 
-Si corres `inicializar_central` otra vez sobre la misma carpeta, no cambia nada.
+Central no confía en ningún proxy de forma predeterminada. Si pones un proxy delante (por ejemplo para el HTTPS), agrega su dirección a `proxies_confiables` en el `configuracion.json` de la carpeta de Central; si no, todas las peticiones parecerán venir de él y compartirán el mismo límite de rechazos.
+
+Si corres `inicializar_central` otra vez sobre la misma carpeta, no cambia la configuración ni las llaves y vuelve a imprimir la llave pública. Si la configuración existe pero falta el archivo de la llave, se detiene con un aviso y no crea una llave nueva (recupérala de tu respaldo).
 
 ## Dar de alta un negocio
 

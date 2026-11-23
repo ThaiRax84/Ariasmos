@@ -1168,7 +1168,7 @@ momento_de(texto: str) -> datetime                          # estricto, devuelve
 1. `documento` es dict con exactamente `carga` y `firma`, ambos texto; base64 estricto (`validate=True`); carga ≤ `LIMITE`; firma de 64 bytes → si no, motivo `formato`.
 2. La firma verifica con alguna de las llaves → si no (o si no hay llaves), motivo `firma`. **Nada se interpreta antes de verificar.**
 3. JSON estricto (objeto; rechaza claves repetidas) → `formato`.
-4. Claves exactamente `CAMPOS[tipo]`; `formato == 1`; `producto == "ariasmos"`; `tipo` igual al pedido; textos son `str`; `serie` y `dias_gracia` enteros ≥ 0 (no `bool`); `modulos` lista de `str`; `instalacion` 64 hex minúsculas; `sello` 32 hex minúsculas; `version` `^\d+\.\d+\.\d+$`; `emitida`, `vence`, `momento` pasan `momento_de` → si no, motivo `campos`.
+4. Claves exactamente `CAMPOS[tipo]`; `formato == 1`; `producto == "ariasmos"`; `tipo` igual al pedido; textos son `str`; `serie` y `dias_gracia` enteros ≥ 0 (no `bool`), con `dias_gracia` ≤ 366, `serie` ≤ 2**53 y, en la licencia, `vence` ≥ `emitida`; `modulos` lista de `str`; `instalacion` 64 hex minúsculas; `sello` 32 hex minúsculas; `version` `^\d+\.\d+\.\d+$`; `emitida`, `vence`, `momento` pasan `momento_de` → si no, motivo `campos`.
 Devuelve la carga como dict (fechas como texto).
 
 Cargas:
@@ -1183,7 +1183,7 @@ Se agrega a `INSTALLED_APPS` y su candado al **final** de `MIDDLEWARE` (en `base
 | Archivo | Contenido |
 |---|---|
 | `llaves.json` | `{"licencias": []}` (lista de llaves públicas de Central en base64; se entrega vacía) |
-| `llaves.py` | `RUTA` (ruta de `llaves.json`); `publicas() -> tuple[bytes, ...]` lee `RUTA` en cada llamada. Estricto: solo la clave `licencias`, máx. 4 llaves de 32 bytes, archivo < 4 KB; si no, `ImproperlyConfigured` |
+| `llaves.py` | `RUTA` (ruta de `llaves.json`); `publicas() -> tuple[bytes, ...]` lee `RUTA` en cada llamada. Estricto: solo la clave `licencias`, máx. 4 llaves de 32 bytes, archivo < 4 KB; si no, `ImproperlyConfigured`. Si falla, `situacion()` no lanza: devuelve `solo_consulta` con motivo `llaves` (falla cerrada) |
 | `politica.py` | `DIAS_PARA_ACTIVAR = 14`, `HORAS_ENTRE_RENOVACIONES = 12`, `TOLERANCIA_RELOJ = timedelta(hours=1)`, `PASO_RELOJ = timedelta(minutes=5)`. Son política del programa: **no** van en `PARAMETROS` (el negocio no debe poder cambiarlas) |
 | `reloj.py` | `ahora()` → `timezone.now()`. Única fuente de hora de la app; se llama siempre como `reloj.ahora()` |
 | `models.py` | `Instalacion` (única, pk=1): `llave_cifrada`, `huella` (64), `activada` (bool, falso), `primer_arranque`, `mayor_momento`, `documento` (texto JSON, vacío si no hay), `revocacion` (texto JSON, vacío si no hay), `ultimo_intento` (nulo), `ultimo_resultado` (≤40, vacío) |
@@ -1238,7 +1238,7 @@ tarea_renovar(...)                    # con la firma que usan las funciones de T
 
 #### Candado: `licencias.middleware.Candado`
 
-Si `not permite_escribir()`, el método no es `GET`, `HEAD` ni `OPTIONS`, y la ruta resuelta no está en `LIBRES`: responde **403**, `Content-Type: text/plain; charset=utf-8`, cabecera **`X-Ariasmos-Licencia: solo-consulta`** y un texto en palabras llanas (la licencia venció; se puede consultar y exportar; no se pueden registrar movimientos; cómo reactivar). En cualquier otro caso deja pasar y no añade la cabecera.
+Si el método no es `GET`, `HEAD` ni `OPTIONS`, la ruta resuelta no está en `LIBRES` y `not permite_escribir()` (en ese orden: entrar, salir y respaldar funcionan aunque la licencia o sus llaves estén dañadas): responde **403**, `Content-Type: text/plain; charset=utf-8`, cabecera **`X-Ariasmos-Licencia: solo-consulta`** y un texto en palabras llanas (la licencia venció; se puede consultar y exportar; no se pueden registrar movimientos; cómo reactivar). En cualquier otro caso deja pasar y no añade la cabecera.
 
 `LIBRES` (conjunto de nombres de ruta, en `middleware.py`): solo lo indispensable para entrar y salir (inicio de sesión, segundo paso con código, cerrar sesión, confirmar contraseña, registro del equipo si hace falta para entrar) y para sacar los datos: `respaldos:respaldar` y `respaldos:probar`. Nada de cobros, altas, ediciones, caja, banco, inventario ni configuración. Todo lo que se descarga por GET sigue funcionando.
 
@@ -1265,11 +1265,11 @@ Proyecto Django aparte. `central/manage.py` mete la raíz del repo en `sys.path`
 | `central/emision/` | app: `models.py`, `ajustes.py`, `llave.py`, `reloj.py`, `origen.py`, `servicios.py`, `views.py`, `urls.py`, `migrations/`, `management/commands/` |
 | `central/requirements.txt` | Django, cryptography y waitress con las mismas versiones fijas del programa (más sus dependencias) |
 
-**Ajustes.** `INSTALLED_APPS = ["emision"]`; middleware mínimo (`SecurityMiddleware`, `CommonMiddleware`); sin sesiones, sin auth, sin admin, sin CSRF (no hay cookies; todo va firmado). `DEBUG = False` siempre. La instancia vive en la carpeta de la variable `CENTRAL_INSTANCIA`, con `configuracion.json`: `clave_django`, `base_datos`, `hosts`, `proxies_confiables`, `llave_licencias` (ruta del archivo PEM PKCS8 de la llave privada; por omisión `<instancia>/llave-licencias.pem`, permisos 0600). SQLite con los mismos ajustes que el programa (WAL, IMMEDIATE, llaves foráneas). Ajustes expuestos: `RUTA_LLAVE_LICENCIAS`, `PROXIES_CONFIABLES`. `ajustes_pruebas.py`: base temporal por PID, llave efímera generada al importar en carpeta temporal, `ALLOWED_HOSTS = ["testserver"]`, `PROXIES_CONFIABLES = []`.
+**Ajustes.** `INSTALLED_APPS = ["emision"]`; middleware mínimo (`SecurityMiddleware`, `CommonMiddleware`); sin sesiones, sin auth, sin admin, sin CSRF (no hay cookies; todo va firmado). `DEBUG = False` siempre. La instancia vive en la carpeta de la variable `CENTRAL_INSTANCIA`, con `configuracion.json`: `clave_django`, `base_datos`, `hosts`, `proxies_confiables` (vacía en una instancia nueva), `llave_licencias` (ruta del archivo PEM PKCS8 de la llave privada; por omisión `<instancia>/llave-licencias.pem`, permisos 0600). SQLite con los mismos ajustes que el programa (WAL, IMMEDIATE, llaves foráneas). Ajustes expuestos: `RUTA_LLAVE_LICENCIAS`, `PROXIES_CONFIABLES`. `ajustes_pruebas.py`: base temporal por PID, llave efímera generada al importar en carpeta temporal, `ALLOWED_HOSTS = ["testserver"]`, `PROXIES_CONFIABLES = []`.
 
 **`emision/llave.py`**: `privada()` (lee `settings.RUTA_LLAVE_LICENCIAS`), `publica() -> bytes` (32 crudos). **`emision/reloj.py`**: `ahora()`, única fuente de hora, llamada siempre como `reloj.ahora()`.
 
-**`emision/ajustes.py`**: modelo `Ajuste(clave, valor)` + catálogo `AJUSTES = {"dias_vigencia": 30, "dias_gracia": 14, "dias_codigo": 7, "minutos_tolerancia": 10, "rechazos_por_hora": 30}`; `valor(clave) -> int` (guardado o el de catálogo). Nada de esto va fijo en otra parte.
+**`emision/ajustes.py`**: modelo `Ajuste(clave, valor)` + catálogo `AJUSTES = {"dias_vigencia": 30, "dias_gracia": 14, "dias_codigo": 7, "minutos_tolerancia": 10, "rechazos_por_hora": 30}`; `valor(clave) -> int` (guardado o el de catálogo). Cada ajuste tiene un rango válido junto a su valor por omisión (`dias_vigencia` 1–366, `dias_gracia` 0–90, `dias_codigo` 1–90, `minutos_tolerancia` 1–60, `rechazos_por_hora` 1–10000); un valor guardado fuera de rango se ignora y se usa el del catálogo. Nada de esto va fijo en otra parte.
 
 **Modelos (`emision/models.py`)**
 
@@ -1307,10 +1307,10 @@ emitir(instalacion) -> dict             # documento de licencia firmado
 
 Reglas comunes a las dos POST, en este orden:
 1. Otro método → 405.
-2. Origen (`origen.de(request)`: `REMOTE_ADDR`; si es un proxy de `PROXIES_CONFIABLES`, el último salto no confiable de `X-Forwarded-For`) con `rechazos_por_hora` o más filas en `Rechazo` en la última hora → **429** `{"error":"espera"}`, sin procesar nada más.
+2. Origen (`origen.de(request)`: `REMOTE_ADDR`; si es un proxy de `PROXIES_CONFIABLES`, el último salto no confiable de `X-Forwarded-For`, solo si es una dirección válida; si no, `REMOTE_ADDR`; las direcciones IPv6 se agrupan por su red /64) con `rechazos_por_hora` o más filas en `Rechazo` en la última hora → **429** `{"error":"espera"}`, sin procesar nada más.
 3. Cuerpo > 16 KB → **413** `{"error":"peticion"}`. No es un objeto JSON, faltan o sobran campos, o tipos equivocados → **400** `{"error":"peticion"}`.
 4. Cualquier otro rechazo → **403** `{"error":"rechazada"}`, **idéntico sea cual sea la causa**.
-5. Toda respuesta 400, 403 y 413 agrega una fila a `Rechazo` y una entrada de bitácora con la causa (sin códigos, llaves ni cuerpos).
+5. Toda respuesta 400, 403 y 413 agrega una fila a `Rechazo` y una entrada de bitácora con la causa (sin códigos, llaves ni cuerpos). En cada POST se borran las filas de `Rechazo` con más de una hora. Un `Host` no permitido, una ruta inexistente o una variante con barra final responden también JSON `{"error":"peticion"}` (400 o 404), sin HTML, y agregan su fila a `Rechazo`.
 6. Ninguna entrada hostil produce 500 ni devuelve trazas, rutas internas o la llave privada.
 
 `POST /v1/renovar` — cuerpo `{"instalacion","carga","firma"}`:
