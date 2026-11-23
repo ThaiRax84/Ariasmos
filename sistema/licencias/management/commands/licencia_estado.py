@@ -38,7 +38,13 @@ class Command(BaseCommand):
         if situacion.vence:
             self.stdout.write(f"Vence: {_fecha(situacion.vence)}")
         if situacion.limite:
-            self.stdout.write(f"Fin del plazo de gracia: {_fecha(situacion.limite)}" if situacion.vence else f"Plazo para activar: hasta {_fecha(situacion.limite)}")
+            self.stdout.write(
+                f"Fin del plazo de gracia: {_fecha(situacion.limite)}"
+                if situacion.vence
+                else f"Plazo para activar: hasta {_fecha(situacion.limite)}"
+            )
         fila = Instalacion.objects.filter(pk=1).first()
         if fila is not None and fila.ultimo_intento:
-            self.stdout.write(f"Última vez que se intentó renovar: {_fecha(fila.ultimo_intento)}; {RESULTADOS.get(fila.ultimo_resultado, fila.ultimo_resultado)}.")
+            self.stdout.write(
+                f"Última vez que se intentó renovar: {_fecha(fila.ultimo_intento)}; {RESULTADOS.get(fila.ultimo_resultado, fila.ultimo_resultado)}."
+            )

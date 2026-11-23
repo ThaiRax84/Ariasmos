@@ -14,7 +14,9 @@ LARGO_LLAVE = 32
 
 def _llave(texto):
     try:
-        crudos = base64.b64decode(texto, validate=True) if isinstance(texto, str) else b""
+        crudos = (
+            base64.b64decode(texto, validate=True) if isinstance(texto, str) else b""
+        )
     except (binascii.Error, ValueError):
         crudos = b""
     if len(crudos) != LARGO_LLAVE:
@@ -29,7 +31,9 @@ def publicas():
     except OSError:
         raise ImproperlyConfigured("No se pudo leer el archivo de llaves de licencias.")
     if len(crudos) >= LIMITE:
-        raise ImproperlyConfigured("El archivo de llaves de licencias es demasiado grande.")
+        raise ImproperlyConfigured(
+            "El archivo de llaves de licencias es demasiado grande."
+        )
     try:
         datos = leer_json(crudos)
     except LicenciaInvalida:

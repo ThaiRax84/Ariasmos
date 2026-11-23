@@ -13,9 +13,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opciones):
         versiones = {}
-        for negocio, version in Instalacion.objects.exclude(ultima_renovacion=None).order_by("ultima_renovacion").values_list("negocio_id", "ultima_version"):
+        for negocio, version in (
+            Instalacion.objects.exclude(ultima_renovacion=None)
+            .order_by("ultima_renovacion")
+            .values_list("negocio_id", "ultima_version")
+        ):
             versiones[negocio] = version
-        lista = Negocio.objects.annotate(equipos=Count("instalacion", filter=Q(instalacion__revocada=False)), renovada=Max("instalacion__ultima_renovacion")).order_by("nombre")
+        lista = Negocio.objects.annotate(
+            equipos=Count("instalacion", filter=Q(instalacion__revocada=False)),
+            renovada=Max("instalacion__ultima_renovacion"),
+        ).order_by("nombre")
         if not lista:
             self.stdout.write("Todavía no hay negocios dados de alta.")
         for negocio in lista:

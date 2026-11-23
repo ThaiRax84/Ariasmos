@@ -31,7 +31,10 @@ def _direccion(ruta):
 
 
 def _pedir(peticion, tiempo):
-    abridor = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl.create_default_context()), _SinRedireccion)
+    abridor = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=ssl.create_default_context()),
+        _SinRedireccion,
+    )
     try:
         with abridor.open(peticion, timeout=tiempo) as respuesta:
             estado, crudos = respuesta.status, respuesta.read(LIMITE_RESPUESTA + 1)
@@ -63,7 +66,11 @@ def enviar(ruta, cuerpo):
 
 def hora_central():
     try:
-        peticion = urllib.request.Request(_direccion("/v1/salud"), headers={"Accept": "application/json"}, method="GET")
+        peticion = urllib.request.Request(
+            _direccion("/v1/salud"),
+            headers={"Accept": "application/json"},
+            method="GET",
+        )
         estado, datos = _pedir(peticion, TIEMPO_LIMITE_HORA)
         return momento_de(datos["hora"]) if estado == 200 else None
     except (SinConexion, KeyError, ValueError):

@@ -8,4 +8,6 @@ def negocio_de(texto):
     try:
         return Negocio.objects.get(pk=texto)
     except (Negocio.DoesNotExist, ValidationError):
-        raise CommandError("No existe un negocio con ese identificador. Usa el comando negocios para ver la lista.")
+        raise CommandError(
+            "No existe un negocio con ese identificador. Usa el comando negocios para ver la lista."
+        )

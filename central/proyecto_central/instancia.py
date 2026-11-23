@@ -10,7 +10,9 @@ LLAVE = "llave-licencias.pem"
 
 
 def carpeta():
-    return Path(os.environ.get("CENTRAL_INSTANCIA") or RAIZ / "central" / "instancia").resolve()
+    return Path(
+        os.environ.get("CENTRAL_INSTANCIA") or RAIZ / "central" / "instancia"
+    ).resolve()
 
 
 def ruta_archivo(base=None):
@@ -44,4 +46,7 @@ def escribir_privado(ruta, contenido):
 
 def escribir(base, datos):
     base.mkdir(parents=True, exist_ok=True)
-    escribir_privado(ruta_archivo(base), json.dumps(datos, indent=2, ensure_ascii=False).encode("utf-8"))
+    escribir_privado(
+        ruta_archivo(base),
+        json.dumps(datos, indent=2, ensure_ascii=False).encode("utf-8"),
+    )

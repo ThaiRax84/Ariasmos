@@ -37,7 +37,9 @@ class CodigoActivacion(models.Model):
     resumen = models.CharField(max_length=64, unique=True)
     vence = models.DateTimeField()
     usado = models.DateTimeField(null=True, blank=True)
-    instalacion = models.ForeignKey("Instalacion", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    instalacion = models.ForeignKey(
+        "Instalacion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
 
 
 class Sello(models.Model):
@@ -46,7 +48,11 @@ class Sello(models.Model):
     momento = models.DateTimeField(db_index=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["instalacion", "valor"], name="sello_unico_por_instalacion")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["instalacion", "valor"], name="sello_unico_por_instalacion"
+            )
+        ]
 
 
 class Rechazo(models.Model):
@@ -57,7 +63,9 @@ class Rechazo(models.Model):
 class Bitacora(models.Model):
     momento = models.DateTimeField()
     accion = models.CharField(max_length=40)
-    negocio = models.ForeignKey(Negocio, null=True, blank=True, on_delete=models.SET_NULL)
+    negocio = models.ForeignKey(
+        Negocio, null=True, blank=True, on_delete=models.SET_NULL
+    )
     origen = models.CharField(max_length=64, blank=True)
     datos = models.JSONField(default=dict)
 

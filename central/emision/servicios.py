@@ -18,7 +18,13 @@ PATRON_CODIGO = re.compile(f"[{ALFABETO}]{{{LARGO_CODIGO}}}")
 
 
 def anotar(accion, negocio=None, origen="", **datos):
-    Bitacora.objects.create(momento=reloj.ahora(), accion=accion, negocio=negocio, origen=origen, datos=datos)
+    Bitacora.objects.create(
+        momento=reloj.ahora(),
+        accion=accion,
+        negocio=negocio,
+        origen=origen,
+        datos=datos,
+    )
 
 
 def normalizar(codigo):
@@ -34,14 +40,23 @@ def codigo_valido(codigo):
 
 
 def pago_al_corriente(negocio):
-    return negocio.pagado_hasta is not None and negocio.pagado_hasta >= reloj.ahora().astimezone(timezone.utc).date()
+    return (
+        negocio.pagado_hasta is not None
+        and negocio.pagado_hasta >= reloj.ahora().astimezone(timezone.utc).date()
+    )
 
 
 def crear_negocio(nombre, contacto="", plan="base", modulos=(), instalaciones=1):
     if instalaciones < 1:
         raise ValueError("Un negocio necesita al menos una instalación permitida.")
     with transaction.atomic():
-        negocio = Negocio.objects.create(nombre=nombre, contacto=contacto, plan=plan, modulos=list(modulos), instalaciones_permitidas=instalaciones)
+        negocio = Negocio.objects.create(
+            nombre=nombre,
+            contacto=contacto,
+            plan=plan,
+            modulos=list(modulos),
+            instalaciones_permitidas=instalaciones,
+        )
         anotar("negocio_creado", negocio)
     return negocio
 
@@ -50,9 +65,13 @@ def crear_codigo(negocio):
     crudo = "".join(secrets.choice(ALFABETO) for _ in range(LARGO_CODIGO))
     vence = reloj.ahora() + timedelta(days=ajustes.valor("dias_codigo"))
     with transaction.atomic():
-        CodigoActivacion.objects.create(negocio=negocio, resumen=resumen_de(crudo), vence=vence)
+        CodigoActivacion.objects.create(
+            negocio=negocio, resumen=resumen_de(crudo), vence=vence
+        )
         anotar("codigo_creado", negocio, vence=licencia.texto_de(vence))
-    return "-".join(crudo[i:i + GRUPO_CODIGO] for i in range(0, LARGO_CODIGO, GRUPO_CODIGO))
+    return "-".join(
+        crudo[i : i + GRUPO_CODIGO] for i in range(0, LARGO_CODIGO, GRUPO_CODIGO)
+    )
 
 
 def registrar_pago(negocio, hasta):
@@ -67,16 +86,25 @@ def revocar(negocio, huella=None, deshacer=False):
         if huella is None:
             Negocio.objects.filter(pk=negocio.pk).update(revocado=not deshacer)
             negocio.revocado = not deshacer
-        elif not Instalacion.objects.filter(negocio=negocio, huella=huella).update(revocada=not deshacer):
+        elif not Instalacion.objects.filter(negocio=negocio, huella=huella).update(
+            revocada=not deshacer
+        ):
             raise LookupError("Ese negocio no tiene una instalación con esa huella.")
-        anotar("revocacion_deshecha" if deshacer else "revocacion", negocio, instalacion=huella or "")
+        anotar(
+            "revocacion_deshecha" if deshacer else "revocacion",
+            negocio,
+            instalacion=huella or "",
+        )
 
 
 def _vencimiento(negocio, emitida):
     vence = emitida + timedelta(days=ajustes.valor("dias_vigencia"))
     if negocio.pagado_hasta is None:
         return vence
-    return min(vence, datetime.combine(negocio.pagado_hasta, time(23, 59, 59), tzinfo=timezone.utc))
+    return min(
+        vence,
+        datetime.combine(negocio.pagado_hasta, time(23, 59, 59), tzinfo=timezone.utc),
+    )
 
 
 def emitir(instalacion):
@@ -98,7 +126,13 @@ def emitir(instalacion):
             "vence": licencia.texto_de(_vencimiento(negocio, emitida)),
             "dias_gracia": ajustes.valor("dias_gracia"),
         }
-        anotar("licencia_emitida", negocio, instalacion=instalacion.huella, serie=instalacion.serie, vence=carga["vence"])
+        anotar(
+            "licencia_emitida",
+            negocio,
+            instalacion=instalacion.huella,
+            serie=instalacion.serie,
+            vence=carga["vence"],
+        )
     return licencia.firmar(carga, llave.privada())
 
 

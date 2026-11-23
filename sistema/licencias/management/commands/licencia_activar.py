@@ -16,7 +16,9 @@ class Command(BaseCommand):
     help = "Activa la licencia de este programa con el código que te dio quien te lo entregó"
 
     def add_arguments(self, parser):
-        parser.add_argument("codigo", help="Código de activación, por ejemplo XXXXX-XXXXX-XXXXX-XXXXX")
+        parser.add_argument(
+            "codigo", help="Código de activación, por ejemplo XXXXX-XXXXX-XXXXX-XXXXX"
+        )
 
     def handle(self, *args, **opciones):
         self.stdout.write(MENSAJES[servicios.activar(opciones["codigo"])])

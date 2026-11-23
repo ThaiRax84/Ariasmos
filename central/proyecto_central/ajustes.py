@@ -23,4 +23,6 @@ else:
     DATABASES = base_de_datos(_datos["base_datos"])
     ALLOWED_HOSTS = list(_datos.get("hosts", []))
     PROXIES_CONFIABLES = list(_datos.get("proxies_confiables", []))
-    RUTA_LLAVE_LICENCIAS = str(_datos.get("llave_licencias") or instancia.carpeta() / instancia.LLAVE)
+    RUTA_LLAVE_LICENCIAS = str(
+        _datos.get("llave_licencias") or instancia.carpeta() / instancia.LLAVE
+    )

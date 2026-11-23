@@ -13,15 +13,55 @@ PRODUCTO = "ariasmos"
 LIMITE = 8192
 LARGO_FIRMA = 64
 CAMPOS = {
-    "licencia": ("formato", "producto", "tipo", "negocio", "instalacion", "plan", "modulos", "serie", "emitida", "vence", "dias_gracia"),
+    "licencia": (
+        "formato",
+        "producto",
+        "tipo",
+        "negocio",
+        "instalacion",
+        "plan",
+        "modulos",
+        "serie",
+        "emitida",
+        "vence",
+        "dias_gracia",
+    ),
     "revocacion": ("formato", "producto", "tipo", "negocio", "instalacion", "emitida"),
-    "renovacion": ("formato", "producto", "tipo", "instalacion", "momento", "sello", "version"),
-    "activacion": ("formato", "producto", "tipo", "instalacion", "momento", "sello", "version"),
+    "renovacion": (
+        "formato",
+        "producto",
+        "tipo",
+        "instalacion",
+        "momento",
+        "sello",
+        "version",
+    ),
+    "activacion": (
+        "formato",
+        "producto",
+        "tipo",
+        "instalacion",
+        "momento",
+        "sello",
+        "version",
+    ),
     "acuse": ("formato", "producto", "tipo", "instalacion", "sello", "hora"),
 }
 ENTEROS = ("serie", "dias_gracia")
 FECHAS = ("emitida", "vence", "momento", "hora")
-TEXTOS = ("producto", "tipo", "negocio", "instalacion", "plan", "emitida", "vence", "momento", "hora", "sello", "version")
+TEXTOS = (
+    "producto",
+    "tipo",
+    "negocio",
+    "instalacion",
+    "plan",
+    "emitida",
+    "vence",
+    "momento",
+    "hora",
+    "sello",
+    "version",
+)
 PATRON_FECHA = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 PATRON_INSTALACION = re.compile(r"[0-9a-f]{64}")
 PATRON_SELLO = re.compile(r"[0-9a-f]{32}")
@@ -39,12 +79,17 @@ class LicenciaInvalida(Exception):
 
 
 def serializar(carga):
-    return json.dumps(carga, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps(
+        carga, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
 
 
 def firmar(carga, llave_privada):
     datos = serializar(carga)
-    return {"carga": base64.b64encode(datos).decode("ascii"), "firma": base64.b64encode(llave_privada.sign(datos)).decode("ascii")}
+    return {
+        "carga": base64.b64encode(datos).decode("ascii"),
+        "firma": base64.b64encode(llave_privada.sign(datos)).decode("ascii"),
+    }
 
 
 def huella(llave_publica):
@@ -82,7 +127,9 @@ def _rechazar_constante(valor):
 def leer_json(datos):
     try:
         texto = bytes(datos).decode("utf-8")
-        return json.loads(texto, object_pairs_hook=_sin_repetidos, parse_constant=_rechazar_constante)
+        return json.loads(
+            texto, object_pairs_hook=_sin_repetidos, parse_constant=_rechazar_constante
+        )
     except (ValueError, RecursionError):
         raise LicenciaInvalida("formato")
 
@@ -131,16 +178,30 @@ def _validar(carga, tipo):
         raise LicenciaInvalida("campos")
     if any(campo in carga and not _es_entero(carga[campo]) for campo in ENTEROS):
         raise LicenciaInvalida("campos")
-    if "modulos" in carga and not (isinstance(carga["modulos"], list) and all(isinstance(m, str) for m in carga["modulos"])):
+    if "modulos" in carga and not (
+        isinstance(carga["modulos"], list)
+        and all(isinstance(m, str) for m in carga["modulos"])
+    ):
         raise LicenciaInvalida("campos")
-    patrones = (("instalacion", PATRON_INSTALACION), ("sello", PATRON_SELLO), ("version", PATRON_VERSION))
-    if any(campo in carga and patron.fullmatch(carga[campo]) is None for campo, patron in patrones):
+    patrones = (
+        ("instalacion", PATRON_INSTALACION),
+        ("sello", PATRON_SELLO),
+        ("version", PATRON_VERSION),
+    )
+    if any(
+        campo in carga and patron.fullmatch(carga[campo]) is None
+        for campo, patron in patrones
+    ):
         raise LicenciaInvalida("campos")
     try:
         fechas = {campo: momento_de(carga[campo]) for campo in FECHAS if campo in carga}
     except ValueError:
         raise LicenciaInvalida("campos")
-    if tipo == "licencia" and not (carga["dias_gracia"] <= GRACIA_MAXIMA and carga["serie"] <= SERIE_MAXIMA and fechas["vence"] >= fechas["emitida"]):
+    if tipo == "licencia" and not (
+        carga["dias_gracia"] <= GRACIA_MAXIMA
+        and carga["serie"] <= SERIE_MAXIMA
+        and fechas["vence"] >= fechas["emitida"]
+    ):
         raise LicenciaInvalida("campos")
 
 

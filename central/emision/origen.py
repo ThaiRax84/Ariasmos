@@ -27,5 +27,11 @@ def _salto_externo(request):
 
 def de(request):
     remoto = request.META.get("REMOTE_ADDR", "")
-    candidato = _salto_externo(request) if remoto in settings.PROXIES_CONFIABLES else None
-    return (candidato is not None and _normalizada(candidato)) or _normalizada(remoto) or remoto[:LARGO_MAXIMO]
+    candidato = (
+        _salto_externo(request) if remoto in settings.PROXIES_CONFIABLES else None
+    )
+    return (
+        (candidato is not None and _normalizada(candidato))
+        or _normalizada(remoto)
+        or remoto[:LARGO_MAXIMO]
+    )

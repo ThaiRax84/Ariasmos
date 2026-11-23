@@ -15,4 +15,6 @@ class Command(BaseCommand):
         negocio = negocio_de(opciones["negocio"])
         codigo = servicios.crear_codigo(negocio)
         self.stdout.write(f"Código de activación para {negocio.nombre}: {codigo}")
-        self.stdout.write(f"Sirve una sola vez y vence en {ajustes.valor('dias_codigo')} días. Anótalo ahora: no se vuelve a mostrar.")
+        self.stdout.write(
+            f"Sirve una sola vez y vence en {ajustes.valor('dias_codigo')} días. Anótalo ahora: no se vuelve a mostrar."
+        )

@@ -11,5 +11,9 @@ AJUSTES = {
 
 def valor(clave):
     omision, minimo, maximo = AJUSTES[clave]
-    guardado = Ajuste.objects.filter(clave=clave).values_list("valor", flat=True).first()
-    return guardado if guardado is not None and minimo <= guardado <= maximo else omision
+    guardado = (
+        Ajuste.objects.filter(clave=clave).values_list("valor", flat=True).first()
+    )
+    return (
+        guardado if guardado is not None and minimo <= guardado <= maximo else omision
+    )
