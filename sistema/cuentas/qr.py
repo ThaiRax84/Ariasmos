@@ -9,7 +9,7 @@ def agrupar(secreto):
 
 
 def svg(uri):
-    return segno.make(uri, error="m", micro=False).svg_inline(scale=5, dark="#000", light="#fff", border=4)
+    return segno.make(uri, error="m", micro=False).svg_inline(scale=5, dark="#000", light="#fff", border=4, omitsize=True)
 
 
 def contexto(secreto, cuenta, emisor):

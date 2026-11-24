@@ -13,7 +13,7 @@ def codigo(recibo):
 
 
 def svg(recibo):
-    return mark_safe(codigo(recibo).svg_inline(scale=4, dark="#000", light="#fff", border=4))
+    return mark_safe(codigo(recibo).svg_inline(scale=4, dark="#000", light="#fff", border=4, omitsize=True))
 
 
 def dibujar(hoja, recibo, x, y, modulo=2.5):

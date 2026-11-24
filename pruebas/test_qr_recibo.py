@@ -1,4 +1,5 @@
 import io
+import re
 
 import pytest
 import segno
@@ -8,6 +9,7 @@ from pypdf import PdfReader
 from auditoria.models import Evento
 from cobros import libro, qr
 from cobros.models import Pago
+from cuentas import qr as qr_cuentas
 from configuracion.models import Parametro
 
 from .conftest import cliente, equipo_aprobado
@@ -29,8 +31,18 @@ def test_el_qr_lleva_solo_serie_folio_y_codigo(recibo):
     for prohibido in (ana.nombre, ana.apellidos, ana.matricula, "1234", "http", "//"):
         assert prohibido not in texto
     pagina = cliente(personas["op"]).get(reverse("cobros:recibo", args=[objeto.pk])).content.decode()
-    esperado = segno.make(texto, error="m", micro=False).svg_inline(scale=4, dark="#000", light="#fff", border=4)
+    esperado = segno.make(texto, error="m", micro=False).svg_inline(scale=4, dark="#000", light="#fff", border=4, omitsize=True)
     assert esperado in pagina
+
+
+def test_los_qr_en_pantalla_llevan_caja_de_vista_sin_tamano_fijo(recibo):
+    _, _, objeto = recibo
+    uri = "otpauth://totp/Mi%20negocio:jefa?secret=JBSWY3DPEHPK3PXP&issuer=Mi%20negocio"
+    for texto, svg, escala in ((qr.texto(objeto), str(qr.svg(objeto)), 4), (uri, qr_cuentas.svg(uri), 5)):
+        etiqueta = re.match(r"<svg[^>]*>", svg).group(0)
+        assert "width=" not in etiqueta and "height=" not in etiqueta
+        lado = len(segno.make(texto, error="m", micro=False).matrix) + 8
+        assert f'viewBox="0 0 {lado * escala} {lado * escala}"' in etiqueta
 
 
 def test_el_pdf_lleva_el_qr(recibo):
