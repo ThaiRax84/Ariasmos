@@ -12,8 +12,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from caja.models import Traslado
-from cuentas.decoradores import requiere_permiso
-from cuentas.permisos import quienes
+from cuentas.decoradores import requiere_ingresos, requiere_permiso
+from cuentas.permisos import quienes, ve_ingresos
 from configuracion.models import Negocio, vocabulario
 from nucleo.matricula import normalizar
 from proyecto.captura import CampoGuiadoTexto
@@ -180,6 +180,7 @@ def importacion(request, pk):
         "puede_revisar": objeto.requiere_revision and objeto.revisada_por_id is None and request.user.tiene_permiso(REVISA) and objeto.creada_por_id != request.user.pk and not conciliacion.libero_algo(objeto, request.user),
         "retenidos": list(conciliacion.retenidos(objeto).order_by("fecha", "id")),
         "puede_liberar": request.user.tiene_permiso(CONCILIA),
+        "ve_movimientos": ve_ingresos(request.user) and any(request.user.tiene_permiso(p) for p in VEN_COLA),
     }
     return render(request, "banco/importacion.html", contexto)
 
@@ -219,6 +220,7 @@ def liberar(request, pk):
 
 
 @requiere_permiso(*VEN_COLA)
+@requiere_ingresos
 def cola(request):
     pendientes = list(MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).select_related("cuenta__banco", "propuesta").order_by("fecha", "id")[:MAXIMO_COLA])
     for m in pendientes:
@@ -251,6 +253,7 @@ def aplicar_varios(request):
 
 
 @requiere_permiso(*VEN_COLA)
+@requiere_ingresos
 def movimiento(request, pk):
     objeto = get_object_or_404(MovimientoBancario.objects.select_related("cuenta__banco", "propuesta", "propuesta_por", "pago__titular", "pago__recibo", "traslado__origen", "resuelto_por"), pk=pk)
     concilia = request.user.tiene_permiso(CONCILIA)
@@ -288,7 +291,8 @@ def _resolver(request, pk, accion):
     return redirect("conciliacion:movimiento", pk=pk)
 
 
-@requiere_permiso("sugerir_conciliacion", "conciliar_banco")
+@requiere_permiso(*VEN_COLA)
+@requiere_ingresos
 @require_POST
 def proponer(request, pk):
     formulario = FormularioMatricula(request.POST)

@@ -12,6 +12,10 @@ def _alguno(permisos, *nombres):
     return any(nombre in permisos for nombre in nombres)
 
 
+def _ve_cola_del_banco(permisos):
+    return "ver_ingresos" in permisos and _alguno(permisos, "conciliar_banco", "sugerir_conciliacion")
+
+
 def _prioritarias(permisos, voc, inventario):
     return [
         ("Inicio", "inicio", True, ("=/",), ()),
@@ -19,7 +23,7 @@ def _prioritarias(permisos, voc, inventario):
         (voc["titulares"], "titulares:lista", "ver_titulares" in permisos, ("/titulares/", "/cobros/titulares/", "/cobros/cargos/", "/cobros/pagos/"), ("/titulares/familias/",)),
         ("Inventario", "inventario:indice", inventario and _alguno(permisos, *PERMISOS_INVENTARIO), ("/inventario/",), ()),
         ("Mi caja", "caja:inicio", "turno_caja" in permisos, ("/caja/",), ("/caja/custodia/", "/caja/traslados/")),
-        ("Banco", "conciliacion:cola", _alguno(permisos, "conciliar_banco", "sugerir_conciliacion"), ("/banco/",), ()),
+        ("Banco", "conciliacion:cola", _ve_cola_del_banco(permisos), ("/banco/",), ()),
         ("Efectivo", "caja:custodia", "recibir_efectivo" in permisos, ("/caja/custodia/", "/caja/traslados/"), ()),
         ("Solicitudes", "solicitudes:bandeja", _alguno(permisos, "solicitar_alta_baja", "aprobar_solicitudes", "alta_baja_directa", "solicitar_importacion_padron"), ("/solicitudes/",), ("/solicitudes/politicas/",)),
         ("Cortes", "cortes:lista", _alguno(permisos, "turno_caja", "ver_cortes"), ("/cortes/",), ()),
@@ -37,7 +41,7 @@ def _demas(permisos, voc):
         ("Políticas", "solicitudes:politicas", "administrar_politicas" in permisos, ("/solicitudes/politicas/",), ()),
         ("Límites de adeudo", "rezagos:limites", "configurar_limites_adeudo" in permisos, ("/rezagos/limites/",), ()),
         ("Reglas de rezago", "rezagos:reglas", "configurar_rezagos" in permisos, ("/rezagos/reglas/",), ()),
-        ("Topes del banco", "conciliacion:topes", "configurar_topes_banco" in permisos and not _alguno(permisos, "conciliar_banco", "sugerir_conciliacion"), ("/banco/topes/",), ()),
+        ("Topes del banco", "conciliacion:topes", "configurar_topes_banco" in permisos and not _ve_cola_del_banco(permisos), ("/banco/topes/",), ()),
         ("Configuración", "configuracion:indice", "administrar_configuracion" in permisos, ("/configuracion/", "/actualizaciones/"), ()),
         ("Respaldos", "respaldos:panel", "administrar_respaldos" in permisos, ("/respaldos/",), ()),
         ("Auditoría", "auditoria:lista", "ver_auditoria" in permisos, ("/auditoria/",), ()),
