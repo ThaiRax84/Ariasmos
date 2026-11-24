@@ -198,9 +198,9 @@ def _cobrado_del_dia(ciego, ahora):
     return _cifra("cobrado_hoy", "Cobrado hoy", detalle, importe=datos["total"], enlace=reverse("cortes:lista"))
 
 
-def _banco():
+def _banco(con_enlace):
     pendientes = MovimientoBancario.objects.filter(estado=MovimientoBancario.POR_IDENTIFICAR).aggregate(total=Count("id"), propuestos=Count("id", filter=Q(propuesta__isnull=False)))
-    return _cifra("banco_por_identificar", "Banco por identificar", f"{pendientes['propuestos']} con propuesta", texto=str(pendientes["total"]), enlace=reverse("conciliacion:cola"), aviso=bool(pendientes["total"]))
+    return _cifra("banco_por_identificar", "Banco por identificar", f"{pendientes['propuestos']} con propuesta", texto=str(pendientes["total"]), enlace=reverse("conciliacion:cola") if con_enlace else None, aviso=bool(pendientes["total"]))
 
 
 def _corte_pendiente(pendientes):
@@ -230,7 +230,7 @@ def cifras(usuario, ahora=None, diarios=None):
         if tiene("recibir_efectivo"):
             lista.append(_custodia(usuario, ciego, "Efectivo sin entregar", "efectivo_sin_entregar"))
         if tiene("conciliar_banco"):
-            lista.append(_banco())
+            lista.append(_banco(tiene("ver_ingresos")))
         if tiene("recibir_efectivo"):
             lista.append(_corte_pendiente(cortes.diarios_pendientes() if diarios is None else diarios))
     return lista
@@ -361,7 +361,7 @@ def _avisos_banco(usuario, permisos):
         ultima = Importacion.objects.order_by("-creada").first()
         titulo = f"Banco: {_plural(pendientes['total'], 'movimiento')} por identificar" + (f" ({pendientes['propuestos']} con propuesta)" if pendientes["propuestos"] else "")
         detalle = f"Última importación: {_fecha(ultima.creada, 'd/m/Y H:i')} ({ultima.nombre_archivo})." if ultima else "Todavía no se ha importado ningún estado de cuenta."
-        filas.append(renglon("banco", titulo, detalle, "revisar" if pendientes["total"] else "bien", [("Ver cola", reverse("conciliacion:cola")), ("Importar estado de cuenta", reverse("conciliacion:importar"))]))
+        filas.append(renglon("banco", titulo, detalle, "revisar" if pendientes["total"] else "bien", ([("Ver cola", reverse("conciliacion:cola"))] if "ver_ingresos" in permisos else []) + [("Importar estado de cuenta", reverse("conciliacion:importar"))]))
     return filas
 
 
