@@ -207,6 +207,7 @@ MATRIZ = {
     "rezagos:recargos_alta": ("administrar_conceptos",),
 }
 
+EXIGEN_INGRESOS = {"conciliacion:cola", "conciliacion:movimiento", "conciliacion:proponer"}
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
 LOTE_DE_OTRO = {"configuracion:padron_lote", "configuracion:padron_matriculas", "configuracion:padron_fichas"}
 
@@ -376,6 +377,8 @@ def escenario(db):
 def permitido(rol, nombre):
     if nombre in OBJETO_PROPIO and OBJETO_PROPIO[nombre] is not None:
         return rol.nombre in OBJETO_PROPIO[nombre]
+    if nombre in EXIGEN_INGRESOS and "ver_ingresos" not in rol.permisos():
+        return False
     return bool(rol.permisos() & set(MATRIZ[nombre]))
 
 

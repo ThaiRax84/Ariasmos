@@ -15,6 +15,7 @@ from caja.models import Traslado
 from cobros import libro
 from cobros.models import Cargo, Pago
 from configuracion.models import Parametro
+from cuentas.models import PermisoRol
 from titulares.models import Titular
 
 from .banco_ayudas import CLABE, cuenta_principal, efectivo, enlace, estado, pdf, retiro, saldo_final, spei
@@ -196,6 +197,7 @@ def test_dos_depositos_iguales_los_elige_quien_concilia(base):
 
 def test_cola_operacion_propone_y_supervision_confirma_y_aprende(base):
     personas, ana = base
+    PermisoRol.objects.create(rol=personas["op"].rol, permiso="ver_ingresos")
     importar_texto(personas["sup"], [spei(3, 30000, concepto="pago de la nena", cuenta=PAGADOR)])
     m = mov()
     op, sup = cliente(personas["op"]), cliente(personas["sup"])
@@ -409,6 +411,7 @@ def test_archivos_hostiles_se_rechazan(base):
 
 def test_texto_del_banco_no_se_interpreta(base):
     personas, _ = base
+    PermisoRol.objects.create(rol=personas["op"].rol, permiso="ver_ingresos")
     importar_texto(personas["sup"], [spei(3, 1000, concepto="<script>alert(1)</script>", nombre="<B>X</B>")])
     m = mov()
     for c in (cliente(personas["sup"]), cliente(personas["op"])):

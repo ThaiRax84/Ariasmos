@@ -21,6 +21,7 @@ from configuracion import esquema, plantillas
 from configuracion.models import Parametro, parametro
 from cortes import calculo
 from cortes.salida import vista
+from cuentas.models import PermisoRol
 from inventario import servicios as inventario
 from inventario.models import Articulo, ComprobanteInventario, Conteo, Devolucion, MovimientoInventario, RegistroInmutable, RegistroInventario, RenglonConteo, RenglonVenta, Venta
 from solicitudes import motor
@@ -373,6 +374,7 @@ def test_dos_devoluciones_simultaneas_no_devuelven_de_mas():
 
 def test_devolucion_en_efectivo_siempre_por_solicitud_de_otra_persona(base):
     personas, ana, libro_a, cuaderno = base
+    PermisoRol.objects.create(rol=personas["op"].rol, permiso="ver_ingresos")
     turno_op = turno_de(personas["op"])
     venta = inventario.vender(ana, [(cuaderno.pk, 2)], Venta.AHORA, personas["sup"])
     turno_sup = turno_de(personas["sup"], "Caja 2")
@@ -697,7 +699,6 @@ def test_migracion_agrega_politicas_y_permisos_a_instalaciones_existentes(db):
 
     configurar("escuela")
     PoliticaAccion.objects.filter(accion__in=["conteo_inventario", "devolucion_efectivo"]).delete()
-    from cuentas.models import PermisoRol
 
     nuevos = ["vender_articulos", "registrar_movimientos_inventario", "subir_conteo_inventario", "devolver_articulos", "revisar_inventario", "administrar_articulos"]
     PermisoRol.objects.filter(permiso__in=nuevos).delete()
