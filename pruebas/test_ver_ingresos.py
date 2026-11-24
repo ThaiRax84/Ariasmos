@@ -17,7 +17,7 @@ from inventario.models import Articulo, Venta
 from titulares.servicios import crear_titular
 
 from .conftest import cliente
-from .libro_ayudas import preparar_conceptos
+from .libro_ayudas import preparar_conceptos, turno_de
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def test_la_delegacion_da_y_quita_ver_ingresos_al_momento(personas, escenario):
     assert Delegacion.objects.get(pk=delegacion.pk).usos == 0
 
 
-def test_la_migracion_da_ver_ingresos_solo_a_quien_ve_cortes(roles):
+def test_la_migracion_da_ver_ingresos_solo_a_quien_ve_cortes(personas):
     PermisoRol.objects.filter(permiso="ver_ingresos").delete()
     migracion = importlib.import_module("cuentas.migrations.0011_ver_ingresos")
     migracion.otorgar(aplicaciones, None)
@@ -88,5 +88,50 @@ def test_la_migracion_da_ver_ingresos_solo_a_quien_ve_cortes(roles):
     assert set(PermisoRol.objects.filter(permiso="ver_ingresos").values_list("rol__nombre", flat=True)) == con_cortes != set()
     eventos = Evento.objects.filter(accion="permiso_agregado")
     assert {e.datos["papel"] for e in eventos} == con_cortes and all(e.datos["permiso"] == "ver_ingresos" for e in eventos)
+    Delegacion.objects.create(otorgante=personas["dir"], receptor=personas["op"], permiso="ver_ingresos", usos_maximos=1)
     migracion.quitar(aplicaciones, None)
-    assert not PermisoRol.objects.filter(permiso="ver_ingresos").exists()
+    assert not PermisoRol.objects.filter(permiso="ver_ingresos").exists() and not Delegacion.objects.filter(permiso="ver_ingresos").exists()
+
+
+def test_recibos_y_reversiones_ajenos_dan_403_sin_ver_ingresos(personas, escenario):
+    ajeno = _cobro(escenario, 111100, personas["sup"])
+    propio = _cobro(escenario, 222200, personas["op"])
+    turno_de(personas["op"])
+    c = cliente(personas["op"])
+    for nombre in ("cobros:recibo", "cobros:recibo_pdf"):
+        assert c.get(reverse(nombre, args=[ajeno.recibo.pk])).status_code == 403
+        assert c.get(reverse(nombre, args=[propio.recibo.pk])).status_code == 200
+    assert c.get(reverse("cobros:revertir", args=[ajeno.pk])).status_code == 403
+    assert c.post(reverse("cobros:revertir", args=[ajeno.pk]), {"motivo": "x"}).status_code == 403
+    assert c.get(reverse("cobros:verificar")).status_code == 200
+    assert cliente(personas["sup"]).get(reverse("cobros:recibo", args=[propio.recibo.pk])).status_code == 200
+
+
+def test_importaciones_y_topes_piden_ver_ingresos_para_mostrar_importes(personas, escenario):
+    for permiso in ("conciliar_banco", "configurar_topes_banco"):
+        PermisoRol.objects.get_or_create(rol=personas["op"].rol, permiso=permiso)
+    cuenta = CuentaBancaria.objects.create(banco=Banco.objects.get(clave="002"), clabe="002010077777777771", beneficiario="B", principal=True)
+    importacion = Importacion.objects.create(cuenta=cuenta, nombre_archivo="e.pdf", sha256="0" * 64, adaptador=Importacion.ESTADO_PDF, creada_por=personas["dir"])
+    c = cliente(personas["op"])
+    assert c.get(reverse("conciliacion:importaciones")).status_code == 403
+    assert c.get(reverse("conciliacion:importacion", args=[importacion.pk])).status_code == 403
+    assert c.post(reverse("conciliacion:liberar", args=[importacion.pk])).status_code == 403
+    topes = c.get(reverse("conciliacion:topes"))
+    assert topes.status_code == 200 and "Aplicado solo hoy" not in topes.content.decode()
+    assert "Aplicado solo hoy" in cliente(personas["sup"]).get(reverse("conciliacion:topes")).content.decode()
+
+
+def test_ver_ingresos_solo_se_presta_por_dias(personas, escenario):
+    c = cliente(personas["dir"])
+    datos = {"receptor": personas["op"].pk, "permiso": "ver_ingresos", "usos": 3}
+    assert c.post(reverse("delegacion_nueva"), datos).status_code == 200
+    assert not Delegacion.objects.exists()
+    assert c.post(reverse("delegacion_nueva"), {**datos, "dias": 2}).status_code == 302
+    assert Delegacion.objects.filter(permiso="ver_ingresos", receptor=personas["op"]).count() == 1
+
+
+def test_sin_ver_ingresos_no_se_ofrece_la_cola_en_el_buscador(personas, escenario):
+    PermisoRol.objects.get_or_create(rol=personas["op"].rol, permiso="conciliar_banco")
+    url = reverse("conciliacion:cola")
+    assert url not in cliente(personas["op"]).get(reverse("ir"), {"q": "estado"}).content.decode()
+    assert url in cliente(personas["sup"]).get(reverse("ir"), {"q": "estado"}).content.decode()

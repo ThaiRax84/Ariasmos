@@ -207,7 +207,7 @@ MATRIZ = {
     "rezagos:recargos_alta": ("administrar_conceptos",),
 }
 
-EXIGEN_INGRESOS = {"conciliacion:cola", "conciliacion:movimiento", "conciliacion:proponer"}
+EXIGEN_INGRESOS = {"conciliacion:cola", "conciliacion:movimiento", "conciliacion:proponer", "conciliacion:importaciones", "conciliacion:importacion", "conciliacion:revisada", "conciliacion:liberar"}
 CARGA_DE_OTRO = {"conciliacion:columnas", "conciliacion:previa", "configuracion:padron_revisar"}
 LOTE_DE_OTRO = {"configuracion:padron_lote", "configuracion:padron_matriculas", "configuracion:padron_fichas"}
 
