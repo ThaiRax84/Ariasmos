@@ -1379,3 +1379,14 @@ Reglas comunes a las dos POST, en este orden:
 - No se mueve ni cambia ningún dato del MVP. Migración única: tabla nueva de `licencias`.
 - Un programa sin llaves en `llaves.json` queda `libre`: actualizar el MVP no puede bloquear a nadie por accidente.
 - La llave pública real de Central la pone Máximo después de correr `inicializar_central` en su servidor. La privada nunca sale de Central ni entra al repositorio.
+
+## Versión 1.0: permiso para ver lo que entra (fase 13)
+
+Los niveles bajos no ven cuánto entra salvo que un nivel superior se lo conceda. El permiso nuevo es `ver_ingresos` y se decide en un solo lugar: `cuentas.permisos.ve_ingresos(usuario)`, que usa `tiene_permiso` (cuenta delegaciones vigentes y no gasta usos).
+
+- **Catálogo.** Está en `PERMISOS` y en `DELEGABLES`; la regla de no dar lo que no se tiene por el papel no cambia. Las seis plantillas lo dan a los papeles que ya tienen `ver_cortes`.
+- **Instalaciones existentes.** La migración `cuentas/0011_ver_ingresos` lo agrega a todo papel con `ver_cortes` y registra un evento `permiso_agregado` por papel; la inversa lo quita de todos.
+- **Lo último que entró** (`/ultimo/`, inicio, aviso y campana). Sin el permiso el servidor no manda el importe de cobros ajenos, ni en el HTML ni en `data-aviso`. El cobro propio sí lo muestra, salvo con turno abierto (conteo ciego).
+- **Banco.** La cola, el detalle de un movimiento y proponer una identificación exigen `ver_ingresos` además del permiso que ya pedían (decorador `requiere_ingresos`); el menú no ofrece la cola a quien no puede abrirla.
+- **Inventario.** Sin el permiso, la lista de ventas solo trae las propias; el detalle y la devolución de una venta ajena dan 403.
+- No hay tablas, pantallas ni rutas nuevas. Totales, cortes, custodia, retiros e importaciones siguen protegidos por sus permisos de siempre.

@@ -205,6 +205,7 @@ Solo si el negocio lleva inventario (menú **Inventario**). Ver también la [gu�
 - **Usuarios** → **Nuevo usuario**: el sistema muestra un **código de activación** que la persona usa para elegir su contraseña (nadie teclea la contraseña de otro).
 - **Restablecer acceso** genera un código nuevo si alguien olvidó su contraseña o perdió su teléfono.
 - **Roles** permite mover permisos entre roles y renombrarlos. Dos permisos tocan la hoja del padrón: **Importar o actualizar desde una hoja, sin aprobación** (Dirección en las plantillas) y **Pedir que se importe o actualice desde una hoja** (Operación y Supervisión en las plantillas).
+- **Ver cuánto entra** es el permiso que deja ver los importes de los cobros y ventas de otras personas, los depósitos del banco y su cola. Supervisión y Dirección lo traen; Operación no: ve quién pagó, el concepto y la hora, y el importe de lo que cobró ella misma. Quien lo tiene por su rol puede prestarlo por un tiempo desde **Delegaciones**.
 
 ### Datos de pago
 
