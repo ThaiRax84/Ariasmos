@@ -14,6 +14,7 @@ from configuracion.models import Negocio
 from configuracion.trabajador import ejecutar_ciclo
 from proyecto import instancia
 
+from cuentas.models import PermisoRol
 from .banco_ayudas import cuenta_principal, enlace, estado, pdf, saldo_final, spei
 from .conftest import cliente
 from .libro_ayudas import preparar_conceptos, titular_activo
@@ -154,6 +155,7 @@ def test_sin_continuidad_no_aplica_pagos_hasta_que_una_persona_la_libere(base):
 
 def test_continuidad_verificada_aplica_sola(base):
     personas, ana, vigilada = base
+    PermisoRol.objects.get_or_create(rol=personas["op"].rol, permiso="ver_ingresos")
     agosto = [enlace(5, 1000, "intereses")]
     dejar(vigilada, "agosto.pdf", pdf(estado(agosto)))
     dos_revisiones()

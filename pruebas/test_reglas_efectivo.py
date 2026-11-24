@@ -7,6 +7,7 @@ from cobros.models import Pago, PlanCobro, ReversionPago
 from solicitudes import motor
 from solicitudes.models import Solicitud
 
+from cuentas.models import PermisoRol
 from .conftest import cliente, codigo_actual
 from .libro_ayudas import campos_piezas, preparar_conceptos, titular_activo, turno_de
 
@@ -33,6 +34,7 @@ def test_mensaje_dice_quien_tiene_el_efectivo(base):
 
 def test_quien_cobro_no_autoriza_por_codigo_su_reversion(base):
     personas, ana = base
+    PermisoRol.objects.get_or_create(rol=personas["op"].rol, permiso="ver_ingresos")
     turno = turno_de(personas["sup"])
     pago = libro.registrar_pago(ana, 50000, Pago.EFECTIVO, personas["sup"], turno=turno)
     turno_de(personas["op"], "Caja 2")
