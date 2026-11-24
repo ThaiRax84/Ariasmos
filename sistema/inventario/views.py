@@ -23,7 +23,7 @@ from cobros.vistas_cobro import _verificaciones_bloqueadas, proponer_cambio
 from configuracion.models import parametro, vocabulario
 from configuracion.moneda import formatear
 from cuentas.permisos import quienes
-from cuentas.decoradores import requiere_permiso
+from cuentas.decoradores import exigir_ingresos_o_propio, requiere_permiso
 from proyecto.orden import elegir
 from rezagos.servicios import sin_credito, solicitar_venta
 from titulares.models import Titular
@@ -235,12 +235,6 @@ def vender_publico(request):
     return redirect("cobros:recibo", pk=venta.pago.recibo.pk)
 
 
-def _exigir_visible(request, venta):
-    if not servicios.es_visible_para(venta, request.user):
-        registrar("acceso_denegado", request=request, datos={"ruta": request.path, "permisos": ["ver_ingresos"]})
-        raise PermissionDenied
-
-
 @requiere_permiso(*VEN_VENTAS)
 @encendido
 def ventas(request):
@@ -251,7 +245,7 @@ def ventas(request):
 @encendido
 def venta(request, pk):
     objeto = get_object_or_404(Venta.objects.select_related("titular", "usuario", "pago__recibo"), pk=pk)
-    _exigir_visible(request, objeto)
+    exigir_ingresos_o_propio(request, objeto.usuario_id)
     libres = servicios.disponibles(objeto, incluir_pendientes=True)
     renglones = [{"renglon": r, "disponible": libres.get(r.pk, 0), "saldo": libro.saldo_de(r.cargo)} for r in objeto.renglones.select_related("articulo", "cargo")]
     contexto = {
@@ -312,7 +306,7 @@ def _venta_por_recibo(request, formulario):
 @encendido
 def devolver_venta(request, pk):
     objeto = get_object_or_404(Venta.objects.select_related("titular", "pago"), pk=pk)
-    _exigir_visible(request, objeto)
+    exigir_ingresos_o_propio(request, objeto.usuario_id)
     if not parametro("devoluciones_inventario"):
         messages.error(request, "El negocio no acepta devoluciones de artículos.")
         return redirect("inventario:venta", pk=pk)

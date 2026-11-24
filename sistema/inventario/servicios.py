@@ -747,10 +747,6 @@ def ventas_recientes(usuario, limite=100):
     return consulta[:limite]
 
 
-def es_visible_para(venta, usuario):
-    return ve_ingresos(usuario) or venta.usuario_id == usuario.pk
-
-
 def buscar_venta(texto):
     texto = str(texto or "").strip().upper()
     if texto.startswith("V-"):

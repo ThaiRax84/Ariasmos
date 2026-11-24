@@ -16,6 +16,7 @@ def otorgar(apps, schema_editor):
 
 def quitar(apps, schema_editor):
     apps.get_model("cuentas", "PermisoRol").objects.filter(permiso=PERMISO).delete()
+    apps.get_model("cuentas", "Delegacion").objects.filter(permiso=PERMISO).delete()
 
 
 class Migration(migrations.Migration):

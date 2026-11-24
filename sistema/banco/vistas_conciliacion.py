@@ -163,12 +163,14 @@ def previa(request, token):
 
 
 @requiere_permiso(CONCILIA)
+@requiere_ingresos
 def importaciones(request):
     consulta = Importacion.objects.select_related("cuenta__banco", "creada_por", "revisada_por", "liberada_por").annotate(aplicados_vigentes=Count("lista", filter=Q(lista__estado=MovimientoBancario.APLICADO)))
     return render(request, "banco/importaciones.html", {"importaciones": consulta[:100]})
 
 
 @requiere_permiso(CONCILIA, REVISA)
+@requiere_ingresos
 def importacion(request, pk):
     objeto = get_object_or_404(Importacion.objects.select_related("cuenta__banco", "creada_por", "revisada_por"), pk=pk)
     aplicados = objeto.lista.filter(estado=MovimientoBancario.APLICADO).aggregate(n=Count("id"), t=Sum("importe"))
@@ -186,6 +188,7 @@ def importacion(request, pk):
 
 
 @requiere_permiso(REVISA)
+@requiere_ingresos
 @require_POST
 def revisada(request, pk):
     objeto = get_object_or_404(Importacion, pk=pk)
@@ -201,6 +204,7 @@ def revisada(request, pk):
 
 
 @requiere_permiso(CONCILIA)
+@requiere_ingresos
 @require_POST
 def liberar(request, pk):
     objeto = get_object_or_404(Importacion.objects.select_related("cuenta"), pk=pk)
@@ -348,9 +352,9 @@ def topes(request):
         else:
             messages.success(request, "Topes guardados." if cambiaron else "Los topes no cambiaron.")
             return redirect("conciliacion:topes")
-    uso = conciliacion.uso_de_topes()
+    uso = conciliacion.uso_de_topes() if ve_ingresos(request.user) else None
     renglones = [{"nombre": nombre, "campo": formulario[f"tope_{clave}"]} for nombre, clave in zip(NOMBRES_DIAS, conciliacion.DIAS_SEMANA)]
-    contexto = {"formulario": formulario, "renglones": renglones, "acumulado": formulario[f"tope_{conciliacion.ACUMULADO}"], "uso": uso, "nombre_hoy": NOMBRES_DIAS[uso["dia"].weekday()]}
+    contexto = {"formulario": formulario, "renglones": renglones, "acumulado": formulario[f"tope_{conciliacion.ACUMULADO}"], "uso": uso, "nombre_hoy": NOMBRES_DIAS[uso["dia"].weekday()] if uso else ""}
     respuesta = render(request, "banco/topes.html", contexto)
     respuesta["Cache-Control"] = "no-store"
     return respuesta

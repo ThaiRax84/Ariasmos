@@ -130,6 +130,8 @@ class FormularioDelegacion(forms.Form):
         datos = super().clean()
         if not datos.get("dias") and not datos.get("usos"):
             raise forms.ValidationError("Indica los días de vigencia, el número de usos o ambos.")
+        if datos.get("permiso") == "ver_ingresos" and not datos.get("dias"):
+            raise forms.ValidationError("Para prestar este permiso indica los días de vigencia; no se puede prestar solo por número de usos.")
         if datos.get("dias") and datos["dias"] > parametro("dias_maximos_delegacion"):
             raise forms.ValidationError("La vigencia supera el máximo permitido.")
         return datos

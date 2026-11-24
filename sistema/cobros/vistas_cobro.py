@@ -24,7 +24,7 @@ from caja.servicios import recibe_movimientos, turno_abierto
 from configuracion import hoja as tamano_hoja
 from configuracion.models import hoy_negocio, parametro, vocabulario
 from cuentas.permisos import quienes
-from cuentas.decoradores import requiere_permiso
+from cuentas.decoradores import exigir_ingresos_o_propio, requiere_permiso
 from configuracion.moneda import formatear
 from rezagos import servicios as rezagos
 from solicitudes import motor
@@ -355,6 +355,7 @@ def _datos_recibo(recibo):
 @requiere_permiso("ver_titulares")
 def recibo(request, pk):
     objeto = get_object_or_404(Recibo.objects.select_related("pago__titular", "pago__reversion"), pk=pk)
+    exigir_ingresos_o_propio(request, objeto.pago.registrado_por_id)
     return render(request, "cobros/recibo.html", _datos_recibo(objeto))
 
 
@@ -391,6 +392,7 @@ def recibo_pdf(request, pk):
     from reportlab.lib.colors import HexColor
 
     objeto = get_object_or_404(Recibo.objects.select_related("pago__titular", "pago__reversion"), pk=pk)
+    exigir_ingresos_o_propio(request, objeto.pago.registrado_por_id)
     datos = _datos_recibo(objeto)
     voc = vocabulario()
     marca_actual, *colores = _colores_recibo()
@@ -643,6 +645,7 @@ def cancelar(request, pk):
 @requiere_permiso(*AJUSTES)
 def revertir(request, pk):
     pago = get_object_or_404(Pago.objects.select_related("titular", "recibo"), pk=pk)
+    exigir_ingresos_o_propio(request, pago.registrado_por_id)
     formulario = FormularioReversion(request.POST if request.method == "POST" else None)
     if pago.medio == Pago.EFECTIVO and control_piezas.faltan_para_contar():
         return control_piezas.pantalla_faltan(request)
