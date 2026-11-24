@@ -1,0 +1,8 @@
+Django==5.2.19
+asgiref==3.13.0
+sqlparse==0.6.1
+tzdata==2026.6
+waitress==3.0.2
+cryptography==50.0.1
+cffi==2.1.1
+pycparser==3.0

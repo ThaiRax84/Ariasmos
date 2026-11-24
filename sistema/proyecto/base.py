@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "rezagos",
     "envios",
     "vivo",
+    "licencias",
 ]
 
 MIDDLEWARE = [
@@ -45,6 +46,7 @@ MIDDLEWARE = [
     "configuracion.middleware.Instalacion",
     "cuentas.middleware.ControlDispositivo",
     "cuentas.middleware.ControlSesion",
+    "licencias.middleware.Candado",
 ]
 
 ROOT_URLCONF = "proyecto.urls"

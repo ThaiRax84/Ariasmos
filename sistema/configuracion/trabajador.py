@@ -9,6 +9,7 @@ from banco.models import depurar_cargas
 from cobros import generacion
 from cortes import servicios as cortes
 from cuentas import secretos
+from licencias import servicios as licencias
 from respaldos import servicios as respaldos
 from cuentas.servicios import depurar_pendientes
 from solicitudes import motor
@@ -123,13 +124,22 @@ TAREAS = (
     ("prueba_respaldo", _prueba, False),
     ("verificar_bitacora", _bitacora, True),
     ("actualizaciones", _actualizaciones, False),
+    ("licencia", licencias.tarea_renovar, False),
+)
+
+ESCRIBEN_DATOS = frozenset(
+    {"generar_cargos", "generar_recargos", "carpeta_banco", "generar_cortes_mayores", "cerrar_cortes_vencidos", "entregar_cortes", "caducar_solicitudes"}
 )
 
 
 def ejecutar_ciclo(hoy=None):
     hoy = hoy or hoy_negocio()
     informe = []
+    escribe = licencias.permite_escribir()
     for nombre, funcion, diaria in TAREAS:
+        if nombre in ESCRIBEN_DATOS and not escribe:
+            informe.append((nombre, True, "omitida: la licencia está en solo consulta"))
+            continue
         tarea, _ = Tarea.objects.get_or_create(nombre=nombre)
         if diaria and tarea.exito and tarea.ultima_fecha is not None and tarea.ultima_fecha >= hoy:
             informe.append((nombre, True, "ya se hizo hoy"))
