@@ -529,3 +529,4 @@ fieldset.recargo legend { font-weight: 800; padding: 0 6px; }
 .muestra-piezas .mosaico { grid-column: auto; }
 .campo.casilla { flex-wrap: wrap; }
 .campo.casilla > small { flex-basis: 100%; padding-left: 32px; }
+.envio-por-omision { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

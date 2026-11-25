@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 from django.conf import settings
@@ -131,3 +132,23 @@ def test_importar_plantilla_de_punta_a_punta():
     assert f'name="recargo_importe_{membresia.pk}"' in pagina
     assert terminar(c).url == reverse("primeros_pasos")
     assert Negocio.objects.get().configurado
+
+
+@pytest.mark.django_db
+def test_enter_en_cada_formulario_del_asistente_hace_la_accion_principal():
+    c = Client()
+    c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE))
+    colegiatura = ConceptoCobro.objects.get(tipo="recurrente")
+    pago = {"clabe": "002 010 07777777777 1", "beneficiario": "Mi negocio SA", "medios": [], "referencia_en": "ambos", "contacto_dudas": "55 1234 5678"}
+    caja = {f"corte_{dia}": "18:00" for dia in range(6)}
+    caja.update({"periodo_retiros": "semana", "tope_retiro_individual": "500", "tope_retiros_periodo": "2,000", "maximo_retiros_periodo": "5", "maximo_efectivo_caja": "0", "dias_retiro_sin_revisar": "3", "control_denominaciones": "on"})
+    avance = [("conceptos", {f"importe_{c_.pk}": "100" for c_ in ConceptoCobro.objects.all()} | {f"dia_{colegiatura.pk}": 10}), ("marca", {"omitir": "1"}), ("pago", pago), ("caja", caja), ("reglas", {"omitir": "1"}), ("cortes", {"omitir": "1"})]
+    for nombre, datos in avance:
+        pagina = c.get(reverse(f"asistente:{nombre}")).content.decode()
+        for formulario in re.findall(r"<form.*?</form>", pagina, re.S):
+            primero = re.search(r"<button[^>]*type=\"submit\"[^>]*>", formulario)
+            assert primero is None or 'name="' not in primero.group(0), nombre
+        assert c.post(reverse(f"asistente:{nombre}"), datos).status_code == 302, nombre
+    c.post(reverse("asistente:usuario"), {"usuario": "jefa", "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    pagina = c.get(reverse("asistente:codigo")).content.decode()
+    assert re.search(r"<form.*?envio-por-omision.*?name=\"atras\"", pagina, re.S)

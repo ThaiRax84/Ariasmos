@@ -2,6 +2,7 @@
 {% block asistente %}
 <form method="post" class="pila" novalidate>
   {% csrf_token %}
+  <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Continuar</button>
   {% include "configuracion/_caja_cortes.html" %}
   <div class="acciones">{% include "asistente/_atras.html" %}<button class="boton grande" type="submit">Continuar</button></div>
 </form>

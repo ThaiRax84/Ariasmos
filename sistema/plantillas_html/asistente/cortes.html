@@ -8,6 +8,7 @@
 {% endif %}
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
+  <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Guardar y continuar</button>
   {% include "comun/_campos.html" %}
   <div class="acciones">
     {% include "asistente/_atras.html" %}

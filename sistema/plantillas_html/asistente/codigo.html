@@ -4,6 +4,7 @@
 <p>Al terminar, este equipo quedará aprobado como el primero.</p>
 <form method="post" class="formulario angosto">
   {% csrf_token %}
+  <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Terminar instalación</button>
   {% include "comun/_campos.html" %}
   <div class="acciones">{% include "asistente/_atras.html" %}<button class="boton grande" type="submit">Terminar instalación</button></div>
 </form>
