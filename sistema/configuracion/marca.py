@@ -18,6 +18,7 @@ LADO_MAXIMO_LOGO = 512
 HORAS_ENTRE_AVISOS = 6
 BLANCO = "#FFFFFF"
 TINTA_ARIASMOS = "#1F1813"
+PRIMARIO_ARIASMOS = "#9E431C"
 SUAVE_ARIASMOS = "#5C5047"
 CONTRASTE_TINTA = 7.0
 CONTRASTE_TEXTO = 4.5
@@ -115,18 +116,29 @@ def respuesta_vista(request):
     return respuesta
 
 
+def barra(marca):
+    color = (marca and (marca.color_barra or marca.color_principal)) or PRIMARIO_ARIASMOS
+    texto = BLANCO if contraste(BLANCO, color) >= CONTRASTE_TEXTO else TINTA_ARIASMOS
+    return color, texto
+
+
+def _contenido(marca):
+    valores = variables(marca.color_principal, marca.color_acento) if marca and marca.con_colores else {}
+    color, texto = barra(marca)
+    valores = {**valores, "--barra": color, "--barra-texto": texto}
+    lineas = [f"  {nombre}: {validar_color(valor)};" for nombre, valor in valores.items()]
+    return ":root {\n" + "\n".join(lineas) + "\n}\n"
+
+
 def hoja(marca):
-    if marca is None or not marca.con_colores:
-        return ":root {}\n"
+    if marca is None:
+        return _contenido(None)
     clave = f"{CLAVE_CACHE}:{marca.version}"
     guardada = cache.get(clave)
-    if guardada is not None:
-        return guardada
-    valores = variables(marca.color_principal, marca.color_acento)
-    lineas = [f"  {nombre}: {validar_color(valor)};" for nombre, valor in valores.items()]
-    contenido = ":root {\n" + "\n".join(lineas) + "\n}\n"
-    cache.set(clave, contenido, None)
-    return contenido
+    if guardada is None:
+        guardada = _contenido(marca)
+        cache.set(clave, guardada, None)
+    return guardada
 
 
 def _obtener_para_cambiar():
@@ -138,19 +150,23 @@ def _olvidar(version):
     cache.delete(f"{CLAVE_CACHE}:{version}")
 
 
-def guardar_colores(principal, acento, usuario, request=None):
+def guardar_colores(principal, acento, usuario, request=None, color_barra=""):
     principal = (principal or "").strip()
     acento = (acento or "").strip()
+    color_barra = (color_barra or "").strip()
     if bool(principal) != bool(acento):
         raise MarcaInvalida("Escribe los dos colores o deja los dos vacíos.")
     if principal:
         principal, acento = validar_color(principal), validar_color(acento)
+    if color_barra:
+        color_barra = validar_color(color_barra)
+    nuevos = {"color_principal": principal, "color_acento": acento, "color_barra": color_barra}
     with transaction.atomic():
         marca = _obtener_para_cambiar()
-        antes = {"color_principal": marca.color_principal, "color_acento": marca.color_acento}
-        MarcaNegocio.objects.filter(pk=1).update(color_principal=principal, color_acento=acento, version=F("version") + 1)
+        antes = {campo: getattr(marca, campo) for campo in nuevos}
+        MarcaNegocio.objects.filter(pk=1).update(**nuevos, version=F("version") + 1)
         marca.refresh_from_db()
-        registrar("marca_cambiada", usuario=usuario, objeto=marca, datos={"cambio": "colores", "antes": antes, "despues": {"color_principal": principal, "color_acento": acento}}, request=request)
+        registrar("marca_cambiada", usuario=usuario, objeto=marca, datos={"cambio": "colores", "antes": antes, "despues": nuevos}, request=request)
     _olvidar(marca.version - 1)
     return marca
 

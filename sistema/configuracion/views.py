@@ -323,6 +323,11 @@ def _contrastes(actual):
     }
 
 
+def _inicial_marca(actual, principal="", acento=""):
+    barra = actual.color_barra if actual else ""
+    return {"color_principal": principal, "color_acento": acento, "barra": "otro" if barra else "principal", "color_barra": barra}
+
+
 def propuesta_del_logo(actual):
     from . import colores_logo
 
@@ -340,10 +345,10 @@ def propuesta_del_logo(actual):
 @requiere_permiso(PERMISO, reingreso=True)
 def marca(request):
     actual = marca_negocio.actual()
-    inicial = {"color_principal": actual.color_principal if actual else "", "color_acento": actual.color_acento if actual else ""}
+    inicial = _inicial_marca(actual, actual.color_principal if actual else "", actual.color_acento if actual else "")
     propuesta = request.session.pop("propuesta_marca", None)
     if propuesta:
-        inicial = {"color_principal": propuesta["principal"], "color_acento": propuesta["acento"]}
+        inicial = _inicial_marca(actual, propuesta["principal"], propuesta["acento"])
     colores = FormularioMarca(initial=inicial)
     logo = FormularioLogo()
     if request.method == "POST":
@@ -351,13 +356,13 @@ def marca(request):
         try:
             if accion == "colores_logo":
                 propuesta = propuesta_del_logo(actual)
-                colores = FormularioMarca(initial={"color_principal": propuesta["principal"], "color_acento": propuesta["acento"]})
+                colores = FormularioMarca(initial=_inicial_marca(actual, propuesta["principal"], propuesta["acento"]))
                 registrar("marca_colores_propuestos", usuario=request.user, datos={"principal": propuesta["principal"], "acento": propuesta["acento"], "origen": propuesta["origen"]}, request=request)
                 messages.info(request, "Estos son los colores tomados del logo. Revísalos en la vista previa y guárdalos si te gustan.")
             elif accion == "colores":
                 colores = FormularioMarca(request.POST)
                 if colores.is_valid():
-                    marca_negocio.guardar_colores(colores.cleaned_data["color_principal"], colores.cleaned_data["color_acento"], request.user, request)
+                    marca_negocio.guardar_colores(colores.cleaned_data["color_principal"], colores.cleaned_data["color_acento"], request.user, request, colores.cleaned_data["color_barra"])
                     messages.success(request, "Colores del negocio guardados.")
                     return redirect("configuracion:marca")
             elif accion == "sin_colores":

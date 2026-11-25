@@ -93,7 +93,7 @@ def _turno(usuario, permisos):
 
 
 def general(request):
-    from .marca import actual as marca_actual
+    from .marca import BLANCO, actual as marca_actual, barra
     from .moneda import actual as moneda_actual
 
     usuario = getattr(request, "user", None)
@@ -101,13 +101,15 @@ def general(request):
     permisos = usuario.permisos_efectivos() if autenticado else set()
     voc = vocabulario()
     inventario = inventario_activo() if permisos else False
+    marca = marca_actual()
     contexto = {
         "negocio": getattr(request, "negocio", None),
         "voc": voc,
         "permisos": permisos,
         "version": version_actual(),
         "inventario_activo": inventario,
-        "marca": marca_actual(),
+        "marca": marca,
+        "barra_clara": autenticado and barra(marca)[1] != BLANCO,
         "moneda": moneda_actual(),
         "roles": RolesPorPermiso(),
     }

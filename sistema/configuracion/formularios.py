@@ -781,9 +781,15 @@ class FormularioAsistenteUsuario(ContrasenaNueva):
     field_order = ["usuario", "nombre", "contrasena1", "contrasena2"]
 
 
-class FormularioMarca(forms.Form):
+class FormularioMarca(ConDependencias, forms.Form):
     color_principal = CampoGuiadoTexto(label="Color principal", max_length=7, required=False, acepta="color", maximo_tecleo=7, help_text="Botones, menú activo y, si es oscuro, el texto. Ejemplo: #1F1A4E")
     color_acento = CampoGuiadoTexto(label="Color de acento", max_length=7, required=False, acepta="color", maximo_tecleo=7, help_text="Franja superior, subrayados y fondos suaves. Ejemplo: #F58634")
+    barra = forms.ChoiceField(label="Color de la barra superior", choices=[("principal", "El color principal de mi marca"), ("otro", "Otro color")], initial="principal", required=False, widget=forms.RadioSelect)
+    color_barra = CampoGuiadoTexto(label="Color de la barra", max_length=7, required=False, acepta="color", maximo_tecleo=7, help_text="El texto de la barra se vuelve claro u oscuro solo. Ejemplo: #1F1A4E")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        depende(self, "color_barra", "barra", ["otro"])
 
     def clean(self):
         from .marca import MarcaInvalida, validar_color
@@ -792,7 +798,12 @@ class FormularioMarca(forms.Form):
         principal, acento = datos.get("color_principal") or "", datos.get("color_acento") or ""
         if bool(principal) != bool(acento):
             raise forms.ValidationError("Escribe los dos colores o deja los dos vacíos.")
-        for campo, valor in (("color_principal", principal), ("color_acento", acento)):
+        pedidos = [("color_principal", principal), ("color_acento", acento)]
+        if datos.get("barra") == "otro":
+            pedidos.append(("color_barra", datos.get("color_barra") or ""))
+            if not pedidos[-1][1]:
+                self.add_error("color_barra", "Elige el color de la barra o usa el principal.")
+        for campo, valor in pedidos:
             if valor:
                 try:
                     datos[campo] = validar_color(valor)

@@ -298,6 +298,7 @@ PATRON_COLOR = r"^#[0-9A-Fa-f]{6}\Z"
 class MarcaNegocio(models.Model):
     color_principal = models.CharField(max_length=7, blank=True)
     color_acento = models.CharField(max_length=7, blank=True)
+    color_barra = models.CharField(max_length=7, blank=True)
     logo = models.CharField(max_length=40, blank=True)
     logo_tipo = models.CharField(max_length=4, blank=True)
     logo_sha256 = models.CharField(max_length=64, blank=True)
@@ -309,6 +310,7 @@ class MarcaNegocio(models.Model):
             models.CheckConstraint(condition=Q(id=1), name="marca_unica"),
             models.CheckConstraint(condition=Q(color_principal="") | Q(color_principal__regex=PATRON_COLOR), name="marca_color_principal"),
             models.CheckConstraint(condition=Q(color_acento="") | Q(color_acento__regex=PATRON_COLOR), name="marca_color_acento"),
+            models.CheckConstraint(condition=Q(color_barra="") | Q(color_barra__regex=PATRON_COLOR), name="marca_color_barra"),
             models.CheckConstraint(condition=(Q(color_principal="") & Q(color_acento="")) | (~Q(color_principal="") & ~Q(color_acento="")), name="marca_colores_juntos"),
             models.CheckConstraint(condition=Q(logo="") | Q(logo__regex=r"^[0-9a-f]{32}\.(jpg|png)\Z"), name="marca_logo_nombre"),
         ]
