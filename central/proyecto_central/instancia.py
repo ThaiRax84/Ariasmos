@@ -35,7 +35,35 @@ def nueva(base, hosts=()):
         "hosts": list(dict.fromkeys(nombre for nombre in nombres if nombre)),
         "proxies_confiables": [],
         "llave_licencias": str(base / LLAVE),
+        **claves_de_mensajes(),
     }
+
+
+def claves_de_mensajes():
+    return {
+        "clave_secretos": secrets.token_hex(32),
+        "url_publica": "",
+        "proveedor_mensajes": "simulado",
+    }
+
+
+def completar(base, datos):
+    faltantes = {
+        clave: valor
+        for clave, valor in claves_de_mensajes().items()
+        if clave not in datos
+    }
+    if faltantes:
+        temporal = ruta_archivo(base).with_suffix(".nuevo")
+        temporal.unlink(missing_ok=True)
+        escribir_privado(
+            temporal,
+            json.dumps({**datos, **faltantes}, indent=2, ensure_ascii=False).encode(
+                "utf-8"
+            ),
+        )
+        os.replace(temporal, ruta_archivo(base))
+    return sorted(faltantes)
 
 
 def escribir_privado(ruta, contenido):

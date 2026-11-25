@@ -17,6 +17,9 @@ from .base import base_de_datos
 SECRET_KEY = "clave-solo-para-pruebas-de-central-0123456789"
 ALLOWED_HOSTS = ["testserver"]
 PROXIES_CONFIABLES = []
+CLAVE_SECRETOS = bytes.fromhex("5a" * 32)
+URL_PUBLICA = "https://central.invalid"
+PROVEEDOR_MENSAJES = "simulado"
 _carpeta = Path(tempfile.mkdtemp(prefix="central-pruebas-"))
 atexit.register(shutil.rmtree, _carpeta, ignore_errors=True)
 RUTA_LLAVE_LICENCIAS = str(_carpeta / "llave-licencias.pem")

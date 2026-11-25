@@ -4,7 +4,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 
 DEBUG = False
 
-INSTALLED_APPS = ["emision"]
+INSTALLED_APPS = ["emision", "mensajeria"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
