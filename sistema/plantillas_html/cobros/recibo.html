@@ -13,6 +13,7 @@
       <a class="boton secundario" href="{% url 'cobros:recibo_pdf' recibo.pk %}">Descargar PDF</a>
       {% if "registrar_pago_efectivo" in permisos and not titular.interno %}<a class="boton secundario" href="{% url 'cobros:buscar' %}">Cobrar a otro {{ voc.titular_min }}</a>{% endif %}
     </div>
+    {% include "cobros/_whatsapp.html" %}
     {% if titular.interno %}{% if inventario_activo %}<a class="enlace" href="{% url 'inventario:indice' %}">Volver al inventario</a>{% endif %}{% else %}<a class="enlace" href="{% url 'titulares:detalle' titular.pk %}">Volver a la ficha</a>{% endif %}
   </div>
   <article class="hoja">

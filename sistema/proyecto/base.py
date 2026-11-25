@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "actualizaciones",
     "tarifas",
     "rezagos",
+    "mensajes",
     "envios",
     "vivo",
     "licencias",

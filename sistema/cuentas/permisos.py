@@ -37,6 +37,8 @@ PERMISOS = {
     "solicitar_importacion_padron": "Pedir que se importe o actualice {padron_min} desde una hoja",
     "configurar_limites_adeudo": "Configurar los límites de adeudo y sus excepciones",
     "configurar_rezagos": "Configurar las reglas de rezago y sus acciones",
+    "enviar_whatsapp": "Mandar recibos por WhatsApp",
+    "administrar_mensajes": "Administrar los mensajes por WhatsApp",
 }
 
 OPCIONES = list(PERMISOS.items())

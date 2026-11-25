@@ -346,8 +346,16 @@ def activar(codigo):
     return _recibir(estado, respuesta, sello, huella, "activada")
 
 
+def servicios_disponibles():
+    return (
+        _sin_llaves() is None
+        and str(settings.CENTRAL_URL).startswith("https://")
+        and instalacion().activada
+    )
+
+
 def _pedir_firmado(ruta, accion, datos, adjunto):
-    if _sin_llaves() is not None or not instalacion().activada:
+    if not servicios_disponibles():
         return 0, {}
     huella, privada = identidad()
     adicional = {"instalacion": huella}

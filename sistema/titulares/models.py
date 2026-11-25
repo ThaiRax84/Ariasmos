@@ -148,6 +148,8 @@ class Contacto(models.Model):
     relacion = models.ForeignKey(RelacionContacto, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     valores = models.JSONField(default=dict, blank=True)
     principal = models.BooleanField(default=False)
+    acepta_whatsapp = models.BooleanField(default=False)
+    baja_whatsapp = models.BooleanField(default=False)
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
 

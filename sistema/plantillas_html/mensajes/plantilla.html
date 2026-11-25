@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}{% if objeto %}Escribir «{{ objeto.nombre }}»{% else %}Mensaje nuevo{% endif %}{% endblock %}
+{% block cabeza %}<script src="{% static 'js/mensajes.js' %}" defer></script>{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Mensajes por WhatsApp</span>
+    <h1>{% if objeto %}Escribir «{{ objeto.nombre }}»{% else %}Mensaje nuevo{% endif %}</h1>
+  </div>
+</div>
+<div class="rejilla">
+  <form method="post" class="formulario" novalidate data-mensaje>
+    {% csrf_token %}
+    {% include "comun/_campos.html" %}
+    <div class="datos-mensaje">
+      <p class="ayuda">Toca un dato para ponerlo en el mensaje. Si no puedes tocarlos, escríbelos con corchetes, por ejemplo [nombre].</p>
+      <div class="atajos">{% for clave, etiqueta in botones %}<button class="boton chico secundario" type="button" data-variable="{{ clave }}">{{ etiqueta }}</button>{% endfor %}</div>
+    </div>
+    <p class="ayuda">Meta revisa cada mensaje nuevo antes de dejarlo usar. Suele tardar de minutos a un día.</p>
+    <div class="acciones">
+      <button class="boton" type="submit">Guardar y mandar a revisión</button>
+      <a class="boton secundario" href="{% url 'mensajes:panel' %}">Cancelar</a>
+    </div>
+  </form>
+  <section class="panel">
+    <h2>Así lo verá la persona</h2>
+    <p class="burbuja" data-vista-previa data-ejemplos="{{ ejemplos }}">{{ vista_previa }}</p>
+  </section>
+</div>
+{% endblock %}

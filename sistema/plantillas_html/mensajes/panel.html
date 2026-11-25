@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titulo %}Mensajes por WhatsApp{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración</span>
+    <h1>Mensajes por WhatsApp</h1>
+    <p class="subtitulo">Escribe los mensajes una vez. Ariasmos pone el nombre, el importe y la fecha de cada persona.</p>
+  </div>
+</div>
+{% if not estado.disponible %}
+<section class="panel calma">
+  <h2>WhatsApp todavía no está disponible</h2>
+  <p>Los mensajes salen por Ariasmos Central. Este equipo todavía no está conectado a Central, por eso no se pueden mandar mensajes. Pide a quien te dio el programa que termine la activación; mientras tanto todo lo demás funciona igual.</p>
+</section>
+{% elif not estado.conectado %}
+<div class="rejilla">
+  <section class="panel">
+    <h2>Conecta el WhatsApp de tu negocio</h2>
+    <p>La conexión la hace Ariasmos por ti. Pide que conecten el número de tu negocio y, cuando esté listo, aquí verás tu número y podrás escribir tus mensajes.</p>
+  </section>
+  <section class="panel">
+    <h2>Cuánto cuesta</h2>
+    <p>Los mensajes se cobran con tu plan. Pregunta a quien te dio el programa cuánto cuesta cada mensaje y cuál es tu tope al mes.</p>
+  </section>
+</div>
+{% else %}
+<div class="cifras">
+  <div class="cifra"><span class="etiqueta">Número conectado</span><span class="cifra-importe media">terminado en {{ estado.numero_final }}</span><span class="estado bien">Conectado</span></div>
+  <div class="cifra"><span class="etiqueta">Enviados este mes</span><span class="cifra-importe media">{{ estado.enviados_mes }} mensajes</span></div>
+  <div class="cifra">
+    <span class="etiqueta">Tope al mes</span><span class="cifra-importe media">{{ estado.tope }} mensajes</span>
+    <form method="post" action="{% url 'mensajes:tope' %}" class="atajos">{% csrf_token %}
+      <label class="ayuda" for="tope-nuevo">Nuevo tope (hasta {{ estado.tope_maximo }})</label>
+      <input id="tope-nuevo" type="number" name="tope" min="1" max="{{ estado.tope_maximo }}" value="{{ estado.tope }}" required>
+      <button class="boton chico secundario" type="submit">Cambiar tope</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+<section class="panel">
+  <div class="encabezado"><h2>Mensajes</h2><div class="encabezado-lado"><a class="boton secundario" href="{% url 'mensajes:plantilla_nueva' %}">Escribir un mensaje nuevo</a></div></div>
+  <table class="tabla">
+    <thead><tr><th>Mensaje</th><th>Texto</th><th>Estado</th><th></th></tr></thead>
+    <tbody>{% for p, texto in plantillas %}<tr>
+      <td class="fuerte">{{ p.nombre }}</td>
+      <td>{{ texto }}</td>
+      <td><span class="estado {{ p.estado }}">{{ p.get_estado_display }}</span>{% if p.motivo %}<br><small class="ayuda">{{ p.motivo }}</small>{% endif %}</td>
+      <td><a href="{% url 'mensajes:plantilla' p.clave %}">Editar</a></td>
+    </tr>{% empty %}<tr><td colspan="4">Todavía no hay mensajes escritos.</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}
