@@ -14,7 +14,7 @@ from .proveedores import FalloProveedor
 
 HORAS_DEL_DOCUMENTO = 2
 DIAS_DE_BAJAS = 30
-LIMITE_ADJUNTO = 1536 * 1024
+LIMITE_ADJUNTO = 1_500_000
 LARGO_VALOR = 200
 PATRON_CLAVE = re.compile(r"[a-z0-9_]{1,40}")
 PATRON_CLAVE_ENVIO = re.compile(r"[A-Za-z0-9_.:-]{1,64}")

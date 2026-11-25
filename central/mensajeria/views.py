@@ -14,7 +14,7 @@ from emision.models import Negocio
 from . import proveedores, servicios
 from .models import Documento, Mensaje, Remitente
 
-LIMITE_ENVIAR = 2560 * 1024
+LIMITE_ENVIAR = 2 * 1024 * 1024
 MAXIMO_DE_IDS = 100
 RESPUESTAS_VACIAS = {"Cache-Control": "no-store"}
 

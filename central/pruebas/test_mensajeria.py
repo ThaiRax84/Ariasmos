@@ -292,3 +292,36 @@ def test_twilio_firma_calculada_a_mano_y_peticion_armada(conectado, monkeypatch)
         == "SM1"
     )
     assert vistas[0].full_url == peticion.full_url
+
+
+def test_limites_exactos_de_tamano(conectado, equipo):
+    _aprobar(equipo)
+    grande = b"%PDF-" + b"0" * (1_550_000 - 5)
+    datos = {
+        "clave_envio": "g",
+        "plantilla": "recibo",
+        "destino": "+525587654321",
+        "valores": {"nombre": "a", "folio": "b"},
+        "adjunto_sha256": hashlib.sha256(grande).hexdigest(),
+    }
+    respuesta = equipo.pedir("/v1/mensajes/enviar", "mensajes_enviar", datos, grande)
+    assert (
+        respuesta.status_code in (400, 413)
+        and not Mensaje.objects.exists()
+        and simulado.ENVIADOS == []
+    )
+    relleno = json.dumps({"relleno": "x" * (2 * 1024 * 1024 + 10)})
+    assert (
+        Client()
+        .post("/v1/mensajes/enviar", relleno, content_type="application/json")
+        .status_code
+        == 413
+    )
+    relleno = json.dumps({"relleno": "x" * (16 * 1024 + 10)})
+    for ruta in ("estado", "plantilla", "tope", "consultar"):
+        assert (
+            Client()
+            .post(f"/v1/mensajes/{ruta}", relleno, content_type="application/json")
+            .status_code
+            == 413
+        )
