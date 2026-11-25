@@ -129,8 +129,41 @@ def test_la_cache_de_la_hoja_se_invalida_al_cambiar(personas, limpio):
     vieja = cliente(personas["op"]).get(reverse("marca_css") + f"?v={actual.version - 1}")
     assert vieja["Cache-Control"] == "no-store" and "#2B4A1F" in vieja.content.decode()
     marca.guardar_colores("", "", personas["dir"])
-    assert marca.hoja(marca.actual()).strip() == ":root {}"
-    assert "marca.css" not in cliente(personas["op"]).get(reverse("inicio")).content.decode()
+    assert marca.hoja(marca.actual()).strip() == ":root {\n  --barra: #9E431C;\n  --barra-texto: #FFFFFF;\n}"
+
+
+def _guardar_barra(c, **datos):
+    return c.post(reverse("configuracion:marca"), {"accion": "colores", "color_principal": "#1F1A4E", "color_acento": "#F58634", **datos})
+
+
+def test_barra_por_omision_cambia_y_vuelve_al_principal(personas, limpio):
+    c = cliente(personas["dir"])
+    assert "--barra: #9E431C;" in c.get(reverse("marca_css")).content.decode()
+    assert _guardar_barra(c).status_code == 302
+    assert "--barra: #1F1A4E;" in marca.hoja(marca.actual()) and "--barra-texto: #FFFFFF;" in marca.hoja(marca.actual())
+    assert _guardar_barra(c, barra="otro", color_barra="#f8e16c").status_code == 302
+    assert MarcaNegocio.objects.get().color_barra == "#F8E16C"
+    hoja = c.get(reverse("marca_css") + f"?v={MarcaNegocio.objects.get().version}").content.decode()
+    assert "--barra: #F8E16C;" in hoja and "--barra-texto: #1F1813;" in hoja
+    assert Evento.objects.filter(accion="marca_cambiada").latest("numero").datos["despues"]["color_barra"] == "#F8E16C"
+    assert 'class="barra clara"' in c.get(reverse("inicio")).content.decode()
+    assert _guardar_barra(c, barra="principal", color_barra="#F8E16C").status_code == 302
+    assert MarcaNegocio.objects.get().color_barra == ""
+
+
+def test_color_de_barra_invalido_no_guarda_nada(personas, limpio):
+    c = cliente(personas["dir"])
+    por_omision = c.get(reverse("marca_css")).content.decode()
+    for malo in ("red;}body{display:none}", "#12345", "#1234567", "url(x)", "#FFF", "#F8E16C\n}"):
+        assert _guardar_barra(c, barra="otro", color_barra=malo).status_code == 200
+        assert not MarcaNegocio.objects.exclude(color_barra="", color_principal="").exists()
+        assert c.get(reverse("marca_css")).content.decode() == por_omision
+
+
+def test_operacion_no_cambia_la_barra_ni_por_post(personas, limpio):
+    respuesta = _guardar_barra(cliente(personas["op"]), barra="otro", color_barra="#F8E16C")
+    assert respuesta.status_code == 403
+    assert not MarcaNegocio.objects.exclude(color_barra="").exists()
 
 
 def test_los_colores_van_juntos(personas, limpio):

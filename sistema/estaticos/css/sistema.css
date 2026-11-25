@@ -11,6 +11,8 @@
   --tinta: #1F1813;
   --suave: #5C5047;
   --primario: #9E431C;
+  --barra: var(--primario);
+  --barra-texto: #FFFFFF;
   --acento: #C4662E;
   --franja: #14100D;
   --borde: #E2D6C6;
@@ -53,7 +55,7 @@ code { font-size: .95em; }
 .saltar:focus { top: 12px; color: #fff; }
 
 .franja { height: 6px; background: var(--franja); }
-.barra { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--borde); padding: 12px 32px; display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; view-transition-name: barra; }
+.barra { position: sticky; top: 0; z-index: 20; background: var(--barra); color: var(--barra-texto); padding: 12px 32px; display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; view-transition-name: barra; }
 .marcas { display: flex; align-items: center; gap: 20px; text-decoration: none; color: var(--tinta); }
 .marca-ariasmos { display: flex; align-items: center; gap: 12px; }
 .medallon { display: block; width: 46px; height: 46px; border-radius: 50%; box-shadow: 0 0 0 2px var(--terracota); }
@@ -78,6 +80,23 @@ code { font-size: .95em; }
 .sesion { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--suave); }
 .sesion form { margin: 0; }
 .sesion a, .sesion button.enlace { font-size: 13px; font-weight: 700; color: var(--tinta); }
+
+.barra { --b-linea: color-mix(in srgb, var(--barra-texto) 28%, transparent); --b-menu: color-mix(in srgb, var(--barra-texto) 84%, transparent); --b-pasa: color-mix(in srgb, var(--barra-texto) 13%, transparent); --b-control: color-mix(in srgb, var(--barra-texto) 8%, transparent); --b-control-pasa: color-mix(in srgb, var(--barra-texto) 16%, transparent); --b-borde: color-mix(in srgb, var(--barra-texto) 32%, transparent); --b-kbd: color-mix(in srgb, var(--barra-texto) 38%, transparent); --b-aro: var(--acento); --b-activo-fondo: #fff; --b-activo-texto: var(--barra); --b-globo-fondo: #fff; --b-globo-texto: var(--barra); }
+.barra.clara { --b-linea: color-mix(in srgb, var(--barra-texto) 30%, transparent); --b-pasa: color-mix(in srgb, var(--barra-texto) 10%, transparent); --b-control: rgba(255, 255, 255, .22); --b-control-pasa: rgba(255, 255, 255, .4); --b-borde: color-mix(in srgb, var(--barra-texto) 35%, transparent); --b-aro: #fff; --b-activo-fondo: var(--barra-texto); --b-activo-texto: #fff; --b-globo-fondo: var(--barra-texto); --b-globo-texto: #fff; }
+.barra .marcas, .barra .nombre-ariasmos, .barra .nombre-negocio, .barra .instalacion-titulo, .barra .instalacion-paso, .barra .sesion { color: var(--barra-texto); }
+.barra .medallon { box-shadow: 0 0 0 2px var(--b-aro); }
+.barra .separador-marcas { background: var(--b-linea); }
+.barra .logo-negocio { box-sizing: content-box; background: #fff; padding: 4px; border-radius: 12px; box-shadow: 0 1px 4px rgba(20, 16, 13, .28); }
+.barra .menu > a, .barra .menu-mas > summary { color: var(--b-menu); }
+.barra .menu > a:hover, .barra .menu-mas > summary:hover { background: var(--b-pasa); color: var(--barra-texto); }
+.barra .menu > a[aria-current="page"], .barra .menu-mas.activo > summary { background: var(--b-activo-fondo); color: var(--b-activo-texto); }
+.barra .flecha, .barra .ir-a, .barra .campana { background: var(--b-control); border-color: var(--b-borde); color: var(--barra-texto); }
+.barra .flecha:hover:not(:disabled), .barra .ir-a:hover, .barra .campana:hover { background: var(--b-control-pasa); border-color: var(--barra-texto); color: var(--barra-texto); }
+.barra .flecha:active:not(:disabled) { background: var(--b-control-pasa); }
+.barra kbd { background: transparent; border-color: var(--b-kbd); color: inherit; }
+.barra .globo { background: var(--b-globo-fondo); color: var(--b-globo-texto); }
+.barra .sesion > a, .barra .sesion > form .enlace { color: var(--barra-texto); }
+.barra .marcas:focus-visible, .barra .menu > a:focus-visible, .barra .menu-mas > summary:focus-visible, .barra .flecha:focus-visible, .barra .ir-a:focus-visible, .barra .campana:focus-visible, .barra .sesion > a:focus-visible, .barra .sesion > form .enlace:focus-visible { outline-color: var(--barra-texto); }
 
 .contenido { max-width: 1184px; margin: 0 auto; padding: 32px; display: flex; flex-direction: column; gap: 24px; view-transition-name: contenido; }
 .contenido > h1 { margin-top: 4px; }
