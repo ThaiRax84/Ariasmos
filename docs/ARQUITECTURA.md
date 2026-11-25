@@ -599,6 +599,8 @@ Sacar efectivo de la caja para un gasto del negocio. Operación los hace sin esp
 
 Ocho pasos. El nuevo paso 5, «Caja: cortes y retiros», pide el calendario de cortes (§15.1), si se capturan piezas por denominación (§15.2) y los topes de retiros (§15.3). El paso 6, «Entrega y respaldo», conserva las carpetas, los niveles de detalle y la clave de recuperación, y agrega la carpeta vigilada del banco (§15.5). Las plantillas y su esquema incluyen los valores nuevos.
 
+El avance del asistente vive en la tabla `AvanceAsistente` (una sola fila) y no en la sesión: la cookie de sesión muere al cerrar la ventana o al reiniciar el componente web, y con ella se perdía todo. El equipo que escribe el token queda ligado a la fila y es el único autorizado; el secreto del autenticador se guarda cifrado con la clave de secretos y la fila se borra al terminar. Volver a pasar por el primer paso con la misma plantilla no la vuelve a cargar, para no pisar lo ya personalizado.
+
 ## 16. Versión 0.17: inventario (opcional, fase 6a)
 
 Pensado para inventarios pequeños. Se enciende con el parámetro `modulo_inventario` (asistente, paso 1, o Configuración). Apagado, nada de este apartado aparece. Nada de aquí cambia `nucleo/`.

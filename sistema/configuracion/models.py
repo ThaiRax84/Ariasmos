@@ -319,3 +319,18 @@ class MarcaNegocio(models.Model):
     @property
     def con_colores(self):
         return bool(self.color_principal and self.color_acento)
+
+
+class AvanceAsistente(models.Model):
+    dispositivo = models.ForeignKey("cuentas.Dispositivo", null=True, blank=True, on_delete=models.SET_NULL, related_name="avance")
+    paso = models.CharField(max_length=20)
+    estado = models.JSONField(default=dict)
+    secreto_cifrado = models.TextField(blank=True)
+    plantilla_aplicada = models.BooleanField(default=False)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=Q(id=1), name="avance_asistente_unico")]
+
+    def __str__(self):
+        return "Avance del asistente"

@@ -14,7 +14,7 @@ from cobros.formularios import FormularioRegla
 from cobros.models import Pago, ReglaRecargo
 from configuracion import zonas
 from configuracion.formularios import FormularioReglas
-from configuracion.models import Negocio, Parametro, Vocabulario, parametro
+from configuracion.models import AvanceAsistente, Negocio, Parametro, Vocabulario, parametro
 from cuentas.models import PreferenciaOrden
 from proyecto import orden as ordenes
 from titulares.models import Titular
@@ -288,10 +288,10 @@ def test_asistente_atras_no_pierde_lo_capturado_y_pliega_lo_avanzado():
     assert parametro("prefijo_pais_telefono") == 52
     vuelta = c.get(reverse("asistente:reglas")).content.decode()
     assert 'name="prefijo_pais_telefono" value="57"' in vuelta and re.search(r'value="a4"[^>]*checked', vuelta)
-    assert "no-se-guarda" not in str(c.session["asistente"])
+    assert "no-se-guarda" not in str(AvanceAsistente.objects.get().estado)
     assert c.post(reverse("asistente:reglas"), {"prefijo_pais_telefono": "57", "digitos_telefono_nacional": "10", "tamano_hoja": "a4", "texto_consentimiento": ""}).url == reverse("asistente:cortes")
     assert parametro("prefijo_pais_telefono") == 57
-    assert "reglas" not in (c.session["asistente"].get("borradores") or {})
+    assert "reglas" not in (AvanceAsistente.objects.get().estado.get("borradores") or {})
     assert 'name="prefijo_pais_telefono" value="57"' in c.get(reverse("asistente:reglas")).content.decode()
 
 

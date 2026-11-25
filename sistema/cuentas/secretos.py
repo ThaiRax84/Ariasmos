@@ -3,6 +3,9 @@ from django.conf import settings
 from nucleo import sobre
 
 
+CONTEXTO_ASISTENTE = "totp|asistente"
+
+
 def _clave():
     return sobre.derivar(bytes(settings.CLAVE_SECRETOS), "totp")
 
@@ -11,8 +14,20 @@ def _contexto(usuario):
     return f"totp|{usuario.pk}"
 
 
+def _sellar(contexto, secreto):
+    return sobre.cifrar_texto(_clave(), secreto, contexto) if secreto else ""
+
+
 def cifrar(usuario, secreto):
-    return sobre.cifrar_texto(_clave(), secreto, _contexto(usuario)) if secreto else ""
+    return _sellar(_contexto(usuario), secreto)
+
+
+def cifrar_del_asistente(secreto):
+    return _sellar(CONTEXTO_ASISTENTE, secreto)
+
+
+def leer_del_asistente(ficha):
+    return sobre.descifrar_texto(_clave(), ficha, CONTEXTO_ASISTENTE) if ficha else ""
 
 
 def guardar(usuario, secreto):

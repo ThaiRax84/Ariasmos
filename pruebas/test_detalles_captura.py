@@ -224,12 +224,12 @@ def test_pantalla_del_codigo_al_entrar_explica_el_autenticador(personas):
 
 @pytest.mark.django_db
 def test_asistente_paso_del_autenticador_con_qr_y_sin_qr_al_terminar():
-    from .test_asistente import paso_inicio
+    from .test_asistente import paso_inicio, secreto_del_asistente
 
     c = Client()
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE))
     c.post(reverse("asistente:usuario"), {"usuario": "jefa", "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
-    secreto = c.session["asistente"]["secreto"]
+    secreto = secreto_del_asistente()
     pagina = c.get(reverse("asistente:codigo")).content.decode()
     assert "Google Authenticator" in pagina and agrupar(secreto) in pagina and "Mi negocio: jefa" in pagina
     svg = re.search(r"<svg.*?</svg>", pagina, re.S).group(0)
