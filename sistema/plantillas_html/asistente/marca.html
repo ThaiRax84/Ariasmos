@@ -17,6 +17,7 @@
   {% if propuesta %}<p class="mensaje info">Colores tomados del logo. Acéptalos o escribe otros.</p>{% endif %}
   <form method="post" class="formulario" novalidate>
     {% csrf_token %}
+    <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">{% if propuesta %}Usar estos colores y continuar{% else %}Continuar{% endif %}</button>
     <input type="hidden" name="accion" value="colores">
     {% include "comun/_campos.html" with formulario=colores %}
     {% if vista %}{% include "comun/_vista_marca.html" %}{% endif %}

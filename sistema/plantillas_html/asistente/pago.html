@@ -3,6 +3,7 @@
 <p class="ayuda">Con CLABE, el banco se reconoce por sus tres primeros dígitos; si tu cuenta no tiene CLABE, elige «Otra cuenta».</p>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
+  <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Guardar y continuar</button>
   {% include "comun/_campos.html" %}
   <div class="acciones">
     {% include "asistente/_atras.html" %}

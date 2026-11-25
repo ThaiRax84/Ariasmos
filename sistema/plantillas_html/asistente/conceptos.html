@@ -2,6 +2,7 @@
 {% block asistente %}
 <form method="post" class="pila" novalidate>
   {% csrf_token %}
+  <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Continuar</button>
   {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
   {% for grupo in formulario.grupos %}
   <section class="panel concepto-asistente">
