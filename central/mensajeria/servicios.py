@@ -15,7 +15,6 @@ from .models import (
     Baja,
     Cuota,
     Documento,
-    Entrante,
     Mensaje,
     Plantilla,
     Remitente,
@@ -242,21 +241,17 @@ def _entregar_al_proveedor(remitente, mensaje, plantilla, destino, datos):
     return _respuesta("aceptado", mensaje.pk)
 
 
-def _repetido(instalacion, datos, destino):
+def _repetido(instalacion, datos):
     previo = (
         Mensaje.objects.filter(
             negocio=instalacion.negocio,
             instalacion=instalacion,
             clave_envio=datos["clave_envio"],
         )
-        .values("pk", "destino_resumen")
+        .values_list("pk", flat=True)
         .first()
     )
-    if previo is None:
-        return None
-    if previo["destino_resumen"] != secretos.resumen_de_numero(destino):
-        raise DatosInvalidos("clave_reusada")
-    return _respuesta("repetido", previo["pk"])
+    return None if previo is None else _respuesta("repetido", previo)
 
 
 def enviar(instalacion, datos, adjunto):
@@ -266,7 +261,7 @@ def enviar(instalacion, datos, adjunto):
     if remitente is None:
         return _respuesta("sin_conexion")
     destino = secretos.normalizar_numero(datos["destino"])
-    if (repetido := _repetido(instalacion, datos, destino)) is not None:
+    if (repetido := _repetido(instalacion, datos)) is not None:
         return repetido
     plantilla = Plantilla.objects.filter(
         negocio=negocio, clave=datos["plantilla"], estado=Plantilla.APROBADA
@@ -284,7 +279,7 @@ def enviar(instalacion, datos, adjunto):
     try:
         mensaje = _registrar(instalacion, plantilla, datos, destino, adjunto)
     except IntegrityError:
-        return _repetido(instalacion, datos, destino)
+        return _repetido(instalacion, datos)
     if mensaje is None:
         return _respuesta("tope")
     return _entregar_al_proveedor(remitente, mensaje, plantilla, destino, datos)
@@ -335,20 +330,9 @@ def _palabra(cuerpo):
     return "".join(c for c in sin_acentos if not unicodedata.combining(c))
 
 
-def _es_repetido(negocio, sid):
-    if not sid:
-        return False
-    try:
-        with transaction.atomic():
-            Entrante.objects.create(negocio=negocio, sid=sid[:64])
-    except IntegrityError:
-        return True
-    return False
-
-
-def aplicar_entrante(negocio, origen, cuerpo, sid=""):
+def aplicar_entrante(negocio, origen, cuerpo):
     numero = secretos.normalizar_numero(origen.removeprefix("whatsapp:"))
-    if PATRON_DESTINO.fullmatch(numero) is None or _es_repetido(negocio, sid):
+    if PATRON_DESTINO.fullmatch(numero) is None:
         return
     resumen = secretos.resumen_de_numero(numero)
     palabra = _palabra(cuerpo)

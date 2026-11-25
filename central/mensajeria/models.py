@@ -138,14 +138,9 @@ class Cuota(models.Model):
     tope = models.PositiveIntegerField(default=TOPE_POR_OMISION)
 
 
-class Entrante(models.Model):
-    negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE)
-    sid = models.CharField(max_length=64)
-    momento = models.DateTimeField(default=_ahora, db_index=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["negocio", "sid"], name="entrante_unico_por_negocio"
-            )
-        ]
+class Meta:
+    constraints = [
+        models.UniqueConstraint(
+            fields=["negocio", "sid"], name="entrante_unico_por_negocio"
+        )
+    ]

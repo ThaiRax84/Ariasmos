@@ -210,5 +210,4 @@ def entrante_twilio(request, identificador):
         negocio,
         request.POST.get("From", ""),
         request.POST.get("Body", ""),
-        request.POST.get("MessageSid") or request.POST.get("SmsSid", ""),
     )

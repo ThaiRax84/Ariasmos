@@ -327,7 +327,7 @@ def test_limites_exactos_de_tamano(conectado, equipo):
         )
 
 
-def test_numero_normalizado_clave_por_instalacion_y_destino_distinto(conectado, equipo):
+def test_numero_normalizado_clave_por_instalacion_y_alta(conectado, equipo):
     _aprobar(equipo)
     conectado.instalaciones_permitidas = 2
     conectado.save()
@@ -336,12 +336,12 @@ def test_numero_normalizado_clave_por_instalacion_y_destino_distinto(conectado, 
     assert _enviar(equipo, destino="+5215587654321").json()["resultado"] == "aceptado"
     assert simulado.ENVIADOS[0]["destino"] == "+525587654321"
     assert _enviar(equipo, destino="+525587654321").json()["resultado"] == "repetido"
-    assert _enviar(equipo, destino="+525500000000").status_code == 400
+    assert _enviar(equipo, destino="+525500000000").json()["resultado"] == "repetido"
     propio = _enviar(otro).json()
     assert propio["resultado"] == "aceptado" and len(simulado.ENVIADOS) == 2
     Client().post(
         f"/v1/twilio/entrante/{conectado.pk}",
-        {"From": "whatsapp:+5215587654321", "Body": "BAJA", "MessageSid": "SM9"},
+        {"From": "whatsapp:+5215587654321", "Body": "BAJA"},
         **firmado,
     )
     suyo = Mensaje.objects.get(instalacion__huella=equipo.huella).pk
@@ -357,7 +357,7 @@ def test_numero_normalizado_clave_por_instalacion_y_destino_distinto(conectado, 
     )
     Client().post(
         f"/v1/twilio/entrante/{conectado.pk}",
-        {"From": "whatsapp:+525587654321", "Body": " álta ", "MessageSid": "SM10"},
+        {"From": "whatsapp:+525587654321", "Body": " álta "},
         **firmado,
     )
     consultado = equipo.pedir(
@@ -366,18 +366,14 @@ def test_numero_normalizado_clave_por_instalacion_y_destino_distinto(conectado, 
     assert not Baja.objects.exists() and consultado["altas"] == ["recibo-1-1"]
 
 
-def test_entrante_repetido_y_secreto_ilegible_no_cambian_nada(
+def test_secreto_ilegible_da_el_mismo_403_que_la_firma_mala(
     conectado, equipo, settings
 ):
     firmado = {"HTTP_X_TWILIO_SIGNATURE": simulado.FIRMA}
     ruta = f"/v1/twilio/entrante/{conectado.pk}"
-    baja = {"From": "whatsapp:+525587654321", "Body": "BAJA", "MessageSid": "SM1"}
-    assert Client().post(ruta, baja, **firmado).status_code == 200
-    Baja.objects.all().delete()
-    assert Client().post(ruta, baja, **firmado).status_code == 200
-    assert not Baja.objects.exists()
+    baja = {"From": "whatsapp:+525587654321", "Body": "BAJA"}
     Remitente.objects.update(token_cifrado="ilegible")
     settings.PROVEEDOR_MENSAJES = "twilio"
-    ilegible = Client().post(ruta, {**baja, "MessageSid": "SM2"}, **firmado)
+    ilegible = Client().post(ruta, baja, **firmado)
     assert ilegible.status_code == 403
     assert ilegible.content == Client().post(ruta, baja).content
