@@ -35,7 +35,7 @@ def buscar_dispositivo(credencial):
 
 def depurar_pendientes():
     limite = timezone.now() - timedelta(hours=24)
-    return Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE, creado__lt=limite).delete()[0]
+    return Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE, creado__lt=limite, avance__isnull=True).delete()[0]
 
 
 def hay_cupo_pendientes():

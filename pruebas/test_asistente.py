@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 import re
 
 import pytest
@@ -6,12 +7,14 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from banco.models import CuentaBancaria
 from cobros.models import ConceptoCobro
 from cuentas.qr import agrupar
-from configuracion.models import Negocio, parametro, vocabulario
+from configuracion.models import AvanceAsistente, Negocio, parametro, vocabulario
 from cortes import calendario
+from cuentas import secretos, servicios
 from cuentas.models import Dispositivo, Usuario
 from nucleo import totp
 
@@ -27,10 +30,14 @@ def paso_inicio(token, plantilla="escuela", archivo=None):
     return datos
 
 
+def secreto_del_asistente():
+    return secretos.leer_del_asistente(AvanceAsistente.objects.get().secreto_cifrado)
+
+
 def terminar(c, usuario="jefa"):
     respuesta = c.post(reverse("asistente:usuario"), {"usuario": usuario, "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
     assert respuesta.url == reverse("asistente:codigo")
-    secreto = c.session["asistente"]["secreto"]
+    secreto = secreto_del_asistente()
     assert agrupar(secreto) in c.get(reverse("asistente:codigo")).content.decode()
     return c.post(reverse("asistente:codigo"), {"codigo": totp.codigo(secreto, totp.paso_actual())})
 
@@ -152,3 +159,66 @@ def test_enter_en_cada_formulario_del_asistente_hace_la_accion_principal():
     c.post(reverse("asistente:usuario"), {"usuario": "jefa", "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
     pagina = c.get(reverse("asistente:codigo")).content.decode()
     assert re.search(r"<form.*?envio-por-omision.*?name=\"atras\"", pagina, re.S)
+
+
+@pytest.mark.django_db
+def test_otra_plantilla_en_inicio_se_aplica_y_la_misma_no_pisa_lo_personalizado():
+    c = Client()
+    c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
+    c.post(reverse("asistente:personalizar"), {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas"})
+    c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
+    assert c.get(reverse("asistente:conceptos")).status_code == 200
+    c.cookies.clear()
+    assert c.get(reverse("asistente:conceptos")).url == reverse("asistente:inicio")
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico")).url == reverse("asistente:conceptos")
+    assert vocabulario()["titular"] == "Socio"
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:personalizar")
+    assert vocabulario()["titular"] == "Alumno" and AvanceAsistente.objects.get().paso == "personalizar"
+
+
+@pytest.mark.django_db
+def test_sin_sesion_el_secreto_sigue_igual_cifrado_y_al_terminar_no_queda_avance():
+    c = Client()
+    c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
+    c.post(reverse("asistente:usuario"), {"usuario": "jefa", "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    secreto = secreto_del_asistente()
+    assert secreto not in AvanceAsistente.objects.get().secreto_cifrado and secreto not in str(AvanceAsistente.objects.values())
+    c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
+    assert agrupar(secreto) in c.get(reverse("asistente:codigo")).content.decode()
+    assert c.post(reverse("asistente:codigo"), {"codigo": totp.codigo(secreto, totp.paso_actual())}).url == reverse("primeros_pasos")
+    assert not AvanceAsistente.objects.exists() and c.get(reverse("asistente:inicio")).status_code == 404
+
+
+@pytest.mark.django_db
+def test_depurar_pendientes_conserva_el_equipo_que_instala():
+    c = Client()
+    c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
+    otro = Dispositivo.objects.create(hash_credencial="x" * 64, codigo="ABC123")
+    Dispositivo.objects.update(creado=timezone.now() - timedelta(days=3))
+    assert servicios.depurar_pendientes() == 1
+    assert not Dispositivo.objects.filter(pk=otro.pk).exists() and AvanceAsistente.objects.get().dispositivo_id is not None
+
+
+def subir_importada(c, contenido):
+    archivo = SimpleUploadedFile("mia.json", contenido, content_type="application/json")
+    return c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "importar", archivo))
+
+
+@pytest.mark.django_db
+def test_importada_se_reanuda_con_el_mismo_archivo_y_otra_plantilla_retira_al_usuario_sin_autenticador():
+    with open(settings.PLANTILLAS_NEGOCIO / "generico.json", encoding="utf-8") as archivo:
+        datos = json.load(archivo)
+    contenido = json.dumps(dict(datos, nombre="Gimnasio")).encode("utf-8")
+    c = Client()
+    subir_importada(c, contenido)
+    c.post(reverse("asistente:revisar"), {})
+    c.post(reverse("asistente:usuario"), {"usuario": "jefa", "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    secreto = secreto_del_asistente()
+    c.get(reverse("asistente:codigo"))
+    c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
+    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:codigo")
+    assert subir_importada(c, contenido).url == reverse("asistente:codigo")
+    assert secreto_del_asistente() == secreto
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:personalizar")
+    assert not Usuario.objects.filter(usuario="jefa").exists() and AvanceAsistente.objects.get().secreto_cifrado == ""
+    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:personalizar")
