@@ -1392,3 +1392,12 @@ Los niveles bajos no ven cuánto entra salvo que un nivel superior se lo conceda
 - No hay tablas, pantallas ni rutas nuevas. Totales, cortes, custodia, retiros e importaciones siguen protegidos por sus permisos de siempre.
 - **Vuelta 1.** Sin el permiso, el recibo, su PDF y la reversión solo sirven para pagos que registró la propia persona (la verificación por código no cambia). La lista, el detalle y las acciones de importaciones del banco exigen `ver_ingresos`, y la pantalla de topes no muestra lo aplicado. `ver_ingresos` solo se presta por días, nunca solo por usos, y la migración inversa retira también sus delegaciones. El buscador y el tablero no ofrecen enlaces a la cola sin el permiso. El historial de pagos de un cliente no cambia.
 - **Enter hace la acción principal.** En todo formulario con más de un botón de envío, el primero del documento es la acción principal (un botón `.envio-por-omision`, fuera de la vista, justo después del token), nunca «Atrás» ni «Omitir por ahora»; así Enter en un campo no regresa ni salta un paso. El asistente conserva el secreto del autenticador al ir y venir con la misma persona.
+
+## Versión 1.0: barra superior de un color configurable (fase 15)
+
+La barra deja de ser blanca y toma `--barra`, por omisión el color principal del negocio.
+
+- **Dato.** `MarcaNegocio.color_barra` (`#RRGGBB` o vacío, restricción `marca_color_barra`, migración `configuracion/0018`). Vacío significa usar el principal.
+- **Hoja.** `marca.barra(marca)` decide el color y el texto (blanco con contraste de 4.5:1 o más, si no `#1F1813`) con `contraste`. `/marca.css` publica siempre `--barra` y `--barra-texto`, también sin marca, por lo que `base.html` la enlaza a toda sesión iniciada. La caché sigue ligada a `version`, que sube con cada cambio.
+- **Tono.** El servidor pone la clase `clara` en `<header class="barra">` (variable `barra_clara` del contexto); las reglas usan solo variables, sin estilos en línea. El asistente de instalación no tiene sesión y usa el color de fábrica.
+- **Pantalla de Marca.** La pregunta `barra` (`principal` u `otro`) y `color_barra` viajan en la misma acción `colores`; `color_barra` solo aplica con `otro` (dependencia de formulario) y se guarda vacío con `principal`. Un valor inválido rechaza todo el formulario. La bitácora guarda antes y después de los tres colores.

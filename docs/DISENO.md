@@ -35,11 +35,12 @@ Todos los colores son variables CSS. Hay dos juegos; la estructura es la misma.
 | `--bien-fondo` / `--bien-texto` | `#E1EEDD` / `#2F5A2A` | `#DDF3E4` / `#1B5E3A` |
 | Tarjetas | `#FFFFFF` | `#FFFFFF` |
 
-**Marca del negocio (configurable por Dirección):** logo y dos colores, principal y acento.
+**Marca del negocio (configurable por Dirección):** logo, dos colores (principal y acento) y, si se quiere, un tercero para la barra superior.
 
 - Los colores se guardan solo como `#RRGGBB` validado con expresión exacta; cualquier otra cosa se rechaza. Nunca se escriben en una hoja de estilos sin validar.
 - De esos dos colores se derivan `--primario`, `--acento`, `--franja`, `--tinte` (acento al 15 % sobre blanco), `--borde` y `--fondo` (acento al 6 % sobre blanco). `--tinta` es el principal si su contraste con blanco es de 7:1 o más; si no, la tinta de Ariasmos.
 - Si el texto blanco sobre el color principal no alcanza contraste 4.5:1, los botones principales usan la tinta como fondo. El cálculo de contraste va en un módulo propio con pruebas.
+- **Color de la barra superior:** por omisión es el color principal («El color principal de mi marca»); «Otro color» guarda `color_barra` (`#RRGGBB` validado igual que los otros, vacío = el principal). `/marca.css` publica siempre `--barra` y `--barra-texto`, también sin marca (con el `#9E431C` de Ariasmos). El texto es blanco si su contraste con la barra es de 4.5:1 o más; si no, `#1F1813`.
 - La hoja con las variables del negocio se sirve como archivo CSS desde una vista (`/marca.css`), con caché que se invalida al cambiar la marca. No hay estilos en línea.
 - **Logo:** solo JPEG o PNG, hasta 1 MB; pasa por el mismo módulo seguro de imágenes de los comprobantes (tipo por contenido, se reconstruye solo con píxeles); se guarda fuera de lo servido directamente y se entrega por una vista con `nosniff`. Sin logo, se muestra solo el nombre del negocio.
 - Las plantillas de negocio no llevan logo ni colores.
@@ -54,7 +55,7 @@ Todos los colores son variables CSS. Hay dos juegos; la estructura es la misma.
 ## 5. Estructura
 
 - **Franja** de 6 px del color `--franja` arriba de todo.
-- **Barra superior** blanca, fija: flechas **Atrás** y **Adelante** · marca Ariasmos · separador · logo y nombre del negocio · menú · a la derecha, el contexto de la sesión (rol, caja y turno, o el nombre) con «Contraseña» y «Salir».
+- **Barra superior** de un solo color (`--barra`), fija; la franja de 6 px no cambia. Oscura (texto blanco) o clara (clase `clara`, texto `#1F1813`) según el contraste. Menú en el texto al 84 %, entrada activa en pastilla invertida, controles (flechas, «Buscar o ir a…», campana) con fondo y borde translúcidos del color del texto, medallón con anillo `--acento` (blanco si la barra es clara). El logo del negocio va sobre una placa blanca de esquinas de 12 px, relleno de 4 px y sombra suave, sin cambiar de tamaño. Contiene: flechas **Atrás** y **Adelante** · marca Ariasmos · separador · logo y nombre del negocio · menú · a la derecha, el contexto de la sesión (rol, caja y turno, o el nombre) con «Contraseña» y «Salir».
 - **Atrás y adelante:** dos botones redondos de 44 px (pastilla, borde 2 px `--borde`, fondo blanco, flecha dibujada con CSS en `--tinta`); al pasar el cursor, borde y flecha `--primario` sobre `--tinte`; al enfocar, el anillo de 3 px `--acento`; **apagados** (35 % de opacidad, sin cursor de mano) cuando no hay a dónde ir. También Alt + ← / → y los botones laterales del ratón. Viven en la página, igual en todas las pantallas.
 - **Menú:** pastillas; la activa con fondo `--primario` y texto blanco. A lo más siete entradas visibles según permisos, en este orden de prioridad: Inicio, Cobrar, Padrón (con el vocabulario del negocio), Inventario (si está encendido), Mi caja, Banco, Efectivo, Solicitudes, Cortes. Lo demás (Familias, Conceptos, Delegaciones, Equipos, Usuarios, Roles, Políticas, Configuración, Respaldos, Auditoría) va en un menú **«Más»** desplegable, accesible con teclado. Ninguna entrada actual desaparece: solo se reordena.
 - **Contenido:** ancho máximo de 1120 px centrado, relleno de 32 px, separación de 24 px entre bloques.
