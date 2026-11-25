@@ -515,7 +515,9 @@ def usuario(request):
                 else:
                     nuevo = Usuario.objects.create_user(datos["usuario"], datos["contrasena1"], nombre=datos["nombre"], rol=rol)
                 registrar("usuario_creado", objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": rol.pk, "origen": "asistente"}, request=request)
-            _guardar_estado(request, usuario=nuevo.pk, secreto=totp.generar_secreto())
+            previo = _estado(request)
+            conserva = previo.get("usuario") == nuevo.pk and previo.get("secreto")
+            _guardar_estado(request, usuario=nuevo.pk, secreto=previo["secreto"] if conserva else totp.generar_secreto())
             return redirect("asistente:codigo")
     rol = _estado(request).get("rol_inicial") or ""
     return _paso(request, "asistente/paso.html", formulario, PASO["usuario"], f"Primer usuario ({rol})" if rol else "Primer usuario")
