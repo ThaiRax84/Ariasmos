@@ -198,6 +198,9 @@ def test_recibo_lleva_la_marca_del_negocio_y_ariasmos_al_pie(personas, limpio):
     from cobros.models import Pago, Recibo
     from cobros import libro
 
+    from cuentas.models import PermisoRol
+
+    PermisoRol.objects.get_or_create(rol=personas["op"].rol, permiso="ver_ingresos")
     preparar_conceptos()
     ana = titular_activo(personas["op"], personas["sup"], "Ana")
     marca.guardar_logo(png(), personas["dir"])

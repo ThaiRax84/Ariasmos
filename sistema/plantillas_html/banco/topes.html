@@ -7,10 +7,10 @@
     <h1>Topes para aplicar pagos solos</h1>
   </div>
 </div>
-<div class="cifras">
+{% if uso %}<div class="cifras">
   <div class="cifra{% if uso.aplicado_hoy >= uso.tope_hoy %} aviso{% endif %}"><span class="etiqueta">Aplicado solo hoy ({{ nombre_hoy|lower }})</span><span class="numero">{{ uso.aplicado_hoy|dinero }}</span><span class="detalle">de un tope del día de {{ uso.tope_hoy|dinero }}</span></div>
   <div class="cifra{% if uso.acumulado >= uso.tope_acumulado %} aviso{% endif %}"><span class="etiqueta">Acumulado sin respaldo de un estado</span><span class="numero">{{ uso.acumulado|dinero }}</span><span class="detalle">de un tope acumulado de {{ uso.tope_acumulado|dinero }}</span></div>
-</div>
+</div>{% endif %}
 <p class="ayuda">Un Excel o CSV que llega por la carpeta vigilada aplica sus pagos solo mientras no rebase ninguno de los dos topes. El del día se cuenta pago por pago, en el orden del archivo, sobre lo que se aplica solo ese día; el que no cabe queda retenido y se sigue con el siguiente. El acumulado cuenta lo aplicado desde archivos editables que todavía no respalda un estado en PDF; si un archivo lo rebasaría, se retiene completo. Lo que liberas a mano no gasta el tope del día. Con un tope en 0 se retiene todo.</p>
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}

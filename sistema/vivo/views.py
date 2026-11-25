@@ -56,7 +56,7 @@ def ultimo(request):
 
 def pagos_recientes(usuario, cuantos):
     from cobros.models import Pago
-    from rezagos.presentacion import ve_saldos
+    from cuentas.permisos import ve_ingresos
 
     consulta = Pago.objects.select_related("titular", "recibo").prefetch_related("aplicaciones__cargo__concepto").order_by("-fecha", "-id")
     if usuario.tiene_permiso("ver_titulares"):
@@ -68,8 +68,8 @@ def pagos_recientes(usuario, cuantos):
     from caja.servicios import turno_abierto
 
     ciego = usuario.tiene_permiso("turno_caja") and turno_abierto(usuario) is not None
-    saldos = ve_saldos(usuario)
+    ve_todo = ve_ingresos(usuario)
     for pago in pagos:
-        pago.ve_importe = not ciego and (saldos or pago.registrado_por_id == usuario.pk)
+        pago.ve_importe = not ciego and (ve_todo or pago.registrado_por_id == usuario.pk)
         pago.conceptos = " + ".join(str(a.cargo) for a in pago.aplicaciones.all()[:3])
     return pagos

@@ -14,6 +14,7 @@ PERMISOS = {
     "conciliar_banco": "Importar banco y conciliar",
     "administrar_conceptos": "Administrar conceptos de cobro",
     "ver_cortes": "Ver cortes",
+    "ver_ingresos": "Ver cuánto entra: importes de los cobros y ventas de otras personas y de los depósitos del banco",
     "cerrar_cortes": "Cerrar cortes",
     "aprobar_dispositivos": "Aprobar dispositivos",
     "administrar_usuarios": "Administrar usuarios",
@@ -40,9 +41,13 @@ PERMISOS = {
 
 OPCIONES = list(PERMISOS.items())
 
-DELEGABLES = ("alta_baja_directa", "aprobar_solicitudes")
+DELEGABLES = ("alta_baja_directa", "aprobar_solicitudes", "ver_ingresos")
 
 INDISPENSABLES = ("administrar_usuarios", "administrar_roles")
+
+
+def ve_ingresos(usuario):
+    return usuario.tiene_permiso("ver_ingresos")
 
 
 def etiqueta(permiso, voc=None):

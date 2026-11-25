@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from auditoria.servicios import registrar
 
+from .permisos import ve_ingresos
 from .servicios import reingreso_vigente
 
 
@@ -40,3 +41,20 @@ def requiere_permiso(*permisos, reingreso=False):
         return envoltura
 
     return decorador
+
+
+def exigir_ingresos_o_propio(request, autor_id):
+    if not ve_ingresos(request.user) and autor_id != request.user.pk:
+        registrar("acceso_denegado", request=request, datos={"ruta": request.path, "permisos": ["ver_ingresos"]})
+        raise PermissionDenied
+
+
+def requiere_ingresos(vista):
+    @wraps(vista)
+    def envoltura(request, *args, **kwargs):
+        if not ve_ingresos(request.user):
+            registrar("acceso_denegado", request=request, datos={"ruta": request.path, "permisos": ["ver_ingresos"]})
+            raise PermissionDenied
+        return vista(request, *args, **kwargs)
+
+    return envoltura

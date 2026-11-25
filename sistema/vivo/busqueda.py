@@ -12,12 +12,12 @@ MAXIMO_PERSONAS = 7
 MAXIMO_TOTAL = 40
 
 ACCIONES = (
-    ("Cobrar", "Abrir la lista para cobrar", "cobros:buscar", ("registrar_pago_efectivo",)),
-    ("Dar de alta", "Registrar a {titular_min} nuevo", "titulares:nuevo", ("solicitar_alta_baja", "alta_baja_directa")),
-    ("Abrir o cerrar mi turno", "Mi caja", "caja:inicio", ("turno_caja",)),
-    ("Verificar un recibo", "Con su código o su QR", "cobros:verificar", ("ver_titulares",)),
-    ("Subir el estado de cuenta", "El archivo que da el banco", "conciliacion:cola", ("conciliar_banco", "sugerir_conciliacion")),
-    ("Cambiar colores y logotipo", "Marca del negocio", "configuracion:marca", ("administrar_configuracion",)),
+    ("Cobrar", "Abrir la lista para cobrar", "cobros:buscar", ("registrar_pago_efectivo",), None),
+    ("Dar de alta", "Registrar a {titular_min} nuevo", "titulares:nuevo", ("solicitar_alta_baja", "alta_baja_directa"), None),
+    ("Abrir o cerrar mi turno", "Mi caja", "caja:inicio", ("turno_caja",), None),
+    ("Verificar un recibo", "Con su código o su QR", "cobros:verificar", ("ver_titulares",), None),
+    ("Subir el estado de cuenta", "El archivo que da el banco", "conciliacion:cola", ("conciliar_banco", "sugerir_conciliacion"), "ver_ingresos"),
+    ("Cambiar colores y logotipo", "Marca del negocio", "configuracion:marca", ("administrar_configuracion",), None),
 )
 
 
@@ -33,8 +33,8 @@ def _coincide(texto, buscado):
 
 def _acciones(permisos, voc, buscado):
     resultado = []
-    for titulo, detalle, nombre, requeridos in ACCIONES:
-        if not any(p in permisos for p in requeridos):
+    for titulo, detalle, nombre, requeridos, ademas in ACCIONES:
+        if not any(p in permisos for p in requeridos) or (ademas and ademas not in permisos):
             continue
         detalle = con_vocabulario(detalle, voc)
         if _coincide(f"{titulo} {detalle}", buscado):

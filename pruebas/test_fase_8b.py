@@ -162,6 +162,9 @@ def test_nombres_de_archivo_de_fabrica_se_conservan(personas):
 def test_recibo_y_ficha_en_a4(personas):
     from cobros.models import Pago, Recibo
 
+    from cuentas.models import PermisoRol
+
+    PermisoRol.objects.get_or_create(rol=personas["op"].rol, permiso="ver_ingresos")
     preparar_conceptos()
     fijar("tamano_hoja", "a4")
     ana = titular_activo(personas["op"], personas["sup"], "Ana")

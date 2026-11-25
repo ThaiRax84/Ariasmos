@@ -16,6 +16,7 @@ from cobros import libro
 from cobros.models import Aplicacion, CancelacionCargo, Cargo, Pago
 from configuracion.models import hoy_negocio, parametro, vocabulario
 from configuracion.moneda import formatear
+from cuentas.permisos import ve_ingresos
 from nucleo.exportar import neutralizar
 from titulares.models import MATRICULA_INTERNA, Titular
 
@@ -739,8 +740,11 @@ def exportar_existencias():
     return ("﻿" + salida.getvalue()).encode("utf-8")
 
 
-def ventas_recientes(limite=100):
-    return Venta.objects.select_related("titular", "usuario", "pago__recibo").annotate(articulos=Count("renglones"))[:limite]
+def ventas_recientes(usuario, limite=100):
+    consulta = Venta.objects.select_related("titular", "usuario", "pago__recibo").annotate(articulos=Count("renglones"))
+    if not ve_ingresos(usuario):
+        consulta = consulta.filter(usuario=usuario)
+    return consulta[:limite]
 
 
 def buscar_venta(texto):
