@@ -1267,7 +1267,9 @@
   var $$ = A.$$;
   var crear = A.crear;
   var raiz = document.documentElement;
-  var VARIABLES = ["--primario", "--acento", "--tinte", "--boton-texto", "--boton-fondo"];
+  var VARIABLES = ["--primario", "--acento", "--tinte", "--boton-texto", "--boton-fondo", "--barra", "--barra-texto"];
+  var cabecera = $(".barra");
+  var claraInicial = !!cabecera && cabecera.classList.contains("clara");
   var estado = { formulario: null, barra: null, arrastrado: null };
 
   function luz(hex) {
@@ -1286,7 +1288,18 @@
     raiz.style.setProperty("--boton-texto", luz(principal) > 0.5 ? "#1F1813" : "#FFFFFF");
   }
 
-  function quitarVista() { VARIABLES.forEach(function (v) { raiz.style.removeProperty(v); }); }
+  function vistaBarra(color) {
+    if (!cabecera || !hexValido(color)) { return; }
+    var clara = 1.05 / (luz(color) + 0.05) < 4.5;
+    raiz.style.setProperty("--barra", color);
+    raiz.style.setProperty("--barra-texto", clara ? "#1F1813" : "#FFFFFF");
+    cabecera.classList.toggle("clara", clara);
+  }
+
+  function quitarVista() {
+    VARIABLES.forEach(function (v) { raiz.style.removeProperty(v); });
+    if (cabecera) { cabecera.classList.toggle("clara", claraInicial); }
+  }
 
   function coloresDe(imagen) {
     var k = 64;
@@ -1317,12 +1330,15 @@
   }
 
   function camposColor() {
-    return { principal: $("input[name='color_principal']"), acento: $("input[name='color_acento']") };
+    return { principal: $("input[name='color_principal']"), acento: $("input[name='color_acento']"), barra: $("input[name='color_barra']"), otro: $("input[name='barra'][value='otro']") };
   }
 
   function aplicarDeCampos() {
     var c = camposColor();
-    if (c.principal && c.acento) { vistaColores(c.principal.value.toUpperCase(), c.acento.value.toUpperCase()); }
+    if (!c.principal || !c.acento) { return; }
+    var principal = c.principal.value.toUpperCase();
+    vistaColores(principal, c.acento.value.toUpperCase());
+    vistaBarra(c.otro && c.otro.checked && c.barra ? c.barra.value.toUpperCase() : principal);
   }
 
   function vistaLogo(archivo) {
@@ -1522,7 +1538,7 @@
   document.addEventListener("input", function (evento) {
     var campo = evento.target;
     if (!campo.form) { return; }
-    if (campo.matches("input[name='color_principal'], input[name='color_acento'], input.selector-color")) { aplicarDeCampos(); }
+    if (campo.matches("input[name='color_principal'], input[name='color_acento'], input[name='color_barra'], input[name='barra'], input.selector-color")) { aplicarDeCampos(); }
     hayCambios(campo.form);
   });
   document.addEventListener("change", function (evento) {
