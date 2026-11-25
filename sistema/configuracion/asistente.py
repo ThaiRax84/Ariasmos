@@ -81,19 +81,41 @@ def _secreto(request):
     return secretos.leer_del_asistente(_fila(request).secreto_cifrado)
 
 
+def _fila_bloqueada():
+    fila = AvanceAsistente.objects.select_for_update().filter(pk=1).first()
+    if fila is None:
+        raise Http404
+    return fila
+
+
+def _escribir_fila(request, secreto=None, estado=None, **campos):
+    with transaction.atomic():
+        fila = _fila_bloqueada()
+        if estado:
+            campos["estado"] = {**fila.estado, **estado}
+        if secreto is not None:
+            campos["secreto_cifrado"] = secretos.cifrar_del_asistente(secreto)
+        for campo, valor in campos.items():
+            setattr(fila, campo, valor)
+        fila.save(update_fields=[*campos, "actualizado"])
+    request.avance_asistente = fila
+
+
 def _guardar_estado(request, secreto=None, **cambios):
-    fila = _fila(request)
-    fila.estado = {**fila.estado, **cambios}
-    if secreto is not None:
-        fila.secreto_cifrado = secretos.cifrar_del_asistente(secreto)
-    fila.save()
+    _escribir_fila(request, secreto=secreto, estado=cambios)
 
 
 def _guardar_paso(request, paso):
+    if _fila(request).paso != paso:
+        _escribir_fila(request, paso=paso)
+
+
+def _paso_guardado(request):
     fila = _fila(request)
-    if fila.paso != paso:
-        fila.paso = paso
-        fila.save()
+    sin_datos = fila.paso == "revisar" or (fila.paso == "codigo" and not (fila.estado.get("usuario") and fila.secreto_cifrado))
+    if sin_datos:
+        _guardar_paso(request, "personalizar")
+    return f"asistente:{_fila(request).paso}"
 
 
 def _token_valido(token):
@@ -170,20 +192,25 @@ def _olvidar(request, paso):
         _guardar_estado(request, borradores=borradores)
 
 
-def _leer_plantilla(formulario):
+def _leer_eleccion(formulario):
     elegida = formulario.cleaned_data["plantilla"]
     if elegida != IMPORTAR:
-        return elegida, plantillas.leer(elegida)
+        return elegida, "", None
     archivo = formulario.cleaned_data["archivo"]
     if archivo.size > esquema.LIMITE_BYTES:
         raise esquema.PlantillaInvalida("El archivo pasa de 256 KB.")
-    return "importada", esquema.desde_bytes(archivo.read(esquema.LIMITE_BYTES + 1))
+    contenido = archivo.read(esquema.LIMITE_BYTES + 1)
+    return "importada", hashlib.sha256(contenido).hexdigest(), contenido
+
+
+def _datos_de(origen, contenido):
+    return esquema.desde_bytes(contenido) if contenido is not None else plantillas.leer(origen)
 
 
 def inicio(request):
     negocio = _disponible(request)
     if request.method == "GET" and _autorizado(request) and _fila(request).plantilla_aplicada:
-        return redirect(f"asistente:{_fila(request).paso}")
+        return redirect(_paso_guardado(request))
     inicial = {"nombre": negocio.nombre, "zona_horaria": negocio.zona_horaria, "moneda": negocio.moneda, "plantilla": negocio.plantilla} if negocio else {"zona_horaria": zonas.de_la_computadora(), "plantilla": "generico"}
     datos_post = request.POST if request.method == "POST" else None
     formulario = FormularioAsistenteInicio(datos_post, request.FILES if request.method == "POST" else None, plantillas=plantillas.disponibles(con_descripcion=True), initial=inicial)
@@ -192,18 +219,17 @@ def inicio(request):
             registrar("asistente_token_invalido", request=request)
             messages.error(request, "El token de instalación no es correcto.")
             return _paso(request, "asistente/paso.html", formulario, PASO["inicio"], "Datos del negocio y plantilla")
-        reanuda = _es_reanudacion(request, negocio, formulario.cleaned_data["plantilla"])
-        origen, datos = formulario.cleaned_data["plantilla"], None
-        if not reanuda:
-            try:
-                origen, datos = _leer_plantilla(formulario)
-            except esquema.PlantillaInvalida as error:
-                registrar("plantilla_rechazada", datos={"motivo": str(error)[:200]}, request=request)
-                formulario.add_error("archivo" if formulario.cleaned_data["plantilla"] == IMPORTAR else "plantilla", f"La plantilla no es válida: {error}")
-                return _paso(request, "asistente/paso.html", formulario, 1, "Datos del negocio y plantilla")
-        _registrar_negocio(request, formulario, origen, datos, reanuda)
+        try:
+            origen, huella, contenido = _leer_eleccion(formulario)
+            reanuda = _es_reanudacion(request, negocio, origen, huella)
+            datos = None if reanuda else _datos_de(origen, contenido)
+        except esquema.PlantillaInvalida as error:
+            registrar("plantilla_rechazada", datos={"motivo": str(error)[:200]}, request=request)
+            formulario.add_error("archivo" if formulario.cleaned_data["plantilla"] == IMPORTAR else "plantilla", f"La plantilla no es válida: {error}")
+            return _paso(request, "asistente/paso.html", formulario, 1, "Datos del negocio y plantilla")
+        _registrar_negocio(request, formulario, origen, huella, datos, reanuda)
         if reanuda:
-            return redirect(f"asistente:{_fila(request).paso}")
+            return redirect(_paso_guardado(request))
         if origen == "importada":
             return redirect("asistente:revisar")
         _aplicar_plantilla(request, datos, origen)
@@ -211,12 +237,12 @@ def inicio(request):
     return _paso(request, "asistente/paso.html", formulario, 1, "Datos del negocio y plantilla")
 
 
-def _es_reanudacion(request, negocio, elegida):
+def _es_reanudacion(request, negocio, origen, huella):
     fila = _fila(request)
-    return bool(fila and fila.plantilla_aplicada and negocio and negocio.plantilla == elegida)
+    return bool(fila and fila.plantilla_aplicada and negocio and negocio.plantilla == origen and fila.huella_plantilla == huella)
 
 
-def _registrar_negocio(request, formulario, origen, datos, reanuda):
+def _registrar_negocio(request, formulario, origen, huella, datos, reanuda):
     with transaction.atomic():
         guardado, _ = Negocio.objects.update_or_create(
             pk=1,
@@ -224,18 +250,20 @@ def _registrar_negocio(request, formulario, origen, datos, reanuda):
         )
         registrar("asistente_negocio", objeto=guardado, datos={"nombre": guardado.nombre, "plantilla": origen, "moneda": guardado.moneda}, request=request)
         if reanuda:
-            _ligar_equipo(request)
+            _escribir_fila(request, dispositivo=request.dispositivo)
         else:
-            _abrir_avance(request, origen, datos, bool(formulario.cleaned_data.get("inventario")))
+            _retirar_usuario_sin_autenticador(request)
+            _abrir_avance(request, origen, huella, datos, bool(formulario.cleaned_data.get("inventario")))
 
 
-def _ligar_equipo(request):
-    fila = _fila(request)
-    fila.dispositivo = request.dispositivo
-    fila.save()
+def _retirar_usuario_sin_autenticador(request):
+    huerfano = Usuario.objects.filter(pk=_estado(request).get("usuario"), totp_confirmado=False).first()
+    if huerfano:
+        registrar("usuario_retirado", objeto=huerfano, datos={"usuario": huerfano.usuario, "origen": "asistente"}, request=request)
+        huerfano.delete()
 
 
-def _abrir_avance(request, origen, datos, inventario):
+def _abrir_avance(request, origen, huella, datos, inventario):
     importada = origen == "importada"
     request.avance_asistente, _ = AvanceAsistente.objects.update_or_create(
         pk=1,
@@ -245,6 +273,7 @@ def _abrir_avance(request, origen, datos, inventario):
             "estado": {"inventario": inventario, "pendiente": datos} if importada else {"inventario": inventario},
             "secreto_cifrado": "",
             "plantilla_aplicada": False,
+            "huella_plantilla": huella,
         },
     )
 
@@ -256,9 +285,7 @@ def _aplicar_plantilla(request, datos, origen):
         inventario = bool(_estado(request).get("inventario"))
         Parametro.objects.update_or_create(clave="modulo_inventario", defaults={"valor": "1" if inventario else "0"})
         registrar("asistente_inventario", datos={"modulo_inventario": inventario, "origen": "asistente"}, request=request)
-        fila = _fila(request)
-        fila.plantilla_aplicada, fila.paso = True, "personalizar"
-        _guardar_estado(request, pendiente=None, rol_inicial=datos["rol_inicial"], recargos=plantillas.recargos(datos))
+        _escribir_fila(request, estado={"pendiente": None, "rol_inicial": datos["rol_inicial"], "recargos": plantillas.recargos(datos)}, plantilla_aplicada=True, paso="personalizar")
 
 
 def revisar(request):
@@ -581,8 +608,8 @@ def usuario(request):
                 else:
                     nuevo = Usuario.objects.create_user(datos["usuario"], datos["contrasena1"], nombre=datos["nombre"], rol=rol)
                 registrar("usuario_creado", objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": rol.pk, "origen": "asistente"}, request=request)
-            previo = _secreto(request) if _estado(request).get("usuario") == nuevo.pk else ""
-            _guardar_estado(request, secreto=previo or totp.generar_secreto(), usuario=nuevo.pk)
+                previo = _secreto(request) if _estado(request).get("usuario") == nuevo.pk else ""
+                _guardar_estado(request, secreto=previo or totp.generar_secreto(), usuario=nuevo.pk)
             return redirect("asistente:codigo")
     rol = _estado(request).get("rol_inicial") or ""
     return _paso(request, "asistente/paso.html", formulario, PASO["usuario"], f"Primer usuario ({rol})" if rol else "Primer usuario")
@@ -611,7 +638,7 @@ def codigo(request):
                 Negocio.objects.filter(pk=1).update(configurado=True)
                 Negocio.objects.filter(pk=1, cobro_desde__isnull=True).update(cobro_desde=hoy_negocio())
                 registrar("asistente_completado", usuario=nuevo, objeto=negocio, request=request)
-                _fila(request).delete()
+                _fila_bloqueada().delete()
         if usado is not None:
             login(request, nuevo, backend="django.contrib.auth.backends.ModelBackend")
             request.session["ultima_actividad"] = timezone.now().timestamp()

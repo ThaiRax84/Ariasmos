@@ -197,3 +197,28 @@ def test_depurar_pendientes_conserva_el_equipo_que_instala():
     Dispositivo.objects.update(creado=timezone.now() - timedelta(days=3))
     assert servicios.depurar_pendientes() == 1
     assert not Dispositivo.objects.filter(pk=otro.pk).exists() and AvanceAsistente.objects.get().dispositivo_id is not None
+
+
+def subir_importada(c, contenido):
+    archivo = SimpleUploadedFile("mia.json", contenido, content_type="application/json")
+    return c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "importar", archivo))
+
+
+@pytest.mark.django_db
+def test_importada_se_reanuda_con_el_mismo_archivo_y_otra_plantilla_retira_al_usuario_sin_autenticador():
+    with open(settings.PLANTILLAS_NEGOCIO / "generico.json", encoding="utf-8") as archivo:
+        datos = json.load(archivo)
+    contenido = json.dumps(dict(datos, nombre="Gimnasio")).encode("utf-8")
+    c = Client()
+    subir_importada(c, contenido)
+    c.post(reverse("asistente:revisar"), {})
+    c.post(reverse("asistente:usuario"), {"usuario": "jefa", "nombre": "Jefa", "contrasena1": CONTRASENA, "contrasena2": CONTRASENA})
+    secreto = secreto_del_asistente()
+    c.get(reverse("asistente:codigo"))
+    c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
+    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:codigo")
+    assert subir_importada(c, contenido).url == reverse("asistente:codigo")
+    assert secreto_del_asistente() == secreto
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:personalizar")
+    assert not Usuario.objects.filter(usuario="jefa").exists() and AvanceAsistente.objects.get().secreto_cifrado == ""
+    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:personalizar")

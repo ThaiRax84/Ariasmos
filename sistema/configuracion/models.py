@@ -327,6 +327,7 @@ class AvanceAsistente(models.Model):
     estado = models.JSONField(default=dict)
     secreto_cifrado = models.TextField(blank=True)
     plantilla_aplicada = models.BooleanField(default=False)
+    huella_plantilla = models.CharField(max_length=64, blank=True)
     actualizado = models.DateTimeField(auto_now=True)
 
     class Meta:
