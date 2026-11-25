@@ -19,7 +19,7 @@ Central no confía en ningún proxy de forma predeterminada. Si pones un proxy d
 
 Si la configuración está dañada o la ruta de la llave no apunta a un archivo de llave válido, se detiene con un aviso y no crea llaves.
 
-Si corres `inicializar_central` otra vez sobre la misma carpeta, no cambia la configuración ni las llaves y vuelve a imprimir la llave pública. Si la configuración existe pero falta el archivo de la llave, se detiene con un aviso y no crea una llave nueva (recupérala de tu respaldo).
+Si corres `inicializar_central` otra vez sobre la misma carpeta, no cambia la configuración ni las llaves (solo agrega los datos de mensajes que falten, ver la guía de WhatsApp) y vuelve a imprimir la llave pública. Si la configuración existe pero falta el archivo de la llave, se detiene con un aviso y no crea una llave nueva (recupérala de tu respaldo).
 
 ## Dar de alta un negocio
 
