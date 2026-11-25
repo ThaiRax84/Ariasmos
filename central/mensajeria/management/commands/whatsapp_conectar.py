@@ -10,6 +10,7 @@ from mensajeria import secretos, servicios
 from mensajeria.models import Remitente
 
 VARIABLE_DEL_TOKEN = "TWILIO_TOKEN"
+MENSAJE_OPCION = "Opción no reconocida. El token se pasa por la variable TWILIO_TOKEN o se escribe cuando se pide."
 PATRON_SID = re.compile(r"[A-Za-z0-9]{4,64}")
 
 
@@ -28,6 +29,18 @@ def _token():
 
 class Command(BaseCommand):
     help = "Conecta el número de WhatsApp de un negocio. El token se lee de la variable TWILIO_TOKEN o se pide por teclado"
+
+    def create_parser(self, *args, **kwargs):
+        parser = super().create_parser(*args, **kwargs)
+        error = parser.error
+
+        def sin_eco(mensaje):
+            if mensaje.startswith("unrecognized arguments"):
+                raise CommandError(MENSAJE_OPCION)
+            error(mensaje)
+
+        parser.error = sin_eco
+        return parser
 
     def add_arguments(self, parser):
         parser.add_argument("negocio", help="Identificador del negocio")

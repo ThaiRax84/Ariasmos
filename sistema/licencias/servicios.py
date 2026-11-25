@@ -273,7 +273,7 @@ def _aplicar_acuse(acuse, sello, huella):
             raise licencia.LicenciaInvalida("acuse")
     except licencia.LicenciaInvalida:
         registrar("licencia_rechazada", datos={"motivo": "acuse"})
-        return
+        return False
     hora = licencia.momento_de(carga["hora"])
     with transaction.atomic():
         fila = instalacion()
@@ -289,6 +289,7 @@ def _aplicar_acuse(acuse, sello, huella):
                     "despues": licencia.texto_de(hora),
                 },
             )
+    return True
 
 
 def _recibir(estado, respuesta, sello, huella, exitosa):
@@ -364,8 +365,8 @@ def _pedir_firmado(ruta, accion, datos, adjunto):
     estado, respuesta, sello = _enviar_firmado(
         ruta, "servicio", huella, privada, adicional, {"accion": accion, "datos": datos}
     )
-    if estado == 200 and "acuse" in respuesta:
-        _aplicar_acuse(respuesta["acuse"], sello, huella)
+    if estado == 200 and not _aplicar_acuse(respuesta.get("acuse"), sello, huella):
+        return 0, {}
     return estado, respuesta
 
 

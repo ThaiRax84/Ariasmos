@@ -10,6 +10,7 @@ from emision import reloj
 from emision import servicios as emision
 from emision import views as base
 from emision.models import Negocio
+from nucleo import sobre
 
 from . import proveedores, servicios
 from .models import Documento, Mensaje, Remitente
@@ -71,7 +72,7 @@ def _servicio(accion, con_adjunto=False):
                 base._gastar_sello(instalacion, carga, tolerancia)
             extra = (_adjunto(cuerpo),) if con_adjunto else ()
             try:
-                respuesta = manejar(instalacion.negocio, carga["datos"], *extra)
+                respuesta = manejar(instalacion, carga["datos"], *extra)
             except servicios.DatosInvalidos as error:
                 raise base.Denegado(400, f"datos_{error}", instalacion.negocio)
             return base._con_acuse(respuesta, instalacion, carga)
@@ -82,21 +83,21 @@ def _servicio(accion, con_adjunto=False):
 
 
 @_servicio("mensajes_estado")
-def estado(negocio, datos):
+def estado(instalacion, datos):
     _exigir(datos, {})
-    return servicios.estado(negocio)
+    return servicios.estado(instalacion.negocio)
 
 
 @_servicio("mensajes_plantilla")
-def plantilla(negocio, datos):
+def plantilla(instalacion, datos):
     _exigir(datos, {"clave": str, "nombre": str, "texto": str, "con_documento": bool})
-    return servicios.guardar_plantilla(negocio, datos)
+    return servicios.guardar_plantilla(instalacion.negocio, datos)
 
 
 @_servicio("mensajes_tope")
-def tope(negocio, datos):
+def tope(instalacion, datos):
     _exigir(datos, {"tope": int})
-    return servicios.fijar_tope(negocio, datos["tope"])
+    return servicios.fijar_tope(instalacion.negocio, datos["tope"])
 
 
 def _validar_envio(datos):
@@ -112,9 +113,9 @@ def _validar_envio(datos):
 
 
 @_servicio("mensajes_enviar", con_adjunto=True)
-def enviar(negocio, datos, adjunto):
+def enviar(instalacion, datos, adjunto):
     _validar_envio(datos)
-    return servicios.enviar(negocio, datos, adjunto)
+    return servicios.enviar(instalacion, datos, adjunto)
 
 
 def _identificadores(ids):
@@ -125,12 +126,12 @@ def _identificadores(ids):
 
 
 @_servicio("mensajes_consultar")
-def consultar(negocio, datos):
+def consultar(instalacion, datos):
     _exigir(datos, {"ids": list})
     ids = datos["ids"]
     if len(ids) > MAXIMO_DE_IDS or any(type(i) is not str for i in ids):
         raise base.Denegado(400, "ids_invalidos")
-    return servicios.consultar(negocio, _identificadores(ids))
+    return servicios.consultar(instalacion, _identificadores(ids))
 
 
 def documento(request, token):
@@ -151,6 +152,7 @@ def documento(request, token):
     respuesta = HttpResponse(bytes(contenido), content_type="application/pdf")
     respuesta["Cache-Control"] = "no-store"
     respuesta["X-Content-Type-Options"] = "nosniff"
+    respuesta["Content-Disposition"] = 'attachment; filename="recibo.pdf"'
     return respuesta
 
 
@@ -159,9 +161,13 @@ def _exigir_firma(request, negocio):
     parametros = {nombre: request.POST.getlist(nombre) for nombre in request.POST}
     firma = request.META.get("HTTP_X_TWILIO_SIGNATURE", "")
     url = settings.URL_PUBLICA + request.get_full_path()
-    if remitente is None or not proveedores.activo().firma_valida(
-        remitente, url, parametros, firma
-    ):
+    try:
+        valida = remitente is not None and proveedores.activo().firma_valida(
+            remitente, url, parametros, firma
+        )
+    except sobre.ErrorSobre:
+        raise base.Denegado(403, "secreto_ilegible", negocio)
+    if not valida:
         raise base.Denegado(403, "firma_de_twilio", negocio)
 
 
@@ -201,5 +207,8 @@ def entrante_twilio(request, identificador):
         raise base.Denegado(404, "negocio_desconocido")
     _exigir_firma(request, negocio)
     servicios.aplicar_entrante(
-        negocio, request.POST.get("From", ""), request.POST.get("Body", "")
+        negocio,
+        request.POST.get("From", ""),
+        request.POST.get("Body", ""),
+        request.POST.get("MessageSid") or request.POST.get("SmsSid", ""),
     )

@@ -36,6 +36,7 @@ class Envio(models.Model):
     LEIDO = "leido"
     FALLIDO = "fallido"
     NO_ENVIADO = "no_enviado"
+    INCIERTO = "incierto"
     ESTADOS = [
         (PENDIENTE, "Pendiente"),
         (ACEPTADO, "Enviado, esperando entrega"),
@@ -44,6 +45,7 @@ class Envio(models.Model):
         (LEIDO, "Leído"),
         (FALLIDO, "No se pudo entregar"),
         (NO_ENVIADO, "No se mandó"),
+        (INCIERTO, "No sabemos si salió"),
     ]
     EN_CURSO = (ACEPTADO, ENVIADO)
     AVANCES = (ENVIADO, ENTREGADO, LEIDO, FALLIDO)

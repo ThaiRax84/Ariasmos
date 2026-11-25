@@ -216,3 +216,30 @@ def test_sin_central_el_panel_lo_explica_y_ni_el_trabajador_ni_el_recibo_fallan(
         for nombre, exito, _ in trabajador.ejecutar_ciclo()
         if nombre == "mensajes"
     )
+
+
+def test_respuesta_sin_acuse_valido_no_cuenta_como_respuesta(
+    tmp_path, monkeypatch, db, settings
+):
+    central = Central(tmp_path, monkeypatch)
+    settings.CENTRAL_URL = "https://central.invalid"
+    licencias.Instalacion.objects.filter(pk=1).update(activada=True)
+    central.respuestas = [
+        lambda cuerpo: (200, {"resultado": "aceptado"}),
+        lambda cuerpo: (200, {"resultado": "aceptado", "acuse": {"carga": "x"}}),
+    ]
+    for _ in central.respuestas[:]:
+        assert licencias.pedir("/v1/mensajes/estado", "mensajes_estado", {}) == (0, {})
+
+
+def test_si_no_se_sabe_si_salio_se_reintenta_con_la_misma_clave(escenario):
+    recibo, central, personas = escenario
+    central.respuestas.clear()
+    assert _enviar(personas, recibo).status_code == 302
+    envio = Envio.objects.get()
+    assert envio.estado == Envio.INCIERTO and "no se cobra doble" in envio.motivo
+    central.respuestas["mensajes_enviar"] = {"resultado": "repetido", "id": ID_CENTRAL}
+    assert _enviar(personas, recibo).status_code == 302
+    assert [c[1]["clave_envio"] for c in central.llamadas] == [envio.clave_envio] * 2
+    envio.refresh_from_db()
+    assert envio.estado == Envio.ACEPTADO and Envio.objects.count() == 1

@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import socket
+import sqlite3
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -45,6 +46,17 @@ def claves_de_mensajes():
         "url_publica": "",
         "proveedor_mensajes": "simulado",
     }
+
+
+def hay_secretos_guardados(datos):
+    try:
+        with sqlite3.connect(datos["base_datos"]) as conexion:
+            return any(
+                conexion.execute(f"SELECT 1 FROM {tabla} LIMIT 1").fetchone()
+                for tabla in ("mensajeria_remitente", "mensajeria_baja")
+            )
+    except (sqlite3.Error, KeyError):
+        return False
 
 
 def completar(base, datos):

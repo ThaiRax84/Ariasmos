@@ -29,7 +29,8 @@ PATRON_CLAVE = re.compile(r"[a-z0-9_]{1,40}")
 CLAVE_RESERVADA = "nueva"
 DIAS_DE_BAJAS = 30
 LOTE = 100
-LIMITE_PDF = 1536 * 1024
+LIMITE_PDF = 1_500_000
+HORAS_PARA_RESOLVER = 2
 NO_DISPONIBLE = "WhatsApp todavía no está disponible: Ariasmos Central no está conectado en este equipo."
 ESTADOS_DE_CENTRAL = {
     "en_revision": PlantillaMensaje.EN_REVISION,
@@ -44,6 +45,10 @@ MOTIVOS = {
     "destino": "El teléfono del contacto no sirve para WhatsApp.",
     "proveedor": "WhatsApp no aceptó el mensaje. Intenta de nuevo en unos minutos.",
 }
+PAIS = "Este número es de un país al que tu servicio de mensajes no envía. Pide que lo activen."
+INCIERTO = "No sabemos si salió. Inténtalo otra vez: no se cobra doble."
+CON_REVERSION = "Ese pago fue cancelado: no se manda su recibo por WhatsApp."
+PDF_GRANDE = "El recibo en PDF es demasiado grande para mandarlo por WhatsApp."
 SIN_RESPUESTA = (
     "No se pudo hablar con Ariasmos Central. Intenta de nuevo en unos minutos."
 )
@@ -245,7 +250,7 @@ def _envio_para(recibo, usuario, contacto, plantilla, numero, reenviar):
     clave = _clave_del_envio(recibo, reenviar)
     existente = Envio.objects.filter(clave_envio=clave).first()
     if existente is not None:
-        return existente, existente.estado == Envio.PENDIENTE
+        return existente, existente.estado in (Envio.PENDIENTE, Envio.INCIERTO)
     try:
         return Envio.objects.create(
             clave_envio=clave,
@@ -266,7 +271,9 @@ def _fijar_estado(envio, estado, motivo=""):
 
 
 def _aplicar_resultado(envio, respuesta):
-    resultado = respuesta.get("resultado") if respuesta else None
+    if respuesta is None:
+        return _fijar_estado(envio, Envio.INCIERTO, INCIERTO)
+    resultado = respuesta.get("resultado")
     if resultado in ("aceptado", "repetido"):
         try:
             id_central = uuid.UUID(str(respuesta.get("id")))
@@ -277,19 +284,22 @@ def _aplicar_resultado(envio, respuesta):
         )
         envio.id_central, envio.estado, envio.motivo = id_central, Envio.ACEPTADO, ""
         return
+    if resultado == "pais":
+        envio.delete()
+        raise NoSePuedeEnviar(PAIS)
     if resultado == "baja":
         Contacto.objects.filter(pk=envio.contacto_id).update(baja_whatsapp=True)
     _fijar_estado(envio, Envio.NO_ENVIADO, MOTIVOS.get(resultado, SIN_RESPUESTA))
 
 
-def _pedir_el_envio(envio, recibo, plantilla, numero, contacto):
+def _pdf_del_recibo(recibo):
     pdf = recibo_pdf.generar(recibo, Negocio.actual())
     if len(pdf) > LIMITE_PDF:
-        return _fijar_estado(
-            envio,
-            Envio.NO_ENVIADO,
-            "El recibo en PDF es demasiado grande para mandarlo por WhatsApp.",
-        )
+        raise NoSePuedeEnviar(PDF_GRANDE)
+    return pdf
+
+
+def _pedir_el_envio(envio, recibo, plantilla, numero, contacto, pdf):
     textos = {
         nombre: variables.limpiar_valor(valor)
         for nombre, valor in _valores_del_recibo(
@@ -315,12 +325,15 @@ def enviar_recibo(recibo, usuario, reenviar=False):
     plantilla = plantilla_del_recibo()
     if not disponible() or plantilla is None:
         raise NoSePuedeEnviar(NO_DISPONIBLE)
+    if hasattr(recibo.pago, "reversion"):
+        raise NoSePuedeEnviar(CON_REVERSION)
     contacto, numero = _destinatario(recibo)
+    pdf = _pdf_del_recibo(recibo)
     envio, por_pedir = _envio_para(
         recibo, usuario, contacto, plantilla, numero, reenviar
     )
     if por_pedir:
-        _pedir_el_envio(envio, recibo, plantilla, numero, contacto)
+        _pedir_el_envio(envio, recibo, plantilla, numero, contacto, pdf)
         registrar(
             "whatsapp_enviado",
             usuario=usuario,
@@ -355,6 +368,7 @@ def situacion_del_recibo(recibo, usuario):
         or not disponible()
         or not usuario.tiene_permiso("enviar_whatsapp")
         or recibo.pago.titular.interno
+        or hasattr(recibo.pago, "reversion")
     ):
         return None
     ultimo = Envio.objects.filter(recibo=recibo).first()
@@ -371,7 +385,8 @@ def situacion_del_recibo(recibo, usuario):
         "contacto": contacto,
         "final": numero[-4:],
         "ultimo": ultimo,
-        "reintentar": ultimo is not None and ultimo.estado in Envio.SIN_ENTREGAR,
+        "reintentar": ultimo is not None
+        and ultimo.estado in Envio.SIN_ENTREGAR + (Envio.INCIERTO,),
     }
 
 
@@ -385,6 +400,13 @@ def _marcar_bajas(claves):
     Contacto.objects.filter(pk__in=ids).update(baja_whatsapp=True)
     for pk in ids:
         registrar("whatsapp_baja", datos={"contacto": pk})
+
+
+def _marcar_altas(claves):
+    Contacto.objects.filter(
+        pk__in=Envio.objects.filter(clave_envio__in=claves).values("contacto_id"),
+        baja_whatsapp=True,
+    ).update(baja_whatsapp=False)
 
 
 def _actualizar_envios(respuesta):
@@ -413,9 +435,32 @@ def _actualizar_envios(respuesta):
     return cambiados
 
 
+def _resolver_incierto(envio, plantilla):
+    try:
+        contacto, numero = _destinatario(envio.recibo)
+        pdf = _pdf_del_recibo(envio.recibo)
+        _pedir_el_envio(envio, envio.recibo, plantilla, numero, contacto, pdf)
+    except NoSePuedeEnviar as aviso:
+        Envio.objects.filter(pk=envio.pk).update(
+            estado=Envio.NO_ENVIADO, motivo=str(aviso)
+        )
+
+
+def _resolver_inciertos():
+    plantilla = plantilla_del_recibo()
+    desde = reloj.ahora() - timedelta(hours=HORAS_PARA_RESOLVER)
+    if plantilla is None:
+        return
+    for envio in Envio.objects.filter(
+        estado=Envio.INCIERTO, creado__gte=desde, recibo__isnull=False
+    ).select_related("recibo__pago")[:LOTE]:
+        _resolver_incierto(envio, plantilla)
+
+
 def actualizar_estados():
     if not disponible():
         return 0
+    _resolver_inciertos()
     if PlantillaMensaje.objects.filter(estado=PlantillaMensaje.EN_REVISION).exists():
         estado()
     en_curso = list(
@@ -429,7 +474,8 @@ def actualizar_estados():
     respuesta = _pedir("mensajes_consultar", {"ids": [str(i) for i in en_curso]})
     if respuesta is None:
         return 0
-    _marcar_bajas([c for c in respuesta.get("bajas", []) if isinstance(c, str)])
+    for clave, marcar in (("bajas", _marcar_bajas), ("altas", _marcar_altas)):
+        marcar([c for c in respuesta.get(clave, []) if isinstance(c, str)])
     return _actualizar_envios(respuesta)
 
 

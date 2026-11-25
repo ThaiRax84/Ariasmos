@@ -28,6 +28,7 @@
 <div class="cifras">
   <div class="cifra"><span class="etiqueta">Número conectado</span><span class="cifra-importe media">terminado en {{ estado.numero_final }}</span><span class="estado bien">Conectado</span></div>
   <div class="cifra"><span class="etiqueta">Enviados este mes</span><span class="cifra-importe media">{{ estado.enviados_mes }} mensajes</span></div>
+  <div class="cifra"><span class="etiqueta">Países a los que se manda</span><span class="cifra-importe media">{% for pais in estado.paises %}+{{ pais }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
   <div class="cifra">
     <span class="etiqueta">Tope al mes</span><span class="cifra-importe media">{{ estado.tope }} mensajes</span>
     <form method="post" action="{% url 'mensajes:tope' %}" class="atajos">{% csrf_token %}

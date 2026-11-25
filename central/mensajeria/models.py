@@ -4,7 +4,7 @@ import uuid
 from django.db import models
 
 from emision import reloj
-from emision.models import Negocio
+from emision.models import Instalacion, Negocio
 
 TOPE_POR_OMISION = 500
 
@@ -70,6 +70,7 @@ class Mensaje(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE)
+    instalacion = models.ForeignKey(Instalacion, null=True, on_delete=models.CASCADE)
     plantilla = models.ForeignKey(Plantilla, on_delete=models.CASCADE)
     clave_envio = models.CharField(max_length=64)
     destino_final = models.CharField(max_length=4)
@@ -83,7 +84,8 @@ class Mensaje(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["negocio", "clave_envio"], name="mensaje_clave_unica"
+                fields=["negocio", "instalacion", "clave_envio"],
+                name="mensaje_clave_unica_por_instalacion",
             )
         ]
         indexes = [
@@ -112,7 +114,38 @@ class Baja(models.Model):
         ]
 
 
+class Alta(models.Model):
+    negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE)
+    resumen = models.CharField(max_length=64)
+    momento = models.DateTimeField(default=_ahora)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["negocio", "resumen"], name="alta_unica_por_negocio"
+            )
+        ]
+
+
+def paises_de_fabrica():
+    return ["52"]
+
+
 class Cuota(models.Model):
     negocio = models.OneToOneField(Negocio, on_delete=models.CASCADE)
+    paises = models.JSONField(default=paises_de_fabrica)
     tope_maximo = models.PositiveIntegerField(default=TOPE_POR_OMISION)
     tope = models.PositiveIntegerField(default=TOPE_POR_OMISION)
+
+
+class Entrante(models.Model):
+    negocio = models.ForeignKey(Negocio, on_delete=models.CASCADE)
+    sid = models.CharField(max_length=64)
+    momento = models.DateTimeField(default=_ahora, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["negocio", "sid"], name="entrante_unico_por_negocio"
+            )
+        ]

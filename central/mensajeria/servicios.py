@@ -1,5 +1,6 @@
 import hashlib
 import re
+import unicodedata
 from datetime import timedelta
 
 from django.conf import settings
@@ -9,7 +10,16 @@ from emision import reloj
 from emision.servicios import anotar
 
 from . import plantillas, proveedores, secretos
-from .models import Baja, Cuota, Documento, Mensaje, Plantilla, Remitente
+from .models import (
+    Alta,
+    Baja,
+    Cuota,
+    Documento,
+    Entrante,
+    Mensaje,
+    Plantilla,
+    Remitente,
+)
 from .proveedores import FalloProveedor
 
 HORAS_DEL_DOCUMENTO = 2
@@ -92,6 +102,7 @@ def estado(negocio):
         "enviados_mes": enviados_del_mes(negocio),
         "tope": cuota.tope,
         "tope_maximo": cuota.tope_maximo,
+        "paises": cuota.paises,
     }
 
 
@@ -151,10 +162,19 @@ def _respuesta(resultado, mensaje_id=""):
     return {"resultado": resultado, "id": str(mensaje_id)}
 
 
+def _valor_limpio(valor):
+    return (
+        bool(valor.strip())
+        and len(valor) <= LARGO_VALOR
+        and "     " not in valor
+        and not set(valor) & set("{}")
+        and not any(unicodedata.category(c) in ("Cc", "Zl", "Zp") for c in valor)
+    )
+
+
 def _valores_validos(plantilla, valores):
     return set(valores) == set(plantilla.variables) and all(
-        len(valor) <= LARGO_VALOR and not set(valor) & set("\r\n{}")
-        for valor in valores.values()
+        _valor_limpio(valor) for valor in valores.values()
     )
 
 
@@ -172,13 +192,15 @@ def _validar_adjunto(plantilla, datos, adjunto):
         raise DatosInvalidos("adjunto")
 
 
-def _registrar(negocio, plantilla, datos, destino, adjunto):
+def _registrar(instalacion, plantilla, datos, destino, adjunto):
+    negocio = instalacion.negocio
     with transaction.atomic():
         if enviados_del_mes(negocio) >= cuota_de(negocio).tope:
             return None
         _validar_adjunto(plantilla, datos, adjunto)
         mensaje = Mensaje.objects.create(
             negocio=negocio,
+            instalacion=instalacion,
             plantilla=plantilla,
             clave_envio=datos["clave_envio"],
             destino_final=destino[-4:],
@@ -220,56 +242,77 @@ def _entregar_al_proveedor(remitente, mensaje, plantilla, destino, datos):
     return _respuesta("aceptado", mensaje.pk)
 
 
-def _mensaje_previo(negocio, clave_envio):
-    return (
-        Mensaje.objects.filter(negocio=negocio, clave_envio=clave_envio)
-        .values_list("pk", flat=True)
+def _repetido(instalacion, datos, destino):
+    previo = (
+        Mensaje.objects.filter(
+            negocio=instalacion.negocio,
+            instalacion=instalacion,
+            clave_envio=datos["clave_envio"],
+        )
+        .values("pk", "destino_resumen")
         .first()
     )
+    if previo is None:
+        return None
+    if previo["destino_resumen"] != secretos.resumen_de_numero(destino):
+        raise DatosInvalidos("clave_reusada")
+    return _respuesta("repetido", previo["pk"])
 
 
-def enviar(negocio, datos, adjunto):
+def enviar(instalacion, datos, adjunto):
+    negocio = instalacion.negocio
     purgar_documentos()
     remitente = _remitente(negocio)
     if remitente is None:
         return _respuesta("sin_conexion")
-    if (previo := _mensaje_previo(negocio, datos["clave_envio"])) is not None:
-        return _respuesta("repetido", previo)
+    destino = secretos.normalizar_numero(datos["destino"])
+    if (repetido := _repetido(instalacion, datos, destino)) is not None:
+        return repetido
     plantilla = Plantilla.objects.filter(
         negocio=negocio, clave=datos["plantilla"], estado=Plantilla.APROBADA
     ).first()
     if plantilla is None or not _valores_validos(plantilla, datos["valores"]):
         return _respuesta("plantilla")
-    destino = datos["destino"]
     if PATRON_DESTINO.fullmatch(destino) is None:
         return _respuesta("destino")
+    if not any(destino.startswith(f"+{p}") for p in cuota_de(negocio).paises):
+        return _respuesta("pais")
     if Baja.objects.filter(
         negocio=negocio, resumen=secretos.resumen_de_numero(destino)
     ).exists():
         return _respuesta("baja")
     try:
-        mensaje = _registrar(negocio, plantilla, datos, destino, adjunto)
+        mensaje = _registrar(instalacion, plantilla, datos, destino, adjunto)
     except IntegrityError:
-        return _respuesta("repetido", _mensaje_previo(negocio, datos["clave_envio"]))
+        return _repetido(instalacion, datos, destino)
     if mensaje is None:
         return _respuesta("tope")
     return _entregar_al_proveedor(remitente, mensaje, plantilla, destino, datos)
 
 
-def consultar(negocio, ids):
+def consultar(instalacion, ids):
     desde = reloj.ahora() - timedelta(days=DIAS_DE_BAJAS)
-    bajas = Baja.objects.filter(negocio=negocio).values("resumen")
+    propios = Mensaje.objects.filter(
+        negocio=instalacion.negocio, instalacion=instalacion
+    )
+    bajas = Baja.objects.filter(negocio=instalacion.negocio).values("resumen")
+    altas = Alta.objects.filter(negocio=instalacion.negocio, momento__gte=desde).values(
+        "resumen"
+    )
     return {
         "mensajes": [
             {"id": str(fila["id"]), "estado": fila["estado"], "error": fila["error"]}
-            for fila in Mensaje.objects.filter(negocio=negocio, pk__in=ids).values(
-                "id", "estado", "error"
-            )
+            for fila in propios.filter(pk__in=ids).values("id", "estado", "error")
         ],
         "bajas": list(
-            Mensaje.objects.filter(
-                negocio=negocio, creado__gte=desde, destino_resumen__in=bajas
-            ).values_list("clave_envio", flat=True)
+            propios.filter(creado__gte=desde, destino_resumen__in=bajas).values_list(
+                "clave_envio", flat=True
+            )
+        ),
+        "altas": list(
+            propios.filter(creado__gte=desde, destino_resumen__in=altas).values_list(
+                "clave_envio", flat=True
+            )
         ),
     }
 
@@ -287,15 +330,37 @@ def aplicar_estado(mensaje, estado_twilio, codigo_error):
             Documento.objects.filter(mensaje=mensaje).delete()
 
 
-def aplicar_entrante(negocio, origen, cuerpo):
-    numero = origen.removeprefix("whatsapp:")
-    if PATRON_DESTINO.fullmatch(numero) is None:
+def _palabra(cuerpo):
+    sin_acentos = unicodedata.normalize("NFKD", cuerpo.strip().upper())
+    return "".join(c for c in sin_acentos if not unicodedata.combining(c))
+
+
+def _es_repetido(negocio, sid):
+    if not sid:
+        return False
+    try:
+        with transaction.atomic():
+            Entrante.objects.create(negocio=negocio, sid=sid[:64])
+    except IntegrityError:
+        return True
+    return False
+
+
+def aplicar_entrante(negocio, origen, cuerpo, sid=""):
+    numero = secretos.normalizar_numero(origen.removeprefix("whatsapp:"))
+    if PATRON_DESTINO.fullmatch(numero) is None or _es_repetido(negocio, sid):
         return
     resumen = secretos.resumen_de_numero(numero)
-    palabra = cuerpo.strip().upper()
+    palabra = _palabra(cuerpo)
     if palabra in PALABRAS_DE_BAJA:
+        Alta.objects.filter(negocio=negocio, resumen=resumen).delete()
         _, nueva = Baja.objects.get_or_create(negocio=negocio, resumen=resumen)
         if nueva:
             anotar("baja_whatsapp", negocio)
     elif palabra == PALABRA_DE_ALTA:
-        Baja.objects.filter(negocio=negocio, resumen=resumen).delete()
+        borradas, _ = Baja.objects.filter(negocio=negocio, resumen=resumen).delete()
+        if borradas:
+            Alta.objects.update_or_create(
+                negocio=negocio, resumen=resumen, defaults={"momento": reloj.ahora()}
+            )
+            anotar("alta_whatsapp", negocio)

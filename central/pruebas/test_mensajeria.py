@@ -24,7 +24,7 @@ TOKEN_SECRETO = "token-secreto-de-twilio"
 
 
 class Equipo:
-    def __init__(self, negocio):
+    def __init__(self, negocio, sello="f" * 32):
         self.privada = Ed25519PrivateKey.generate()
         publica = self.privada.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         self.huella = licencia.huella(publica)
@@ -35,7 +35,7 @@ class Equipo:
             "tipo": "activacion",
             "instalacion": self.huella,
             "momento": licencia.texto_de(reloj.ahora()),
-            "sello": "f" * 32,
+            "sello": sello,
             "version": "1.0.0",
         }
         cuerpo = {
@@ -325,3 +325,59 @@ def test_limites_exactos_de_tamano(conectado, equipo):
             .status_code
             == 413
         )
+
+
+def test_numero_normalizado_clave_por_instalacion_y_destino_distinto(conectado, equipo):
+    _aprobar(equipo)
+    conectado.instalaciones_permitidas = 2
+    conectado.save()
+    otro = Equipo(conectado, sello="e" * 32)
+    firmado = {"HTTP_X_TWILIO_SIGNATURE": simulado.FIRMA}
+    assert _enviar(equipo, destino="+5215587654321").json()["resultado"] == "aceptado"
+    assert simulado.ENVIADOS[0]["destino"] == "+525587654321"
+    assert _enviar(equipo, destino="+525587654321").json()["resultado"] == "repetido"
+    assert _enviar(equipo, destino="+525500000000").status_code == 400
+    propio = _enviar(otro).json()
+    assert propio["resultado"] == "aceptado" and len(simulado.ENVIADOS) == 2
+    Client().post(
+        f"/v1/twilio/entrante/{conectado.pk}",
+        {"From": "whatsapp:+5215587654321", "Body": "BAJA", "MessageSid": "SM9"},
+        **firmado,
+    )
+    suyo = Mensaje.objects.get(instalacion__huella=equipo.huella).pk
+    ids = [propio["id"], suyo]
+    consultado = equipo.pedir(
+        "/v1/mensajes/consultar", "mensajes_consultar", {"ids": [str(i) for i in ids]}
+    ).json()
+    assert [m["id"] for m in consultado["mensajes"]] == [str(ids[1])]
+    assert consultado["bajas"] == ["recibo-1-1"]
+    assert Baja.objects.count() == 1
+    assert (
+        _enviar(equipo, clave="p", destino="+14155550123").json()["resultado"] == "pais"
+    )
+    Client().post(
+        f"/v1/twilio/entrante/{conectado.pk}",
+        {"From": "whatsapp:+525587654321", "Body": " álta ", "MessageSid": "SM10"},
+        **firmado,
+    )
+    consultado = equipo.pedir(
+        "/v1/mensajes/consultar", "mensajes_consultar", {"ids": []}
+    ).json()
+    assert not Baja.objects.exists() and consultado["altas"] == ["recibo-1-1"]
+
+
+def test_entrante_repetido_y_secreto_ilegible_no_cambian_nada(
+    conectado, equipo, settings
+):
+    firmado = {"HTTP_X_TWILIO_SIGNATURE": simulado.FIRMA}
+    ruta = f"/v1/twilio/entrante/{conectado.pk}"
+    baja = {"From": "whatsapp:+525587654321", "Body": "BAJA", "MessageSid": "SM1"}
+    assert Client().post(ruta, baja, **firmado).status_code == 200
+    Baja.objects.all().delete()
+    assert Client().post(ruta, baja, **firmado).status_code == 200
+    assert not Baja.objects.exists()
+    Remitente.objects.update(token_cifrado="ilegible")
+    settings.PROVEEDOR_MENSAJES = "twilio"
+    ilegible = Client().post(ruta, {**baja, "MessageSid": "SM2"}, **firmado)
+    assert ilegible.status_code == 403
+    assert ilegible.content == Client().post(ruta, baja).content

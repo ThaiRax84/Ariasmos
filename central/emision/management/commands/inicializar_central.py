@@ -83,6 +83,12 @@ class Command(BaseCommand):
         if instancia.ruta_archivo(base).exists():
             datos = _datos_existentes(base)
             llave = _llave_existente(base, datos)
+            if "clave_secretos" not in datos and instancia.hay_secretos_guardados(
+                datos
+            ):
+                raise CommandError(
+                    "Central ya tiene números o bajas de WhatsApp guardados, pero a su configuración le falta la clave que los protege. No se creó una clave nueva porque esos datos quedarían ilegibles: recupera la configuración desde tu respaldo."
+                )
             agregadas = instancia.completar(base, datos)
             self.stdout.write(
                 "Central ya estaba preparada en esa carpeta; no se cambió su configuración ni sus llaves."

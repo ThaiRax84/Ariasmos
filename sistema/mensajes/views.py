@@ -118,7 +118,7 @@ def enviar_recibo(request, pk):
     except servicios.NoSePuedeEnviar as aviso:
         messages.error(request, str(aviso))
     else:
-        if envio.estado == Envio.NO_ENVIADO:
+        if envio.estado in (Envio.NO_ENVIADO, Envio.INCIERTO):
             messages.error(request, envio.motivo)
         else:
             messages.success(
