@@ -46,6 +46,17 @@ CAMPOS = {
         "version",
     ),
     "acuse": ("formato", "producto", "tipo", "instalacion", "sello", "hora"),
+    "servicio": (
+        "formato",
+        "producto",
+        "tipo",
+        "instalacion",
+        "momento",
+        "sello",
+        "version",
+        "accion",
+        "datos",
+    ),
 }
 ENTEROS = ("serie", "dias_gracia")
 FECHAS = ("emitida", "vence", "momento", "hora")
@@ -61,11 +72,13 @@ TEXTOS = (
     "hora",
     "sello",
     "version",
+    "accion",
 )
 PATRON_FECHA = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 PATRON_INSTALACION = re.compile(r"[0-9a-f]{64}")
 PATRON_SELLO = re.compile(r"[0-9a-f]{32}")
 PATRON_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+PATRON_ACCION = re.compile(r"[a-z_]{1,40}")
 FORMATO_FECHA = "%Y-%m-%dT%H:%M:%SZ"
 ANIO_MAXIMO = 9000
 GRACIA_MAXIMA = 366
@@ -183,10 +196,13 @@ def _validar(carga, tipo):
         and all(isinstance(m, str) for m in carga["modulos"])
     ):
         raise LicenciaInvalida("campos")
+    if "datos" in carga and not isinstance(carga["datos"], dict):
+        raise LicenciaInvalida("campos")
     patrones = (
         ("instalacion", PATRON_INSTALACION),
         ("sello", PATRON_SELLO),
         ("version", PATRON_VERSION),
+        ("accion", PATRON_ACCION),
     )
     if any(
         campo in carga and patron.fullmatch(carga[campo]) is None

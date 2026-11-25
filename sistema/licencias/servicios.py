@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -18,6 +19,8 @@ from proyecto import version
 
 from . import cliente, llaves, politica, reloj
 from .models import Instalacion
+
+logger = logging.getLogger(__name__)
 
 CONTEXTO_LLAVE = "licencias|llave"
 HORAS_ENTRE_AVISOS_DE_RELOJ = 6
@@ -231,9 +234,10 @@ def _anotar_intento(resultado):
     return resultado
 
 
-def _intentar(ruta, tipo, huella, privada, adicional, momento):
+def _intentar(ruta, tipo, huella, privada, adicional, momento, campos=None):
     sello = secrets.token_hex(16)
     carga = {
+        **(campos or {}),
         "formato": licencia.FORMATO,
         "producto": licencia.PRODUCTO,
         "tipo": tipo,
@@ -248,16 +252,16 @@ def _intentar(ruta, tipo, huella, privada, adicional, momento):
     return estado, respuesta, sello
 
 
-def _enviar_firmado(ruta, tipo, huella, privada, adicional):
+def _enviar_firmado(ruta, tipo, huella, privada, adicional, campos=None):
     momento = momento_efectivo()
     estado, respuesta, sello = _intentar(
-        ruta, tipo, huella, privada, adicional, momento
+        ruta, tipo, huella, privada, adicional, momento, campos
     )
     if estado == 403:
         hora = cliente.hora_central()
         if hora is not None and abs(hora - momento) > politica.DESFASE_PARA_REINTENTO:
             estado, respuesta, sello = _intentar(
-                ruta, tipo, huella, privada, adicional, hora
+                ruta, tipo, huella, privada, adicional, hora, campos
             )
     return estado, respuesta, sello
 
@@ -340,6 +344,31 @@ def activar(codigo):
     except cliente.SinConexion:
         return "sin_conexion"
     return _recibir(estado, respuesta, sello, huella, "activada")
+
+
+def _pedir_firmado(ruta, accion, datos, adjunto):
+    if _sin_llaves() is not None or not instalacion().activada:
+        return 0, {}
+    huella, privada = identidad()
+    adicional = {"instalacion": huella}
+    if adjunto is not None:
+        adicional["adjunto"] = base64.b64encode(adjunto).decode("ascii")
+    estado, respuesta, sello = _enviar_firmado(
+        ruta, "servicio", huella, privada, adicional, {"accion": accion, "datos": datos}
+    )
+    if estado == 200 and "acuse" in respuesta:
+        _aplicar_acuse(respuesta["acuse"], sello, huella)
+    return estado, respuesta
+
+
+def pedir(ruta, accion, datos, adjunto=None):
+    try:
+        return _pedir_firmado(ruta, accion, datos, adjunto)
+    except cliente.SinConexion:
+        return 0, {}
+    except Exception:
+        logger.exception("Falló la petición de servicio %s a Central", accion)
+        return 0, {}
 
 
 def _paso_tiempo_real(transcurrido):
