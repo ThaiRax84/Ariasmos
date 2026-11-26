@@ -118,3 +118,20 @@ def principal(titular):
         if compartido is not None:
             return compartido
     return Contacto.objects.filter(titular=titular, principal=True).select_related("relacion").first()
+
+
+def principales(titulares):
+    familias = {t.familia_id for t in titulares if t.familia_id}
+    de_familia = {
+        c.familia_id: c
+        for c in Contacto.objects.filter(familia_id__in=familias, principal=True)
+    }
+    de_titular = {
+        c.titular_id: c
+        for c in Contacto.objects.filter(
+            titular_id__in=[t.pk for t in titulares], principal=True
+        )
+    }
+    return {
+        t.pk: de_familia.get(t.familia_id) or de_titular.get(t.pk) for t in titulares
+    }

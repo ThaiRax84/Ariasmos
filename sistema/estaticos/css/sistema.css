@@ -555,3 +555,9 @@ fieldset.recargo legend { font-weight: 800; padding: 0 6px; }
 .burbuja { background: var(--bien-fondo); color: var(--tinta); border-radius: 16px 16px 16px 4px; padding: 14px 16px; max-width: 360px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .recibo-whatsapp { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .recibo-whatsapp p { margin: 0; }
+
+.interruptor { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--tinta); cursor: pointer; }
+.interruptor .pista { position: relative; width: 46px; height: 26px; border-radius: 999px; background: #C9BEB0; transition: background var(--t-ui) ease; }
+.interruptor .pista::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left var(--t-ui) ease; }
+.interruptor[aria-checked="true"] .pista { background: var(--bien-texto); }
+.interruptor[aria-checked="true"] .pista::after { left: 23px; }

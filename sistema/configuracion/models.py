@@ -84,6 +84,10 @@ PARAMETROS = {
     "dias_prueba_restauracion": (30, "Días entre pruebas de restauración (a lo más 180)"),
     "rechazos_antes_de_autorizar": (3, "Retiros rechazados por tope en un turno antes de que el siguiente pida autorización"),
     "porcentaje_aviso_tope": (80, "Porcentaje del tope de retiros del periodo en el que se avisa que se está por alcanzar"),
+    "avisos_hora_inicio": ("09:00", "Hora desde la que salen los avisos automáticos de WhatsApp (HH:MM, hora del negocio)"),
+    "avisos_hora_fin": ("19:00", "Hora desde la que ya no salen avisos automáticos de WhatsApp (HH:MM, hora del negocio)"),
+    "avisos_maximo_semana": (2, "Avisos automáticos de WhatsApp que una persona puede recibir en 7 días (1 a 14)"),
+    "avisos_dias_sin_envio": ("6", "Días de la semana sin avisos automáticos de WhatsApp (0 lunes a 6 domingo, separados por comas; vacío para ninguno)"),
     "porcentaje_existencia_baja": (20, "Porcentaje de su nivel de referencia (existencia tras su última entrada o conteo aprobado) en o bajo el cual un artículo tiene existencia baja"),
 }
 
@@ -111,6 +115,10 @@ ESPECIALES = (
     "apellidos_obligatorios",
     "pedir_consentimiento",
     "texto_consentimiento",
+    "avisos_hora_inicio",
+    "avisos_hora_fin",
+    "avisos_maximo_semana",
+    "avisos_dias_sin_envio",
 )
 
 
@@ -271,10 +279,13 @@ def inventario_activo():
     return bool(parametro("modulo_inventario"))
 
 
-def hoy_negocio():
+def zona_negocio():
     negocio = Negocio.actual()
-    zona = ZoneInfo(negocio.zona_horaria) if negocio else timezone.get_default_timezone()
-    return timezone.localtime(timezone.now(), zona).date()
+    return ZoneInfo(negocio.zona_horaria) if negocio else timezone.get_default_timezone()
+
+
+def hoy_negocio():
+    return timezone.localtime(timezone.now(), zona_negocio()).date()
 
 
 class Tarea(models.Model):

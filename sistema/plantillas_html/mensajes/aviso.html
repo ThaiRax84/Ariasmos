@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}{% if aviso %}Cambiar el aviso{% else %}Agregar un aviso{% endif %}{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Avisos automáticos</span>
+    <h1>{% if aviso %}Cambiar el aviso{% else %}Agregar un aviso{% endif %}</h1>
+  </div>
+</div>
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "comun/_campos.html" %}
+  <p class="ayuda">Un aviso nuevo nace apagado. Lo enciendes en la lista cuando su mensaje esté «Listo para usar».</p>
+  <div class="acciones">
+    <button class="boton" type="submit">Guardar</button>
+    <a class="boton secundario" href="{% url 'mensajes:avisos' %}">Cancelar</a>
+  </div>
+</form>
+{% if aviso and aviso.momento != 'pago' %}
+<form method="post" class="formulario" action="{% url 'mensajes:aviso' aviso.pk %}">
+  {% csrf_token %}
+  <input type="hidden" name="accion" value="borrar">
+  <button class="boton peligro" type="submit">Borrar este aviso</button>
+</form>
+{% endif %}
+{% endblock %}
