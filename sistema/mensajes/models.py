@@ -1,5 +1,11 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
+from django.utils import timezone
+
+
+MAXIMO_DIAS_ANTES = 60
+MAXIMO_DIAS_ATRASO = 365
 
 
 class PlantillaMensaje(models.Model):
@@ -26,6 +32,51 @@ class PlantillaMensaje(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class Aviso(models.Model):
+    PAGO = "pago"
+    ANTES = "antes"
+    ATRASO = "atraso"
+    MOMENTOS = [
+        (PAGO, "Al registrar un pago"),
+        (ANTES, "Antes de que venza"),
+        (ATRASO, "Cuando ya está atrasado"),
+    ]
+    MAXIMO_DE_AVISOS = 10
+    MAXIMO_DIAS = {ANTES: MAXIMO_DIAS_ANTES, ATRASO: MAXIMO_DIAS_ATRASO}
+
+    activo = models.BooleanField(default=False)
+    momento = models.CharField(max_length=6, choices=MOMENTOS)
+    dias = models.PositiveSmallIntegerField(default=0)
+    plantilla = models.ForeignKey(
+        PlantillaMensaje, on_delete=models.PROTECT, related_name="+"
+    )
+    agrupaciones = models.ManyToManyField(
+        "titulares.Agrupacion", blank=True, related_name="+"
+    )
+    activado = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(momento="pago", dias=0)
+                | Q(momento="antes", dias__gte=1, dias__lte=MAXIMO_DIAS_ANTES)
+                | Q(momento="atraso", dias__gte=1, dias__lte=MAXIMO_DIAS_ATRASO),
+                name="aviso_dias_del_momento",
+            ),
+            models.UniqueConstraint(
+                fields=["momento"],
+                condition=Q(momento="pago"),
+                name="aviso_un_solo_pago",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.activo and self.activado is None:
+            self.activado = timezone.now()
+        super().save(*args, **kwargs)
 
 
 class Envio(models.Model):
@@ -68,6 +119,20 @@ class Envio(models.Model):
         on_delete=models.PROTECT,
         related_name="envios",
     )
+    aviso = models.ForeignKey(
+        Aviso,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="envios",
+    )
+    cargo = models.ForeignKey(
+        "cobros.Cargo",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
     destino_final = models.CharField(max_length=4)
     id_central = models.UUIDField(null=True, blank=True)
     estado = models.CharField(max_length=12, choices=ESTADOS, default=PENDIENTE)
@@ -84,3 +149,10 @@ class Envio(models.Model):
     class Meta:
         ordering = ["-creado", "-id"]
         indexes = [models.Index(fields=["estado"], name="envio_estado")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["aviso", "cargo"],
+                condition=Q(aviso__isnull=False, cargo__isnull=False),
+                name="envio_un_aviso_por_cargo",
+            )
+        ]

@@ -30,6 +30,10 @@ Con esta fase, el programa de cada negocio puede mandar el recibo por WhatsApp c
 - **El tope.** En el panel de mensajes se ve cuántos se han mandado este mes y el tope. El negocio puede bajarlo o subirlo hasta el máximo que fijó Máximo. Al llegar al tope ya no se manda nada hasta el mes siguiente.
 - **Las bajas.** Si la persona contesta BAJA, STOP o ALTO, no se le manda nada más y el programa la marca. Si contesta ALTA, Central vuelve a permitirlo.
 
+## Avisos automáticos
+
+En «Mensajes», «Avisos automáticos» se decide qué mensaje sale solo y cuándo: al registrar un pago (el recibo con el PDF), unos días antes de que venza un cargo o unos días después de que se atrasó. Cada aviso nace apagado; solo se enciende si su mensaje está «Listo para usar». En «Para no molestar» se eligen la hora de envío, el máximo de avisos por persona en una semana y los días sin envíos. Solo se escribe a quien aceptó recibir WhatsApp: «Ver quién falta» muestra a quien todavía no puede recibir mensajes y por qué. Un aviso encendido cuyo mensaje deja de estar aprobado aparece «En pausa» y no manda nada. Al encender un aviso de atraso no se escribe por adeudos más viejos que sus días más una semana.
+
 ## Si un mensaje no llega
 
 1. En el recibo se ve el estado y el motivo en palabras llanas. «Intentar otra vez» aparece solo si falló.

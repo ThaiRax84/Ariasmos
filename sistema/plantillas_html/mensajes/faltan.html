@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Quién falta{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Avisos automáticos</span>
+    <h1>Quién falta</h1>
+    <p class="subtitulo">A estas personas todavía no se les puede escribir por WhatsApp.</p>
+  </div>
+</div>
+<section class="panel">
+  <table class="tabla">
+    <thead><tr><th>{{ voc.titular }}</th><th>{{ voc.matricula }}</th><th>Responsable de pago</th><th>Por qué falta</th><th></th></tr></thead>
+    <tbody>{% for r, motivo, enlace in filas %}<tr>
+      <td class="fuerte">{{ r.titular.nombre_completo }}</td>
+      <td>{{ r.titular.matricula }}</td>
+      <td>{% if r.contacto %}{{ r.contacto.nombre }}{% if r.final %}<span class="detalle">Teléfono terminado en {{ r.final }}</span>{% endif %}{% else %}-{% endif %}</td>
+      <td>{{ motivo }}</td>
+      <td>{% if enlace %}<a href="{{ enlace }}">Abrir su ficha</a>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="5">Todos pueden recibir mensajes.</td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+<p><a href="{% url 'mensajes:avisos' %}">Volver a avisos automáticos</a></p>
+{% endblock %}

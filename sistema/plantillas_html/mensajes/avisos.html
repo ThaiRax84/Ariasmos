@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titulo %}Avisos automáticos{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <div class="encabezado-texto">
+    <span class="antetitulo">Configuración · Mensajes por WhatsApp</span>
+    <h1>Avisos automáticos</h1>
+    <p class="subtitulo">Tú decides cuándo se manda cada mensaje. Ariasmos revisa los adeudos y los manda solo, a la hora que elijas.</p>
+  </div>
+</div>
+<section class="panel">
+  <table class="tabla">
+    <thead><tr><th>Activo</th><th>¿Cuándo?</th><th>¿Qué mensaje?</th><th>¿A quién?</th><th></th></tr></thead>
+    <tbody>{% for fila in filas %}<tr>
+      <td>
+        <form method="post" action="{% url 'mensajes:aviso' fila.aviso.pk %}">{% csrf_token %}
+          <input type="hidden" name="accion" value="{% if fila.aviso.activo %}desactivar{% else %}activar{% endif %}">
+          <button class="interruptor" type="submit" role="switch" aria-checked="{% if fila.aviso.activo %}true{% else %}false{% endif %}" aria-label="{{ fila.cuando }}: {% if fila.aviso.activo %}apagar{% else %}encender{% endif %}"><span class="pista"></span><span class="texto-interruptor">{% if fila.aviso.activo %}Sí{% else %}No{% endif %}</span></button>
+        </form>
+      </td>
+      <td class="fuerte">{{ fila.cuando }}{% if fila.pausa %}<span class="detalle"><span class="estado aviso">{{ fila.pausa }}</span></span>{% endif %}</td>
+      <td>{{ fila.mensaje }}</td>
+      <td>{{ fila.a_quien }}</td>
+      <td><a class="boton chico secundario" href="{% url 'mensajes:aviso' fila.aviso.pk %}">Cambiar</a></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+  {% if caben_mas %}<p><a class="boton" href="{% url 'mensajes:aviso_nuevo' %}">Agregar un aviso</a></p>{% else %}<p class="ayuda">Ya hay 10 avisos, que es el máximo. Borra uno para agregar otro.</p>{% endif %}
+</section>
+<div class="rejilla">
+  <section class="panel">
+    <h2>Para no molestar</h2>
+    <dl class="datos">
+      <dt>Hora de envío</dt><dd>De {{ limites.inicio|time:"G:i" }} a {{ limites.fin|time:"G:i" }}</dd>
+      <dt>Máximo por persona</dt><dd>{{ limites.maximo }} {% if limites.maximo == 1 %}aviso{% else %}avisos{% endif %} por semana</dd>
+      <dt>Días sin envíos</dt><dd>{{ sin_envio }}</dd>
+    </dl>
+    <details class="mas-opciones"{% if formulario.errors %} open{% endif %}>
+      <summary>Cambiar</summary>
+      <form method="post" class="formulario" novalidate>{% csrf_token %}
+        <input type="hidden" name="accion" value="limites">
+        {% include "comun/_campos.html" %}
+        <div class="acciones"><button class="boton" type="submit">Guardar</button></div>
+      </form>
+    </details>
+  </section>
+  <section class="panel">
+    <h2>Quién recibe mensajes</h2>
+    <p>Solo se le escribe a quien aceptó recibir WhatsApp. Se marca en la ficha de cada persona, junto a su teléfono. Si alguien responde «BAJA», se le deja de escribir.</p>
+    <dl class="datos"><dt>Aceptaron</dt><dd>{{ aceptaron }} de {{ total }} responsables de pago</dd></dl>
+    <p><a class="boton secundario" href="{% url 'mensajes:faltan' %}">Ver quién falta</a></p>
+  </section>
+</div>
+<p><a href="{% url 'mensajes:panel' %}">Volver a mensajes por WhatsApp</a></p>
+{% endblock %}

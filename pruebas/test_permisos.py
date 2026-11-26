@@ -12,6 +12,7 @@ from configuracion.models import Parametro
 from cortes.models import Corte, Destino, Entrega
 from inventario import servicios as inventario
 from inventario.models import Articulo, Conteo, Devolucion, Venta
+from mensajes.models import Aviso
 from cuentas.models import CodigoUsado, Delegacion, Dispositivo, Rol
 from solicitudes.models import PoliticaAccion, Solicitud
 from titulares.models import Agrupacion, Contacto, Familia, LotePadron, Titular
@@ -209,6 +210,10 @@ MATRIZ = {
     "mensajes:tope": ("administrar_mensajes",),
     "mensajes:plantilla": ("administrar_mensajes",),
     "mensajes:plantilla_nueva": ("administrar_mensajes",),
+    "mensajes:avisos": ("administrar_mensajes",),
+    "mensajes:aviso_nuevo": ("administrar_mensajes",),
+    "mensajes:aviso": ("administrar_mensajes",),
+    "mensajes:faltan": ("administrar_mensajes",),
     "mensajes:enviar_recibo": ("enviar_whatsapp",),
 }
 
@@ -343,6 +348,7 @@ def escenario(db):
         "cobros:recibo_pdf": {"pk": pago.recibo.pk},
         "mensajes:enviar_recibo": {"pk": pago.recibo.pk},
         "mensajes:plantilla": {"clave": "recibo"},
+        "mensajes:aviso": {"pk": Aviso.objects.first().pk},
         "cobros:cargo_manual": {"pk": titular.pk},
         "cobros:beca": {"pk": titular.pk},
         "cobros:prorroga": {"pk": cargo.pk},

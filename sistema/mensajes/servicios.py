@@ -157,18 +157,23 @@ def fijar_tope(tope, usuario):
     registrar("mensajes_tope_cambiado", usuario=usuario, datos={"tope": tope})
 
 
-def _telefono_de(contacto):
-    for campo in contactos.campos_activos():
-        if campo.tipo == campo.TELEFONO and contacto.valor(campo):
-            try:
-                return "+" + telefono.normalizar(
-                    contacto.valor(campo),
-                    str(parametro("prefijo_pais_telefono")),
-                    parametro("digitos_telefono_nacional"),
-                )
-            except telefono.TelefonoInvalido:
-                return ""
-    return ""
+def lector_de_telefonos():
+    campos = [c for c in contactos.campos_activos() if c.tipo == c.TELEFONO]
+    prefijo = str(parametro("prefijo_pais_telefono"))
+    digitos = parametro("digitos_telefono_nacional")
+
+    def telefono_de(contacto):
+        for campo in campos:
+            if contacto.valor(campo):
+                try:
+                    return "+" + telefono.normalizar(
+                        contacto.valor(campo), prefijo, digitos
+                    )
+                except telefono.TelefonoInvalido:
+                    return ""
+        return ""
+
+    return telefono_de
 
 
 def _valores_del_recibo(recibo, contacto, usadas):
@@ -220,19 +225,30 @@ def _exigir_permisos(recibo, usuario):
         raise PermissionDenied
 
 
+def falta_de(contacto, numero):
+    if not numero:
+        return "telefono"
+    if contacto.baja_whatsapp:
+        return "baja"
+    if not contacto.acepta_whatsapp:
+        return "consentimiento"
+    return None
+
+
+FALTAS_DEL_RECIBO = {
+    "telefono": "No hay un teléfono en el contacto principal. Agrégalo en su ficha.",
+    "baja": "Esa persona pidió no recibir mensajes por WhatsApp.",
+    "consentimiento": "Esa persona todavía no aceptó recibir mensajes por WhatsApp. Marca la casilla en su ficha cuando lo acepte.",
+}
+
+
 def _destinatario(recibo):
     contacto = contactos.principal(recibo.pago.titular)
-    numero = _telefono_de(contacto) if contacto else ""
-    if not numero:
+    numero = lector_de_telefonos()(contacto) if contacto else ""
+    falta = falta_de(contacto, numero)
+    if falta:
         raise NoSePuedeEnviar(
-            "No hay un teléfono en el contacto principal. Agrégalo en su ficha."
-        )
-    if contacto.baja_whatsapp:
-        raise NoSePuedeEnviar("Esa persona pidió no recibir mensajes por WhatsApp.")
-    if not contacto.acepta_whatsapp:
-        raise NoSePuedeEnviar(
-            "Esa persona todavía no aceptó recibir mensajes por WhatsApp. Marca la casilla en su ficha cuando lo acepte.",
-            falta_consentimiento=True,
+            FALTAS_DEL_RECIBO[falta], falta_consentimiento=falta == "consentimiento"
         )
     return contacto, numero
 
@@ -246,11 +262,14 @@ def _clave_del_envio(recibo, reenviar):
     return ultimo.clave_envio
 
 
-def _envio_para(recibo, usuario, contacto, plantilla, numero, reenviar):
+def _envio_para(recibo, usuario, contacto, plantilla, numero, reenviar, aviso):
     clave = _clave_del_envio(recibo, reenviar)
     existente = Envio.objects.filter(clave_envio=clave).first()
     if existente is not None:
-        return existente, existente.estado in (Envio.PENDIENTE, Envio.INCIERTO)
+        reintentable = (Envio.PENDIENTE, Envio.INCIERTO) + (
+            (Envio.NO_ENVIADO,) if aviso else ()
+        )
+        return existente, existente.estado in reintentable
     try:
         return Envio.objects.create(
             clave_envio=clave,
@@ -258,6 +277,7 @@ def _envio_para(recibo, usuario, contacto, plantilla, numero, reenviar):
             contacto=contacto,
             titular=recibo.pago.titular,
             recibo=recibo,
+            aviso=aviso,
             destino_final=numero[-4:],
             enviado_por=usuario,
         ), True
@@ -322,7 +342,10 @@ def _pedir_el_envio(envio, recibo, plantilla, numero, contacto, pdf):
 
 def enviar_recibo(recibo, usuario, reenviar=False):
     _exigir_permisos(recibo, usuario)
-    plantilla = plantilla_del_recibo()
+    return mandar_recibo(recibo, usuario, plantilla_del_recibo(), reenviar)
+
+
+def mandar_recibo(recibo, usuario, plantilla, reenviar=False, aviso=None):
     if not disponible() or plantilla is None:
         raise NoSePuedeEnviar(NO_DISPONIBLE)
     if hasattr(recibo.pago, "reversion"):
@@ -330,7 +353,7 @@ def enviar_recibo(recibo, usuario, reenviar=False):
     contacto, numero = _destinatario(recibo)
     pdf = _pdf_del_recibo(recibo)
     envio, por_pedir = _envio_para(
-        recibo, usuario, contacto, plantilla, numero, reenviar
+        recibo, usuario, contacto, plantilla, numero, reenviar, aviso
     )
     if por_pedir:
         _pedir_el_envio(envio, recibo, plantilla, numero, contacto, pdf)
@@ -349,7 +372,7 @@ def enviar_recibo(recibo, usuario, reenviar=False):
     return envio
 
 
-def _enlace_al_consentimiento(contacto, usuario):
+def enlace_al_consentimiento(contacto, usuario):
     if contacto is None or not any(usuario.tiene_permiso(p) for p in CAPTURA):
         return ""
     if contacto.titular_id:
@@ -376,7 +399,7 @@ def situacion_del_recibo(recibo, usuario):
         contacto, numero = _destinatario(recibo)
     except NoSePuedeEnviar as aviso:
         enlace = (
-            _enlace_al_consentimiento(contactos.principal(recibo.pago.titular), usuario)
+            enlace_al_consentimiento(contactos.principal(recibo.pago.titular), usuario)
             if aviso.falta_consentimiento
             else ""
         )
@@ -435,11 +458,15 @@ def _actualizar_envios(respuesta):
     return cambiados
 
 
-def _resolver_incierto(envio, plantilla):
+def _resolver_incierto(envio):
+    if envio.cargo_id:
+        from . import avisos
+
+        return avisos.reintentar(envio)
     try:
         contacto, numero = _destinatario(envio.recibo)
         pdf = _pdf_del_recibo(envio.recibo)
-        _pedir_el_envio(envio, envio.recibo, plantilla, numero, contacto, pdf)
+        _pedir_el_envio(envio, envio.recibo, envio.plantilla, numero, contacto, pdf)
     except NoSePuedeEnviar as aviso:
         Envio.objects.filter(pk=envio.pk).update(
             estado=Envio.NO_ENVIADO, motivo=str(aviso)
@@ -447,14 +474,13 @@ def _resolver_incierto(envio, plantilla):
 
 
 def _resolver_inciertos():
-    plantilla = plantilla_del_recibo()
     desde = reloj.ahora() - timedelta(hours=HORAS_PARA_RESOLVER)
-    if plantilla is None:
-        return
     for envio in Envio.objects.filter(
-        estado=Envio.INCIERTO, creado__gte=desde, recibo__isnull=False
-    ).select_related("recibo__pago")[:LOTE]:
-        _resolver_incierto(envio, plantilla)
+        estado=Envio.INCIERTO,
+        creado__gte=desde,
+        plantilla__estado=PlantillaMensaje.APROBADA,
+    ).select_related("recibo__pago", "plantilla")[:LOTE]:
+        _resolver_incierto(envio)
 
 
 def actualizar_estados():

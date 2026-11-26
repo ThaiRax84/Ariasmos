@@ -23,7 +23,7 @@ ETIQUETAS = {
     "importe": "Importe",
     "adeudo": "Adeudo",
     "fecha": "Fecha",
-    "dias": "Días de atraso",
+    "dias": "Días (de atraso o que faltan)",
     "folio": "Folio",
     "negocio": "Negocio",
 }

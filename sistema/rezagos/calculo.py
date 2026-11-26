@@ -74,11 +74,15 @@ def _prorroga():
     return Subquery(Prorroga.objects.filter(cargo=OuterRef("pk")).order_by().values("cargo").annotate(m=Max("fecha_limite")).values("m"), output_field=DateField())
 
 
+def con_efectivo(consulta):
+    return consulta.annotate(efectivo=Greatest("vencimiento", Coalesce(_prorroga(), "vencimiento")))
+
+
 def vencidos(hoy, ids=None):
     consulta = Cargo.objects.filter(vencimiento__lt=hoy, titular__interno=False, titular__estado__in=ESTADOS)
     if ids is not None:
         consulta = consulta.filter(titular_id__in=list(ids))
-    consulta = libro.con_saldo(consulta).annotate(efectivo=Greatest("vencimiento", Coalesce(_prorroga(), "vencimiento"))).filter(saldo__gt=0, efectivo__lt=hoy)
+    consulta = con_efectivo(libro.con_saldo(consulta)).filter(saldo__gt=0, efectivo__lt=hoy)
     filas = consulta.order_by().values("titular_id", "titular__agrupacion_id").annotate(total=Sum("saldo"), desde=Min("efectivo"))
     return {f["titular_id"]: (f["titular__agrupacion_id"], f["total"], f["desde"]) for f in filas}
 

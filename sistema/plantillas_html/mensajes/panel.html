@@ -40,7 +40,7 @@
 </div>
 {% endif %}
 <section class="panel">
-  <div class="encabezado"><h2>Mensajes</h2><div class="encabezado-lado"><a class="boton secundario" href="{% url 'mensajes:plantilla_nueva' %}">Escribir un mensaje nuevo</a></div></div>
+  <div class="encabezado"><h2>Mensajes</h2><div class="encabezado-lado"><a class="boton secundario" href="{% url 'mensajes:avisos' %}">Avisos automáticos</a> <a class="boton secundario" href="{% url 'mensajes:plantilla_nueva' %}">Escribir un mensaje nuevo</a></div></div>
   <table class="tabla">
     <thead><tr><th>Mensaje</th><th>Texto</th><th>Estado</th><th></th></tr></thead>
     <tbody>{% for p, texto in plantillas %}<tr>
