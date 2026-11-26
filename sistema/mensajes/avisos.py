@@ -1,6 +1,7 @@
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, namedtuple
 from datetime import time, timedelta
-from functools import cached_property
+from functools import cached_property, partial, reduce
+from operator import or_
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Q, Sum
@@ -9,7 +10,7 @@ from django.utils import timezone
 from auditoria.servicios import registrar
 from cobros import libro
 from cobros.models import Cargo, Recibo
-from configuracion.models import Negocio, parametro, zona_negocio
+from configuracion.models import PARAMETROS, Negocio, parametro, zona_negocio
 from configuracion.moneda import formatear
 from rezagos.calculo import ESTADOS, con_efectivo
 from titulares import contactos
@@ -28,6 +29,11 @@ CIERRAN_EL_CICLO = {
     servicios.MOTIVOS["sin_conexion"],
     servicios.SIN_RESPUESTA,
 }
+MOMENTOS_DE_AVISO = (Aviso.PAGO, Aviso.ANTES, Aviso.ATRASO)
+MOMENTOS_DEL_MAXIMO = (Aviso.ANTES, Aviso.ATRASO)
+MAXIMOS_POR_SEMANA = (1, 14)
+CAMBIO = "El aviso cambió antes de salir"
+Trabajo = namedtuple("Trabajo", ["previo", "mandar"])
 EN_PAUSA = "En pausa: "
 SIN_APROBAR = EN_PAUSA + "el mensaje no está aprobado"
 NO_SIRVE = EN_PAUSA + "este mensaje no sirve para este aviso"
@@ -52,13 +58,37 @@ def pausa(aviso):
     return ""
 
 
-def hora_de(clave):
-    return time.fromisoformat(str(parametro(clave)))
+def horario():
+    de_fabrica = tuple(
+        time.fromisoformat(PARAMETROS[clave][0])
+        for clave in ("avisos_hora_inicio", "avisos_hora_fin")
+    )
+    try:
+        inicio = time.fromisoformat(str(parametro("avisos_hora_inicio")))
+        fin = time.fromisoformat(str(parametro("avisos_hora_fin")))
+    except ValueError:
+        return de_fabrica
+    return (inicio, fin) if inicio < fin else de_fabrica
+
+
+def maximo_por_semana():
+    minimo, maximo = MAXIMOS_POR_SEMANA
+    return min(max(parametro("avisos_maximo_semana"), minimo), maximo)
 
 
 def dias_sin_envio():
     texto = str(parametro("avisos_dias_sin_envio"))
-    return {int(d) for d in texto.split(",") if d.strip().isdigit()}
+    return {int(d) for d in texto.split(",") if d.strip().isdigit() and int(d) <= 6}
+
+
+def _de_la_semana(ahora, contactos=None):
+    envios = Envio.objects.filter(
+        momento__in=MOMENTOS_DEL_MAXIMO, creado__gte=ahora - SEMANA
+    ).exclude(estado=Envio.NO_ENVIADO)
+    if contactos is not None:
+        envios = envios.filter(contacto_id__in=contactos)
+    filas = envios.order_by().values("contacto_id").annotate(total=Count("id"))
+    return defaultdict(int, {f["contacto_id"]: f["total"] for f in filas})
 
 
 class _Ciclo:
@@ -77,28 +107,16 @@ class _Ciclo:
     @cached_property
     def en_horario(self):
         local = timezone.localtime(self.ahora, zona_negocio())
-        return (
-            hora_de("avisos_hora_inicio") <= local.time() < hora_de("avisos_hora_fin")
-            and local.weekday() not in dias_sin_envio()
-        )
+        inicio, fin = horario()
+        return inicio <= local.time() < fin and local.weekday() not in dias_sin_envio()
 
     @cached_property
     def maximo_semanal(self):
-        return parametro("avisos_maximo_semana")
+        return maximo_por_semana()
 
     @cached_property
     def semanales(self):
-        filas = (
-            Envio.objects.filter(
-                aviso__momento__in=(Aviso.ANTES, Aviso.ATRASO),
-                creado__gte=self.ahora - SEMANA,
-            )
-            .exclude(estado=Envio.NO_ENVIADO)
-            .order_by()
-            .values("contacto_id")
-            .annotate(total=Count("id"))
-        )
-        return defaultdict(int, {f["contacto_id"]: f["total"] for f in filas})
+        return _de_la_semana(self.ahora)
 
     @cached_property
     def telefono_de(self):
@@ -132,21 +150,30 @@ def _recibos_por_mandar(ciclo, aviso):
         )
         .exclude(Exists(sin_reintento))
         .select_related("pago__titular")
-        .order_by("pago__fecha")[: ciclo.cupo]
+        .order_by("pago__fecha")
     )
 
 
-def _mandar_recibos(ciclo, aviso):
-    for recibo in _recibos_por_mandar(ciclo, aviso):
-        if not ciclo.sigue:
-            return
-        try:
-            envio = servicios.mandar_recibo(
-                recibo, None, aviso.plantilla, aviso=aviso
+def _mandar_recibo(ciclo, aviso, recibo):
+    try:
+        envio = servicios.mandar_recibo(recibo, None, aviso.plantilla, aviso=aviso)
+    except servicios.NoSePuedeEnviar:
+        return
+    ciclo.anotar(aviso, envio)
+
+
+def _trabajos_de_recibos(ciclo, aviso):
+    recibos = list(_recibos_por_mandar(ciclo, aviso))
+    principales = contactos.principales([r.pago.titular for r in recibos])
+    previos = {e.recibo_id: e for e in Envio.objects.filter(recibo__in=recibos)}
+    trabajos = []
+    for recibo in recibos:
+        contacto = principales[recibo.pago.titular_id]
+        if contacto and not servicios.falta_de(contacto, ciclo.telefono_de(contacto)):
+            trabajos.append(
+                Trabajo(previos.get(recibo.pk), partial(_mandar_recibo, ciclo, aviso, recibo))
             )
-        except servicios.NoSePuedeEnviar:
-            continue
-        ciclo.anotar(aviso, envio)
+    return trabajos
 
 
 def _fechas_del_aviso(aviso, hoy):
@@ -219,18 +246,15 @@ def _pedir_aviso(envio, numero, valores):
         "destino": numero,
         "valores": valores,
     }
-    try:
-        servicios._aplicar_resultado(
-            envio, servicios._pedir("mensajes_enviar", datos)
-        )
-    except servicios.NoSePuedeEnviar as pais:
-        envio.estado, envio.motivo = Envio.FALLIDO, str(pais)
-        envio.save()
+    servicios._aplicar_resultado(envio, servicios._pedir("mensajes_enviar", datos))
 
 
-def _crear_envio(aviso, cargo, contacto, numero):
+def _crear_envio(ciclo, aviso, cargo, contacto, numero):
     try:
         with transaction.atomic():
+            ya_enviados = _de_la_semana(ciclo.ahora, [contacto.pk])[contacto.pk]
+            if ya_enviados >= ciclo.maximo_semanal:
+                return None
             return Envio.objects.create(
                 clave_envio=f"aviso-{aviso.pk}-{cargo.pk}",
                 plantilla=aviso.plantilla,
@@ -253,28 +277,26 @@ def _cuenta_en_la_semana(ciclo, envio):
 
 
 def _mandar_cargo(ciclo, aviso, cargo, contacto, previo, adeudo):
-    if contacto is None:
-        return
     numero = ciclo.telefono_de(contacto)
     if servicios.falta_de(contacto, numero):
         return
     contado = _cuenta_en_la_semana(ciclo, previo)
     if ciclo.semanales[contacto.pk] - contado >= ciclo.maximo_semanal:
         return
-    envio = previo or _crear_envio(aviso, cargo, contacto, numero)
+    envio = previo or _crear_envio(ciclo, aviso, cargo, contacto, numero)
     if envio is None:
         return
-    valores = _valores(ciclo, aviso.plantilla, cargo, contacto, adeudo)
+    valores = _valores(ciclo, envio.plantilla, cargo, contacto, adeudo)
     _pedir_aviso(envio, numero, valores)
     ciclo.anotar(aviso, envio)
     if envio.estado != Envio.NO_ENVIADO and not contado:
         ciclo.semanales[contacto.pk] += 1
 
 
-def _mandar_cargos(ciclo, aviso):
+def _trabajos_de_cargos(ciclo, aviso):
     elegidos = _el_mas_antiguo_de_cada_titular(_cargos_por_avisar(aviso, ciclo.hoy))
     if not elegidos:
-        return
+        return []
     titulares = [c.titular for c in elegidos]
     principales = contactos.principales(titulares)
     previos = {
@@ -288,42 +310,22 @@ def _mandar_cargos(ciclo, aviso):
         if "adeudo" in variables.usadas(aviso.plantilla.texto)
         else {}
     )
-    for cargo in elegidos:
-        if not ciclo.sigue:
-            return
-        _mandar_cargo(
-            ciclo,
-            aviso,
-            cargo,
-            principales[cargo.titular_id],
+    return [
+        Trabajo(
             previos.get(cargo.pk),
-            adeudos.get(cargo.titular_id, 0),
+            partial(
+                _mandar_cargo,
+                ciclo,
+                aviso,
+                cargo,
+                principales[cargo.titular_id],
+                previos.get(cargo.pk),
+                adeudos.get(cargo.titular_id, 0),
+            ),
         )
-
-
-def reintentar(envio):
-    ciclo = _Ciclo(timezone.now())
-    cargo = (
-        con_efectivo(
-            libro.con_saldo(
-                Cargo.objects.filter(pk=envio.cargo_id).select_related(
-                    "concepto", "titular"
-                )
-            )
-        )
-        .filter(saldo__gt=0)
-        .first()
-    )
-    numero = ciclo.telefono_de(envio.contacto)
-    if (
-        cargo is None
-        or servicios.falta_de(envio.contacto, numero)
-        or not _calculables(envio.plantilla)
-    ):
-        return
-    adeudo = _adeudos([cargo.titular]).get(cargo.titular_id, 0)
-    valores = _valores(ciclo, envio.plantilla, cargo, envio.contacto, adeudo)
-    _pedir_aviso(envio, numero, valores)
+        for cargo in elegidos
+        if principales[cargo.titular_id] is not None
+    ]
 
 
 def _activos():
@@ -339,16 +341,35 @@ def _bitacora(ciclo):
         )
 
 
+def _cerrar_los_que_cambiaron(activos):
+    vigentes = [Q(aviso=a, plantilla=a.plantilla_id) for a in activos]
+    cambiados = Envio.objects.filter(
+        estado__in=REINTENTABLES, momento__in=MOMENTOS_DE_AVISO
+    )
+    if vigentes:
+        cambiados = cambiados.exclude(reduce(or_, vigentes))
+    cambiados.update(estado=Envio.FALLIDO, motivo=CAMBIO)
+
+
+def _trabajos(ciclo, activos):
+    trabajos = []
+    for aviso in activos:
+        if aviso.momento == Aviso.PAGO:
+            trabajos += _trabajos_de_recibos(ciclo, aviso)
+        elif ciclo.en_horario:
+            trabajos += _trabajos_de_cargos(ciclo, aviso)
+    return sorted(trabajos, key=lambda trabajo: trabajo.previo is not None)
+
+
 def ejecutar(ahora=None):
     if not servicios.disponible():
         return 0
     ciclo = _Ciclo(ahora or timezone.now())
-    for aviso in _activos():
+    activos = _activos()
+    _cerrar_los_que_cambiaron(activos)
+    for trabajo in _trabajos(ciclo, activos):
         if not ciclo.sigue:
             break
-        if aviso.momento == Aviso.PAGO:
-            _mandar_recibos(ciclo, aviso)
-        elif ciclo.en_horario:
-            _mandar_cargos(ciclo, aviso)
+        trabajo.mandar()
     _bitacora(ciclo)
     return sum(ciclo.enviados.values())

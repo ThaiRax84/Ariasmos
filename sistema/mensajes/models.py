@@ -133,6 +133,7 @@ class Envio(models.Model):
         on_delete=models.PROTECT,
         related_name="+",
     )
+    momento = models.CharField(max_length=6, blank=True)
     destino_final = models.CharField(max_length=4)
     id_central = models.UUIDField(null=True, blank=True)
     estado = models.CharField(max_length=12, choices=ESTADOS, default=PENDIENTE)
@@ -145,6 +146,11 @@ class Envio(models.Model):
         on_delete=models.PROTECT,
         related_name="+",
     )
+
+    def save(self, *args, **kwargs):
+        if self.aviso_id and not self.momento:
+            self.momento = self.aviso.momento
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-creado", "-id"]

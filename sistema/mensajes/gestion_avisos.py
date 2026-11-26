@@ -4,7 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from auditoria.servicios import registrar
-from configuracion.models import Parametro, parametro
+from configuracion.models import Parametro
 from titulares import contactos
 from titulares.models import Titular
 
@@ -53,6 +53,8 @@ def guardar(aviso, plantilla, dias, agrupaciones, usuario):
     with transaction.atomic():
         if aviso.pk is None:
             _admitir_nuevo(aviso)
+        if _repetido(aviso, [] if es_pago else agrupaciones):
+            raise ValueError("Ya hay un aviso igual a este.")
         aviso.save()
         aviso.agrupaciones.set([] if es_pago else agrupaciones)
     registrar(
@@ -68,6 +70,17 @@ def _admitir_nuevo(aviso):
         raise ValueError(f"Solo puede haber {Aviso.MAXIMO_DE_AVISOS} avisos.")
     if aviso.momento == Aviso.PAGO and Aviso.objects.filter(momento=Aviso.PAGO).exists():
         raise ValueError("Ya hay un aviso al registrar un pago. Cámbialo en lugar de agregar otro.")
+
+
+def _repetido(aviso, agrupaciones):
+    pedidas = {a.pk for a in agrupaciones}
+    iguales = Aviso.objects.filter(momento=aviso.momento, dias=aviso.dias).exclude(
+        pk=aviso.pk
+    )
+    return any(
+        {a.pk for a in otro.agrupaciones.all()} == pedidas
+        for otro in iguales.prefetch_related("agrupaciones")
+    )
 
 
 def _datos(aviso):
@@ -92,15 +105,18 @@ def cambiar_activo(aviso, activo, usuario):
 def borrar(aviso, usuario):
     if aviso.momento == Aviso.PAGO:
         raise ValueError("El aviso al registrar un pago no se puede borrar; solo se puede apagar.")
+    if aviso.envios.exists():
+        raise ValueError("Este aviso ya mandó mensajes. Puedes apagarlo, pero no borrarlo.")
     registrar("aviso_borrado", usuario=usuario, objeto=aviso, datos=_datos(aviso))
     aviso.delete()
 
 
 def limites():
+    inicio, fin = avisos.horario()
     return {
-        "inicio": avisos.hora_de("avisos_hora_inicio"),
-        "fin": avisos.hora_de("avisos_hora_fin"),
-        "maximo": parametro("avisos_maximo_semana"),
+        "inicio": inicio,
+        "fin": fin,
+        "maximo": avisos.maximo_por_semana(),
         "dias_sin_envio": sorted(avisos.dias_sin_envio()),
     }
 

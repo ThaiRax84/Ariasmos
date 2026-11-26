@@ -22,7 +22,7 @@ from titulares.models import Contacto
 from titulares.views import CAPTURA
 
 from . import variables
-from .models import Envio, PlantillaMensaje
+from .models import Aviso, Envio, PlantillaMensaje
 
 CLAVE_DEL_RECIBO = "recibo"
 PATRON_CLAVE = re.compile(r"[a-z0-9_]{1,40}")
@@ -46,6 +46,7 @@ MOTIVOS = {
     "proveedor": "WhatsApp no aceptó el mensaje. Intenta de nuevo en unos minutos.",
 }
 PAIS = "Este número es de un país al que tu servicio de mensajes no envía. Pide que lo activen."
+DEFINITIVOS = frozenset(MOTIVOS) - {"tope", "sin_conexion"} | {"pais"}
 INCIERTO = "No sabemos si salió. Inténtalo otra vez: no se cobra doble."
 CON_REVERSION = "Ese pago fue cancelado: no se manda su recibo por WhatsApp."
 PDF_GRANDE = "El recibo en PDF es demasiado grande para mandarlo por WhatsApp."
@@ -304,12 +305,14 @@ def _aplicar_resultado(envio, respuesta):
         )
         envio.id_central, envio.estado, envio.motivo = id_central, Envio.ACEPTADO, ""
         return
-    if resultado == "pais":
+    if resultado == "pais" and not envio.aviso_id:
         envio.delete()
         raise NoSePuedeEnviar(PAIS)
     if resultado == "baja":
         Contacto.objects.filter(pk=envio.contacto_id).update(baja_whatsapp=True)
-    _fijar_estado(envio, Envio.NO_ENVIADO, MOTIVOS.get(resultado, SIN_RESPUESTA))
+    estado = Envio.FALLIDO if envio.aviso_id and resultado in DEFINITIVOS else Envio.NO_ENVIADO
+    motivo = PAIS if resultado == "pais" else MOTIVOS.get(resultado, SIN_RESPUESTA)
+    _fijar_estado(envio, estado, motivo)
 
 
 def _pdf_del_recibo(recibo):
@@ -459,10 +462,6 @@ def _actualizar_envios(respuesta):
 
 
 def _resolver_incierto(envio):
-    if envio.cargo_id:
-        from . import avisos
-
-        return avisos.reintentar(envio)
     try:
         contacto, numero = _destinatario(envio.recibo)
         pdf = _pdf_del_recibo(envio.recibo)
@@ -475,11 +474,15 @@ def _resolver_incierto(envio):
 
 def _resolver_inciertos():
     desde = reloj.ahora() - timedelta(hours=HORAS_PARA_RESOLVER)
-    for envio in Envio.objects.filter(
-        estado=Envio.INCIERTO,
-        creado__gte=desde,
-        plantilla__estado=PlantillaMensaje.APROBADA,
-    ).select_related("recibo__pago", "plantilla")[:LOTE]:
+    for envio in (
+        Envio.objects.filter(
+            estado=Envio.INCIERTO,
+            creado__gte=desde,
+            plantilla__estado=PlantillaMensaje.APROBADA,
+        )
+        .exclude(momento__in=(Aviso.ANTES, Aviso.ATRASO))
+        .select_related("recibo__pago", "plantilla")[:LOTE]
+    ):
         _resolver_incierto(envio)
 
 

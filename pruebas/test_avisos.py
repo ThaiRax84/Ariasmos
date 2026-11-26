@@ -137,7 +137,7 @@ def test_las_pantallas_guardan_limites_niegan_plantillas_sin_aprobar_y_la_tarea_
         reverse("mensajes:avisos"),
         {"accion": "limites", "inicio": "08:00", "fin": "17:30", "maximo": "3", "dias_sin_envio": ["5", "6"]},
     )
-    assert avisos.hora_de("avisos_hora_fin") == time(17, 30)
+    assert avisos.horario() == (time(8, 0), time(17, 30))
     PlantillaMensaje.objects.filter(clave="atraso").update(estado="borrador")
     web.post(reverse("mensajes:aviso", args=[aviso.pk]), {"accion": "desactivar"})
     web.post(reverse("mensajes:aviso", args=[aviso.pk]), {"accion": "activar"})
@@ -146,3 +146,72 @@ def test_las_pantallas_guardan_limites_niegan_plantillas_sin_aprobar_y_la_tarea_
     monkeypatch.setattr(licencias, "permite_escribir", lambda: False)
     informe = {n: texto for n, _, texto in trabajador.ejecutar_ciclo()}
     assert "solo consulta" in informe["avisos"]
+
+
+def test_lo_permanente_no_se_repite_y_lo_nuevo_va_antes_que_los_reintentos(escenario):
+    aviso, ahora, hoy, personas, central = escenario
+    for nombre, telefono in (("Ana", "5512345678"), ("Beto", "5587654321")):
+        _debe(_titular(personas, nombre, telefono), hoy - timedelta(days=6))
+    central.respuestas["mensajes_enviar"] = {"resultado": "destino"}
+    assert avisos.ejecutar(ahora) == 0
+    assert set(Envio.objects.values_list("estado", flat=True)) == {"fallido"}
+    llamadas = len(central.llamadas)
+    avisos.ejecutar(ahora)
+    assert len(central.llamadas) == llamadas
+    Envio.objects.update(estado="no_enviado")
+    _debe(_titular(personas, "Caro", "5511112222"), hoy - timedelta(days=6))
+    central.llamadas.clear()
+    avisos.ejecutar(ahora)
+    assert central.llamadas[0][1]["destino"] == "+525511112222"
+
+
+def test_el_recibo_sin_destinatario_valido_no_ocupa_lugar(escenario, monkeypatch):
+    aviso, ahora, hoy, personas, central = escenario
+    pago = Aviso.objects.get(momento="pago")
+    pago.activo = True
+    pago.save()
+    sin_permiso = _titular(personas, "Sin", "5512345678")
+    Contacto.objects.filter(titular=sin_permiso).update(acepta_whatsapp=False)
+    con_permiso = _titular(personas, "Con", "5587654321")
+    _debe(sin_permiso, hoy)
+    _debe(con_permiso, hoy)
+    monkeypatch.setattr(avisos, "MAXIMO_POR_CICLO", 1)
+    libro.registrar_pago(sin_permiso, 10000, Pago.BANCO, personas["op"])
+    libro.registrar_pago(con_permiso, 10000, Pago.BANCO, personas["op"])
+    assert avisos.ejecutar(ahora) == 1
+
+
+def test_borrar_y_recrear_no_salta_el_maximo_y_lo_enviado_no_se_borra(escenario):
+    aviso, ahora, hoy, personas, central = escenario
+    ana = _titular(personas, "Ana", "5512345678")
+    _debe(ana, hoy - timedelta(days=6))
+    avisos.ejecutar(ahora)
+    envio = Envio.objects.get()
+    assert envio.momento == "atraso"
+    web = cliente(personas["dir"])
+    web.post(reverse("mensajes:aviso", args=[aviso.pk]), {"accion": "borrar"})
+    assert Aviso.objects.filter(pk=aviso.pk).exists()
+    copia = Aviso.objects.create(
+        momento="atraso", dias=4, plantilla=aviso.plantilla, activo=True
+    )
+    Envio.objects.filter(pk=envio.pk).update(aviso=None)
+    _debe(ana, hoy - timedelta(days=5))
+    Envio.objects.create(
+        clave_envio="x", plantilla=aviso.plantilla, contacto=envio.contacto,
+        titular=ana, momento="antes", destino_final="5678", estado="enviado",
+    )
+    assert copia.pk and avisos.ejecutar(ahora) == 0
+
+
+def test_un_reintento_con_el_aviso_cambiado_falla_sin_mandarse(escenario):
+    aviso, ahora, hoy, personas, central = escenario
+    _debe(_titular(personas, "Ana", "5512345678"), hoy - timedelta(days=6))
+    central.respuestas.clear()
+    avisos.ejecutar(ahora)
+    assert Envio.objects.get().estado == "incierto"
+    otra = PlantillaMensaje.objects.get(clave="sin_acceso")
+    Aviso.objects.filter(pk=aviso.pk).update(plantilla=otra)
+    central.llamadas.clear()
+    avisos.ejecutar(ahora)
+    envio = Envio.objects.get()
+    assert envio.estado == "fallido" and "cambió" in envio.motivo and not central.llamadas
