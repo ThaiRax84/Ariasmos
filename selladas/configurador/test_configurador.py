@@ -125,19 +125,20 @@ def test_importes_por_grupo_quedan_exactos_y_uno_invalido_no_guarda_ninguno():
     primero, segundo = conceptos()
     antes = importes()
     for malo in ("0", "-5", "doce", "99999999999999999"):
-        datos = {casilla(primero, norte): "100", casilla(primero, sur): malo, casilla(segundo, norte): "50"}
+        datos = {f"importe_{primero.pk}": "1000", f"importe_{segundo.pk}": "80", casilla(primero, norte): "100", casilla(primero, sur): malo, casilla(segundo, norte): "50"}
         respuesta = c.post(ruta("conceptos"), datos)
         assert respuesta.status_code == 200, (malo, destino(respuesta))
         assert not TarifaAgrupacion.objects.exists(), f"Con la casilla «{malo}» se guardaron tarifas"
         assert importes() == antes
-    datos = {casilla(primero, norte): "1250.50", casilla(primero, sur): "1300", casilla(segundo, norte): "99.99", casilla(segundo, sur): ""}
+    datos = {f"importe_{primero.pk}": "1000", f"importe_{segundo.pk}": "80", casilla(primero, norte): "1250.50", casilla(primero, sur): "1300", casilla(segundo, norte): "99.99", casilla(segundo, sur): ""}
     assert destino(c.post(ruta("conceptos"), datos)) == ruta("pago")
     assert tarifas() == {(primero.pk, norte.pk, 125050, True), (primero.pk, sur.pk, 130000, True), (segundo.pk, norte.pk, 9999, True)}
-    assert importes() == antes
+    despues = {**antes, primero.pk: 100000, segundo.pk: 8000}
+    assert importes() == despues
     datos[casilla(segundo, norte)] = ""
     assert destino(c.post(ruta("conceptos"), datos)) == ruta("pago")
     assert tarifas() == {(primero.pk, norte.pk, 125050, True), (primero.pk, sur.pk, 130000, True)}, "La casilla vaciada no borró su tarifa"
-    assert importes() == antes
+    assert importes() == despues
 
 
 @pytest.mark.django_db
@@ -151,6 +152,7 @@ def test_casillas_ajenas_no_truenan_ni_crean_tarifas():
     ajeno = max(ConceptoCobro.objects.values_list("pk", flat=True)) + 1000
     sin_grupo = max(Agrupacion.objects.values_list("pk", flat=True)) + 1000
     datos = {
+        f"importe_{primero.pk}": "150",
         casilla(primero, norte): "200",
         f"importe_{ajeno}_{norte.pk}": "300",
         f"importe_{primero.pk}_{sin_grupo}": "400",
@@ -213,7 +215,7 @@ def test_cambiar_a_no_borra_las_tarifas_guardadas():
     autorizar(c)
     norte, sur = con_grupos(c)
     primero = conceptos(1)[0]
-    assert destino(c.post(ruta("conceptos"), {casilla(primero, norte): "100", casilla(primero, sur): "200"})) == ruta("pago")
+    assert destino(c.post(ruta("conceptos"), {f"importe_{primero.pk}": "150", casilla(primero, norte): "100", casilla(primero, sur): "200"})) == ruta("pago")
     assert TarifaAgrupacion.objects.count() == 2
     assert c.get(ruta("grupos")).status_code == 200
     assert destino(c.post(ruta("grupos"), {"por_grupo": "no"})) == ruta("conceptos")
@@ -237,7 +239,7 @@ def test_orden_nuevo_de_punta_a_punta_y_reanuda_en_grupos():
                 reanudado = True
             extra = {"por_grupo": "si", **NOMBRES}
         if paso == "conceptos":
-            extra = {casilla(conceptos(1)[0], Agrupacion.objects.get(nombre="Grupo norte")): "100"}
+            extra = {f"importe_{conceptos(1)[0].pk}": "150", casilla(conceptos(1)[0], Agrupacion.objects.get(nombre="Grupo norte")): "100"}
         respuesta = enviar(c, paso, extra=extra)
         assert respuesta.status_code == 302, (recorrido, respuesta.status_code)
         if paso == "inicio":

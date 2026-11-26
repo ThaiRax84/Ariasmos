@@ -290,7 +290,7 @@ def test_7_instalacion_existente_recibe_ver_ingresos_donde_hay_ver_cortes():
     con_cortes = {n for n, lista in antes.items() if "ver_cortes" in lista}
     assert con_cortes == {"Supervisión", "Dirección", "Contabilidad"}
     assert set(PermisoRol.objects.filter(permiso="ver_ingresos").values_list("rol__nombre", flat=True)) == con_cortes
-    assert {rol.nombre: rol.permisos() for rol in Rol.objects.all()} == {n: lista | ({"ver_ingresos"} if n in con_cortes else set()) for n, lista in antes.items()}
+    assert {rol.nombre: rol.permisos() for rol in Rol.objects.all()} == {n: lista | ({"ver_ingresos"} if n in con_cortes else set()) | ({"enviar_whatsapp"} if "registrar_pago_efectivo" in lista else set()) for n, lista in antes.items()}
     eventos = [e.datos for e in Evento.objects.filter(accion="permiso_agregado")]
     assert sorted(json.dumps(d, sort_keys=True) for d in eventos) == sorted(json.dumps({"permiso": "ver_ingresos", "papel": n}, sort_keys=True) for n in con_cortes)
 
