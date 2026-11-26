@@ -15,7 +15,7 @@ from pruebas.conftest import CONTRASENA
 from pruebas.test_asistente import paso_inicio
 from pruebas.test_fabrica import Campos
 
-PASOS = ("inicio", "personalizar", "conceptos", "marca", "pago", "caja", "reglas", "cortes", "usuario", "codigo")
+PASOS = ("inicio", "marca", "personalizar", "grupos", "conceptos", "pago", "caja", "reglas", "cortes", "usuario", "codigo")
 # Enter solo envía desde campos de una línea; un formulario con solo un archivo (el logo de «Marca») no se envía con Enter.
 ESCRIBIBLES = {"text", "search", "url", "tel", "email", "password", "number", "date", "month", "week", "time", "datetime-local"}
 COLOR_PRINCIPAL, COLOR_ACENTO = "#1F1A4E", "#F58634"

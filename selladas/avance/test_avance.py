@@ -46,7 +46,7 @@ def personalizado():
 @pytest.mark.django_db
 def test_sin_cookie_de_sesion_el_siguiente_paso_abre():
     c = Client()
-    assert destino(autorizar(c)) == reverse("asistente:personalizar")
+    assert destino(autorizar(c)) == reverse("asistente:marca")
     recorrer(c, ("personalizar", "conceptos", "marca"))
     perder_sesion(c)
     respuesta = c.get(reverse("asistente:pago"))
