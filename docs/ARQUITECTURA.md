@@ -601,6 +601,8 @@ Ocho pasos. El nuevo paso 5, «Caja: cortes y retiros», pide el calendario de c
 
 El avance del asistente vive en la tabla `AvanceAsistente` (una sola fila) y no en la sesión: la cookie de sesión muere al cerrar la ventana o al reiniciar el componente web, y con ella se perdía todo. El equipo que escribe el token queda ligado a la fila y es el único autorizado; el secreto del autenticador se guarda cifrado con la clave de secretos y la fila se borra al terminar. Volver a pasar por el primer paso con la misma plantilla no la vuelve a cargar, para no pisar lo ya personalizado.
 
+**Orden y bloques (0.12.0).** Once pasos en cuatro bloques: *Tu negocio* (`inicio`, `marca`), *Lo que cobras* (`personalizar`, `grupos`, `conceptos`), *Cómo cobras* (`pago`, `caja`, `reglas`) y *Seguridad y arranque* (`cortes`, `usuario`, `codigo`). Una sola tabla (`PASOS`) da el orden, los bloques, «Atrás» y el total. El paso `grupos` pregunta si se cobra distinto por grupo: con «sí» crea las `Agrupacion` (las que sobran se borran o, con titulares, se desactivan); con «no» borra las `TarifaAgrupacion`. Con grupos, «Importes» es una tabla concepto por grupo que guarda `TarifaAgrupacion` y no toca el importe del concepto; el día de vencimiento y el recargo siguen por concepto. Durante la instalación, si los equipos pendientes llenan el cupo, un equipo nuevo desplaza al pendiente más viejo que no sea el ligado al avance; con el negocio configurado el cupo no cambia.
+
 ## 16. Versión 0.17: inventario (opcional, fase 6a)
 
 Pensado para inventarios pequeños. Se enciende con el parámetro `modulo_inventario` (asistente, paso 1, o Configuración). Apagado, nada de este apartado aparece. Nada de aquí cambia `nucleo/`.

@@ -25,7 +25,7 @@ from .conftest import cliente, configurar, nuevo_usuario
 ROLES = ("Operación", "Supervisión", "Dirección")
 
 PUBLICAS = {
-    "entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:conceptos", "asistente:marca",
+    "entrar", "entrar_codigo", "activar", "dispositivo_pendiente", "asistente:inicio", "asistente:revisar", "asistente:personalizar", "asistente:grupos", "asistente:conceptos", "asistente:marca",
     "asistente:vista_marca", "asistente:logo", "asistente:pago", "asistente:caja", "asistente:reglas", "asistente:cortes", "asistente:usuario", "asistente:codigo",
 }
 

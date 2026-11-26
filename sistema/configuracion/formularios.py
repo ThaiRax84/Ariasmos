@@ -5,7 +5,7 @@ from django import forms
 
 from banco.models import MedioPago
 from caja.models import Caja, Denominacion
-from cobros.formularios import CampoImporte, CampoPorcentaje, valor_de_recargo
+from cobros.formularios import MAXIMO_ABSURDO, CampoImporte, CampoImportePositivo, CampoPorcentaje, valor_de_recargo
 from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
@@ -18,6 +18,7 @@ from nucleo.matricula import LONGITUD_MAX, LONGITUD_MIN
 from titulares.models import Agrupacion, CampoContacto, MotivoBaja, RelacionContacto
 
 from . import moneda, zonas
+from .grupos import MAXIMO_GRUPOS, clave_de_nombre, nombre_limpio
 from .models import ESPECIALES, PARAMETROS, VOCABULARIO_BASE, Negocio, con_vocabulario, descripcion_parametro, opciones_vocabulario, vocabulario
 
 
@@ -422,11 +423,12 @@ class FormularioPersonalizar(ConDependencias, forms.Form):
 
 
 class FormularioAsistenteConceptos(ConDependencias, forms.Form):
-    def __init__(self, *args, conceptos=(), con_recargo=None, **kwargs):
+    def __init__(self, *args, conceptos=(), con_recargo=None, agrupaciones=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.conceptos = list(conceptos)
+        self.agrupaciones = list(agrupaciones)
         for concepto in self.conceptos:
-            self.fields[f"importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe", required=False)
+            self._campos_de_importe(concepto)
             if concepto.tipo == "recurrente":
                 maximo = {"semanal": 7, "quincenal": 15}.get(concepto.periodicidad, 28)
                 ayuda = {"semanal": "día de la semana en que vence (1 lunes a 7 domingo)", "quincenal": "día en que vence la primera quincena (1 a 15); la segunda, quince días después"}.get(concepto.periodicidad, "día de vencimiento (1 a 28)")
@@ -441,17 +443,35 @@ class FormularioAsistenteConceptos(ConDependencias, forms.Form):
                 depende(self, f"recargo_importe_{concepto.pk}", f"recargo_tipo_{concepto.pk}", [ReglaRecargo.FIJO])
                 depende(self, f"recargo_porcentaje_{concepto.pk}", f"recargo_tipo_{concepto.pk}", [ReglaRecargo.PORCENTAJE])
 
+    def _campos_de_importe(self, concepto):
+        etiqueta = "precio general" if self.agrupaciones else "importe"
+        self.fields[f"importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: {etiqueta}", required=False, maximo=MAXIMO_ABSURDO - 1)
+        for agrupacion in self.agrupaciones:
+            self.fields[f"importe_{concepto.pk}_{agrupacion.pk}"] = CampoImportePositivo(label=f"{concepto.nombre}: {agrupacion.nombre}", required=False)
+
     def grupos(self):
         resultado = []
         for concepto in self.conceptos:
-            nombres = [n for n in (f"importe_{concepto.pk}", f"dia_{concepto.pk}") if n in self.fields]
+            candidatos = (f"dia_{concepto.pk}",) if self.agrupaciones else (f"importe_{concepto.pk}", f"dia_{concepto.pk}")
+            nombres = [n for n in candidatos if n in self.fields]
             recargo = [n for n in (f"recargo_tipo_{concepto.pk}", f"recargo_importe_{concepto.pk}", f"recargo_porcentaje_{concepto.pk}", f"recargo_gracia_{concepto.pk}") if n in self.fields]
-            resultado.append({"concepto": concepto, "campos": [self[n] for n in nombres], "recargo": [self[n] for n in recargo]})
+            celdas = [self[f"importe_{concepto.pk}_{a.pk}"] for a in self.agrupaciones]
+            resultado.append({"concepto": concepto, "general": self[f"importe_{concepto.pk}"], "celdas": celdas, "campos": [self[n] for n in nombres], "recargo": [self[n] for n in recargo]})
         return resultado
+
+    def _exigir_precio_general(self, concepto, datos):
+        general = f"importe_{concepto.pk}"
+        con_importe = any(datos.get(f"importe_{concepto.pk}_{a.pk}") is not None for a in self.agrupaciones)
+        if con_importe and datos.get(general) is None and general not in self.errors:
+            self.add_error(general, "Escribe también el precio general.")
+
+    def importes_por_grupo(self):
+        return {(c.pk, a.pk): self.cleaned_data.get(f"importe_{c.pk}_{a.pk}") for c in self.conceptos for a in self.agrupaciones}
 
     def clean(self):
         datos = super().clean()
         for concepto in self.conceptos:
+            self._exigir_precio_general(concepto, datos)
             clave_tipo = f"recargo_tipo_{concepto.pk}"
             if clave_tipo not in self.fields:
                 continue
@@ -464,6 +484,57 @@ class FormularioAsistenteConceptos(ConDependencias, forms.Form):
                 datos[f"recargo_valor_{concepto.pk}"] = valor_de_recargo(tipo, importe, porcentaje)
             except forms.ValidationError as error:
                 self.add_error(f"recargo_porcentaje_{concepto.pk}" if tipo == ReglaRecargo.PORCENTAJE else f"recargo_importe_{concepto.pk}", error)
+        return datos
+
+
+OPCIONES_GRUPOS = (
+    ("no", "No, todos pagan lo mismo", "Te pregunto un solo importe por concepto."),
+    ("si", "Sí, cada {agrupacion_min} tiene sus precios", "Primero me dices tus {agrupaciones_min} y después el importe de cada uno."),
+)
+CASILLAS_NUEVAS = 3
+
+
+class FormularioAsistenteGrupos(ConDependencias, forms.Form):
+    por_grupo = forms.ChoiceField(widget=forms.RadioSelect, label="Cobro por grupo")
+
+    def __init__(self, *args, textos=None, nombres=(), por_grupo=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        textos = textos if textos is not None else vocabulario()
+        self.textos = textos
+        self.fields["por_grupo"].choices = [(valor, con_vocabulario(titulo, textos)) for valor, titulo, _ in OPCIONES_GRUPOS]
+        self.initial["por_grupo"] = "si" if por_grupo else "no"
+        for numero in range(1, MAXIMO_GRUPOS + 1):
+            clave = f"grupo_{numero}"
+            self.fields[clave] = forms.CharField(label=f"{textos['agrupacion']} {numero}", max_length=100, required=False)
+            self.initial[clave] = nombres[numero - 1] if numero <= len(nombres) else ""
+            depende(self, clave, "por_grupo", ["si"])
+
+    def opciones(self):
+        return [(opcion, con_vocabulario(detalle, self.textos)) for opcion, (_, _, detalle) in zip(self["por_grupo"], OPCIONES_GRUPOS)]
+
+    def casillas(self):
+        escritos = [n for n in range(1, MAXIMO_GRUPOS + 1) if (self[f"grupo_{n}"].value() or "").strip()]
+        visibles = min(MAXIMO_GRUPOS, (escritos[-1] if escritos else 0) + CASILLAS_NUEVAS)
+        return [self[f"grupo_{n}"] for n in range(1, visibles + 1)]
+
+    def nombres(self):
+        escritos = (nombre_limpio(self.cleaned_data[f"grupo_{n}"]) for n in range(1, MAXIMO_GRUPOS + 1))
+        return [nombre for nombre in escritos if nombre]
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get("por_grupo") != "si" or self.errors:
+            return datos
+        vistos = set()
+        for numero in range(1, MAXIMO_GRUPOS + 1):
+            clave = clave_de_nombre(datos[f"grupo_{numero}"])
+            if not clave:
+                continue
+            if clave in vistos:
+                self.add_error(f"grupo_{numero}", "Ese grupo ya está escrito.")
+            vistos.add(clave)
+        if len(vistos) < 2 and not self.errors:
+            self.add_error(None, con_vocabulario("Escribe al menos dos {agrupaciones_min}.", self.textos))
         return datos
 
 

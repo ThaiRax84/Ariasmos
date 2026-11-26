@@ -179,7 +179,7 @@ def test_asistente_pregunta_la_moneda_con_mxn_preseleccionada():
     pagina = c.get(reverse("asistente:inicio")).content.decode()
     assert '<option value="MXN" selected>' in pagina and 'name="moneda"' in pagina
     datos = {"token": settings.TOKEN_ASISTENTE, "nombre": "Mi negocio", "plantilla": "escuela", "zona_horaria": "America/Mexico_City", "moneda": "GTQ"}
-    assert c.post(reverse("asistente:inicio"), datos).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:inicio"), datos).url == reverse("asistente:marca")
     assert Negocio.objects.get().moneda == "GTQ" and not Denominacion.objects.exists()
     assert c.post(reverse("asistente:inicio"), {**datos, "moneda": "ZZZ"}).status_code == 200
 
