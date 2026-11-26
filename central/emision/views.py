@@ -75,29 +75,31 @@ def _demasiados_rechazos(request):
     ).count() >= ajustes.valor("rechazos_por_hora")
 
 
-def _leer_cuerpo(request):
+def _leer_cuerpo(request, limite):
     largo = request.META.get("CONTENT_LENGTH", "")
-    if largo.isascii() and largo.isdigit() and int(largo) > LIMITE_CUERPO:
+    if largo.isascii() and largo.isdigit() and int(largo) > limite:
         raise Denegado(413, "cuerpo_grande")
-    crudo = request.read(LIMITE_CUERPO + 1)
-    if len(crudo) > LIMITE_CUERPO:
+    crudo = request.read(limite + 1)
+    if len(crudo) > limite:
         raise Denegado(413, "cuerpo_grande")
     return crudo
 
 
-def _campos(request, esperados):
+def _campos(request, esperados, limite, opcionales):
     try:
-        cuerpo = licencia.leer_json(_leer_cuerpo(request))
+        cuerpo = licencia.leer_json(_leer_cuerpo(request, limite))
     except licencia.LicenciaInvalida:
         raise Denegado(400, "json_invalido")
-    if not isinstance(cuerpo, dict) or set(cuerpo) != set(esperados):
+    if not isinstance(cuerpo, dict) or not (
+        set(esperados) <= set(cuerpo) <= set(esperados) | set(opcionales)
+    ):
         raise Denegado(400, "campos_distintos")
     if not all(isinstance(valor, str) for valor in cuerpo.values()):
         raise Denegado(400, "tipos_equivocados")
     return cuerpo
 
 
-def _post(campos, autentica=None):
+def _post(campos, autentica=None, limite=LIMITE_CUERPO, opcionales=()):
     def decorador(proceso):
         def vista(request):
             if request.method != "POST":
@@ -106,7 +108,7 @@ def _post(campos, autentica=None):
             if sobre_el_limite and autentica is None:
                 return _negar(429)
             try:
-                cuerpo = _campos(request, campos)
+                cuerpo = _campos(request, campos, limite, opcionales)
                 if sobre_el_limite:
                     autentica(cuerpo)
                 return _responder(proceso(cuerpo))
@@ -166,7 +168,7 @@ def salud(request):
     return _responder({"estado": "ok", "hora": licencia.texto_de(reloj.ahora())})
 
 
-def _autenticar_renovacion(cuerpo):
+def _autenticar(cuerpo, tipo):
     huella = cuerpo["instalacion"]
     if licencia.PATRON_INSTALACION.fullmatch(huella) is None:
         raise Denegado(400, "huella_invalida")
@@ -176,9 +178,7 @@ def _autenticar_renovacion(cuerpo):
     if instalacion is None:
         raise Denegado(403, "instalacion_desconocida")
     negocio = instalacion.negocio
-    carga = _abrir(
-        cuerpo, base64.b64decode(instalacion.llave_publica), "renovacion", negocio
-    )
+    carga = _abrir(cuerpo, base64.b64decode(instalacion.llave_publica), tipo, negocio)
     if carga["instalacion"] != huella:
         raise Denegado(403, "instalacion_distinta", negocio)
     tolerancia = _tolerancia()
@@ -188,19 +188,27 @@ def _autenticar_renovacion(cuerpo):
     return instalacion, carga, tolerancia
 
 
+def _autenticar_renovacion(cuerpo):
+    return _autenticar(cuerpo, "renovacion")
+
+
+def _gastar_sello(instalacion, carga, tolerancia):
+    _, nuevo = Sello.objects.get_or_create(
+        instalacion=instalacion,
+        valor=carga["sello"],
+        defaults={"momento": reloj.ahora()},
+    )
+    if not nuevo:
+        raise Denegado(403, "peticion_repetida", instalacion.negocio)
+    Sello.objects.filter(momento__lt=reloj.ahora() - 2 * tolerancia).delete()
+
+
 @_post(CAMPOS_RENOVAR, autentica=_autenticar_renovacion)
 def renovar(cuerpo):
     instalacion, carga, tolerancia = _autenticar_renovacion(cuerpo)
     negocio = instalacion.negocio
     with transaction.atomic():
-        _, nuevo = Sello.objects.get_or_create(
-            instalacion=instalacion,
-            valor=carga["sello"],
-            defaults={"momento": reloj.ahora()},
-        )
-        if not nuevo:
-            raise Denegado(403, "peticion_repetida", negocio)
-        Sello.objects.filter(momento__lt=reloj.ahora() - 2 * tolerancia).delete()
+        _gastar_sello(instalacion, carga, tolerancia)
         if instalacion.revocada or negocio.revocado:
             servicios.anotar(
                 "revocada_avisada", negocio, instalacion=instalacion.huella

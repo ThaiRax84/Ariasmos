@@ -205,6 +205,11 @@ MATRIZ = {
     "rezagos:regla_nueva": ("configurar_rezagos",),
     "rezagos:regla_editar": ("configurar_rezagos",),
     "rezagos:recargos_alta": ("administrar_conceptos",),
+    "mensajes:panel": ("administrar_mensajes",),
+    "mensajes:tope": ("administrar_mensajes",),
+    "mensajes:plantilla": ("administrar_mensajes",),
+    "mensajes:plantilla_nueva": ("administrar_mensajes",),
+    "mensajes:enviar_recibo": ("enviar_whatsapp",),
 }
 
 EXIGEN_INGRESOS = {"conciliacion:cola", "conciliacion:movimiento", "conciliacion:proponer", "conciliacion:importaciones", "conciliacion:importacion", "conciliacion:revisada", "conciliacion:liberar"}
@@ -336,6 +341,8 @@ def escenario(db):
         "cobros:cobrar": {"pk": titular.pk},
         "cobros:recibo": {"pk": pago.recibo.pk},
         "cobros:recibo_pdf": {"pk": pago.recibo.pk},
+        "mensajes:enviar_recibo": {"pk": pago.recibo.pk},
+        "mensajes:plantilla": {"clave": "recibo"},
         "cobros:cargo_manual": {"pk": titular.pk},
         "cobros:beca": {"pk": titular.pk},
         "cobros:prorroga": {"pk": cargo.pk},

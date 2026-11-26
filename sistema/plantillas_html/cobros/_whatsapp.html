@@ -1,0 +1,17 @@
+{% if whatsapp %}
+<div class="recibo-whatsapp">
+  {% if whatsapp.aviso %}
+  <p class="ayuda">{{ whatsapp.aviso }}</p>
+  {% if whatsapp.pedir_permiso %}<a class="boton secundario" href="{{ whatsapp.pedir_permiso }}">Pedir permiso para mandar por WhatsApp</a>{% endif %}
+  {% else %}
+  {% if not whatsapp.ultimo or whatsapp.reintentar %}
+  <form method="post" action="{% url 'mensajes:enviar_recibo' recibo.pk %}">{% csrf_token %}
+    {% if whatsapp.reintentar %}<input type="hidden" name="reenviar" value="1">{% endif %}
+    <button class="boton whatsapp" type="submit">{% if whatsapp.reintentar %}Intentar otra vez por WhatsApp{% else %}Mandar por WhatsApp{% endif %}</button>
+  </form>
+  <p class="ayuda">Se manda al WhatsApp de {{ whatsapp.contacto.nombre }}, terminado en {{ whatsapp.final }}.</p>
+  {% endif %}
+  {% endif %}
+  {% if whatsapp.ultimo %}<p class="ayuda"><span class="estado {{ whatsapp.ultimo.estado }}">{{ whatsapp.ultimo.get_estado_display }}</span>{% if whatsapp.ultimo.motivo %} {{ whatsapp.ultimo.motivo }}{% endif %}</p>{% endif %}
+</div>
+{% endif %}

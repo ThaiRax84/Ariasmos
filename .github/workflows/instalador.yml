@@ -41,7 +41,8 @@ jobs:
         run: |
           python -m pytest -q
           python -m pytest -q selladas/producto
-          python -m pytest -q --ds=proyecto_central.ajustes_pruebas central/pruebas selladas/central
+          python -m pytest -q selladas/mensajes_producto
+          python -m pytest -q --ds=proyecto_central.ajustes_pruebas central/pruebas selladas/central selladas/mensajes_central
 
   pruebas-windows:
     runs-on: windows-latest

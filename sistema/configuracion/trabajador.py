@@ -10,6 +10,7 @@ from cobros import generacion
 from cortes import servicios as cortes
 from cuentas import secretos
 from licencias import servicios as licencias
+from mensajes import servicios as mensajes
 from respaldos import servicios as respaldos
 from cuentas.servicios import depurar_pendientes
 from solicitudes import motor
@@ -108,6 +109,10 @@ def _actualizaciones(hoy):
     return actualizaciones.ciclo(en_hilo=True)
 
 
+def _mensajes(hoy):
+    return f"{mensajes.actualizar_estados()} mensajes de WhatsApp actualizados"
+
+
 TAREAS = (
     ("generar_cargos", _cargos, False),
     ("generar_recargos", _recargos, False),
@@ -125,10 +130,11 @@ TAREAS = (
     ("verificar_bitacora", _bitacora, True),
     ("actualizaciones", _actualizaciones, False),
     ("licencia", licencias.tarea_renovar, False),
+    ("mensajes", _mensajes, False),
 )
 
 ESCRIBEN_DATOS = frozenset(
-    {"generar_cargos", "generar_recargos", "carpeta_banco", "generar_cortes_mayores", "cerrar_cortes_vencidos", "entregar_cortes", "caducar_solicitudes"}
+    {"generar_cargos", "generar_recargos", "carpeta_banco", "generar_cortes_mayores", "cerrar_cortes_vencidos", "entregar_cortes", "caducar_solicitudes", "mensajes"}
 )
 
 

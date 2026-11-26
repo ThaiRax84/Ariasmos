@@ -549,3 +549,9 @@ fieldset.recargo legend { font-weight: 800; padding: 0 6px; }
 .campo.casilla { flex-wrap: wrap; }
 .campo.casilla > small { flex-basis: 100%; padding-left: 32px; }
 .envio-por-omision { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.boton.whatsapp { background: #0F7D44; color: #fff; }
+.boton.whatsapp:hover { color: #fff; }
+.burbuja { background: var(--bien-fondo); color: var(--tinta); border-radius: 16px 16px 16px 4px; padding: 14px 16px; max-width: 360px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recibo-whatsapp { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.recibo-whatsapp p { margin: 0; }

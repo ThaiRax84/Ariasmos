@@ -25,6 +25,7 @@ def foto_contacto(contacto):
         "Nombre del contacto": contacto.nombre,
         "Relación": str(contacto.relacion) if contacto.relacion_id else None,
         "Contacto principal": "Sí" if contacto.principal else "No",
+        "Aceptó mensajes por WhatsApp": "Sí" if contacto.acepta_whatsapp else "No",
     }
     for campo in CampoContacto.objects.all():
         valor = contacto.valor(campo)
@@ -92,6 +93,7 @@ def guardar_contacto(usuario, titular, datos, contacto=None, principal=None, req
         contacto.relacion = datos.get("relacion")
         contacto.valores = datos.get("valores", {})
         contacto.principal = principal
+        contacto.acepta_whatsapp = datos.get("acepta_whatsapp", contacto.acepta_whatsapp)
         contacto.save()
         cambios = diferencias(antes, foto_contacto(contacto))
         if nuevo or cambios:

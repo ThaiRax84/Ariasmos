@@ -78,6 +78,7 @@ class FormularioContacto(forms.Form):
         if inicial_contacto is not None:
             self.initial.setdefault("contacto_nombre", inicial_contacto.nombre)
             self.initial.setdefault("contacto_relacion", inicial_contacto.relacion_id)
+            self.initial.setdefault("acepta_whatsapp", inicial_contacto.acepta_whatsapp)
             for campo in self.campos:
                 self.initial.setdefault(campo.clave, inicial_contacto.valor(campo))
 

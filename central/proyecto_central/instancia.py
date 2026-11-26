@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import socket
+import sqlite3
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -35,7 +36,46 @@ def nueva(base, hosts=()):
         "hosts": list(dict.fromkeys(nombre for nombre in nombres if nombre)),
         "proxies_confiables": [],
         "llave_licencias": str(base / LLAVE),
+        **claves_de_mensajes(),
     }
+
+
+def claves_de_mensajes():
+    return {
+        "clave_secretos": secrets.token_hex(32),
+        "url_publica": "",
+        "proveedor_mensajes": "simulado",
+    }
+
+
+def hay_secretos_guardados(datos):
+    try:
+        with sqlite3.connect(datos["base_datos"]) as conexion:
+            return any(
+                conexion.execute(f"SELECT 1 FROM {tabla} LIMIT 1").fetchone()
+                for tabla in ("mensajeria_remitente", "mensajeria_baja")
+            )
+    except (sqlite3.Error, KeyError):
+        return False
+
+
+def completar(base, datos):
+    faltantes = {
+        clave: valor
+        for clave, valor in claves_de_mensajes().items()
+        if clave not in datos
+    }
+    if faltantes:
+        temporal = ruta_archivo(base).with_suffix(".nuevo")
+        temporal.unlink(missing_ok=True)
+        escribir_privado(
+            temporal,
+            json.dumps({**datos, **faltantes}, indent=2, ensure_ascii=False).encode(
+                "utf-8"
+            ),
+        )
+        os.replace(temporal, ruta_archivo(base))
+    return sorted(faltantes)
 
 
 def escribir_privado(ruta, contenido):

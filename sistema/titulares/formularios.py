@@ -5,7 +5,7 @@ from configuracion.models import parametro, vocabulario
 from proyecto.dependencias import ConDependencias, depende
 
 from .contactos import FormularioContacto
-from .models import Agrupacion, Familia, MotivoBaja, Titular
+from .models import Agrupacion, CampoContacto, Familia, MotivoBaja, Titular
 
 
 MAXIMO_NOTAS = 2000
@@ -81,12 +81,25 @@ class FormularioAlta(FormularioContacto):
 
 class FormularioEditarContacto(FormularioContacto):
     contacto_principal = forms.BooleanField(label="Contacto principal", required=False)
+    acepta_whatsapp = forms.BooleanField(label="Aceptó recibir mensajes por WhatsApp", required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, exigir_obligatorios=True, **kwargs)
+        self.order_fields(self._orden_con_casilla_junto_al_telefono())
+
+    def _orden_con_casilla_junto_al_telefono(self):
+        orden = [n for n in self.fields if n != "acepta_whatsapp"]
+        telefonos = [c.clave for c in self.campos if c.tipo == CampoContacto.TELEFONO]
+        orden.insert(orden.index(telefonos[0]) + 1 if telefonos else len(orden), "acepta_whatsapp")
+        return orden
 
     def datos_contacto(self):
-        return {"nombre": self.cleaned_data["contacto_nombre"], "relacion": self.cleaned_data.get("contacto_relacion"), "valores": self.valores()}
+        return {
+            "nombre": self.cleaned_data["contacto_nombre"],
+            "relacion": self.cleaned_data.get("contacto_relacion"),
+            "valores": self.valores(),
+            "acepta_whatsapp": self.cleaned_data["acepta_whatsapp"],
+        }
 
 
 class FormularioCambioFamilia(ConDependencias, forms.Form):

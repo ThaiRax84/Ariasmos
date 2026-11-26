@@ -43,6 +43,7 @@ def _demas(permisos, voc):
         ("Reglas de rezago", "rezagos:reglas", "configurar_rezagos" in permisos, ("/rezagos/reglas/",), ()),
         ("Topes del banco", "conciliacion:topes", "configurar_topes_banco" in permisos and not _ve_cola_del_banco(permisos), ("/banco/topes/",), ()),
         ("Configuración", "configuracion:indice", "administrar_configuracion" in permisos, ("/configuracion/", "/actualizaciones/"), ()),
+        ("Mensajes", "mensajes:panel", "administrar_mensajes" in permisos, ("/mensajes/",), ()),
         ("Respaldos", "respaldos:panel", "administrar_respaldos" in permisos, ("/respaldos/",), ()),
         ("Auditoría", "auditoria:lista", "ver_auditoria" in permisos, ("/auditoria/",), ()),
     ]
