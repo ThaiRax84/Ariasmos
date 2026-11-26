@@ -42,19 +42,22 @@ def test_grupos_validos_se_guardan_y_los_invalidos_no_guardan_nada():
 
 
 @pytest.mark.django_db
-def test_importes_por_grupo_guardan_tarifas_exactas_y_no_tocan_el_concepto():
+def test_importes_por_grupo_piden_precio_general_y_guardan_tarifas_exactas():
     c = instalar_hasta_grupos()
     enviar_grupos(c, "Primaria", "Secundaria")
     conceptos, agrupaciones, datos = casillas(c)
-    antes = {k.pk: k.importe_centavos for k in conceptos}
     primero = conceptos[0]
     datos[f"importe_{primero.pk}_{agrupaciones[0].pk}"] = "1,500.50"
     datos[f"importe_{primero.pk}_{agrupaciones[1].pk}"] = "1800"
     datos["importe_9999_1"] = "5"
     datos[f"importe_{primero.pk}_9999"] = "5"
+    sin_general = c.post(reverse("asistente:conceptos"), datos)
+    assert sin_general.status_code == 200 and "Escribe también el precio general." in sin_general.content.decode() and not TarifaAgrupacion.objects.exists()
+    datos[f"importe_{primero.pk}"] = "1000"
     assert c.post(reverse("asistente:conceptos"), datos).url == reverse("asistente:pago")
     assert {(t.agrupacion_id, t.importe_centavos) for t in TarifaAgrupacion.objects.all()} == {(agrupaciones[0].pk, 150050), (agrupaciones[1].pk, 180000)}
-    assert {k.pk: k.importe_centavos for k in ConceptoCobro.objects.all()} == antes
+    assert ConceptoCobro.objects.get(pk=primero.pk).importe_centavos == 100000
+    assert c.post(reverse("asistente:conceptos"), {f"importe_{primero.pk}": "9" * 19}).status_code == 200
 
 
 @pytest.mark.django_db
@@ -75,8 +78,9 @@ def test_igual_para_todos_repinta_sin_guardar_y_pasar_a_no_borra_las_tarifas():
     enviar_grupos(c, "Primaria", "Secundaria")
     conceptos, agrupaciones, datos = casillas(c)
     datos[f"importe_{conceptos[0].pk}_{agrupaciones[0].pk}"] = "700"
+    datos[f"importe_{conceptos[0].pk}"] = "500"
     respuesta = c.post(reverse("asistente:conceptos"), {**datos, "igual": str(conceptos[0].pk)})
-    assert respuesta.status_code == 200 and respuesta.content.decode().count('value="700"') == 2
+    assert respuesta.status_code == 200 and respuesta.content.decode().count('value="700"') == 2 and 'value="500"' in respuesta.content.decode()
     assert not TarifaAgrupacion.objects.exists()
     c.post(reverse("asistente:conceptos"), {**datos, f"importe_{conceptos[0].pk}_{agrupaciones[1].pk}": "700"})
     assert TarifaAgrupacion.objects.count() == 2
@@ -108,3 +112,31 @@ def test_al_terminar_un_paso_se_guarda_el_siguiente_aunque_no_se_abra():
     c.post(reverse("asistente:personalizar"), {"titular": "Socio", "titulares": "Socios", "matricula": "Número", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas", "seguir": "continuar"})
     c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
     assert c.get(reverse("asistente:inicio")).url == reverse("asistente:grupos")
+
+
+@pytest.mark.django_db
+def test_omitir_grupos_no_cambia_nada_y_una_plantilla_nueva_limpia_grupos_y_tarifas():
+    c = instalar_hasta_grupos()
+    enviar_grupos(c, "Primaria", "Secundaria")
+    conceptos, agrupaciones, datos = casillas(c)
+    datos.update({f"importe_{conceptos[0].pk}": "100", f"importe_{conceptos[0].pk}_{agrupaciones[0].pk}": "150"})
+    c.post(reverse("asistente:conceptos"), datos)
+    assert c.post(reverse("asistente:grupos"), {"omitir": "1"}).url == reverse("asistente:conceptos")
+    assert AvanceAsistente.objects.get().estado["por_grupo"] is True and TarifaAgrupacion.objects.count() == 1
+    c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
+    assert not TarifaAgrupacion.objects.exists() and not Agrupacion.objects.exists()
+
+
+@pytest.mark.django_db
+def test_con_plantilla_importada_sin_revisar_los_demas_pasos_mandan_a_revisar():
+    import json
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    with open(settings.PLANTILLAS_NEGOCIO / "generico.json", encoding="utf-8") as archivo:
+        contenido = json.dumps(json.load(archivo)).encode("utf-8")
+    c = Client()
+    archivo = SimpleUploadedFile("mia.json", contenido, content_type="application/json")
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "importar", archivo)).url == reverse("asistente:revisar")
+    for paso in ("marca", "grupos", "conceptos", "usuario", "codigo"):
+        assert c.get(reverse(f"asistente:{paso}")).url == reverse("asistente:revisar"), paso

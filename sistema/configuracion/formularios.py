@@ -5,7 +5,7 @@ from django import forms
 
 from banco.models import MedioPago
 from caja.models import Caja, Denominacion
-from cobros.formularios import CampoImporte, CampoImportePositivo, CampoPorcentaje, valor_de_recargo
+from cobros.formularios import MAXIMO_ABSURDO, CampoImporte, CampoImportePositivo, CampoPorcentaje, valor_de_recargo
 from cobros.libro import ErrorLibro, validar_orden
 from cobros.models import ConceptoCobro, ReglaRecargo
 from cuentas.formularios import ContrasenaNueva
@@ -444,20 +444,26 @@ class FormularioAsistenteConceptos(ConDependencias, forms.Form):
                 depende(self, f"recargo_porcentaje_{concepto.pk}", f"recargo_tipo_{concepto.pk}", [ReglaRecargo.PORCENTAJE])
 
     def _campos_de_importe(self, concepto):
-        if not self.agrupaciones:
-            self.fields[f"importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: importe", required=False)
-            return
+        etiqueta = "precio general" if self.agrupaciones else "importe"
+        self.fields[f"importe_{concepto.pk}"] = CampoImporte(label=f"{concepto.nombre}: {etiqueta}", required=False, maximo=MAXIMO_ABSURDO - 1)
         for agrupacion in self.agrupaciones:
             self.fields[f"importe_{concepto.pk}_{agrupacion.pk}"] = CampoImportePositivo(label=f"{concepto.nombre}: {agrupacion.nombre}", required=False)
 
     def grupos(self):
         resultado = []
         for concepto in self.conceptos:
-            nombres = [n for n in (f"importe_{concepto.pk}", f"dia_{concepto.pk}") if n in self.fields]
+            candidatos = (f"dia_{concepto.pk}",) if self.agrupaciones else (f"importe_{concepto.pk}", f"dia_{concepto.pk}")
+            nombres = [n for n in candidatos if n in self.fields]
             recargo = [n for n in (f"recargo_tipo_{concepto.pk}", f"recargo_importe_{concepto.pk}", f"recargo_porcentaje_{concepto.pk}", f"recargo_gracia_{concepto.pk}") if n in self.fields]
             celdas = [self[f"importe_{concepto.pk}_{a.pk}"] for a in self.agrupaciones]
-            resultado.append({"concepto": concepto, "celdas": celdas, "campos": [self[n] for n in nombres], "recargo": [self[n] for n in recargo]})
+            resultado.append({"concepto": concepto, "general": self[f"importe_{concepto.pk}"], "celdas": celdas, "campos": [self[n] for n in nombres], "recargo": [self[n] for n in recargo]})
         return resultado
+
+    def _exigir_precio_general(self, concepto, datos):
+        general = f"importe_{concepto.pk}"
+        con_importe = any(datos.get(f"importe_{concepto.pk}_{a.pk}") is not None for a in self.agrupaciones)
+        if con_importe and datos.get(general) is None and general not in self.errors:
+            self.add_error(general, "Escribe también el precio general.")
 
     def importes_por_grupo(self):
         return {(c.pk, a.pk): self.cleaned_data.get(f"importe_{c.pk}_{a.pk}") for c in self.conceptos for a in self.agrupaciones}
@@ -465,6 +471,7 @@ class FormularioAsistenteConceptos(ConDependencias, forms.Form):
     def clean(self):
         datos = super().clean()
         for concepto in self.conceptos:
+            self._exigir_precio_general(concepto, datos)
             clave_tipo = f"recargo_tipo_{concepto.pk}"
             if clave_tipo not in self.fields:
                 continue

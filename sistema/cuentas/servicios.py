@@ -44,8 +44,13 @@ def hay_cupo_pendientes():
 
 
 def descartar_pendiente_mas_viejo():
-    viejo = Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE, avance__isnull=True).order_by("creado", "pk").first()
-    return viejo is not None and bool(viejo.delete())
+    with transaction.atomic():
+        while True:
+            viejo = Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE, avance__isnull=True).order_by("creado", "pk").values_list("pk", flat=True).first()
+            if viejo is None:
+                return False
+            if Dispositivo.objects.filter(pk=viejo, avance__isnull=True).delete()[0]:
+                return True
 
 
 def registrar_dispositivo(request):

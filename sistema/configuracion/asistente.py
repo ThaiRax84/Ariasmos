@@ -54,7 +54,7 @@ from .formularios import (
     valores_caja,
     valores_reglas,
 )
-from .grupos import guardar_grupos, guardar_tarifas, quitar_tarifas
+from .grupos import guardar_grupos, guardar_tarifas, quitar_tarifas, reiniciar_grupos
 from .resumen import resumir
 from .models import VOCABULARIO_BASE, AvanceAsistente, Negocio, Parametro, Vocabulario, con_vocabulario, hoy_negocio, parametro, vocabulario
 
@@ -294,6 +294,7 @@ def _registrar_negocio(request, formulario, origen, huella, datos, reanuda):
             _escribir_fila(request, dispositivo=request.dispositivo)
         else:
             _retirar_usuario_sin_autenticador(request)
+            reiniciar_grupos()
             _abrir_avance(request, origen, huella, datos, bool(formulario.cleaned_data.get("inventario")))
 
 
@@ -330,7 +331,7 @@ def _aplicar_plantilla(request, datos, origen):
 
 
 def revisar(request):
-    negocio = _exigir_autorizado(request)
+    negocio = _exigir_autorizado(request, requiere_plantilla=False)
     pendiente = _estado(request).get("pendiente")
     if negocio is None or not pendiente:
         return redirect("asistente:inicio")
@@ -349,19 +350,24 @@ def revisar(request):
     return _paso(request, "asistente/revisar.html", formulario, "inicio", "Revisa la plantilla antes de aplicarla", resumen=resumen, nombre=datos["nombre"])
 
 
-def _exigir_autorizado(request, paso=None):
+def _exigir_autorizado(request, paso=None, requiere_plantilla=True):
     negocio = _disponible(request)
-    if negocio is None or not _autorizado(request):
+    if negocio is None or not _autorizado(request) or (requiere_plantilla and not _fila(request).plantilla_aplicada):
         return None
     if paso:
         _guardar_paso(request, paso)
     return negocio
 
 
+def _sin_acceso(request):
+    por_revisar = _autorizado(request) and _fila(request).estado.get("pendiente")
+    return redirect("asistente:revisar" if por_revisar else "asistente:inicio")
+
+
 def personalizar(request):
     negocio = _exigir_autorizado(request, "personalizar")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     lista = list(ConceptoCobro.objects.all())
     antes = vocabulario()
     formulario = FormularioPersonalizar(request.POST if request.method == "POST" else None, textos=antes, conceptos=lista)
@@ -399,11 +405,10 @@ def personalizar(request):
 def grupos(request):
     negocio = _exigir_autorizado(request, "grupos")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "grupos"):
         return _atras(request, "grupos")
     if request.method == "POST" and request.POST.get("omitir"):
-        _guardar_estado(request, por_grupo=False)
         registrar("asistente_grupos_omitido", request=request)
         return _seguir(request, "conceptos")
     textos = _textos(request)
@@ -448,7 +453,7 @@ def _con_fila_igual(datos, lista, agrupaciones):
 def conceptos(request):
     negocio = _exigir_autorizado(request, "conceptos")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "conceptos"):
         return _atras(request, "conceptos")
     por_grupo = bool(_estado(request).get("por_grupo"))
@@ -502,7 +507,7 @@ def _vista_de(formulario):
 def marca(request):
     negocio = _exigir_autorizado(request, "marca")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     actual = marca_negocio.actual()
     if request.method == "POST" and request.POST.get("omitir"):
         registrar("asistente_marca_omitida", request=request)
@@ -569,7 +574,7 @@ def logo_asistente(request):
 def pago(request):
     negocio = _exigir_autorizado(request, "pago")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "pago"):
         return _atras(request, "pago")
     actual = CuentaBancaria.principal_activa()
@@ -586,7 +591,7 @@ def pago(request):
 def caja(request):
     negocio = _exigir_autorizado(request, "caja")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "caja"):
         return _atras(request, "caja")
     antes = valores_caja()
@@ -612,7 +617,7 @@ def caja(request):
 def reglas(request):
     negocio = _exigir_autorizado(request, "reglas")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "reglas"):
         return _atras(request, "reglas")
     antes = valores_reglas()
@@ -635,7 +640,7 @@ def reglas(request):
 def cortes(request):
     negocio = _exigir_autorizado(request, "cortes")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "cortes"):
         return _atras(request, "cortes")
     if request.method == "POST" and request.POST.get("omitir"):
@@ -686,7 +691,7 @@ def cortes(request):
 def usuario(request):
     negocio = _exigir_autorizado(request, "usuario")
     if negocio is None:
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     if _pide_atras(request, "usuario"):
         return _atras(request, "usuario")
     formulario = FormularioAsistenteUsuario(request.POST if request.method == "POST" else None)
@@ -720,7 +725,7 @@ def codigo(request):
     estado = _estado(request)
     secreto = _secreto(request) if negocio else ""
     if not secreto or not estado.get("usuario"):
-        return redirect("asistente:inicio")
+        return _sin_acceso(request)
     _guardar_paso(request, "codigo")
     if _pide_atras(request, "codigo"):
         return _atras(request, "codigo")

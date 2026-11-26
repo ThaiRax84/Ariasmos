@@ -1,5 +1,7 @@
 import unicodedata
 
+from django.db.models import PROTECT
+
 from tarifas.models import TarifaAgrupacion
 from titulares.models import Agrupacion
 
@@ -16,26 +18,53 @@ def clave_de_nombre(texto):
 
 
 def guardar_grupos(nombres):
-    existentes = {clave_de_nombre(a.nombre): a for a in Agrupacion.objects.all()}
+    existentes = list(Agrupacion.objects.all())
+    por_clave = {clave_de_nombre(a.nombre): a for a in existentes}
+    ocupados = {a.nombre for a in existentes}
     conservar = []
     for nombre in nombres:
-        agrupacion = existentes.get(clave_de_nombre(nombre))
+        agrupacion = por_clave.get(clave_de_nombre(nombre))
         if agrupacion is None:
             agrupacion = Agrupacion.objects.create(nombre=nombre)
-        elif not agrupacion.activa:
-            agrupacion.activa = True
-            agrupacion.save(update_fields=["activa"])
+        else:
+            _actualizar(agrupacion, nombre, ocupados)
         conservar.append(agrupacion.pk)
-    _retirar_sobrantes(conservar)
+    _retirar_sobrantes(Agrupacion.objects.exclude(pk__in=conservar))
 
 
-def _retirar_sobrantes(conservar):
-    sobrantes = Agrupacion.objects.exclude(pk__in=conservar)
-    con_titulares = set(sobrantes.filter(titulares__isnull=False).values_list("pk", flat=True))
-    sin_titulares = sobrantes.exclude(pk__in=con_titulares)
-    TarifaAgrupacion.objects.filter(agrupacion__in=sin_titulares).delete()
-    sin_titulares.delete()
-    Agrupacion.objects.filter(pk__in=con_titulares).update(activa=False)
+def _actualizar(agrupacion, nombre, ocupados):
+    cambios = []
+    if not agrupacion.activa:
+        agrupacion.activa = True
+        cambios.append("activa")
+    if agrupacion.nombre != nombre and nombre not in ocupados:
+        agrupacion.nombre = nombre
+        cambios.append("nombre")
+    if cambios:
+        agrupacion.save(update_fields=cambios)
+
+
+def _con_referencias(agrupaciones):
+    referidas = set()
+    for relacion in Agrupacion._meta.get_fields(include_hidden=True):
+        if relacion.auto_created and not relacion.concrete and relacion.on_delete is PROTECT and relacion.related_model is not TarifaAgrupacion:
+            columna = relacion.field.attname
+            referidas.update(relacion.related_model._base_manager.filter(**{f"{columna}__in": agrupaciones}).values_list(columna, flat=True))
+    return referidas
+
+
+def _retirar_sobrantes(sobrantes):
+    referidas = _con_referencias(sobrantes)
+    libres = sobrantes.exclude(pk__in=referidas)
+    TarifaAgrupacion.objects.filter(agrupacion__in=libres).delete()
+    libres.delete()
+    Agrupacion.objects.filter(pk__in=referidas).update(activa=False)
+
+
+def reiniciar_grupos():
+    quitar_tarifas()
+    libres = Agrupacion.objects.exclude(pk__in=_con_referencias(Agrupacion.objects.all()))
+    libres.delete()
 
 
 def quitar_tarifas():

@@ -8,16 +8,17 @@
   <section class="panel">
     <div class="desplazable" role="region" aria-label="Importes por grupo" tabindex="0">
       <table class="tabla-importes">
-        <thead><tr><th scope="col">Concepto</th>{% for agrupacion in formulario.agrupaciones %}<th scope="col">{{ agrupacion.nombre }}</th>{% endfor %}<th scope="col"><span class="solo-lectores">Acción</span></th></tr></thead>
+        <thead><tr><th scope="col">Concepto</th><th scope="col">Precio general<span class="detalle">Para quien no tiene grupo, o si dejas vacía la casilla de un grupo.</span></th>{% for agrupacion in formulario.agrupaciones %}<th scope="col">{{ agrupacion.nombre }}</th>{% endfor %}<th scope="col"><span class="solo-lectores">Acción</span></th></tr></thead>
         <tbody>
           {% for grupo in formulario.grupos %}
           <tr>
             <th scope="row"><strong>{{ grupo.concepto.nombre }}</strong><span class="detalle">{{ grupo.concepto.get_tipo_display }}{% if grupo.concepto.periodicidad %} · {{ grupo.concepto.get_periodicidad_display|lower }}{% endif %}</span></th>
+            {% with celda=grupo.general %}<td><label class="solo-lectores" for="{{ celda.id_for_label }}">{{ celda.label }}</label>{{ celda }}{% for e in celda.errors %}<p class="error">{{ e }}</p>{% endfor %}</td>{% endwith %}
             {% for celda in grupo.celdas %}<td><label class="solo-lectores" for="{{ celda.id_for_label }}">{{ celda.label }}</label>{{ celda }}{% for e in celda.errors %}<p class="error">{{ e }}</p>{% endfor %}</td>{% endfor %}
             <td><button class="boton secundario chico" type="submit" name="igual" value="{{ grupo.concepto.pk }}" formnovalidate>Igual para todos</button></td>
           </tr>
           {% empty %}
-          <tr><td colspan="{{ formulario.agrupaciones|length|add:2 }}">La plantilla no trae conceptos. Agrégalos con «Agregar concepto».</td></tr>
+          <tr><td colspan="{{ formulario.agrupaciones|length|add:3 }}">La plantilla no trae conceptos. Agrégalos con «Agregar concepto».</td></tr>
           {% endfor %}
         </tbody>
       </table>
