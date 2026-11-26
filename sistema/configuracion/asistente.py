@@ -115,6 +115,11 @@ def _guardar_paso(request, paso):
         _escribir_fila(request, paso=paso)
 
 
+def _seguir(request, ruta):
+    _guardar_paso(request, ruta)
+    return redirect(f"asistente:{ruta}")
+
+
 def _paso_guardado(request):
     fila = _fila(request)
     sin_datos = fila.paso == "revisar" or (fila.paso == "codigo" and not (fila.estado.get("usuario") and fila.secreto_cifrado))
@@ -197,7 +202,7 @@ def _atras(request, paso):
     borradores = dict(_estado(request).get("borradores") or {})
     borradores[paso] = {clave: request.POST.getlist(clave)[:50] for clave in list(request.POST)[:300] if clave not in RESERVADOS}
     _guardar_estado(request, borradores=borradores)
-    return redirect(f"asistente:{ANTERIOR[paso]}")
+    return _seguir(request, ANTERIOR[paso])
 
 
 def _pide_atras(request, paso):
@@ -267,9 +272,9 @@ def inicio(request):
         if reanuda:
             return redirect(_paso_guardado(request))
         if origen == "importada":
-            return redirect("asistente:revisar")
+            return _seguir(request, "revisar")
         _aplicar_plantilla(request, datos, origen)
-        return redirect("asistente:marca")
+        return _seguir(request, "marca")
     return _paso(request, "asistente/paso.html", formulario, "inicio", "Datos del negocio y plantilla")
 
 
@@ -340,7 +345,7 @@ def revisar(request):
         if resumen["advertencias"]:
             registrar("plantilla_aceptada_con_advertencias", datos={"advertencias": resumen["advertencias"]}, request=request)
         _aplicar_plantilla(request, datos, "importada")
-        return redirect("asistente:marca")
+        return _seguir(request, "marca")
     return _paso(request, "asistente/revisar.html", formulario, "inicio", "Revisa la plantilla antes de aplicarla", resumen=resumen, nombre=datos["nombre"])
 
 
@@ -387,7 +392,7 @@ def personalizar(request):
         _guardar_estado(request, recargos=recargos)
         if request.POST.get("seguir") == "agregar":
             return redirect("asistente:personalizar")
-        return redirect("asistente:grupos")
+        return _seguir(request, "grupos")
     return _paso(request, "asistente/personalizar.html", formulario, "personalizar", "Revisar vocabulario y conceptos")
 
 
@@ -400,7 +405,7 @@ def grupos(request):
     if request.method == "POST" and request.POST.get("omitir"):
         _guardar_estado(request, por_grupo=False)
         registrar("asistente_grupos_omitido", request=request)
-        return redirect("asistente:conceptos")
+        return _seguir(request, "conceptos")
     textos = _textos(request)
     actuales = list(Agrupacion.objects.filter(activa=True).values_list("nombre", flat=True))
     formulario = FormularioAsistenteGrupos(request.POST if request.method == "POST" else None, textos=textos, nombres=actuales, por_grupo=bool(_estado(request).get("por_grupo")))
@@ -424,7 +429,7 @@ def _guardar_grupos(request, formulario):
             quitar_tarifas()
         _guardar_estado(request, por_grupo=por_grupo)
         registrar("asistente_grupos", datos={"por_grupo": por_grupo, "nombres": nombres}, request=request)
-    return redirect("asistente:conceptos")
+    return _seguir(request, "conceptos")
 
 
 def _con_fila_igual(datos, lista, agrupaciones):
@@ -458,7 +463,7 @@ def conceptos(request):
     if request.method == "POST" and not igual and formulario.is_valid():
         _olvidar(request, "conceptos")
         _guardar_conceptos(request, formulario, lista)
-        return redirect("asistente:pago")
+        return _seguir(request, "pago")
     return _paso(request, "asistente/conceptos.html", formulario, "conceptos", "¿Cuánto cobras?" if por_grupo else "Importes de los conceptos", omitir="asistente:pago")
 
 
@@ -501,7 +506,7 @@ def marca(request):
     actual = marca_negocio.actual()
     if request.method == "POST" and request.POST.get("omitir"):
         registrar("asistente_marca_omitida", request=request)
-        return redirect("asistente:personalizar")
+        return _seguir(request, "personalizar")
     inicial = {"color_principal": actual.color_principal if actual else "", "color_acento": actual.color_acento if actual else ""}
     propuesta = _estado(request).get("propuesta_marca")
     if propuesta:
@@ -526,7 +531,7 @@ def marca(request):
                     if principal:
                         marca_negocio.guardar_colores(principal, acento, None, request)
                     _guardar_estado(request, propuesta_marca=None)
-                    return redirect("asistente:personalizar")
+                    return _seguir(request, "personalizar")
         except marca_negocio.MarcaInvalida as error:
             registrar("marca_rechazada", datos={"accion": "asistente", "motivo": str(error)}, request=request)
             (logo if request.POST.get("accion") == "logo" else colores).add_error(None, str(error))
@@ -574,7 +579,7 @@ def pago(request):
         _olvidar(request, "pago")
         guardada = guardar_cuenta(formulario, None, cuenta=actual, request=request, forzar_principal=True)
         avisar_banco(request, formulario, guardada)
-        return redirect("asistente:caja")
+        return _seguir(request, "caja")
     return _paso(request, "asistente/pago.html", formulario, "pago", "Datos de pago (opcional)")
 
 
@@ -600,7 +605,7 @@ def caja(request):
                     Denominacion.objects.get_or_create(valor=valor, defaults={"tipo": tipo})
                 registrar("asistente_denominaciones", datos={"moneda": negocio.moneda, "denominaciones": piezas.cleaned_data["denominaciones"]}, request=request)
             registrar("asistente_caja", datos={"cambios": diferencias(antes, valores_caja()), "origen": "asistente"}, request=request)
-        return redirect("asistente:reglas")
+        return _seguir(request, "reglas")
     return _paso(request, "asistente/caja.html", formulario, "caja", "Caja: cortes y retiros", piezas=piezas, denominaciones=list(Denominacion.objects.filter(activa=True)))
 
 
@@ -615,14 +620,14 @@ def reglas(request):
     _recordar(request, "reglas", formulario)
     if request.method == "POST" and request.POST.get("omitir"):
         registrar("asistente_reglas_omitidas", request=request)
-        return redirect("asistente:cortes")
+        return _seguir(request, "cortes")
     if request.method == "POST" and formulario.is_valid():
         _olvidar(request, "reglas")
         with transaction.atomic():
             for clave, valor in formulario.valores().items():
                 Parametro.objects.update_or_create(clave=clave, defaults={"valor": str(valor)})
             registrar("asistente_reglas", datos={"cambios": diferencias(antes, valores_reglas()), "origen": "asistente"}, request=request)
-        return redirect("asistente:cortes")
+        return _seguir(request, "cortes")
     return _paso(request, "asistente/paso.html", formulario, "reglas", "Reglas del negocio (opcional)", omitir=True)
 
 
@@ -635,7 +640,7 @@ def cortes(request):
         return _atras(request, "cortes")
     if request.method == "POST" and request.POST.get("omitir"):
         registrar("asistente_cortes_omitido", request=request)
-        return redirect("asistente:usuario")
+        return _seguir(request, "usuario")
     niveles = {d.tipo: d.nivel for d in DefinicionCorte.objects.all()}
     pendiente = Negocio.objects.filter(pk=1, clave_recuperacion_pendiente=True).exists()
     formulario = FormularioAsistenteCortes(
@@ -671,7 +676,7 @@ def cortes(request):
                 Negocio.objects.filter(pk=1).update(clave_recuperacion_pendiente=False)
                 registrar("clave_recuperacion_guardada", objeto=negocio, request=request)
             registrar("asistente_cortes", datos={"entrega": bool(datos["carpeta_entrega"]), "respaldo": bool(datos["carpeta_respaldo"]), "carpeta_banco": bool(datos["carpeta_banco"])}, request=request)
-        return redirect("asistente:usuario")
+        return _seguir(request, "usuario")
     contexto = {"texto_clave": sobre.clave_a_texto(clave_respaldo()) if pendiente else ""}
     respuesta = _paso(request, "asistente/cortes.html", formulario, "cortes", "Entrega y respaldo", **contexto)
     respuesta["Cache-Control"] = "no-store"
@@ -705,7 +710,7 @@ def usuario(request):
                 registrar("usuario_creado", objeto=nuevo, datos={"usuario": nuevo.usuario, "rol": rol.pk, "origen": "asistente"}, request=request)
                 previo = _secreto(request) if _estado(request).get("usuario") == nuevo.pk else ""
                 _guardar_estado(request, secreto=previo or totp.generar_secreto(), usuario=nuevo.pk)
-            return redirect("asistente:codigo")
+            return _seguir(request, "codigo")
     rol = _estado(request).get("rol_inicial") or ""
     return _paso(request, "asistente/paso.html", formulario, "usuario", f"Primer usuario ({rol})" if rol else "Primer usuario")
 

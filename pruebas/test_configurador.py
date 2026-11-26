@@ -99,3 +99,12 @@ def test_con_el_negocio_sin_configurar_un_equipo_nuevo_desplaza_al_pendiente_mas
     Negocio.objects.filter(pk=1).update(configurado=True)
     Dispositivo.objects.create(hash_credencial="f" * 64, codigo="ABC123")
     assert Client().get(reverse("entrar")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_al_terminar_un_paso_se_guarda_el_siguiente_aunque_no_se_abra():
+    c = instalar_hasta_grupos()
+    c.post(reverse("asistente:marca"), {"omitir": "1"})
+    c.post(reverse("asistente:personalizar"), {"titular": "Socio", "titulares": "Socios", "matricula": "Número", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas", "seguir": "continuar"})
+    c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
+    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:grupos")
