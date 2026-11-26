@@ -459,7 +459,7 @@ def test_paso_de_marca_del_asistente(limpio):
     assert "Colores tomados del logo" in pagina and reverse("asistente:vista_marca") in pagina and reverse("asistente:logo") in pagina
     assert c.get(reverse("asistente:logo")).status_code == 200
     propuesta = colores_logo.proponer(_logo_fondo_blanco())
-    assert c.post(reverse("asistente:marca"), {"accion": "colores", "color_principal": propuesta["principal"], "color_acento": propuesta["acento"]}).url == reverse("asistente:pago")
+    assert c.post(reverse("asistente:marca"), {"accion": "colores", "color_principal": propuesta["principal"], "color_acento": propuesta["acento"]}).url == reverse("asistente:personalizar")
     actual = marca.actual()
     assert (actual.color_principal, actual.color_acento) == (propuesta["principal"], propuesta["acento"]) and actual.logo
     assert "--primario" in c.get(reverse("asistente:vista_marca") + "?p=112233&a=445566").content.decode()

@@ -1,0 +1,23 @@
+{% extends "asistente/_base.html" %}
+{% block asistente %}
+<form method="post" class="pila" novalidate>
+  {% csrf_token %}
+  <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Continuar</button>
+  {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  <fieldset class="panel opciones-grupo">
+    <legend class="solo-lectores">{{ formulario.por_grupo.label }}</legend>
+    <div class="pila junta">
+      {% for opcion, detalle in formulario.opciones %}<label class="opcion">{{ opcion.tag }}<span><span class="opcion-titulo">{{ opcion.choice_label }}</span><span class="opcion-detalle">{{ detalle }}</span></span></label>{% endfor %}
+    </div>
+    {% for e in formulario.por_grupo.errors %}<p class="error">{{ e }}</p>{% endfor %}
+  </fieldset>
+  <section class="panel" data-depende-de="por_grupo" data-mostrar-si="si">
+    <h2>{{ lista_titulo }}</h2>
+    <div class="rejilla">
+      {% for campo in formulario.casillas %}<div class="campo{% if campo.errors %} con-error{% endif %}">{{ campo.label_tag }} {{ campo }}{% for e in campo.errors %}<p class="error">{{ e }}</p>{% endfor %}</div>{% endfor %}
+    </div>
+    <div class="acciones"><button class="boton secundario" type="submit" name="accion" value="otro" formnovalidate>{{ agregar }}</button></div>
+  </section>
+  <div class="acciones">{% include "asistente/_atras.html" %}<button class="boton grande" type="submit">Continuar</button><button class="boton secundario" type="submit" name="omitir" value="1" formnovalidate>Omitir por ahora</button></div>
+</form>
+{% endblock %}

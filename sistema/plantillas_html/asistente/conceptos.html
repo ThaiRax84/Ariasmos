@@ -4,10 +4,32 @@
   {% csrf_token %}
   <button type="submit" class="envio-por-omision" tabindex="-1" aria-hidden="true">Continuar</button>
   {% if formulario.non_field_errors %}<div class="errores" role="alert">{% for e in formulario.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+  {% if formulario.agrupaciones %}
+  <section class="panel">
+    <div class="desplazable" role="region" aria-label="Importes por grupo" tabindex="0">
+      <table class="tabla-importes">
+        <thead><tr><th scope="col">Concepto</th>{% for agrupacion in formulario.agrupaciones %}<th scope="col">{{ agrupacion.nombre }}</th>{% endfor %}<th scope="col"><span class="solo-lectores">Acción</span></th></tr></thead>
+        <tbody>
+          {% for grupo in formulario.grupos %}
+          <tr>
+            <th scope="row"><strong>{{ grupo.concepto.nombre }}</strong><span class="detalle">{{ grupo.concepto.get_tipo_display }}{% if grupo.concepto.periodicidad %} · {{ grupo.concepto.get_periodicidad_display|lower }}{% endif %}</span></th>
+            {% for celda in grupo.celdas %}<td><label class="solo-lectores" for="{{ celda.id_for_label }}">{{ celda.label }}</label>{{ celda }}{% for e in celda.errors %}<p class="error">{{ e }}</p>{% endfor %}</td>{% endfor %}
+            <td><button class="boton secundario chico" type="submit" name="igual" value="{{ grupo.concepto.pk }}" formnovalidate>Igual para todos</button></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="{{ formulario.agrupaciones|length|add:2 }}">La plantilla no trae conceptos. Agrégalos con «Agregar concepto».</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="acciones"><a class="boton secundario" href="{% url 'asistente:personalizar' %}">Agregar concepto</a></div>
+  </section>
+  {% endif %}
   {% for grupo in formulario.grupos %}
+  {% if grupo.campos or grupo.recargo %}
   <section class="panel concepto-asistente">
     <h2>{{ grupo.concepto.nombre }}</h2>
-    <p class="ayuda">{{ grupo.concepto.get_tipo_display }}{% if grupo.concepto.periodicidad %} · {{ grupo.concepto.get_periodicidad_display|lower }}{% endif %}</p>
+    {% if not formulario.agrupaciones %}<p class="ayuda">{{ grupo.concepto.get_tipo_display }}{% if grupo.concepto.periodicidad %} · {{ grupo.concepto.get_periodicidad_display|lower }}{% endif %}</p>{% endif %}
     <div class="rejilla">{% for campo in grupo.campos %}{% include "comun/_campo.html" %}{% endfor %}</div>
     {% if grupo.recargo %}
     <fieldset class="recargo">
@@ -16,6 +38,7 @@
     </fieldset>
     {% endif %}
   </section>
+  {% endif %}
   {% empty %}
   <p class="ayuda">La plantilla no trae conceptos. Agrégalos después en Configuración.</p>
   {% endfor %}

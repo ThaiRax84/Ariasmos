@@ -108,5 +108,5 @@ def test_resumen_de_plantilla_importada_con_advertencias(db):
     assert "Advertencias" in pagina and "puede administrar usuarios" in pagina and "sin aprobación de nadie" in pagina
     assert c.post(reverse("asistente:revisar"), {}).status_code == 200
     assert vocabulario()["titular"] == "Titular" and Negocio.objects.get().plantilla == "importada"
-    assert c.post(reverse("asistente:revisar"), {"confirmo": "on"}).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:revisar"), {"confirmo": "on"}).url == reverse("asistente:marca")
     assert vocabulario()["titular"] == "Cliente"

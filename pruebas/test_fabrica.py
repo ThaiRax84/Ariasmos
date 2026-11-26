@@ -108,7 +108,7 @@ def correr_asistente(plantilla):
     datos = paso_inicio(settings.TOKEN_ASISTENTE, plantilla)
     datos["inventario"] = "on"
     assert c.post(reverse("asistente:inicio"), datos).status_code == 302
-    for paso, extra in (("personalizar", {"seguir": "continuar"}), ("conceptos", {}), ("caja", {}), ("reglas", {})):
+    for paso, extra in (("personalizar", {"seguir": "continuar"}), ("grupos", {}), ("conceptos", {}), ("caja", {}), ("reglas", {})):
         pagina = c.get(reverse(f"asistente:{paso}"))
         sin_5xx(pagina)
         if paso == "caja":

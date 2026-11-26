@@ -53,29 +53,31 @@ def test_asistente_completo_deja_instalacion_usable():
     respuesta = c.post(reverse("asistente:inicio"), paso_inicio("token-equivocado"))
     assert respuesta.status_code == 200 and not Negocio.objects.exists()
     assert c.get(reverse("asistente:conceptos")).url == reverse("asistente:inicio")
-    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE)).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE)).url == reverse("asistente:marca")
     negocio = Negocio.objects.get()
     assert (negocio.longitud_matricula, negocio.sede, negocio.ranuras) == (7, 0, 10)
+    assert "Tu negocio, paso 2 de 2" in c.get(reverse("asistente:marca")).content.decode()
+    assert c.post(reverse("asistente:marca"), {"omitir": "1"}).url == reverse("asistente:personalizar")
     assert "Usar tal cual" in c.get(reverse("asistente:personalizar")).content.decode()
+    assert c.post(reverse("asistente:grupos"), {"por_grupo": "no"}).url == reverse("asistente:conceptos")
     colegiatura = ConceptoCobro.objects.get(tipo="recurrente")
     datos = {f"importe_{c_.pk}": "100" for c_ in ConceptoCobro.objects.all()}
     datos.update({f"importe_{colegiatura.pk}": "1500.50", f"dia_{colegiatura.pk}": 10, f"recargo_tipo_{colegiatura.pk}": "porcentaje", f"recargo_porcentaje_{colegiatura.pk}": "10", f"recargo_gracia_{colegiatura.pk}": 3})
-    assert c.post(reverse("asistente:conceptos"), datos).url == reverse("asistente:marca")
-    assert "paso 4 de 10" in c.get(reverse("asistente:marca")).content.decode()
-    assert c.post(reverse("asistente:marca"), {"omitir": "1"}).url == reverse("asistente:pago")
+    assert c.post(reverse("asistente:conceptos"), datos).url == reverse("asistente:pago")
+    assert "Cómo cobras, paso 1 de 3" in c.get(reverse("asistente:pago")).content.decode()
     colegiatura.refresh_from_db()
     assert colegiatura.importe_centavos == 150050 and colegiatura.dia_vencimiento == 10 and colegiatura.regla_recargo.valor == 1000
     respuesta = c.post(reverse("asistente:pago"), {"clabe": "002 010 07777777777 1", "beneficiario": "Mi negocio SA", "medios": [], "referencia_en": "ambos", "contacto_dudas": "55 1234 5678"})
     assert respuesta.url == reverse("asistente:caja")
     pagina_caja = c.get(reverse("asistente:caja")).content.decode()
-    assert "paso 6 de 10" in pagina_caja and 'name="corte_0" value="18:00"' in pagina_caja and 'name="corte_6"' in pagina_caja and 'name="corte_6" value=' not in pagina_caja
+    assert "Cómo cobras, paso 2 de 3" in pagina_caja and 'name="corte_0" value="18:00"' in pagina_caja and 'name="corte_6"' in pagina_caja and 'name="corte_6" value=' not in pagina_caja
     caja = {f"corte_{dia}": "18:00" for dia in range(6)}
     caja.update({"corte_5": "14:00", "periodo_retiros": "semana", "tope_retiro_individual": "500", "tope_retiros_periodo": "2,000", "maximo_retiros_periodo": "5", "maximo_efectivo_caja": "0", "dias_retiro_sin_revisar": "3", "control_denominaciones": "on"})
     assert c.post(reverse("asistente:caja"), caja).url == reverse("asistente:reglas")
     assert c.post(reverse("asistente:reglas"), {"omitir": "1"}).url == reverse("asistente:cortes")
     assert calendario.actual() == {"0": "18:00", "1": "18:00", "2": "18:00", "3": "18:00", "4": "18:00", "5": "14:00"}
     assert (parametro("tope_retiro_individual"), parametro("tope_retiros_periodo"), parametro("maximo_retiros_periodo"), parametro("control_denominaciones"), parametro("periodo_retiros")) == (50000, 200000, 5, 1, "semana")
-    assert "paso 8 de 10" in c.get(reverse("asistente:cortes")).content.decode()
+    assert "Seguridad y arranque, paso 1 de 3" in c.get(reverse("asistente:cortes")).content.decode()
     assert "Clave de recuperación" in c.get(reverse("asistente:cortes")).content.decode()
     assert c.post(reverse("asistente:cortes"), {"omitir": "1"}).url == reverse("asistente:usuario")
     cuenta = CuentaBancaria.objects.get()
@@ -109,11 +111,12 @@ def test_personalizar_vocabulario_y_conceptos():
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
     quitar = ConceptoCobro.objects.get(nombre="Otro cargo")
     datos = {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas", f"quitar_{quitar.pk}": "on", "nuevo_nombre": "Cuota anual", "nuevo_tipo": "recurrente", "nuevo_periodicidad": "anual", "nuevo_aplica_a": "todos", "nuevo_recargo": "on", "seguir": "continuar"}
-    assert c.post(reverse("asistente:personalizar"), datos).url == reverse("asistente:conceptos")
+    assert c.post(reverse("asistente:personalizar"), datos).url == reverse("asistente:grupos")
     assert vocabulario()["titular"] == "Socio"
     assert not ConceptoCobro.objects.filter(nombre="Otro cargo").exists()
     nuevo = ConceptoCobro.objects.get(nombre="Cuota anual")
     assert nuevo.periodicidad == "anual"
+    c.post(reverse("asistente:grupos"), {"por_grupo": "no"})
     assert f'name="recargo_importe_{nuevo.pk}"' in c.get(reverse("asistente:conceptos")).content.decode()
 
 
@@ -131,10 +134,11 @@ def test_importar_plantilla_de_punta_a_punta():
     assert not ConceptoCobro.objects.filter(nombre="Membresía").exists()
     resumen = c.get(reverse("asistente:revisar")).content.decode()
     assert "Gimnasio de ejemplo" in resumen and "Quién hace cada cosa" in resumen
-    assert c.post(reverse("asistente:revisar"), {}).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:revisar"), {}).url == reverse("asistente:marca")
     assert Negocio.objects.get().plantilla == "importada"
     assert vocabulario()["titular"] == "Miembro"
     membresia = ConceptoCobro.objects.get(nombre="Membresía")
+    c.post(reverse("asistente:grupos"), {"por_grupo": "no"})
     pagina = c.get(reverse("asistente:conceptos")).content.decode()
     assert f'name="recargo_importe_{membresia.pk}"' in pagina
     assert terminar(c).url == reverse("primeros_pasos")
@@ -149,7 +153,7 @@ def test_enter_en_cada_formulario_del_asistente_hace_la_accion_principal():
     pago = {"clabe": "002 010 07777777777 1", "beneficiario": "Mi negocio SA", "medios": [], "referencia_en": "ambos", "contacto_dudas": "55 1234 5678"}
     caja = {f"corte_{dia}": "18:00" for dia in range(6)}
     caja.update({"periodo_retiros": "semana", "tope_retiro_individual": "500", "tope_retiros_periodo": "2,000", "maximo_retiros_periodo": "5", "maximo_efectivo_caja": "0", "dias_retiro_sin_revisar": "3", "control_denominaciones": "on"})
-    avance = [("conceptos", {f"importe_{c_.pk}": "100" for c_ in ConceptoCobro.objects.all()} | {f"dia_{colegiatura.pk}": 10}), ("marca", {"omitir": "1"}), ("pago", pago), ("caja", caja), ("reglas", {"omitir": "1"}), ("cortes", {"omitir": "1"})]
+    avance = [("marca", {"omitir": "1"}), ("grupos", {"por_grupo": "no"}), ("conceptos", {f"importe_{c_.pk}": "100" for c_ in ConceptoCobro.objects.all()} | {f"dia_{colegiatura.pk}": 10}), ("pago", pago), ("caja", caja), ("reglas", {"omitir": "1"}), ("cortes", {"omitir": "1"})]
     for nombre, datos in avance:
         pagina = c.get(reverse(f"asistente:{nombre}")).content.decode()
         for formulario in re.findall(r"<form.*?</form>", pagina, re.S):
@@ -166,14 +170,15 @@ def test_otra_plantilla_en_inicio_se_aplica_y_la_misma_no_pisa_lo_personalizado(
     c = Client()
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico"))
     c.post(reverse("asistente:personalizar"), {"titular": "Socio", "titulares": "Socios", "matricula": "Número de socio", "agrupacion": "Grupo", "agrupaciones": "Grupos", "familia": "Cuenta", "familias": "Cuentas"})
+    c.post(reverse("asistente:grupos"), {"por_grupo": "no"})
     c.cookies.pop(settings.SESSION_COOKIE_NAME, None)
     assert c.get(reverse("asistente:conceptos")).status_code == 200
     c.cookies.clear()
     assert c.get(reverse("asistente:conceptos")).url == reverse("asistente:inicio")
     assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "generico")).url == reverse("asistente:conceptos")
     assert vocabulario()["titular"] == "Socio"
-    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:personalizar")
-    assert vocabulario()["titular"] == "Alumno" and AvanceAsistente.objects.get().paso == "personalizar"
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:marca")
+    assert vocabulario()["titular"] == "Alumno" and AvanceAsistente.objects.get().paso == "marca"
 
 
 @pytest.mark.django_db
@@ -219,6 +224,6 @@ def test_importada_se_reanuda_con_el_mismo_archivo_y_otra_plantilla_retira_al_us
     assert c.get(reverse("asistente:inicio")).url == reverse("asistente:codigo")
     assert subir_importada(c, contenido).url == reverse("asistente:codigo")
     assert secreto_del_asistente() == secreto
-    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, "escuela")).url == reverse("asistente:marca")
     assert not Usuario.objects.filter(usuario="jefa").exists() and AvanceAsistente.objects.get().secreto_cifrado == ""
-    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:personalizar")
+    assert c.get(reverse("asistente:inicio")).url == reverse("asistente:marca")

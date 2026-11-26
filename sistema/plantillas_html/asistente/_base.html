@@ -4,17 +4,24 @@
 {% block barra %}
 <header class="barra">
   <span class="marcas"><span class="marca-ariasmos"><img class="medallon" src="{% static 'marca/grifo-medallon.jpg' %}" alt="" width="46" height="46"><span class="nombre-ariasmos">ARIASMOS</span></span><span class="separador-marcas"></span><span class="instalacion-titulo">Instalación</span></span>
-  <span class="instalacion-paso">Instalación · paso {{ paso }} de {{ total }}</span>
+  <span class="instalacion-paso">Instalación · {{ bloque }}, paso {{ paso_bloque }} de {{ total_bloque }}</span>
 </header>
 {% endblock %}
 {% block contenido %}
 <div class="asistente">
-  <ol class="pasos" aria-label="Pasos de la instalación">
-    {% for nombre, enlace in pasos_enlaces %}<li class="{% if forloop.counter < paso %}hecho{% elif forloop.counter == paso %}actual{% endif %}"{% if forloop.counter == paso %} aria-current="step"{% endif %}><span class="numero">{% if forloop.counter < paso %}✓{% else %}{{ forloop.counter }}{% endif %}</span>{% if enlace %}<a href="{% url enlace %}">{{ nombre }}</a>{% else %}{{ nombre }}{% endif %}</li>{% endfor %}
-  </ol>
+  <nav class="bloques" aria-label="Pasos de la instalación">
+    {% for bloque_pasos in bloques %}
+    <section class="bloque-pasos">
+      <h2 class="bloque-titulo">{{ bloque_pasos.nombre }}</h2>
+      <ol class="pasos">
+        {% for p in bloque_pasos.pasos %}<li class="{% if p.numero < paso %}hecho{% elif p.numero == paso %}actual{% endif %}"{% if p.numero == paso %} aria-current="step"{% endif %}><span class="numero">{% if p.numero < paso %}✓{% else %}{{ p.numero }}{% endif %}</span>{% if p.enlace %}<a href="{% url p.enlace %}">{{ p.nombre }}</a>{% else %}{{ p.nombre }}{% endif %}</li>{% endfor %}
+      </ol>
+    </section>
+    {% endfor %}
+  </nav>
   <div class="asistente-cuerpo">
     <div class="encabezado-texto">
-      <span class="antetitulo">Paso {{ paso }} de {{ total }}</span>
+      <span class="antetitulo">{{ bloque }}, paso {{ paso_bloque }} de {{ total_bloque }}</span>
       <h1>{{ titulo }}</h1>
       {% if intro %}<p class="subtitulo">{{ intro }}</p>{% endif %}
     </div>

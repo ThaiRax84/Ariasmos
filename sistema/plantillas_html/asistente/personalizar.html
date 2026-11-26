@@ -1,6 +1,6 @@
 {% extends "asistente/_base.html" %}
 {% block asistente %}
-<div class="acciones"><a class="boton grande" href="{% url 'asistente:conceptos' %}">Usar tal cual</a></div>
+<div class="acciones"><a class="boton secundario" href="{% url 'asistente:marca' %}">Atrás</a><a class="boton grande" href="{% url 'asistente:grupos' %}">Usar tal cual</a></div>
 <details class="panel mas-opciones" data-abrir-con-error{% if formulario.is_bound %} open{% endif %}>
   <summary>Personalizar vocabulario y conceptos</summary>
   <p class="ayuda">Cambia cómo se llama cada cosa en tu negocio, quita los conceptos que no uses o agrega uno nuevo.</p>

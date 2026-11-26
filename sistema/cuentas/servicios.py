@@ -43,8 +43,14 @@ def hay_cupo_pendientes():
     return Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE).count() < parametro("maximo_equipos_pendientes")
 
 
+def descartar_pendiente_mas_viejo():
+    viejo = Dispositivo.objects.filter(estado=Dispositivo.PENDIENTE, avance__isnull=True).order_by("creado", "pk").first()
+    return viejo is not None and bool(viejo.delete())
+
+
 def registrar_dispositivo(request):
-    if not hay_cupo_pendientes():
+    instalando = not getattr(request, "instalacion_configurada", True)
+    if not hay_cupo_pendientes() and not (instalando and descartar_pendiente_mas_viejo()):
         return None, None
     credencial = secrets.token_urlsafe(32)
     codigo = "".join(secrets.choice(ALFABETO_CODIGO) for _ in range(6))

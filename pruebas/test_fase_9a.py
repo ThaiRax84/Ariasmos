@@ -86,7 +86,7 @@ def test_asistente_propone_la_zona_y_la_valida(monkeypatch):
     datos["zona_horaria"] = "Marte/Olimpo"
     assert c.post(reverse("asistente:inicio"), datos).status_code == 200 and not Negocio.objects.exists()
     datos["zona_horaria"] = "Europe/Madrid"
-    assert c.post(reverse("asistente:inicio"), datos).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:inicio"), datos).url == reverse("asistente:marca")
     assert Negocio.objects.get().zona_horaria == "Europe/Madrid"
 
 
@@ -277,7 +277,7 @@ def test_otras_listas_ofrecen_su_orden(personas):
 @pytest.mark.django_db
 def test_asistente_atras_no_pierde_lo_capturado_y_pliega_lo_avanzado():
     c = Client()
-    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE)).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE)).url == reverse("asistente:marca")
     personalizar = c.get(reverse("asistente:personalizar")).content.decode()
     assert 'name="atras"' not in personalizar
     caja_pagina = c.get(reverse("asistente:caja")).content.decode()
@@ -299,7 +299,7 @@ def test_asistente_atras_no_pierde_lo_capturado_y_pliega_lo_avanzado():
 def test_cada_paso_del_asistente_dice_para_que_sirve():
     c = Client()
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE))
-    for paso in ("personalizar", "conceptos", "marca", "pago", "caja", "reglas", "cortes", "usuario"):
+    for paso in ("marca", "personalizar", "grupos", "conceptos", "pago", "caja", "reglas", "cortes", "usuario"):
         pagina = c.get(reverse(f"asistente:{paso}")).content.decode()
         assert re.search(r'<p class="subtitulo">[^<]{20,}</p>', pagina), paso
 

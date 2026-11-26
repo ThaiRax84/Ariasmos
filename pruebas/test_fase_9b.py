@@ -567,7 +567,7 @@ def test_el_asistente_trae_las_reglas_de_arranque_solo_en_instalacion_nueva():
 
     Negocio.objects.filter(pk=1).update(configurado=False)
     c = Client()
-    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE)).url == reverse("asistente:personalizar")
+    assert c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE)).url == reverse("asistente:marca")
     assert set(ReglaRezago.objects.values_list("texto", flat=True)) == {"Pago atrasado", "No puede pasar"}
     c.post(reverse("asistente:inicio"), paso_inicio(settings.TOKEN_ASISTENTE, plantilla="gimnasio"))
     assert ReglaRezago.objects.count() == 2
